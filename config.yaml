@@ -1,0 +1,174 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+
+log:
+  level: "info"
+  output: "stdout"
+
+mcp:
+  enabled: true
+  host: "0.0.0.0"
+  port: 8081
+
+openai:
+  api_key: "sk-xxx"  # 请设置您的OpenAI API Key
+  base_url: "https://api.deepseek.com/v1"
+  model: "deepseek-chat"
+
+database:
+  path: "data/conversations.db"
+
+security:
+  tools:
+    # 示例1: 使用参数定义的工具（推荐方式）
+    - name: "nmap"
+      command: "nmap"
+      args: ["-sT", "-sV", "-sC"]  # 固定参数
+      description: "网络扫描工具，用于发现网络主机和服务"
+      enabled: true
+      parameters:
+        - name: "target"
+          type: "string"
+          description: "目标IP地址或域名"
+          required: true
+          position: 0  # 位置参数，放在最后
+          format: "positional"
+        - name: "ports"
+          type: "string"
+          description: "端口范围，例如: 1-1000, 80,443,8080"
+          required: false
+          flag: "-p"
+          format: "flag"
+    
+    # 示例2: 标志参数工具
+    - name: "sqlmap"
+      command: "sqlmap"
+      description: "SQL注入检测和利用工具"
+      enabled: true
+      parameters:
+        - name: "url"
+          type: "string"
+          description: "目标URL，例如: http://example.com/page?id=1"
+          required: true
+          flag: "-u"
+          format: "flag"
+        - name: "batch"
+          type: "bool"
+          description: "非交互模式"
+          required: false
+          default: true
+          flag: "--batch"
+          format: "flag"
+        - name: "level"
+          type: "int"
+          description: "测试级别 (1-5)"
+          required: false
+          default: 3
+          flag: "--level"
+          format: "combined"  # --level=3
+    
+    # 示例3: 位置参数工具
+    - name: "nikto"
+      command: "nikto"
+      description: "Web服务器扫描工具"
+      enabled: true
+      parameters:
+        - name: "target"
+          type: "string"
+          description: "目标URL或IP地址"
+          required: true
+          flag: "-h"
+          format: "flag"
+    
+    # 示例4: 简单位置参数
+    - name: "dirb"
+      command: "dirb"
+      description: "Web目录扫描工具"
+      enabled: true
+      parameters:
+        - name: "url"
+          type: "string"
+          description: "目标URL"
+          required: true
+          position: 0
+          format: "positional"
+        - name: "wordlist"
+          type: "string"
+          description: "字典文件路径"
+          required: false
+          flag: "-w"
+          format: "flag"
+    
+    # 示例5: 执行系统命令
+    - name: "exec"
+      command: "sh"
+      args: ["-c"]
+      description: "执行系统命令（谨慎使用）"
+      enabled: true
+      parameters:
+        - name: "command"
+          type: "string"
+          description: "要执行的系统命令"
+          required: true
+          position: 0
+          format: "positional"
+        - name: "shell"
+          type: "string"
+          description: "使用的shell（可选，默认为sh）"
+          required: false
+          default: "sh"
+        - name: "workdir"
+          type: "string"
+          description: "工作目录"
+          required: false
+    
+    # 示例6: 自定义工具 - 使用模板格式
+    - name: "custom_scanner"
+      command: "my-scanner"
+      description: "自定义扫描工具示例"
+      enabled: false  # 默认禁用，需要时启用
+      parameters:
+        - name: "target"
+          type: "string"
+          description: "扫描目标"
+          required: true
+          flag: "--target"
+          format: "flag"
+        - name: "mode"
+          type: "string"
+          description: "扫描模式"
+          required: false
+          default: "normal"
+          options: ["normal", "aggressive", "stealth"]  # 枚举值
+          flag: "--mode"
+          format: "combined"  # --mode=normal
+        - name: "threads"
+          type: "int"
+          description: "线程数"
+          required: false
+          default: 10
+          flag: "-t"
+          format: "flag"
+        - name: "output"
+          type: "string"
+          description: "输出文件路径"
+          required: false
+          flag: "-o"
+          format: "template"
+          template: "-o {value}"  # 自定义模板
+        - name: "verbose"
+          type: "bool"
+          description: "详细输出"
+          required: false
+          default: false
+          flag: "-v"
+          format: "flag"  # 布尔值：如果为true，只添加-v，不添加值
+    
+    # 示例7: 向后兼容 - 不定义parameters，使用旧的硬编码逻辑
+    # - name: "legacy_tool"
+    #   command: "legacy"
+    #   args: ["--option"]
+    #   description: "旧工具（使用硬编码逻辑）"
+    #   enabled: false
+

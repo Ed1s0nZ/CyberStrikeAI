@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberStrikeAI - 自主渗透测试平台</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div class="logo">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <h1>CyberStrike</h1>
+                </div>
+                <p class="header-subtitle">安全测试平台</p>
+            </div>
+        </header>
+
+        <div class="main-layout">
+            <!-- 历史对话侧边栏 -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <button class="new-chat-btn" onclick="startNewConversation()">
+                        <span>+</span> 新对话
+                    </button>
+                </div>
+                <div class="sidebar-content">
+                    <div class="sidebar-title">历史对话</div>
+                    <div id="conversations-list" class="conversations-list"></div>
+                </div>
+            </aside>
+
+            <!-- 对话界面 -->
+            <div class="chat-container">
+                <div id="chat-messages" class="chat-messages"></div>
+                <div class="chat-input-container">
+                    <input type="text" id="chat-input" placeholder="输入测试目标或命令..." />
+                    <button onclick="sendMessage()">发送</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MCP调用详情模态框 -->
+    <div id="mcp-detail-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>工具调用详情</h2>
+                <span class="modal-close" onclick="closeMCPDetail()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="detail-section">
+                    <h3>执行信息</h3>
+                    <div class="detail-item">
+                        <strong>工具:</strong> <span id="detail-tool-name"></span>
+                    </div>
+                    <div class="detail-item">
+                        <strong>状态:</strong> <span id="detail-status"></span>
+                    </div>
+                    <div class="detail-item">
+                        <strong>时间:</strong> <span id="detail-time"></span>
+                    </div>
+                    <div class="detail-item">
+                        <strong>ID:</strong> <span id="detail-execution-id" style="font-family: monospace; font-size: 0.8125rem; color: var(--text-secondary);"></span>
+                    </div>
+                </div>
+                <div class="detail-section">
+                    <h3>请求参数</h3>
+                    <pre id="detail-request" class="code-block"></pre>
+                </div>
+                <div class="detail-section">
+                    <h3>响应结果</h3>
+                    <pre id="detail-response" class="code-block"></pre>
+                </div>
+                <div class="detail-section" id="detail-error-section" style="display: none;">
+                    <h3>错误信息</h3>
+                    <pre id="detail-error" class="code-block error"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
+
