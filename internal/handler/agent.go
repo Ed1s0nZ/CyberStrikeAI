@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -171,15 +172,43 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	c.Header("X-Accel-Buffering", "no") // 禁用nginx缓冲
 
 	// 发送初始事件
+	// 用于跟踪客户端是否已断开连接
+	clientDisconnected := false
+	
 	sendEvent := func(eventType, message string, data interface{}) {
+		// 如果客户端已断开，不再发送事件
+		if clientDisconnected {
+			return
+		}
+		
+		// 检查请求上下文是否被取消（客户端断开）
+		select {
+		case <-c.Request.Context().Done():
+			clientDisconnected = true
+			return
+		default:
+		}
+		
 		event := StreamEvent{
 			Type:    eventType,
 			Message: message,
 			Data:    data,
 		}
 		eventJSON, _ := json.Marshal(event)
-		fmt.Fprintf(c.Writer, "data: %s\n\n", eventJSON)
-		c.Writer.Flush()
+		
+		// 尝试写入事件，如果失败则标记客户端断开
+		if _, err := fmt.Fprintf(c.Writer, "data: %s\n\n", eventJSON); err != nil {
+			clientDisconnected = true
+			h.logger.Debug("客户端断开连接，停止发送SSE事件", zap.Error(err))
+			return
+		}
+		
+		// 刷新响应，如果失败则标记客户端断开
+		if flusher, ok := c.Writer.(http.Flusher); ok {
+			flusher.Flush()
+		} else {
+			c.Writer.Flush()
+		}
 	}
 
 	// 如果没有对话ID，创建新对话
@@ -245,9 +274,14 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 		}
 	}
 
-	// 执行Agent Loop，传入进度回调
+	// 创建一个独立的上下文用于任务执行，不随HTTP请求取消
+	// 这样即使客户端断开连接（如刷新页面），任务也能继续执行
+	taskCtx, taskCancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer taskCancel()
+	
+	// 执行Agent Loop，传入独立的上下文，确保任务不会因客户端断开而中断
 	sendEvent("progress", "正在分析您的请求...", nil)
-	result, err := h.agent.AgentLoopWithProgress(c.Request.Context(), req.Message, agentHistoryMessages, progressCallback)
+	result, err := h.agent.AgentLoopWithProgress(taskCtx, req.Message, agentHistoryMessages, progressCallback)
 	if err != nil {
 		h.logger.Error("Agent Loop执行失败", zap.Error(err))
 		sendEvent("error", "执行失败: "+err.Error(), nil)
