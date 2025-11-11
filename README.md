@@ -145,6 +145,8 @@ sudo apt-get install nmap sqlmap nuclei httpx gobuster feroxbuster
 # 或使用各工具的官方安装方法
 ```
 
+Ubuntu安全工具批量安装脚本:https://github.com/Ed1s0nZ/sec_tools/blob/main/install_tools_ubuntu.sh
+
 **注意**：不是所有工具都需要安装，AI会根据您的测试需求自动选择可用的工具。如果某个工具未安装，AI会尝试使用替代工具。
 
 5. **启动服务器**
