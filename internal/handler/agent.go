@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -18,6 +19,7 @@ type AgentHandler struct {
 	agent  *agent.Agent
 	db     *database.DB
 	logger *zap.Logger
+	tasks  *AgentTaskManager
 }
 
 // NewAgentHandler 创建新的Agent处理器
@@ -26,6 +28,7 @@ func NewAgentHandler(agent *agent.Agent, db *database.DB, logger *zap.Logger) *A
 		agent:  agent,
 		db:     db,
 		logger: logger,
+		tasks:  NewAgentTaskManager(),
 	}
 }
 
@@ -101,7 +104,7 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 			zap.String("content", contentPreview),
 		)
 	}
-	
+
 	h.logger.Info("历史消息转换完成",
 		zap.Int("originalCount", len(historyMessages)),
 		zap.Int("convertedCount", len(agentHistoryMessages)),
@@ -130,14 +133,14 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 	c.JSON(http.StatusOK, ChatResponse{
 		Response:        result.Response,
 		MCPExecutionIDs: result.MCPExecutionIDs,
-		ConversationID: conversationID,
+		ConversationID:  conversationID,
 		Time:            time.Now(),
 	})
 }
 
 // StreamEvent 流式事件
 type StreamEvent struct {
-	Type    string      `json:"type"`    // progress, tool_call, tool_result, response, error, done
+	Type    string      `json:"type"`    // conversation, progress, tool_call, tool_result, response, error, cancelled, done
 	Message string      `json:"message"` // 显示消息
 	Data    interface{} `json:"data,omitempty"`
 }
@@ -174,13 +177,13 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	// 发送初始事件
 	// 用于跟踪客户端是否已断开连接
 	clientDisconnected := false
-	
+
 	sendEvent := func(eventType, message string, data interface{}) {
 		// 如果客户端已断开，不再发送事件
 		if clientDisconnected {
 			return
 		}
-		
+
 		// 检查请求上下文是否被取消（客户端断开）
 		select {
 		case <-c.Request.Context().Done():
@@ -188,21 +191,21 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 			return
 		default:
 		}
-		
+
 		event := StreamEvent{
 			Type:    eventType,
 			Message: message,
 			Data:    data,
 		}
 		eventJSON, _ := json.Marshal(event)
-		
+
 		// 尝试写入事件，如果失败则标记客户端断开
 		if _, err := fmt.Fprintf(c.Writer, "data: %s\n\n", eventJSON); err != nil {
 			clientDisconnected = true
 			h.logger.Debug("客户端断开连接，停止发送SSE事件", zap.Error(err))
 			return
 		}
-		
+
 		// 刷新响应，如果失败则标记客户端断开
 		if flusher, ok := c.Writer.(http.Flusher); ok {
 			flusher.Flush()
@@ -226,6 +229,10 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 		}
 		conversationID = conv.ID
 	}
+
+	sendEvent("conversation", "会话已创建", map[string]interface{}{
+		"conversationId": conversationID,
+	})
 
 	// 获取历史消息
 	historyMessages, err := h.db.GetMessages(conversationID)
@@ -262,10 +269,10 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	if assistantMsg != nil {
 		assistantMessageID = assistantMsg.ID
 	}
-	
+
 	progressCallback := func(eventType, message string, data interface{}) {
 		sendEvent(eventType, message, data)
-		
+
 		// 保存过程详情到数据库（排除response和done事件，它们会在后面单独处理）
 		if assistantMessageID != "" && eventType != "response" && eventType != "done" {
 			if err := h.db.AddProcessDetail(assistantMessageID, conversationID, eventType, message, data); err != nil {
@@ -276,20 +283,101 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 
 	// 创建一个独立的上下文用于任务执行，不随HTTP请求取消
 	// 这样即使客户端断开连接（如刷新页面），任务也能继续执行
-	taskCtx, taskCancel := context.WithTimeout(context.Background(), 30*time.Minute)
-	defer taskCancel()
-	
+	baseCtx, cancelWithCause := context.WithCancelCause(context.Background())
+	taskCtx, timeoutCancel := context.WithTimeout(baseCtx, 30*time.Minute)
+	defer timeoutCancel()
+	defer cancelWithCause(nil)
+
+	if _, err := h.tasks.StartTask(conversationID, req.Message, cancelWithCause); err != nil {
+		if errors.Is(err, ErrTaskAlreadyRunning) {
+			sendEvent("error", "当前会话已有任务正在执行，请先停止后再尝试。", map[string]interface{}{
+				"conversationId": conversationID,
+			})
+		} else {
+			sendEvent("error", "无法启动任务: "+err.Error(), map[string]interface{}{
+				"conversationId": conversationID,
+			})
+		}
+		sendEvent("done", "", map[string]interface{}{
+			"conversationId": conversationID,
+		})
+		return
+	}
+
+	taskStatus := "completed"
+	defer h.tasks.FinishTask(conversationID, taskStatus)
+
 	// 执行Agent Loop，传入独立的上下文，确保任务不会因客户端断开而中断
 	sendEvent("progress", "正在分析您的请求...", nil)
 	result, err := h.agent.AgentLoopWithProgress(taskCtx, req.Message, agentHistoryMessages, progressCallback)
 	if err != nil {
 		h.logger.Error("Agent Loop执行失败", zap.Error(err))
-		sendEvent("error", "执行失败: "+err.Error(), nil)
-		// 保存错误事件
-		if assistantMessageID != "" {
-			h.db.AddProcessDetail(assistantMessageID, conversationID, "error", "执行失败: "+err.Error(), nil)
+		cause := context.Cause(baseCtx)
+
+		switch {
+		case errors.Is(cause, ErrTaskCancelled):
+			taskStatus = "cancelled"
+			cancelMsg := "任务已被用户取消，后续操作已停止。"
+			if assistantMessageID != "" {
+				if _, updateErr := h.db.Exec(
+					"UPDATE messages SET content = ? WHERE id = ?",
+					cancelMsg,
+					assistantMessageID,
+				); updateErr != nil {
+					h.logger.Warn("更新取消后的助手消息失败", zap.Error(updateErr))
+				}
+				h.db.AddProcessDetail(assistantMessageID, conversationID, "cancelled", cancelMsg, nil)
+			}
+			sendEvent("cancelled", cancelMsg, map[string]interface{}{
+				"conversationId": conversationID,
+				"messageId":      assistantMessageID,
+			})
+			sendEvent("done", "", map[string]interface{}{
+				"conversationId": conversationID,
+			})
+			return
+		case errors.Is(err, context.DeadlineExceeded) || errors.Is(cause, context.DeadlineExceeded):
+			taskStatus = "timeout"
+			timeoutMsg := "任务执行超时，已自动终止。"
+			if assistantMessageID != "" {
+				if _, updateErr := h.db.Exec(
+					"UPDATE messages SET content = ? WHERE id = ?",
+					timeoutMsg,
+					assistantMessageID,
+				); updateErr != nil {
+					h.logger.Warn("更新超时后的助手消息失败", zap.Error(updateErr))
+				}
+				h.db.AddProcessDetail(assistantMessageID, conversationID, "timeout", timeoutMsg, nil)
+			}
+			sendEvent("error", timeoutMsg, map[string]interface{}{
+				"conversationId": conversationID,
+				"messageId":      assistantMessageID,
+			})
+			sendEvent("done", "", map[string]interface{}{
+				"conversationId": conversationID,
+			})
+			return
+		default:
+			taskStatus = "failed"
+			errorMsg := "执行失败: " + err.Error()
+			if assistantMessageID != "" {
+				if _, updateErr := h.db.Exec(
+					"UPDATE messages SET content = ? WHERE id = ?",
+					errorMsg,
+					assistantMessageID,
+				); updateErr != nil {
+					h.logger.Warn("更新失败后的助手消息失败", zap.Error(updateErr))
+				}
+				h.db.AddProcessDetail(assistantMessageID, conversationID, "error", errorMsg, nil)
+			}
+			sendEvent("error", errorMsg, map[string]interface{}{
+				"conversationId": conversationID,
+				"messageId":      assistantMessageID,
+			})
+			sendEvent("done", "", map[string]interface{}{
+				"conversationId": conversationID,
+			})
 		}
-		sendEvent("done", "", nil)
 		return
 	}
 
@@ -329,3 +417,39 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	})
 }
 
+// CancelAgentLoop 取消正在执行的任务
+func (h *AgentHandler) CancelAgentLoop(c *gin.Context) {
+	var req struct {
+		ConversationID string `json:"conversationId" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ok, err := h.tasks.CancelTask(req.ConversationID, ErrTaskCancelled)
+	if err != nil {
+		h.logger.Error("取消任务失败", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "未找到正在执行的任务"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":         "cancelling",
+		"conversationId": req.ConversationID,
+		"message":        "已提交取消请求，任务将在当前步骤完成后停止。",
+	})
+}
+
+// ListAgentTasks 列出所有运行中的任务
+func (h *AgentHandler) ListAgentTasks(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"tasks": h.tasks.GetActiveTasks(),
+	})
+}

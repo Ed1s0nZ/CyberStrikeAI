@@ -1,6 +1,63 @@
 
 // 当前对话ID
 let currentConversationId = null;
+// 进度ID与任务信息映射
+const progressTaskState = new Map();
+// 活跃任务刷新定时器
+let activeTaskInterval = null;
+const ACTIVE_TASK_REFRESH_INTERVAL = 20000;
+
+function registerProgressTask(progressId, conversationId = null) {
+    const state = progressTaskState.get(progressId) || {};
+    state.conversationId = conversationId !== undefined && conversationId !== null
+        ? conversationId
+        : (state.conversationId ?? currentConversationId);
+    state.cancelling = false;
+    progressTaskState.set(progressId, state);
+
+    const progressElement = document.getElementById(progressId);
+    if (progressElement) {
+        progressElement.dataset.conversationId = state.conversationId || '';
+    }
+}
+
+function updateProgressConversation(progressId, conversationId) {
+    if (!conversationId) {
+        return;
+    }
+    registerProgressTask(progressId, conversationId);
+}
+
+function markProgressCancelling(progressId) {
+    const state = progressTaskState.get(progressId);
+    if (state) {
+        state.cancelling = true;
+    }
+}
+
+function finalizeProgressTask(progressId, finalLabel = '已完成') {
+    const stopBtn = document.getElementById(`${progressId}-stop-btn`);
+    if (stopBtn) {
+        stopBtn.disabled = true;
+        stopBtn.textContent = finalLabel;
+    }
+    progressTaskState.delete(progressId);
+}
+
+async function requestCancel(conversationId) {
+    const response = await fetch('/api/agent-loop/cancel', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ conversationId }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(result.error || '取消失败');
+    }
+    return result;
+}
 
 // 发送消息
 async function sendMessage() {
@@ -18,6 +75,8 @@ async function sendMessage() {
     // 创建进度消息容器（使用详细的进度展示）
     const progressId = addProgressMessage();
     const progressElement = document.getElementById(progressId);
+    registerProgressTask(progressId, currentConversationId);
+    loadActiveTasks();
     let assistantMessageId = null;
     let mcpExecutionIds = [];
     
@@ -103,13 +162,17 @@ function addProgressMessage() {
     bubble.innerHTML = `
         <div class="progress-header">
             <span class="progress-title">🔍 渗透测试进行中...</span>
-            <button class="progress-toggle" onclick="toggleProgressDetails('${id}')">收起详情</button>
+            <div class="progress-actions">
+                <button class="progress-stop" id="${id}-stop-btn" onclick="cancelProgressTask('${id}')">停止任务</button>
+                <button class="progress-toggle" onclick="toggleProgressDetails('${id}')">收起详情</button>
+            </div>
         </div>
         <div class="progress-timeline expanded" id="${id}-timeline"></div>
     `;
     
     contentWrapper.appendChild(bubble);
     messageDiv.appendChild(contentWrapper);
+    messageDiv.dataset.conversationId = currentConversationId || '';
     messagesDiv.appendChild(messageDiv);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
     
@@ -296,6 +359,49 @@ function toggleProcessDetails(progressId, assistantMessageId) {
     }
 }
 
+// 停止当前进度对应的任务
+async function cancelProgressTask(progressId) {
+    const state = progressTaskState.get(progressId);
+    const stopBtn = document.getElementById(`${progressId}-stop-btn`);
+
+    if (!state || !state.conversationId) {
+        if (stopBtn) {
+            stopBtn.disabled = true;
+            setTimeout(() => {
+                stopBtn.disabled = false;
+            }, 1500);
+        }
+        alert('任务信息尚未同步，请稍后再试。');
+        return;
+    }
+
+    if (state.cancelling) {
+        return;
+    }
+
+    markProgressCancelling(progressId);
+    if (stopBtn) {
+        stopBtn.disabled = true;
+        stopBtn.textContent = '取消中...';
+    }
+
+    try {
+        await requestCancel(state.conversationId);
+        loadActiveTasks();
+    } catch (error) {
+        console.error('取消任务失败:', error);
+        alert('取消任务失败: ' + error.message);
+        if (stopBtn) {
+            stopBtn.disabled = false;
+            stopBtn.textContent = '停止任务';
+        }
+        const currentState = progressTaskState.get(progressId);
+        if (currentState) {
+            currentState.cancelling = false;
+        }
+    }
+}
+
 // 将进度消息转换为可折叠的详情组件
 function convertProgressToDetails(progressId, assistantMessageId) {
     const progressElement = document.getElementById(progressId);
@@ -367,6 +473,16 @@ function handleStreamEvent(event, progressElement, progressId,
     if (!timeline) return;
     
     switch (event.type) {
+        case 'conversation':
+            if (event.data && event.data.conversationId) {
+                updateProgressConversation(progressId, event.data.conversationId);
+                currentConversationId = event.data.conversationId;
+                updateActiveConversation();
+                loadActiveTasks();
+                // 立即刷新对话列表，让新对话显示在历史记录中
+                loadConversations();
+            }
+            break;
         case 'iteration':
             // 添加迭代标记
             addTimelineItem(timeline, 'iteration', {
@@ -429,6 +545,20 @@ function handleStreamEvent(event, progressElement, progressId,
                 progressTitle.textContent = '🔍 ' + event.message;
             }
             break;
+        
+        case 'cancelled':
+            addTimelineItem(timeline, 'cancelled', {
+                title: '⛔ 任务已取消',
+                message: event.message,
+                data: event.data
+            });
+            const cancelTitle = document.querySelector(`#${progressId} .progress-title`);
+            if (cancelTitle) {
+                cancelTitle.textContent = '⛔ 任务已取消';
+            }
+            finalizeProgressTask(progressId, '已取消');
+            loadActiveTasks();
+            break;
             
         case 'response':
             // 先添加助手回复
@@ -440,6 +570,8 @@ function handleStreamEvent(event, progressElement, progressId,
             if (responseData.conversationId) {
                 currentConversationId = responseData.conversationId;
                 updateActiveConversation();
+                updateProgressConversation(progressId, responseData.conversationId);
+                loadActiveTasks();
             }
             
             // 添加助手回复，并传入进度ID以便集成详情
@@ -477,7 +609,12 @@ function handleStreamEvent(event, progressElement, progressId,
             if (event.data && event.data.conversationId) {
                 currentConversationId = event.data.conversationId;
                 updateActiveConversation();
+                updateProgressConversation(progressId, event.data.conversationId);
             }
+            if (progressTaskState.has(progressId)) {
+                finalizeProgressTask(progressId, '已完成');
+            }
+            loadActiveTasks();
             // 完成时自动折叠所有详情（延迟一下确保response事件已处理）
             setTimeout(() => {
                 const assistantIdFromDone = getAssistantId();
@@ -537,6 +674,12 @@ function addTimelineItem(timeline, type, options) {
                     <pre class="tool-result">${escapeHtml(result)}</pre>
                     ${data.executionId ? `<div class="tool-execution-id">执行ID: <code>${data.executionId}</code></div>` : ''}
                 </div>
+            </div>
+        `;
+    } else if (type === 'cancelled') {
+        content += `
+            <div class="timeline-item-content">
+                ${escapeHtml(options.message || '任务已取消')}
             </div>
         `;
     }
@@ -921,6 +1064,8 @@ function startNewConversation() {
     document.getElementById('chat-messages').innerHTML = '';
     addMessage('assistant', '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。');
     updateActiveConversation();
+    // 刷新对话列表，确保显示最新的历史对话
+    loadConversations();
 }
 
 // 加载对话列表
@@ -1126,6 +1271,88 @@ function updateActiveConversation() {
     });
 }
 
+// 加载活跃任务列表
+async function loadActiveTasks(showErrors = false) {
+    const bar = document.getElementById('active-tasks-bar');
+    try {
+        const response = await fetch('/api/agent-loop/tasks');
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(result.error || '获取活跃任务失败');
+        }
+
+        renderActiveTasks(result.tasks || []);
+    } catch (error) {
+        console.error('获取活跃任务失败:', error);
+        if (showErrors && bar) {
+            bar.style.display = 'block';
+            bar.innerHTML = `<div class="active-task-error">无法获取任务状态：${escapeHtml(error.message)}</div>`;
+        }
+    }
+}
+
+function renderActiveTasks(tasks) {
+    const bar = document.getElementById('active-tasks-bar');
+    if (!bar) return;
+
+    if (!tasks || tasks.length === 0) {
+        bar.style.display = 'none';
+        bar.innerHTML = '';
+        return;
+    }
+
+    bar.style.display = 'flex';
+    bar.innerHTML = '';
+
+    tasks.forEach(task => {
+        const item = document.createElement('div');
+        item.className = 'active-task-item';
+
+        const startedTime = task.startedAt ? new Date(task.startedAt) : null;
+        const timeText = startedTime && !isNaN(startedTime.getTime())
+            ? startedTime.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            : '';
+
+        item.innerHTML = `
+            <div class="active-task-info">
+                <span class="active-task-status">${task.status === 'cancelling' ? '取消中' : '执行中'}</span>
+                <span class="active-task-message">${escapeHtml(task.message || '未命名任务')}</span>
+            </div>
+            <div class="active-task-actions">
+                ${timeText ? `<span class="active-task-time">${timeText}</span>` : ''}
+                <button class="active-task-cancel">停止任务</button>
+            </div>
+        `;
+
+        const cancelBtn = item.querySelector('.active-task-cancel');
+        cancelBtn.onclick = () => cancelActiveTask(task.conversationId, cancelBtn);
+        if (task.status === 'cancelling') {
+            cancelBtn.disabled = true;
+            cancelBtn.textContent = '取消中...';
+        }
+
+        bar.appendChild(item);
+    });
+}
+
+async function cancelActiveTask(conversationId, button) {
+    if (!conversationId) return;
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = '取消中...';
+
+    try {
+        await requestCancel(conversationId);
+        loadActiveTasks();
+    } catch (error) {
+        console.error('取消任务失败:', error);
+        alert('取消任务失败: ' + error.message);
+        button.disabled = false;
+        button.textContent = originalText;
+    }
+}
+
 // 页面加载时初始化
 document.addEventListener('DOMContentLoaded', function() {
     // 加载对话列表
@@ -1139,5 +1366,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 添加欢迎消息
     addMessage('assistant', '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。');
+    
+    loadActiveTasks(true);
+    if (activeTaskInterval) {
+        clearInterval(activeTaskInterval);
+    }
+    activeTaskInterval = setInterval(() => loadActiveTasks(), ACTIVE_TASK_REFRESH_INTERVAL);
 });
 

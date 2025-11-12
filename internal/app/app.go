@@ -42,7 +42,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	if dbPath == "" {
 		dbPath = "data/conversations.db"
 	}
-	
+
 	// 确保目录存在
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
 		return nil, fmt.Errorf("创建数据库目录失败: %w", err)
@@ -95,10 +95,10 @@ func (a *App) Run() error {
 		go func() {
 			mcpAddr := fmt.Sprintf("%s:%d", a.config.MCP.Host, a.config.MCP.Port)
 			a.logger.Info("启动MCP服务器", zap.String("address", mcpAddr))
-			
+
 			mux := http.NewServeMux()
 			mux.HandleFunc("/mcp", a.mcpServer.HandleHTTP)
-			
+
 			if err := http.ListenAndServe(mcpAddr, mux); err != nil {
 				a.logger.Error("MCP服务器启动失败", zap.Error(err))
 			}
@@ -108,7 +108,7 @@ func (a *App) Run() error {
 	// 启动主服务器
 	addr := fmt.Sprintf("%s:%d", a.config.Server.Host, a.config.Server.Port)
 	a.logger.Info("启动HTTP服务器", zap.String("address", addr))
-	
+
 	return a.router.Run(addr)
 }
 
@@ -121,19 +121,22 @@ func setupRoutes(router *gin.Engine, agentHandler *handler.AgentHandler, monitor
 		api.POST("/agent-loop", agentHandler.AgentLoop)
 		// Agent Loop 流式输出
 		api.POST("/agent-loop/stream", agentHandler.AgentLoopStream)
-		
+		// Agent Loop 取消与任务列表
+		api.POST("/agent-loop/cancel", agentHandler.CancelAgentLoop)
+		api.GET("/agent-loop/tasks", agentHandler.ListAgentTasks)
+
 		// 对话历史
 		api.POST("/conversations", conversationHandler.CreateConversation)
 		api.GET("/conversations", conversationHandler.ListConversations)
 		api.GET("/conversations/:id", conversationHandler.GetConversation)
 		api.DELETE("/conversations/:id", conversationHandler.DeleteConversation)
-		
+
 		// 监控
 		api.GET("/monitor", monitorHandler.Monitor)
 		api.GET("/monitor/execution/:id", monitorHandler.GetExecution)
 		api.GET("/monitor/stats", monitorHandler.GetStats)
 		api.GET("/monitor/vulnerabilities", monitorHandler.GetVulnerabilities)
-		
+
 		// MCP端点
 		api.POST("/mcp", func(c *gin.Context) {
 			mcpServer.HandleHTTP(c.Writer, c.Request)
@@ -143,7 +146,7 @@ func setupRoutes(router *gin.Engine, agentHandler *handler.AgentHandler, monitor
 	// 静态文件
 	router.Static("/static", "./web/static")
 	router.LoadHTMLGlob("web/templates/*")
-	
+
 	// 前端页面
 	router.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.html", nil)
@@ -166,4 +169,3 @@ func corsMiddleware() gin.HandlerFunc {
 		c.Next()
 	}
 }
-

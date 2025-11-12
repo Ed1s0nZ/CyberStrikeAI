@@ -993,10 +993,37 @@ header {
     border-bottom: 1px solid var(--border-color);
 }
 
+.progress-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .progress-title {
     font-weight: 600;
     color: var(--text-primary);
     font-size: 0.9375rem;
+}
+
+.progress-stop {
+    padding: 4px 12px;
+    background: rgba(220, 53, 69, 0.1);
+    border: 1px solid rgba(220, 53, 69, 0.4);
+    border-radius: 4px;
+    font-size: 0.8125rem;
+    color: var(--error-color);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.progress-stop:hover {
+    background: rgba(220, 53, 69, 0.15);
+    border-color: var(--error-color);
+}
+
+.progress-stop:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .progress-toggle {
@@ -1068,6 +1095,11 @@ header {
 .timeline-item-error {
     border-left-color: var(--error-color);
     background: rgba(220, 53, 69, 0.1);
+}
+
+.timeline-item-cancelled {
+    border-left-color: #ff7043;
+    background: rgba(255, 112, 67, 0.12);
 }
 
 .timeline-item-header {
@@ -1181,4 +1213,92 @@ header {
     border-radius: 3px;
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
     color: var(--text-secondary);
+}
+
+/* 活跃任务栏 */
+.active-tasks-bar {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    background: rgba(0, 102, 255, 0.06);
+    border-bottom: 1px solid rgba(0, 102, 255, 0.15);
+    color: var(--text-primary);
+}
+
+.active-task-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    background: var(--bg-primary);
+    border: 1px solid rgba(0, 102, 255, 0.2);
+    border-radius: 8px;
+    padding: 8px 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.active-task-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.active-task-status {
+    background: rgba(0, 102, 255, 0.12);
+    color: var(--accent-color);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.active-task-message {
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 320px;
+}
+
+.active-task-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.active-task-time {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.active-task-cancel {
+    padding: 6px 12px;
+    background: rgba(220, 53, 69, 0.1);
+    border: 1px solid rgba(220, 53, 69, 0.4);
+    border-radius: 6px;
+    color: var(--error-color);
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.active-task-cancel:hover {
+    background: rgba(220, 53, 69, 0.2);
+    border-color: var(--error-color);
+}
+
+.active-task-cancel:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.active-task-error {
+    font-size: 0.875rem;
+    color: var(--error-color);
 }
