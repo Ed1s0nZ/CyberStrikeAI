@@ -4,6 +4,7 @@
   ![详情预览](./img/效果1.png)
 
 ## 更新日志
+ - 2025.11.13 新增 MCP stdio 模式支持，可在 Cursor IDE 中直接使用所有安全工具；
  - 2025.11.12 增加了任务停止功能，优化前端；
 
 ## ✨ 功能特性
@@ -19,6 +20,7 @@
 
 ### 工具集成
 - 🔌 **MCP协议支持** - 完整实现MCP协议，支持工具注册、调用、监控
+- 📡 **双传输模式** - 支持HTTP和stdio两种传输方式，可在Web应用和IDE中无缝使用
 - 🛠️ **灵活工具配置** - 支持从目录加载工具配置（YAML），易于扩展和维护
 - 📈 **实时监控** - 监控所有工具的执行状态、结果、调用次数和统计信息
 - 🔍 **漏洞自动分析** - 自动分析工具输出，提取和分类发现的漏洞
@@ -36,6 +38,8 @@ CyberStrikeAI/
 ├── cmd/
 │   ├── server/
 │   │   └── main.go          # 程序入口，启动HTTP服务器
+│   ├── mcp-stdio/
+│   │   └── main.go          # MCP stdio模式入口（用于Cursor等IDE集成）
 │   └── test-config/
 │       └── main.go          # 配置测试工具
 ├── internal/
@@ -572,6 +576,23 @@ MCP协议端点，支持JSON-RPC 2.0格式的请求。
 
 本项目完整实现了MCP（Model Context Protocol）协议，支持以下功能：
 
+### 传输模式
+
+CyberStrikeAI 支持两种 MCP 传输模式：
+
+#### 1. HTTP 模式（默认）
+- 通过 HTTP POST 请求进行通信
+- 适用于 Web 应用和其他 HTTP 客户端
+- 默认监听地址：`0.0.0.0:8081/mcp`
+- 可通过 `/api/mcp` 端点访问
+
+#### 2. stdio 模式（新增）
+- 通过标准输入输出（stdio）进行通信
+- 适用于 Cursor、Claude Desktop 等 IDE 集成
+- 完全符合 JSON-RPC 2.0 规范
+- 支持字符串、数字和 null 类型的 id 字段
+- 正确处理通知（notification）消息
+
 ### 支持的方法
 
 - `initialize` - 初始化连接，协商协议版本和功能
@@ -582,6 +603,7 @@ MCP协议端点，支持JSON-RPC 2.0格式的请求。
 - `resources/list` - 列出可用资源
 - `resources/read` - 读取资源内容
 - `sampling/request` - 采样请求（占位实现）
+- `notifications/initialized` - 初始化完成通知（stdio 模式）
 
 ### 工具执行机制
 
@@ -594,7 +616,73 @@ MCP协议端点，支持JSON-RPC 2.0格式的请求。
   - 执行结果或错误信息
 - 系统自动跟踪所有工具的执行统计信息
 
-### MCP协议使用示例
+### MCP stdio 模式（Cursor IDE 集成）
+
+stdio 模式允许你在 Cursor IDE 中直接使用 CyberStrikeAI 的所有安全工具。
+
+#### 编译 stdio 模式程序
+
+```bash
+# 在项目根目录执行
+go build -o cyberstrike-ai-mcp cmd/mcp-stdio/main.go
+```
+
+#### 在 Cursor 中配置
+
+**方法一：通过 UI 配置**
+
+1. 打开 Cursor 设置 → **Tools & MCP**
+2. 点击 **Add Custom MCP**
+3. 配置如下（请替换为你的实际路径）：
+
+```json
+{
+  "mcpServers": {
+    "cyberstrike-ai": {
+      "command": "/absolute/path/to/cyberstrike-ai-mcp",
+      "args": [
+        "--config",
+        "/absolute/path/to/config.yaml"
+      ]
+    }
+  }
+}
+```
+
+**方法二：通过项目配置文件**
+
+在项目根目录创建 `.cursor/mcp.json` 文件：
+
+```json
+{
+  "mcpServers": {
+    "cyberstrike-ai": {
+      "command": "/Users/yourname/Downloads/CyberStrikeAI-main/cyberstrike-ai-mcp",
+      "args": [
+        "--config",
+        "/Users/yourname/Downloads/CyberStrikeAI-main/config.yaml"
+      ]
+    }
+  }
+}
+```
+
+**重要提示：**
+- ✅ 使用绝对路径：`command` 和配置文件路径必须使用绝对路径
+- ✅ 可执行权限：确保编译后的程序有执行权限（Linux/macOS）
+- ✅ 重启 Cursor：配置后需要重启 Cursor 才能生效
+
+配置完成后，重启 Cursor，你就可以在聊天中直接使用所有安全工具了！
+
+#### stdio 模式特性
+
+- ✅ 完全符合 JSON-RPC 2.0 规范
+- ✅ 支持字符串、数字和 null 类型的 id 字段
+- ✅ 正确处理通知（notification）消息
+- ✅ 日志输出到 stderr，不干扰 JSON-RPC 通信
+- ✅ 与 HTTP 模式完全独立，可同时使用
+
+### MCP HTTP 模式使用示例
 
 #### 初始化连接
 
@@ -825,6 +913,28 @@ parameters:
 - ✅ 检查MCP端口（默认8081）是否被占用
 - ✅ 验证MCP配置中的 `enabled: true`
 - ✅ 查看日志中的MCP服务器启动信息
+
+**问题：Cursor 中 MCP stdio 模式无法连接**
+
+- ✅ 检查 `cyberstrike-ai-mcp` 程序路径是否正确（使用绝对路径）
+- ✅ 检查程序是否有执行权限（Linux/macOS）：`chmod +x cyberstrike-ai-mcp`
+- ✅ 检查 `config.yaml` 配置文件路径是否正确
+- ✅ 查看 Cursor 的日志输出（通常在 Cursor 的开发者工具中）
+- ✅ 确保配置文件中的 `security.tools_dir` 配置正确
+
+**问题：Cursor 中工具列表为空**
+
+- ✅ 确保 `config.yaml` 中的 `security.tools_dir` 配置正确
+- ✅ 确保工具配置文件在指定目录中
+- ✅ 检查工具配置文件格式是否正确（YAML 语法）
+- ✅ 查看程序日志（stderr 输出）
+
+**问题：Cursor 中工具执行失败**
+
+- ✅ 确保相应的安全工具已安装在系统中
+- ✅ 检查工具是否在系统 PATH 中
+- ✅ 查看程序日志（stderr 输出）
+- ✅ 尝试在终端中直接运行工具命令，确认工具可用
 
 ### 日志调试
 

@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -16,15 +17,66 @@ const (
 // MCP协议版本
 const ProtocolVersion = "2024-11-05"
 
-// Message 表示MCP消息
+// MessageID 表示JSON-RPC 2.0的id字段，可以是字符串、数字或null
+type MessageID struct {
+	value interface{}
+}
+
+// UnmarshalJSON 自定义反序列化，支持字符串、数字和null
+func (m *MessageID) UnmarshalJSON(data []byte) error {
+	// 尝试解析为null
+	if string(data) == "null" {
+		m.value = nil
+		return nil
+	}
+	
+	// 尝试解析为字符串
+	var str string
+	if err := json.Unmarshal(data, &str); err == nil {
+		m.value = str
+		return nil
+	}
+	
+	// 尝试解析为数字
+	var num json.Number
+	if err := json.Unmarshal(data, &num); err == nil {
+		m.value = num
+		return nil
+	}
+	
+	return fmt.Errorf("invalid id type")
+}
+
+// MarshalJSON 自定义序列化
+func (m MessageID) MarshalJSON() ([]byte, error) {
+	if m.value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(m.value)
+}
+
+// String 返回字符串表示
+func (m MessageID) String() string {
+	if m.value == nil {
+		return ""
+	}
+	return fmt.Sprintf("%v", m.value)
+}
+
+// Value 返回原始值
+func (m MessageID) Value() interface{} {
+	return m.value
+}
+
+// Message 表示MCP消息（符合JSON-RPC 2.0规范）
 type Message struct {
-	ID      string          `json:"id,omitempty"`
-	Type    string          `json:"type"`
+	ID      MessageID       `json:"id,omitempty"`
+	Type    string          `json:"-"` // 内部使用，不序列化到JSON
 	Method  string          `json:"method,omitempty"`
 	Params  json.RawMessage `json:"params,omitempty"`
 	Result  json.RawMessage `json:"result,omitempty"`
 	Error   *Error          `json:"error,omitempty"`
-	Version string          `json:"jsonrpc,omitempty"`
+	Version string          `json:"jsonrpc,omitempty"` // JSON-RPC 2.0 版本标识
 }
 
 // Error 表示MCP错误

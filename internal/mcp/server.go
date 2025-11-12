@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -93,8 +94,12 @@ func (s *Server) HandleHTTP(w http.ResponseWriter, r *http.Request) {
 
 // handleMessage 处理MCP消息
 func (s *Server) handleMessage(msg *Message) *Message {
-	if msg.ID == "" {
-		msg.ID = uuid.New().String()
+	// 检查是否是通知（notification）- 通知没有id字段，不需要响应
+	isNotification := msg.ID.Value() == nil || msg.ID.String() == ""
+	
+	// 如果不是通知且ID为空，生成新的UUID
+	if !isNotification && msg.ID.String() == "" {
+		msg.ID = MessageID{value: uuid.New().String()}
 	}
 
 	switch msg.Method {
@@ -114,11 +119,29 @@ func (s *Server) handleMessage(msg *Message) *Message {
 		return s.handleReadResource(msg)
 	case "sampling/request":
 		return s.handleSamplingRequest(msg)
+	case "notifications/initialized":
+		// 通知类型，不需要响应
+		s.logger.Debug("收到 initialized 通知")
+		return nil
+	case "":
+		// 空方法名，可能是通知，不返回错误
+		if isNotification {
+			s.logger.Debug("收到无方法名的通知消息")
+			return nil
+		}
+		fallthrough
 	default:
+		// 如果是通知，不返回错误响应
+		if isNotification {
+			s.logger.Debug("收到未知通知", zap.String("method", msg.Method))
+			return nil
+		}
+		// 对于请求，返回方法未找到错误
 		return &Message{
-			ID:    msg.ID,
-			Type:  MessageTypeError,
-			Error: &Error{Code: -32601, Message: "Method not found"},
+			ID:      msg.ID,
+			Type:    MessageTypeError,
+			Version: "2.0",
+			Error:   &Error{Code: -32601, Message: "Method not found"},
 		}
 	}
 }
@@ -128,9 +151,10 @@ func (s *Server) handleInitialize(msg *Message) *Message {
 	var req InitializeRequest
 	if err := json.Unmarshal(msg.Params, &req); err != nil {
 		return &Message{
-			ID:    msg.ID,
-			Type:  MessageTypeError,
-			Error: &Error{Code: -32602, Message: "Invalid params"},
+			ID:      msg.ID,
+			Type:    MessageTypeError,
+			Version: "2.0",
+			Error:   &Error{Code: -32602, Message: "Invalid params"},
 		}
 	}
 
@@ -188,9 +212,10 @@ func (s *Server) handleCallTool(msg *Message) *Message {
 	var req CallToolRequest
 	if err := json.Unmarshal(msg.Params, &req); err != nil {
 		return &Message{
-			ID:    msg.ID,
-			Type:  MessageTypeError,
-			Error: &Error{Code: -32602, Message: "Invalid params"},
+			ID:      msg.ID,
+			Type:    MessageTypeError,
+			Version: "2.0",
+			Error:   &Error{Code: -32602, Message: "Invalid params"},
 		}
 	}
 
@@ -222,9 +247,10 @@ func (s *Server) handleCallTool(msg *Message) *Message {
 		now := time.Now()
 		execution.EndTime = &now
 		return &Message{
-			ID:    msg.ID,
-			Type:  MessageTypeError,
-			Error: &Error{Code: -32601, Message: "Tool not found"},
+			ID:      msg.ID,
+			Type:    MessageTypeError,
+			Version: "2.0",
+			Error:   &Error{Code: -32601, Message: "Tool not found"},
 		}
 	}
 
@@ -481,9 +507,10 @@ func (s *Server) handleGetPrompt(msg *Message) *Message {
 	var req GetPromptRequest
 	if err := json.Unmarshal(msg.Params, &req); err != nil {
 		return &Message{
-			ID:    msg.ID,
-			Type:  MessageTypeError,
-			Error: &Error{Code: -32602, Message: "Invalid params"},
+			ID:      msg.ID,
+			Type:    MessageTypeError,
+			Version: "2.0",
+			Error:   &Error{Code: -32602, Message: "Invalid params"},
 		}
 	}
 	
@@ -493,9 +520,10 @@ func (s *Server) handleGetPrompt(msg *Message) *Message {
 	
 	if !exists {
 		return &Message{
-			ID:    msg.ID,
-			Type:  MessageTypeError,
-			Error: &Error{Code: -32601, Message: "Prompt not found"},
+			ID:      msg.ID,
+			Type:    MessageTypeError,
+			Version: "2.0",
+			Error:   &Error{Code: -32601, Message: "Prompt not found"},
 		}
 	}
 	
@@ -588,9 +616,10 @@ func (s *Server) handleReadResource(msg *Message) *Message {
 	var req ReadResourceRequest
 	if err := json.Unmarshal(msg.Params, &req); err != nil {
 		return &Message{
-			ID:    msg.ID,
-			Type:  MessageTypeError,
-			Error: &Error{Code: -32602, Message: "Invalid params"},
+			ID:      msg.ID,
+			Type:    MessageTypeError,
+			Version: "2.0",
+			Error:   &Error{Code: -32602, Message: "Invalid params"},
 		}
 	}
 	
@@ -600,9 +629,10 @@ func (s *Server) handleReadResource(msg *Message) *Message {
 	
 	if !exists {
 		return &Message{
-			ID:    msg.ID,
-			Type:  MessageTypeError,
-			Error: &Error{Code: -32601, Message: "Resource not found"},
+			ID:      msg.ID,
+			Type:    MessageTypeError,
+			Version: "2.0",
+			Error:   &Error{Code: -32601, Message: "Resource not found"},
 		}
 	}
 	
@@ -753,9 +783,10 @@ func (s *Server) handleSamplingRequest(msg *Message) *Message {
 	var req SamplingRequest
 	if err := json.Unmarshal(msg.Params, &req); err != nil {
 		return &Message{
-			ID:    msg.ID,
-			Type:  MessageTypeError,
-			Error: &Error{Code: -32602, Message: "Invalid params"},
+			ID:      msg.ID,
+			Type:    MessageTypeError,
+			Version: "2.0",
+			Error:   &Error{Code: -32602, Message: "Invalid params"},
 		}
 	}
 	
@@ -797,12 +828,62 @@ func (s *Server) RegisterResource(resource *Resource) {
 	s.resources[resource.URI] = resource
 }
 
+// HandleStdio 处理标准输入输出（用于 stdio 传输模式）
+// MCP 协议使用换行分隔的 JSON-RPC 消息
+func (s *Server) HandleStdio() error {
+	decoder := json.NewDecoder(os.Stdin)
+	encoder := json.NewEncoder(os.Stdout)
+	// 注意：不设置缩进，MCP 协议期望紧凑的 JSON 格式
+
+	for {
+		var msg Message
+		if err := decoder.Decode(&msg); err != nil {
+			if err == io.EOF {
+				break
+			}
+			// 日志输出到 stderr，避免干扰 stdout 的 JSON-RPC 通信
+			s.logger.Error("读取消息失败", zap.Error(err))
+			// 发送错误响应
+			errorMsg := Message{
+				ID:      msg.ID,
+				Type:    MessageTypeError,
+				Version: "2.0",
+				Error:   &Error{Code: -32700, Message: "Parse error", Data: err.Error()},
+			}
+			if err := encoder.Encode(errorMsg); err != nil {
+				return fmt.Errorf("发送错误响应失败: %w", err)
+			}
+			continue
+		}
+
+		// 处理消息
+		response := s.handleMessage(&msg)
+
+		// 如果是通知（response 为 nil），不需要发送响应
+		if response == nil {
+			continue
+		}
+
+		// 发送响应
+		if err := encoder.Encode(response); err != nil {
+			return fmt.Errorf("发送响应失败: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // sendError 发送错误响应
 func (s *Server) sendError(w http.ResponseWriter, id interface{}, code int, message, data string) {
+	var msgID MessageID
+	if id != nil {
+		msgID = MessageID{value: id}
+	}
 	response := Message{
-		ID:    fmt.Sprintf("%v", id),
-		Type:  MessageTypeError,
-		Error: &Error{Code: code, Message: message, Data: data},
+		ID:      msgID,
+		Type:    MessageTypeError,
+		Version: "2.0",
+		Error:   &Error{Code: code, Message: message, Data: data},
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
