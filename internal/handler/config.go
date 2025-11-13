@@ -248,16 +248,6 @@ func (h *ConfigHandler) saveConfig() error {
 				}
 			}
 
-			toolData, err := os.ReadFile(toolFile)
-			if err != nil {
-				h.logger.Warn("读取工具配置文件失败", zap.String("tool", tool.Name), zap.Error(err))
-				continue
-			}
-
-			if err := os.WriteFile(toolFile+".backup", toolData, 0644); err != nil {
-				h.logger.Warn("创建工具配置备份失败", zap.String("tool", tool.Name), zap.Error(err))
-			}
-
 			toolDoc, err := loadYAMLDocument(toolFile)
 			if err != nil {
 				h.logger.Warn("解析工具配置失败", zap.String("tool", tool.Name), zap.Error(err))

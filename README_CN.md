@@ -1,9 +1,7 @@
 # CyberStrikeAI
 
-[English](README.md) | [中文](README_CN.md) 
-
 🚀 **AI自主渗透测试平台** - 基于Golang构建，内置上百个安全工具，支持灵活扩展自定义工具，通过MCP协议实现AI智能决策与自动化执行，让安全测试像对话一样简单。
-- web 模式
+- web模式
   ![详情预览](./img/效果.png)
 - mcp-stdio / mcp-http 模式
   ![详情预览](./img/mcp-stdio2.png) 
@@ -893,42 +891,62 @@ curl -X POST http://localhost:8080/api/mcp \
 
 ### 添加新工具
 
-#### 方法一：创建工具配置文件（推荐）
+为确保 AI 能够无歧义地调用自定义工具，请按照下述字段规范编写 `tools/*.yaml` 配置文件。系统在加载时会逐项校验，缺失必填字段的工具会被跳过并在日志中提示。
 
-1. 在 `tools/` 目录下创建新的YAML文件，例如 `tools/mytool.yaml`：
+> 需要完整的字段对照表和模板示例？请查看 `tools/README.md`（中文）或 `tools/README_EN.md`（英文）获取更详细的配置指南。
 
-```yaml
-name: "mytool"
-command: "mytool"
-args: ["--default-arg"]
-enabled: true
+#### 顶层字段（工具级）
 
-short_description: "简短描述（用于工具列表）"
+| 字段 | 必填 | 类型 | 说明 |
+|------|------|------|------|
+| `name` | ✅ | string | 工具唯一标识，建议使用小写字母＋数字＋短横线组合，便于在对话中引用。 |
+| `command` | ✅ | string | 实际执行的命令或脚本名称，需在 PATH 中或写绝对路径。 |
+| `enabled` | ✅ | bool | 是否注册到 MCP。为 `false` 时，前端和 AI 都不会看到该工具。 |
+| `description` | ✅ | string | 工具详细说明，支持多行 Markdown，供 AI 深度理解以及 `resources/read` 查询。 |
+| `short_description` | 可选 | string | 适合 20-50 字的摘要，优先用于工具列表和对话上下文，缺失时系统会自动截取 `description` 片段。 |
+| `args` | 可选 | string[] | 固定参数，按顺序写入命令行，常用于定义默认扫描模式或全局开关。 |
+| `parameters` | 可选 | 参数对象数组 | 定义调用时可覆盖的动态参数，详见下节。 |
+| `arg_mapping` | 可选 | string | 参数映射模式（`auto`/`manual`/`template`），当前版本默认 `auto`，不填写即可。 |
 
-description: |
-  工具的详细描述，帮助AI理解工具的用途和使用场景。
+> **提示**：所有文本字段推荐使用 UTF-8/ASCII，无需额外引号的内容需保持 YAML 缩进正确。
 
-parameters:
-  - name: "target"
-    type: "string"
-    description: "目标参数描述"
-    required: true
-    position: 0  # 位置参数
-    format: "positional"
-  
-  - name: "option"
-    type: "string"
-    description: "选项参数描述"
-    required: false
-    flag: "--option"
-    format: "flag"
-```
+#### 参数字段（`parameters[]`）
 
-2. 重启服务器，工具会自动加载。
+每个参数对象支持以下属性，请根据工具特性选择：
+
+- `name`（必填）：参数键名，同时用于构建命令行和生成 MCP JSON-Schema。
+- `type`（必填）：`string`、`int`/`integer`、`bool`/`boolean`、`array` 等。
+- `description`（必填）：建议使用 Markdown 描述用途、格式、示例值及安全提示。
+- `required`：布尔值，标记是否必须由调用方提供。缺失必填参数时执行器会返回错误信息。
+- `default`：默认值。调用方未传值时将使用该值，便于提供合理的开箱体验。
+- `flag`：命令行标志（如 `-u`、`--url`），结合 `format` 决定拼接方式。
+- `position`：整数（从 0 开始），指定位置参数顺序。所有位置参数会在标志参数之后依次插入。
+- `format`：拼接策略，支持：
+  - `flag`（默认）：输出为 `--flag value` 或 `-f value`；
+  - `combined`：输出为 `--flag=value`；
+  - `positional`：按 `position` 顺序直接写入值；
+  - `template`：配合 `template` 字段自定义渲染。
+- `template`：当 `format: "template"` 时生效，支持 `{flag}`、`{value}`、`{name}` 占位符。
+- `options`：枚举值数组。定义后 AI 会提示可选项，MCP schema 也会自动带上 `enum` 信息。
+
+#### 约定的特殊参数名
+
+- `additional_args`：允许用户在一次调用中追加任意命令行片段（内部会智能拆分并追加到命令末尾）。
+- `scan_type`：主要用于 `nmap` 等网络扫描工具，用来覆盖默认扫描参数（如 `-sV -sC`）。
+- `action`：供少数需要内部状态分支的工具使用，仅在服务端逻辑消费，不会拼接到命令行。
+
+这些名称在执行器中有特殊处理，建议复用而不要自定义同义字段。
+
+#### 推荐配置流程
+
+1. 在 `tools/` 目录新建 YAML 文件，例如 `tools/mytool.yaml`。
+2. 填写上述顶层字段及参数列表，为常用参数设置 `default`，并在 `description` 中提供示例。
+3. 如需快速校验，执行 `go run cmd/test-config/main.go`，确认加载无误。
+4. 重启服务或触发热更新后，前端设置面板与 MCP 工具列表会自动展示新工具。
 
 #### 方法二：在主配置文件中添加
 
-在 `config.yaml` 的 `security.tools` 中添加工具配置。
+如果暂时不想拆分文件，也可以直接在 `config.yaml` 的 `security.tools` 下编写相同结构的对象。若同时存在 `tools_dir` 与内联 `tools`，目录中的配置优先生效。
 
 ### 工具参数配置
 

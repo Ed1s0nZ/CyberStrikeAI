@@ -4,9 +4,9 @@
 
 🚀 **AI-Powered Autonomous Penetration Testing Platform** - Built with Golang, featuring hundreds of built-in security tools, flexible custom tool extensions, and intelligent AI decision-making through MCP protocol, making security testing as simple as a conversation.
 
-- web mode
+- Web Mode
   ![Preview](./img/效果.png)
-- mcp-stdio / mcp-http modes
+- MCP Stdio Mode
   ![Preview](./img/mcp-stdio2.png)
 
 ## Changelog
@@ -892,42 +892,62 @@ For the complete tool list, please check the `tools/TOOLS_LIST.md` file.
 
 ### Adding New Tools
 
-#### Method 1: Create Tool Configuration File (Recommended)
+To help the AI reason about custom tools without ambiguity, each `tools/*.yaml` file must describe the tool metadata, default behaviour, and runtime parameters in detail. The loader validates every field on startup—tools with missing required fields are skipped and reported in the logs.
 
-1. Create a new YAML file in the `tools/` directory, for example `tools/mytool.yaml`:
+> Need the full checklist? See `tools/README.md` (Chinese) or `tools/README_EN.md` (English) for the complete field reference, templates, and best practices.
 
-```yaml
-name: "mytool"
-command: "mytool"
-args: ["--default-arg"]
-enabled: true
+#### Top-level fields (tool scope)
 
-short_description: "Short description (for tool list)"
+| Field | Required | Type | Description |
+|-------|----------|------|-------------|
+| `name` | ✅ | string | Unique identifier. Use lowercase letters, numbers, and hyphens for easy reference in conversations. |
+| `command` | ✅ | string | Executable or script to run. Must be resolvable from `$PATH` or provided as an absolute path. |
+| `enabled` | ✅ | bool | Registers the tool with MCP. When `false`, the tool is hidden from the UI and AI runtime. |
+| `description` | ✅ | string | Full Markdown description. Powers MCP `resources/read` and gives the AI rich context. |
+| `short_description` | Optional | string | 20–50 character summary shown in tool lists. If omitted, the loader extracts the start of `description`. |
+| `args` | Optional | string[] | Static arguments prepended to every invocation, often used for default scan profiles. |
+| `parameters` | Optional | array | List of user-supplied parameters. See the next section for field definitions. |
+| `arg_mapping` | Optional | string | Mapping strategy (`auto`/`manual`/`template`). Defaults to `auto`; usually no change required. |
 
-description: |
-  Detailed tool description to help AI understand the tool's purpose and use cases.
+> Tip: prefer plain ASCII/UTF-8 content and keep YAML indentation consistent to avoid parse errors.
 
-parameters:
-  - name: "target"
-    type: "string"
-    description: "Target parameter description"
-    required: true
-    position: 0  # Positional parameter
-    format: "positional"
-  
-  - name: "option"
-    type: "string"
-    description: "Option parameter description"
-    required: false
-    flag: "--option"
-    format: "flag"
-```
+#### Parameter objects (`parameters[]`)
 
-2. Restart the server, and the tool will be automatically loaded.
+Each parameter definition may include:
 
-#### Method 2: Add to Main Configuration File
+- `name` (required): Key used in both command construction and MCP JSON Schema.
+- `type` (required): `string`, `int`/`integer`, `bool`/`boolean`, `array`, etc.
+- `description` (required): Use Markdown to explain purpose, accepted formats, example values, and safety notes.
+- `required`: Boolean flag. When `true`, the executor will stop with an error if the caller omits the value.
+- `default`: Default value applied when the caller does not provide one.
+- `flag`: CLI switch such as `-u` or `--url`. Combined with `format` to decide how the argument is rendered.
+- `position`: Zero-based integer for positional arguments. Positional arguments are appended after flag arguments in ascending order.
+- `format`: Controls rendering strategy:
+  - `flag` (default): Emits `--flag value` or `-f value`.
+  - `combined`: Emits `--flag=value`.
+  - `positional`: Inserts the value directly according to `position`.
+  - `template`: Uses the `template` string with placeholders.
+- `template`: Active when `format: "template"`. Supports `{flag}`, `{value}`, and `{name}` placeholders.
+- `options`: Array of allowed values. Populates MCP schema `enum` entries and drives AI suggestions.
 
-Add tool configuration in `config.yaml` under `security.tools`.
+#### Reserved parameter names
+
+- `additional_args`: Lets users append raw CLI fragments in one field. The executor tokenises the string and appends it to the command.
+- `scan_type`: Primarily for tools like `nmap` to replace default scan switches (e.g., `-sV -sC`).
+- `action`: Consumed exclusively inside server-side logic for tools requiring sub-commands. Not passed to the CLI.
+
+These names are handled specially by the executor—reuse them instead of creating near-duplicates.
+
+#### Recommended authoring workflow
+
+1. Create a new YAML file under `tools/`, for example `tools/mytool.yaml`.
+2. Fill out the top-level fields, list common parameters with helpful defaults, and document examples inside `description`.
+3. Run `go run cmd/test-config/main.go` to lint configurations locally.
+4. Restart the server (or trigger a reload) so the frontend settings panel and MCP registry pick up the new tool.
+
+#### Method 2: Add to main configuration file
+
+If you prefer inline definitions, replicate the exact structure under `security.tools` in `config.yaml`. When both `tools_dir` and inline `tools` are present, files from the directory take precedence.
 
 ### Tool Parameter Configuration
 
