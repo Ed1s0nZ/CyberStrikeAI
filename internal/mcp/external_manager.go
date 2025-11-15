@@ -3,10 +3,12 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"cyberstrike-ai/internal/config"
+
 	"github.com/google/uuid"
 
 	"go.uber.org/zap"
@@ -14,13 +16,13 @@ import (
 
 // ExternalMCPManager 外部MCP管理器
 type ExternalMCPManager struct {
-	clients   map[string]ExternalMCPClient
-	configs   map[string]config.ExternalMCPServerConfig
-	logger    *zap.Logger
-	storage   MonitorStorage // 可选的持久化存储
+	clients    map[string]ExternalMCPClient
+	configs    map[string]config.ExternalMCPServerConfig
+	logger     *zap.Logger
+	storage    MonitorStorage            // 可选的持久化存储
 	executions map[string]*ToolExecution // 执行记录
-	stats     map[string]*ToolStats // 工具统计信息
-	mu        sync.RWMutex
+	stats      map[string]*ToolStats     // 工具统计信息
+	mu         sync.RWMutex
 }
 
 // NewExternalMCPManager 创建外部MCP管理器
@@ -121,7 +123,13 @@ func (m *ExternalMCPManager) StartClient(name string) error {
 	if hasClient {
 		// 检查客户端是否已连接
 		if client, ok := m.GetClient(name); ok && client.IsConnected() {
-			return fmt.Errorf("客户端已连接")
+			// 客户端已连接，直接返回成功（目标状态已达成）
+			// 更新配置为启用（确保配置一致）
+			m.mu.Lock()
+			serverCfg.ExternalMCPEnable = true
+			m.configs[name] = serverCfg
+			m.mu.Unlock()
+			return nil
 		}
 		// 如果有客户端但未连接，先关闭
 		if client, ok := m.GetClient(name); ok {
@@ -638,10 +646,45 @@ func (m *ExternalMCPManager) StartAllEnabled() {
 		if m.isEnabled(cfg) {
 			go func(n string, c config.ExternalMCPServerConfig) {
 				if err := m.connectClient(n, c); err != nil {
-					m.logger.Error("启动外部MCP客户端失败",
-						zap.String("name", n),
-						zap.Error(err),
-					)
+					// 检查是否是连接被拒绝的错误（服务可能还没启动）
+					errStr := strings.ToLower(err.Error())
+					isConnectionRefused := strings.Contains(errStr, "connection refused") ||
+						strings.Contains(errStr, "dial tcp") ||
+						strings.Contains(errStr, "connect: connection refused")
+
+					if isConnectionRefused {
+						// 连接被拒绝，说明目标服务可能还没启动，这是正常的
+						// 使用 Warn 级别，提示用户这是正常的，可以通过手动启动或等待服务启动后自动连接
+						fields := []zap.Field{
+							zap.String("name", n),
+							zap.String("message", "目标服务可能尚未启动，这是正常的。服务启动后可通过界面手动连接，或等待自动重试"),
+							zap.Error(err),
+						}
+
+						// 根据传输模式添加相应的信息
+						transport := c.Transport
+						if transport == "" {
+							if c.Command != "" {
+								transport = "stdio"
+							} else if c.URL != "" {
+								transport = "http"
+							}
+						}
+
+						if transport == "http" && c.URL != "" {
+							fields = append(fields, zap.String("url", c.URL))
+						} else if transport == "stdio" && c.Command != "" {
+							fields = append(fields, zap.String("command", c.Command))
+						}
+
+						m.logger.Warn("外部MCP服务暂未就绪", fields...)
+					} else {
+						// 其他错误，使用 Error 级别
+						m.logger.Error("启动外部MCP客户端失败",
+							zap.String("name", n),
+							zap.Error(err),
+						)
+					}
 				}
 			}(name, cfg)
 		}
