@@ -7,12 +7,14 @@
 [English](README.md) | [中文](README_CN.md)
 
 🚀 **AI自主渗透测试平台** - 基于Golang构建，内置上百个安全工具，支持灵活扩展自定义工具，通过MCP协议实现AI智能决策与自动化执行，让安全测试像对话一样简单。
-- web模式
-  ![详情预览](./img/效果.png)
-- mcp-stdio / mcp-http 模式
-  ![详情预览](./img/mcp-stdio2.png)
-- 外部MCP服务器集成（支持 stdio 和 HTTP 传输模式）
-  ![详情预览](./img/外部MCP接入.png)
+- web模式   
+  <img src="./img/效果.png" alt="Preview" width="600">
+  
+- mcp-stdio / mcp-http 模式   
+  <img src="./img/mcp-stdio2.png" alt="Preview" width="600">
+  
+- 外部MCP服务器集成（支持 stdio 和 HTTP 传输模式）   
+  <img src="./img/外部MCP接入.png" alt="Preview" width="600">
   
 ## 更新日志
 - 2025.11.17 新增攻击链可视化功能：基于AI分析自动从对话中构建攻击链，可视化展示工具执行流程、漏洞发现路径和节点间关联关系，支持交互式图谱探索和风险评分
