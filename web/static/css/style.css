@@ -2579,3 +2579,141 @@ header {
         grid-template-columns: 1fr;
     }
 }
+
+/* ==================== 攻击链可视化样式 ==================== */
+
+.attack-chain-modal-content {
+    max-width: 95vw;
+    width: 95vw;
+    height: 90vh;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.attack-chain-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    padding: 0;
+}
+
+.attack-chain-controls {
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    background: var(--bg-secondary);
+}
+
+.attack-chain-info {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.attack-chain-legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.875rem;
+}
+
+.legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+
+.attack-chain-container {
+    flex: 1;
+    min-height: 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    position: relative;
+}
+
+.attack-chain-details {
+    padding: 16px;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.attack-chain-details h3 {
+    margin: 0 0 12px 0;
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+.node-detail-item {
+    margin-bottom: 8px;
+    font-size: 0.875rem;
+}
+
+.node-detail-item strong {
+    color: var(--text-primary);
+    margin-right: 8px;
+}
+
+.node-detail-item code {
+    background: var(--bg-tertiary);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.8125rem;
+}
+
+.metadata-pre {
+    background: var(--bg-tertiary);
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 0.8125rem;
+    overflow-x: auto;
+    margin-top: 4px;
+}
+
+.modal-header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.loading-spinner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-secondary);
+    font-size: 1rem;
+}
+
+.empty-message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-secondary);
+    font-size: 1rem;
+}
+
+.error-message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--error-color);
+    font-size: 1rem;
+    padding: 20px;
+}

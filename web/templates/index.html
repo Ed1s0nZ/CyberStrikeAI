@@ -304,10 +304,73 @@
         </div>
     </div>
 
+    <!-- 攻击链可视化模态框 -->
+    <div id="attack-chain-modal" class="modal">
+        <div class="modal-content attack-chain-modal-content">
+            <div class="modal-header">
+                <h2>攻击链可视化</h2>
+                <div class="modal-header-actions">
+                    <button class="btn-secondary" onclick="regenerateAttackChain()" title="重新生成攻击链（包含最新对话内容）" style="background: #007bff; color: white; border-color: #007bff; margin-right: 8px;">
+                        🔄 重新生成
+                    </button>
+                    <button class="btn-secondary" onclick="exportAttackChain('png')" title="导出为PNG">
+                        📥 PNG
+                    </button>
+                    <button class="btn-secondary" onclick="exportAttackChain('svg')" title="导出为SVG">
+                        📥 SVG
+                    </button>
+                    <button class="btn-secondary" onclick="refreshAttackChain()" title="刷新当前攻击链（不重新生成）">
+                        ↻ 刷新
+                    </button>
+                    <span class="modal-close" onclick="closeAttackChainModal()">&times;</span>
+                </div>
+            </div>
+            <div class="modal-body attack-chain-body">
+                <div class="attack-chain-controls">
+                    <div class="attack-chain-info">
+                        <span id="attack-chain-stats">节点: 0 | 边: 0</span>
+                    </div>
+                    <div class="attack-chain-legend">
+                        <div class="legend-item">
+                            <span class="legend-color" style="background: #ff4444;"></span>
+                            <span>高风险 (80-100)</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color" style="background: #ff8800;"></span>
+                            <span>中高风险 (60-79)</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color" style="background: #ffbb00;"></span>
+                            <span>中风险 (40-59)</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color" style="background: #88cc00;"></span>
+                            <span>低风险 (0-39)</span>
+                        </div>
+                    </div>
+                </div>
+                <div id="attack-chain-container" class="attack-chain-container">
+                    <div class="loading-spinner">加载中...</div>
+                </div>
+                <div id="attack-chain-details" class="attack-chain-details" style="display: none;">
+                    <h3>节点详情</h3>
+                    <div id="attack-chain-details-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Marked.js for Markdown parsing -->
     <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
     <!-- DOMPurify for HTML sanitization to prevent XSS -->
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
+    <!-- Cytoscape.js for attack chain visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.27.0/dist/cytoscape.min.js"></script>
+    <!-- dagre layout dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/graphlib@2.1.8/dist/graphlib.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"></script>
+    <!-- dagre layout for hierarchical layout -->
+    <script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
     <script src="/static/js/app.js"></script>
 </body>
 </html>

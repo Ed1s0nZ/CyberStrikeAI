@@ -130,6 +130,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	authHandler := handler.NewAuthHandler(authManager, cfg, configPath, log.Logger)
 	configHandler := handler.NewConfigHandler(configPath, cfg, mcpServer, executor, agent, externalMCPMgr, log.Logger)
 	externalMCPHandler := handler.NewExternalMCPHandler(externalMCPMgr, cfg, configPath, log.Logger)
+	attackChainHandler := handler.NewAttackChainHandler(db, &cfg.OpenAI, log.Logger)
 
 	// 设置路由
 	setupRoutes(
@@ -140,6 +141,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 		conversationHandler,
 		configHandler,
 		externalMCPHandler,
+		attackChainHandler,
 		mcpServer,
 		authManager,
 	)
@@ -198,6 +200,7 @@ func setupRoutes(
 	conversationHandler *handler.ConversationHandler,
 	configHandler *handler.ConfigHandler,
 	externalMCPHandler *handler.ExternalMCPHandler,
+	attackChainHandler *handler.AttackChainHandler,
 	mcpServer *mcp.Server,
 	authManager *security.AuthManager,
 ) {
@@ -250,6 +253,10 @@ func setupRoutes(
 		protected.DELETE("/external-mcp/:name", externalMCPHandler.DeleteExternalMCP)
 		protected.POST("/external-mcp/:name/start", externalMCPHandler.StartExternalMCP)
 		protected.POST("/external-mcp/:name/stop", externalMCPHandler.StopExternalMCP)
+
+		// 攻击链可视化
+		protected.GET("/attack-chain/:conversationId", attackChainHandler.GetAttackChain)
+		protected.POST("/attack-chain/:conversationId/regenerate", attackChainHandler.RegenerateAttackChain)
 
 		// MCP端点
 		protected.POST("/mcp", func(c *gin.Context) {

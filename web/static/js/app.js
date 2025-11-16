@@ -1750,6 +1750,9 @@ async function loadConversation(conversationId) {
         // 滚动到底部
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
         
+        // 添加攻击链按钮
+        addAttackChainButton(conversationId);
+        
         // 刷新对话列表
         loadConversations();
     } catch (error) {
@@ -2879,27 +2882,24 @@ function renderMonitorPagination() {
     
     const { page, totalPages, total, pageSize } = monitorState.pagination;
     
-    // 如果只有一页或没有数据，不显示分页
-    if (totalPages <= 1 || total === 0) {
-        return;
-    }
-    
+    // 始终显示分页控件
     const pagination = document.createElement('div');
     pagination.className = 'monitor-pagination';
     
-    const startItem = (page - 1) * pageSize + 1;
-    const endItem = Math.min(page * pageSize, total);
+    // 处理没有数据的情况
+    const startItem = total === 0 ? 0 : (page - 1) * pageSize + 1;
+    const endItem = total === 0 ? 0 : Math.min(page * pageSize, total);
     
     pagination.innerHTML = `
         <div class="pagination-info">
             显示 ${startItem}-${endItem} / 共 ${total} 条记录
         </div>
         <div class="pagination-controls">
-            <button class="btn-secondary" onclick="refreshMonitorPanel(1)" ${page === 1 ? 'disabled' : ''}>首页</button>
-            <button class="btn-secondary" onclick="refreshMonitorPanel(${page - 1})" ${page === 1 ? 'disabled' : ''}>上一页</button>
-            <span class="pagination-page">第 ${page} / ${totalPages} 页</span>
-            <button class="btn-secondary" onclick="refreshMonitorPanel(${page + 1})" ${page === totalPages ? 'disabled' : ''}>下一页</button>
-            <button class="btn-secondary" onclick="refreshMonitorPanel(${totalPages})" ${page === totalPages ? 'disabled' : ''}>末页</button>
+            <button class="btn-secondary" onclick="refreshMonitorPanel(1)" ${page === 1 || total === 0 ? 'disabled' : ''}>首页</button>
+            <button class="btn-secondary" onclick="refreshMonitorPanel(${page - 1})" ${page === 1 || total === 0 ? 'disabled' : ''}>上一页</button>
+            <span class="pagination-page">第 ${page} / ${totalPages || 1} 页</span>
+            <button class="btn-secondary" onclick="refreshMonitorPanel(${page + 1})" ${page >= totalPages || total === 0 ? 'disabled' : ''}>下一页</button>
+            <button class="btn-secondary" onclick="refreshMonitorPanel(${totalPages || 1})" ${page >= totalPages || total === 0 ? 'disabled' : ''}>末页</button>
         </div>
     `;
     
@@ -3481,3 +3481,1031 @@ openSettings = async function() {
     await originalOpenSettings();
     await loadExternalMCPs();
 };
+
+// ==================== 攻击链可视化功能 ====================
+
+let attackChainCytoscape = null;
+let currentAttackChainConversationId = null;
+let isAttackChainLoading = false; // 防止重复加载
+
+// 添加攻击链按钮
+function addAttackChainButton(conversationId) {
+    // 检查是否已存在按钮
+    let attackChainBtn = document.getElementById('attack-chain-btn');
+    if (!attackChainBtn) {
+        attackChainBtn = document.createElement('button');
+        attackChainBtn.id = 'attack-chain-btn';
+        attackChainBtn.className = 'btn-secondary';
+        attackChainBtn.style.marginLeft = '10px';
+        attackChainBtn.innerHTML = '🔗 攻击链';
+        attackChainBtn.onclick = () => showAttackChain(conversationId);
+        
+        // 在消息区域上方添加按钮容器
+        const chatMessages = document.getElementById('chat-messages');
+        if (chatMessages) {
+            // 检查是否已有按钮容器
+            let btnContainer = document.getElementById('attack-chain-btn-container');
+            if (!btnContainer) {
+                btnContainer = document.createElement('div');
+                btnContainer.id = 'attack-chain-btn-container';
+                btnContainer.style.padding = '10px';
+                btnContainer.style.borderBottom = '1px solid var(--border-color)';
+                btnContainer.style.background = 'var(--bg-secondary)';
+                chatMessages.parentNode.insertBefore(btnContainer, chatMessages);
+            }
+            btnContainer.innerHTML = '';
+            btnContainer.appendChild(attackChainBtn);
+        }
+    } else {
+        attackChainBtn.onclick = () => showAttackChain(conversationId);
+    }
+}
+
+// 显示攻击链模态框
+async function showAttackChain(conversationId) {
+    // 防止重复点击
+    if (isAttackChainLoading) {
+        console.log('攻击链正在加载中，请稍候...');
+        return;
+    }
+    
+    currentAttackChainConversationId = conversationId;
+    const modal = document.getElementById('attack-chain-modal');
+    if (!modal) {
+        console.error('攻击链模态框未找到');
+        return;
+    }
+    
+    modal.style.display = 'block';
+    
+    // 清空容器
+    const container = document.getElementById('attack-chain-container');
+    if (container) {
+        container.innerHTML = '<div class="loading-spinner">加载中...</div>';
+    }
+    
+    // 隐藏详情面板
+    const detailsPanel = document.getElementById('attack-chain-details');
+    if (detailsPanel) {
+        detailsPanel.style.display = 'none';
+    }
+    
+    // 禁用重新生成按钮
+    const regenerateBtn = document.querySelector('button[onclick="regenerateAttackChain()"]');
+    if (regenerateBtn) {
+        regenerateBtn.disabled = true;
+        regenerateBtn.style.opacity = '0.5';
+        regenerateBtn.style.cursor = 'not-allowed';
+    }
+    
+    // 加载攻击链数据
+    await loadAttackChain(conversationId);
+}
+
+// 加载攻击链数据
+async function loadAttackChain(conversationId) {
+    if (isAttackChainLoading) {
+        return; // 防止重复调用
+    }
+    
+    isAttackChainLoading = true;
+    
+    try {
+        const response = await apiFetch(`/api/attack-chain/${conversationId}`);
+        
+        if (!response.ok) {
+            // 处理 409 Conflict（正在生成中）
+            if (response.status === 409) {
+                const error = await response.json();
+                const container = document.getElementById('attack-chain-container');
+                if (container) {
+                    container.innerHTML = `
+                        <div class="loading-spinner" style="text-align: center; padding: 40px;">
+                            <div style="margin-bottom: 16px;">⏳ 攻击链正在生成中...</div>
+                            <div style="color: var(--text-secondary); font-size: 0.875rem;">
+                                请稍候，生成完成后将自动显示
+                            </div>
+                            <button class="btn-secondary" onclick="refreshAttackChain()" style="margin-top: 16px;">
+                                刷新查看进度
+                            </button>
+                        </div>
+                    `;
+                }
+                // 5秒后自动刷新（允许刷新，但保持加载状态防止重复点击）
+                setTimeout(() => {
+                    refreshAttackChain();
+                }, 5000);
+                // 在 409 情况下，保持 isAttackChainLoading = true，防止重复点击
+                // 但允许 refreshAttackChain 调用 loadAttackChain 来检查状态
+                // 注意：不重置 isAttackChainLoading，保持加载状态
+                // 恢复按钮状态（虽然保持加载状态，但允许用户手动刷新）
+                const regenerateBtn = document.querySelector('button[onclick="regenerateAttackChain()"]');
+                if (regenerateBtn) {
+                    regenerateBtn.disabled = false;
+                    regenerateBtn.style.opacity = '1';
+                    regenerateBtn.style.cursor = 'pointer';
+                }
+                return; // 提前返回，不执行 finally 块中的 isAttackChainLoading = false
+            }
+            
+            const error = await response.json();
+            throw new Error(error.error || '加载攻击链失败');
+        }
+        
+        const chainData = await response.json();
+        
+        // 渲染攻击链
+        renderAttackChain(chainData);
+        
+        // 更新统计信息
+        updateAttackChainStats(chainData);
+        
+        // 成功加载后，重置加载状态
+        isAttackChainLoading = false;
+        
+    } catch (error) {
+        console.error('加载攻击链失败:', error);
+        const container = document.getElementById('attack-chain-container');
+        if (container) {
+            container.innerHTML = `<div class="error-message">加载失败: ${error.message}</div>`;
+        }
+        // 错误时也重置加载状态
+        isAttackChainLoading = false;
+    } finally {
+        // 恢复重新生成按钮
+        const regenerateBtn = document.querySelector('button[onclick="regenerateAttackChain()"]');
+        if (regenerateBtn) {
+            regenerateBtn.disabled = false;
+            regenerateBtn.style.opacity = '1';
+            regenerateBtn.style.cursor = 'pointer';
+        }
+    }
+}
+
+// 渲染攻击链
+function renderAttackChain(chainData) {
+    const container = document.getElementById('attack-chain-container');
+    if (!container) {
+        return;
+    }
+    
+    // 清空容器
+    container.innerHTML = '';
+    
+    if (!chainData.nodes || chainData.nodes.length === 0) {
+        container.innerHTML = '<div class="empty-message">暂无攻击链数据</div>';
+        return;
+    }
+    
+    // 计算图的复杂度（用于动态调整布局和样式）
+    const nodeCount = chainData.nodes.length;
+    const edgeCount = chainData.edges.length;
+    const isComplexGraph = nodeCount > 20 || edgeCount > 30;
+    
+    // 准备Cytoscape数据
+    const elements = [];
+    
+    // 添加节点，并预计算文字颜色和边框颜色
+    chainData.nodes.forEach(node => {
+        const riskScore = node.risk_score || 0;
+        // 根据风险分数计算文字颜色和边框颜色
+        let textColor, borderColor, textOutlineWidth, textOutlineColor;
+        if (riskScore >= 80) {
+            // 红色背景：白色文字，白色边框
+            textColor = '#fff';
+            borderColor = '#fff';
+            textOutlineWidth = 1;
+            textOutlineColor = '#333';
+        } else if (riskScore >= 60) {
+            // 橙色背景：白色文字，白色边框
+            textColor = '#fff';
+            borderColor = '#fff';
+            textOutlineWidth = 1;
+            textOutlineColor = '#333';
+        } else if (riskScore >= 40) {
+            // 黄色背景：深色文字，深色边框
+            textColor = '#333';
+            borderColor = '#cc9900';
+            textOutlineWidth = 2;
+            textOutlineColor = '#fff';
+        } else {
+            // 绿色背景：深绿色文字，深色边框
+            textColor = '#1a5a1a';
+            borderColor = '#5a8a5a';
+            textOutlineWidth = 2;
+            textOutlineColor = '#fff';
+        }
+        
+        elements.push({
+            data: {
+                id: node.id,
+                label: node.label,
+                type: node.type,
+                riskScore: riskScore,
+                toolExecutionId: node.tool_execution_id || '',
+                metadata: node.metadata || {},
+                textColor: textColor,
+                borderColor: borderColor,
+                textOutlineWidth: textOutlineWidth,
+                textOutlineColor: textOutlineColor
+            }
+        });
+    });
+    
+    // 添加边
+    chainData.edges.forEach(edge => {
+        elements.push({
+            data: {
+                id: edge.id,
+                source: edge.source,
+                target: edge.target,
+                type: edge.type || 'leads_to',
+                weight: edge.weight || 1
+            }
+        });
+    });
+    
+    // 初始化Cytoscape
+    attackChainCytoscape = cytoscape({
+        container: container,
+        elements: elements,
+        style: [
+            {
+                selector: 'node',
+                style: {
+                    'label': 'data(label)',
+                    // 统一节点大小，减少布局混乱（根据复杂度调整）
+                    'width': nodeCount > 20 ? 60 : 'mapData(riskScore, 0, 100, 45, 75)',
+                    'height': nodeCount > 20 ? 60 : 'mapData(riskScore, 0, 100, 45, 75)',
+                    'shape': function(ele) {
+                        const type = ele.data('type');
+                        if (type === 'vulnerability') return 'diamond';
+                        if (type === 'action') return 'round-rectangle';
+                        if (type === 'target') return 'star';
+                        return 'ellipse';
+                    },
+                    'background-color': function(ele) {
+                        const riskScore = ele.data('riskScore') || 0;
+                        if (riskScore >= 80) return '#ff4444';  // 红色
+                        if (riskScore >= 60) return '#ff8800';  // 橙色
+                        if (riskScore >= 40) return '#ffbb00';  // 黄色
+                        return '#88cc00';  // 绿色
+                    },
+                    // 使用预计算的颜色数据
+                    'color': 'data(textColor)',
+                    'font-size': nodeCount > 20 ? '11px' : '12px',  // 复杂图使用更小字体
+                    'font-weight': 'bold',
+                    'text-valign': 'center',
+                    'text-halign': 'center',
+                    'text-wrap': 'wrap',
+                    'text-max-width': nodeCount > 20 ? '80px' : '100px',  // 复杂图限制文本宽度
+                    'border-width': 2,
+                    'border-color': 'data(borderColor)',
+                    'overlay-padding': '4px',
+                    'text-outline-width': 'data(textOutlineWidth)',
+                    'text-outline-color': 'data(textOutlineColor)'
+                }
+            },
+            {
+                selector: 'edge',
+                style: {
+                    'width': 'mapData(weight, 1, 5, 1.5, 3)',
+                    'line-color': function(ele) {
+                        const type = ele.data('type');
+                        if (type === 'discovers') return '#3498db';  // 浅蓝：action发现vulnerability
+                        if (type === 'targets') return '#0066ff';  // 蓝色：target指向action
+                        if (type === 'enables') return '#e74c3c';  // 深红：vulnerability间的因果关系
+                        if (type === 'leads_to') return '#666';  // 灰色：action之间的逻辑顺序
+                        return '#999';
+                    },
+                    'target-arrow-color': function(ele) {
+                        const type = ele.data('type');
+                        if (type === 'discovers') return '#3498db';
+                        if (type === 'targets') return '#0066ff';
+                        if (type === 'enables') return '#e74c3c';
+                        if (type === 'leads_to') return '#666';
+                        return '#999';
+                    },
+                    'target-arrow-shape': 'triangle',
+                    'target-arrow-size': 8,
+                    // 对于复杂图，使用straight样式减少交叉；简单图使用bezier更美观
+                    'curve-style': isComplexGraph ? 'straight' : 'bezier',
+                    'control-point-step-size': isComplexGraph ? 40 : 60,  // bezier控制点间距
+                    'control-point-distance': isComplexGraph ? 30 : 50,   // bezier控制点距离
+                    'opacity': isComplexGraph ? 0.5 : 0.7,  // 复杂图降低不透明度，减少视觉混乱
+                    'line-style': 'solid'
+                }
+            },
+            {
+                selector: 'node:selected',
+                style: {
+                    'border-width': 4,
+                    'border-color': '#0066ff'
+                }
+            }
+        ],
+        userPanningEnabled: true,
+        userZoomingEnabled: true,
+        boxSelectionEnabled: true
+    });
+    
+    // 注册dagre布局（确保依赖已加载）
+    let layoutName = 'breadthfirst'; // 默认布局
+    let layoutOptions = {
+        name: 'breadthfirst',
+        directed: true,
+        spacingFactor: isComplexGraph ? 2.5 : 2.0,
+        padding: 30
+    };
+    
+    if (typeof cytoscape !== 'undefined' && typeof cytoscapeDagre !== 'undefined') {
+        try {
+            cytoscape.use(cytoscapeDagre);
+            layoutName = 'dagre';
+            // 根据图的复杂度调整布局参数
+            layoutOptions = {
+                name: 'dagre',
+                rankDir: 'TB',  // 从上到下
+                spacingFactor: isComplexGraph ? 2.5 : 2.0,  // 增加整体间距
+                nodeSep: isComplexGraph ? 80 : 60,  // 增加节点间距
+                edgeSep: isComplexGraph ? 40 : 30,  // 增加边间距
+                rankSep: isComplexGraph ? 120 : 100,  // 增加层级间距
+                nodeDimensionsIncludeLabels: true,  // 考虑标签大小
+                animate: false,
+                padding: 40  // 增加边距
+            };
+        } catch (e) {
+            console.warn('dagre布局注册失败，使用默认布局:', e);
+        }
+    } else {
+        console.warn('dagre布局插件未加载，使用默认布局');
+    }
+    
+    // 应用布局
+    attackChainCytoscape.layout(layoutOptions).run();
+    
+    // 布局完成后，调整视图以适应所有节点
+    attackChainCytoscape.fit(undefined, 50);  // 50px padding
+    
+    // 添加点击事件
+    attackChainCytoscape.on('tap', 'node', function(evt) {
+        const node = evt.target;
+        showNodeDetails(node.data());
+    });
+    
+    // 添加悬停效果
+    attackChainCytoscape.on('mouseover', 'node', function(evt) {
+        const node = evt.target;
+        node.style('opacity', 0.8);
+    });
+    
+    attackChainCytoscape.on('mouseout', 'node', function(evt) {
+        const node = evt.target;
+        node.style('opacity', 1);
+    });
+}
+
+// 显示节点详情
+function showNodeDetails(nodeData) {
+    const detailsPanel = document.getElementById('attack-chain-details');
+    const detailsContent = document.getElementById('attack-chain-details-content');
+    
+    if (!detailsPanel || !detailsContent) {
+        return;
+    }
+    
+    detailsPanel.style.display = 'block';
+    
+    let html = `
+        <div class="node-detail-item">
+            <strong>节点ID:</strong> <code>${nodeData.id}</code>
+        </div>
+        <div class="node-detail-item">
+            <strong>类型:</strong> ${getNodeTypeLabel(nodeData.type)}
+        </div>
+        <div class="node-detail-item">
+            <strong>标签:</strong> ${escapeHtml(nodeData.label)}
+        </div>
+        <div class="node-detail-item">
+            <strong>风险评分:</strong> ${nodeData.riskScore}/100
+        </div>
+    `;
+    
+    // 显示action节点信息（工具执行 + AI分析）
+    if (nodeData.type === 'action' && nodeData.metadata) {
+        if (nodeData.metadata.tool_name) {
+            html += `
+                <div class="node-detail-item">
+                    <strong>工具名称:</strong> <code>${escapeHtml(nodeData.metadata.tool_name)}</code>
+                </div>
+            `;
+        }
+        if (nodeData.metadata.tool_intent) {
+            html += `
+                <div class="node-detail-item">
+                    <strong>工具意图:</strong> <span style="color: #0066ff; font-weight: bold;">${escapeHtml(nodeData.metadata.tool_intent)}</span>
+                </div>
+            `;
+        }
+        if (nodeData.metadata.ai_analysis) {
+            html += `
+                <div class="node-detail-item">
+                    <strong>AI分析:</strong> <div style="margin-top: 5px; padding: 8px; background: #f5f5f5; border-radius: 4px;">${escapeHtml(nodeData.metadata.ai_analysis)}</div>
+                </div>
+            `;
+        }
+        if (nodeData.metadata.findings && Array.isArray(nodeData.metadata.findings) && nodeData.metadata.findings.length > 0) {
+            html += `
+                <div class="node-detail-item">
+                    <strong>关键发现:</strong>
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        ${nodeData.metadata.findings.map(f => `<li>${escapeHtml(f)}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+    }
+    
+    // 显示目标信息（如果是目标节点）
+    if (nodeData.type === 'target' && nodeData.metadata && nodeData.metadata.target) {
+        html += `
+            <div class="node-detail-item">
+                <strong>测试目标:</strong> <code>${escapeHtml(nodeData.metadata.target)}</code>
+            </div>
+        `;
+    }
+    
+    // 显示漏洞信息（如果是漏洞节点）
+    if (nodeData.type === 'vulnerability' && nodeData.metadata) {
+        if (nodeData.metadata.vulnerability_type) {
+            html += `
+                <div class="node-detail-item">
+                    <strong>漏洞类型:</strong> ${escapeHtml(nodeData.metadata.vulnerability_type)}
+                </div>
+            `;
+        }
+        if (nodeData.metadata.description) {
+            html += `
+                <div class="node-detail-item">
+                    <strong>描述:</strong> ${escapeHtml(nodeData.metadata.description)}
+                </div>
+            `;
+        }
+        if (nodeData.metadata.severity) {
+            html += `
+                <div class="node-detail-item">
+                    <strong>严重程度:</strong> <span style="color: ${getSeverityColor(nodeData.metadata.severity)}; font-weight: bold;">${escapeHtml(nodeData.metadata.severity)}</span>
+                </div>
+            `;
+        }
+        if (nodeData.metadata.location) {
+            html += `
+                <div class="node-detail-item">
+                    <strong>位置:</strong> <code>${escapeHtml(nodeData.metadata.location)}</code>
+                </div>
+            `;
+        }
+    }
+    
+    if (nodeData.toolExecutionId) {
+        html += `
+            <div class="node-detail-item">
+                <strong>工具执行ID:</strong> <code>${nodeData.toolExecutionId}</code>
+            </div>
+        `;
+    }
+    
+    if (nodeData.metadata && Object.keys(nodeData.metadata).length > 0) {
+        html += `
+            <div class="node-detail-item">
+                <strong>完整元数据:</strong>
+                <pre class="metadata-pre">${JSON.stringify(nodeData.metadata, null, 2)}</pre>
+            </div>
+        `;
+    }
+    
+    detailsContent.innerHTML = html;
+}
+
+// 转义HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 获取严重程度颜色
+function getSeverityColor(severity) {
+    const colors = {
+        'critical': '#ff0000',
+        'high': '#ff4444',
+        'medium': '#ff8800',
+        'low': '#ffbb00'
+    };
+    return colors[severity.toLowerCase()] || '#666';
+}
+
+// 获取节点类型标签
+function getNodeTypeLabel(type) {
+    const labels = {
+        'action': '行动',
+        'vulnerability': '漏洞',
+        'target': '目标'
+    };
+    return labels[type] || type;
+}
+
+// 更新统计信息
+function updateAttackChainStats(chainData) {
+    const statsElement = document.getElementById('attack-chain-stats');
+    if (statsElement) {
+        const nodeCount = chainData.nodes ? chainData.nodes.length : 0;
+        const edgeCount = chainData.edges ? chainData.edges.length : 0;
+        statsElement.textContent = `节点: ${nodeCount} | 边: ${edgeCount}`;
+    }
+}
+
+// 关闭攻击链模态框
+function closeAttackChainModal() {
+    const modal = document.getElementById('attack-chain-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    
+    // 清理Cytoscape实例
+    if (attackChainCytoscape) {
+        attackChainCytoscape.destroy();
+        attackChainCytoscape = null;
+    }
+    
+    currentAttackChainConversationId = null;
+}
+
+// 刷新攻击链（重新加载）
+// 注意：此函数允许在加载过程中调用，用于检查生成状态
+function refreshAttackChain() {
+    if (currentAttackChainConversationId) {
+        // 临时允许刷新，即使正在加载中（用于检查生成状态）
+        const wasLoading = isAttackChainLoading;
+        isAttackChainLoading = false; // 临时重置，允许刷新
+        loadAttackChain(currentAttackChainConversationId).finally(() => {
+            // 如果之前正在加载（409 情况），恢复加载状态
+            // 否则保持 false（正常完成）
+            if (wasLoading) {
+                // 检查是否仍然需要保持加载状态（如果还是 409，会在 loadAttackChain 中处理）
+                // 这里我们假设如果成功加载，则重置状态
+                // 如果还是 409，loadAttackChain 会保持 isAttackChainLoading = true
+            }
+        });
+    }
+}
+
+// 重新生成攻击链
+async function regenerateAttackChain() {
+    if (!currentAttackChainConversationId) {
+        return;
+    }
+    
+    // 防止重复点击
+    if (isAttackChainLoading) {
+        console.log('攻击链正在生成中，请稍候...');
+        return;
+    }
+    
+    isAttackChainLoading = true;
+    
+    const container = document.getElementById('attack-chain-container');
+    if (container) {
+        container.innerHTML = '<div class="loading-spinner">重新生成中...</div>';
+    }
+    
+    // 禁用重新生成按钮
+    const regenerateBtn = document.querySelector('button[onclick="regenerateAttackChain()"]');
+    if (regenerateBtn) {
+        regenerateBtn.disabled = true;
+        regenerateBtn.style.opacity = '0.5';
+        regenerateBtn.style.cursor = 'not-allowed';
+    }
+    
+    try {
+        // 调用重新生成接口
+        const response = await apiFetch(`/api/attack-chain/${currentAttackChainConversationId}/regenerate`, {
+            method: 'POST'
+        });
+        
+        if (!response.ok) {
+            // 处理 409 Conflict（正在生成中）
+            if (response.status === 409) {
+                const error = await response.json();
+                if (container) {
+                    container.innerHTML = `
+                        <div class="loading-spinner" style="text-align: center; padding: 40px;">
+                            <div style="margin-bottom: 16px;">⏳ 攻击链正在生成中...</div>
+                            <div style="color: var(--text-secondary); font-size: 0.875rem;">
+                                请稍候，生成完成后将自动显示
+                            </div>
+                            <button class="btn-secondary" onclick="refreshAttackChain()" style="margin-top: 16px;">
+                                刷新查看进度
+                            </button>
+                        </div>
+                    `;
+                }
+                // 5秒后自动刷新
+                setTimeout(() => {
+                    if (isAttackChainLoading) {
+                        refreshAttackChain();
+                    }
+                }, 5000);
+                return;
+            }
+            
+            const error = await response.json();
+            throw new Error(error.error || '重新生成攻击链失败');
+        }
+        
+        const chainData = await response.json();
+        
+        // 渲染攻击链
+        renderAttackChain(chainData);
+        
+        // 更新统计信息
+        updateAttackChainStats(chainData);
+        
+    } catch (error) {
+        console.error('重新生成攻击链失败:', error);
+        if (container) {
+            container.innerHTML = `<div class="error-message">重新生成失败: ${error.message}</div>`;
+        }
+    } finally {
+        isAttackChainLoading = false;
+        
+        // 恢复重新生成按钮
+        if (regenerateBtn) {
+            regenerateBtn.disabled = false;
+            regenerateBtn.style.opacity = '1';
+            regenerateBtn.style.cursor = 'pointer';
+        }
+    }
+}
+
+// 导出攻击链
+function exportAttackChain(format) {
+    if (!attackChainCytoscape) {
+        alert('请先加载攻击链');
+        return;
+    }
+    
+    // 确保图形已经渲染完成（使用小延迟）
+    setTimeout(() => {
+        try {
+            if (format === 'png') {
+                try {
+                    const pngPromise = attackChainCytoscape.png({
+                        output: 'blob',
+                        bg: 'white',
+                        full: true,
+                        scale: 1
+                    });
+                    
+                    // 处理 Promise
+                    if (pngPromise && typeof pngPromise.then === 'function') {
+                        pngPromise.then(blob => {
+                            if (!blob) {
+                                throw new Error('PNG导出返回空数据');
+                            }
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `attack-chain-${currentAttackChainConversationId || 'export'}-${Date.now()}.png`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            setTimeout(() => URL.revokeObjectURL(url), 100);
+                        }).catch(err => {
+                            console.error('导出PNG失败:', err);
+                            alert('导出PNG失败: ' + (err.message || '未知错误'));
+                        });
+                    } else {
+                        // 如果不是 Promise，直接使用
+                        const url = URL.createObjectURL(pngPromise);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `attack-chain-${currentAttackChainConversationId || 'export'}-${Date.now()}.png`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        setTimeout(() => URL.revokeObjectURL(url), 100);
+                    }
+                } catch (err) {
+                    console.error('PNG导出错误:', err);
+                    alert('导出PNG失败: ' + (err.message || '未知错误'));
+                }
+            } else if (format === 'svg') {
+                try {
+                    // Cytoscape.js 3.x 不直接支持 .svg() 方法
+                    // 使用替代方案：从 Cytoscape 数据手动构建 SVG
+                    const container = attackChainCytoscape.container();
+                    if (!container) {
+                        throw new Error('无法获取容器元素');
+                    }
+                    
+                    // 获取所有节点和边
+                    const nodes = attackChainCytoscape.nodes();
+                    const edges = attackChainCytoscape.edges();
+                    
+                    if (nodes.length === 0) {
+                        throw new Error('没有节点可导出');
+                    }
+                    
+                    // 计算所有节点的实际边界（包括节点大小）
+                    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                    nodes.forEach(node => {
+                        const pos = node.position();
+                        const nodeWidth = node.width();
+                        const nodeHeight = node.height();
+                        const size = Math.max(nodeWidth, nodeHeight) / 2;
+                        
+                        minX = Math.min(minX, pos.x - size);
+                        minY = Math.min(minY, pos.y - size);
+                        maxX = Math.max(maxX, pos.x + size);
+                        maxY = Math.max(maxY, pos.y + size);
+                    });
+                    
+                    // 也考虑边的范围
+                    edges.forEach(edge => {
+                        const sourcePos = edge.source().position();
+                        const targetPos = edge.target().position();
+                        minX = Math.min(minX, sourcePos.x, targetPos.x);
+                        minY = Math.min(minY, sourcePos.y, targetPos.y);
+                        maxX = Math.max(maxX, sourcePos.x, targetPos.x);
+                        maxY = Math.max(maxY, sourcePos.y, targetPos.y);
+                    });
+                    
+                    // 添加边距
+                    const padding = 50;
+                    minX -= padding;
+                    minY -= padding;
+                    maxX += padding;
+                    maxY += padding;
+                    
+                    const width = maxX - minX;
+                    const height = maxY - minY;
+                    
+                    // 创建 SVG 元素
+                    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                    svg.setAttribute('width', width.toString());
+                    svg.setAttribute('height', height.toString());
+                    svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                    svg.setAttribute('viewBox', `${minX} ${minY} ${width} ${height}`);
+                    
+                    // 添加白色背景矩形
+                    const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    bgRect.setAttribute('x', minX.toString());
+                    bgRect.setAttribute('y', minY.toString());
+                    bgRect.setAttribute('width', width.toString());
+                    bgRect.setAttribute('height', height.toString());
+                    bgRect.setAttribute('fill', 'white');
+                    svg.appendChild(bgRect);
+                    
+                    // 创建 defs 用于箭头标记
+                    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+                    
+                    // 添加边的箭头标记（为不同类型的边创建不同的箭头）
+                    const edgeTypes = ['discovers', 'targets', 'enables', 'leads_to'];
+                    edgeTypes.forEach((type, index) => {
+                        let color = '#999';
+                        if (type === 'discovers') color = '#3498db';
+                        else if (type === 'targets') color = '#0066ff';
+                        else if (type === 'enables') color = '#e74c3c';
+                        else if (type === 'leads_to') color = '#666';
+                        
+                        const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+                        marker.setAttribute('id', `arrowhead-${type}`);
+                        marker.setAttribute('markerWidth', '10');
+                        marker.setAttribute('markerHeight', '10');
+                        marker.setAttribute('refX', '9');
+                        marker.setAttribute('refY', '3');
+                        marker.setAttribute('orient', 'auto');
+                        const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                        polygon.setAttribute('points', '0 0, 10 3, 0 6');
+                        polygon.setAttribute('fill', color);
+                        marker.appendChild(polygon);
+                        defs.appendChild(marker);
+                    });
+                    svg.appendChild(defs);
+                    
+                    // 添加边（先绘制，这样节点会在上面）
+                    edges.forEach(edge => {
+                        const sourcePos = edge.source().position();
+                        const targetPos = edge.target().position();
+                        const edgeData = edge.data();
+                        const edgeType = edgeData.type || 'leads_to';
+                        
+                        // 获取边的样式
+                        let lineColor = '#999';
+                        if (edgeType === 'discovers') lineColor = '#3498db';
+                        else if (edgeType === 'targets') lineColor = '#0066ff';
+                        else if (edgeType === 'enables') lineColor = '#e74c3c';
+                        else if (edgeType === 'leads_to') lineColor = '#666';
+                        
+                        // 创建路径（支持曲线）
+                        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                        // 简单的直线路径（可以改进为曲线）
+                        const midX = (sourcePos.x + targetPos.x) / 2;
+                        const midY = (sourcePos.y + targetPos.y) / 2;
+                        const dx = targetPos.x - sourcePos.x;
+                        const dy = targetPos.y - sourcePos.y;
+                        const offset = Math.min(30, Math.sqrt(dx * dx + dy * dy) * 0.3);
+                        
+                        // 使用二次贝塞尔曲线
+                        const controlX = midX + (dy > 0 ? -offset : offset);
+                        const controlY = midY + (dx > 0 ? offset : -offset);
+                        path.setAttribute('d', `M ${sourcePos.x} ${sourcePos.y} Q ${controlX} ${controlY} ${targetPos.x} ${targetPos.y}`);
+                        path.setAttribute('stroke', lineColor);
+                        path.setAttribute('stroke-width', '2');
+                        path.setAttribute('fill', 'none');
+                        path.setAttribute('marker-end', `url(#arrowhead-${edgeType})`);
+                        svg.appendChild(path);
+                    });
+                    
+                    // 添加节点
+                    nodes.forEach(node => {
+                        const pos = node.position();
+                        const nodeData = node.data();
+                        const riskScore = nodeData.riskScore || 0;
+                        const nodeWidth = node.width();
+                        const nodeHeight = node.height();
+                        const size = Math.max(nodeWidth, nodeHeight) / 2;
+                        
+                        // 确定节点颜色
+                        let bgColor = '#88cc00';
+                        let textColor = '#1a5a1a';
+                        let borderColor = '#5a8a5a';
+                        if (riskScore >= 80) {
+                            bgColor = '#ff4444';
+                            textColor = '#fff';
+                            borderColor = '#fff';
+                        } else if (riskScore >= 60) {
+                            bgColor = '#ff8800';
+                            textColor = '#fff';
+                            borderColor = '#fff';
+                        } else if (riskScore >= 40) {
+                            bgColor = '#ffbb00';
+                            textColor = '#333';
+                            borderColor = '#cc9900';
+                        }
+                        
+                        // 确定节点形状
+                        const nodeType = nodeData.type;
+                        let shapeElement;
+                        if (nodeType === 'vulnerability') {
+                            // 菱形
+                            shapeElement = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                            const points = [
+                                `${pos.x},${pos.y - size}`,
+                                `${pos.x + size},${pos.y}`,
+                                `${pos.x},${pos.y + size}`,
+                                `${pos.x - size},${pos.y}`
+                            ].join(' ');
+                            shapeElement.setAttribute('points', points);
+                        } else if (nodeType === 'target') {
+                            // 星形（五角星）
+                            shapeElement = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                            const points = [];
+                            for (let i = 0; i < 5; i++) {
+                                const angle = (i * 4 * Math.PI / 5) - Math.PI / 2;
+                                const x = pos.x + size * Math.cos(angle);
+                                const y = pos.y + size * Math.sin(angle);
+                                points.push(`${x},${y}`);
+                            }
+                            shapeElement.setAttribute('points', points.join(' '));
+                        } else {
+                            // 圆角矩形
+                            shapeElement = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                            shapeElement.setAttribute('x', (pos.x - size).toString());
+                            shapeElement.setAttribute('y', (pos.y - size).toString());
+                            shapeElement.setAttribute('width', (size * 2).toString());
+                            shapeElement.setAttribute('height', (size * 2).toString());
+                            shapeElement.setAttribute('rx', '5');
+                            shapeElement.setAttribute('ry', '5');
+                        }
+                        
+                        shapeElement.setAttribute('fill', bgColor);
+                        shapeElement.setAttribute('stroke', borderColor);
+                        shapeElement.setAttribute('stroke-width', '2');
+                        svg.appendChild(shapeElement);
+                        
+                        // 添加文本标签（使用文本描边提高可读性）
+                        const label = (nodeData.label || nodeData.id || '').toString();
+                        const maxLength = 15;
+                        
+                        // 创建文本组，包含描边和填充
+                        const textGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                        textGroup.setAttribute('text-anchor', 'middle');
+                        textGroup.setAttribute('dominant-baseline', 'middle');
+                        
+                        // 处理长文本（简单换行）
+                        let lines = [];
+                        if (label.length > maxLength) {
+                            const words = label.split(' ');
+                            let currentLine = '';
+                            words.forEach(word => {
+                                if ((currentLine + word).length <= maxLength) {
+                                    currentLine += (currentLine ? ' ' : '') + word;
+                                } else {
+                                    if (currentLine) lines.push(currentLine);
+                                    currentLine = word;
+                                }
+                            });
+                            if (currentLine) lines.push(currentLine);
+                            lines = lines.slice(0, 2); // 最多两行
+                        } else {
+                            lines = [label];
+                        }
+                        
+                        // 确定文本描边颜色（与原始渲染一致）
+                        let textOutlineColor = '#fff';
+                        let textOutlineWidth = 2;
+                        if (riskScore >= 80 || riskScore >= 60) {
+                            // 红色/橙色背景：白色文字，白色描边，深色轮廓
+                            textOutlineColor = '#333';
+                            textOutlineWidth = 1;
+                        } else if (riskScore >= 40) {
+                            // 黄色背景：深色文字，白色描边
+                            textOutlineColor = '#fff';
+                            textOutlineWidth = 2;
+                        } else {
+                            // 绿色背景：深绿色文字，白色描边
+                            textOutlineColor = '#fff';
+                            textOutlineWidth = 2;
+                        }
+                        
+                        // 为每行文本创建描边和填充
+                        lines.forEach((line, i) => {
+                            const textY = pos.y + (i - (lines.length - 1) / 2) * 16;
+                            
+                            // 描边文本（用于提高对比度，模拟text-outline效果）
+                            const strokeText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                            strokeText.setAttribute('x', pos.x.toString());
+                            strokeText.setAttribute('y', textY.toString());
+                            strokeText.setAttribute('fill', 'none');
+                            strokeText.setAttribute('stroke', textOutlineColor);
+                            strokeText.setAttribute('stroke-width', textOutlineWidth.toString());
+                            strokeText.setAttribute('stroke-linejoin', 'round');
+                            strokeText.setAttribute('stroke-linecap', 'round');
+                            strokeText.setAttribute('font-size', '14px');
+                            strokeText.setAttribute('font-weight', 'bold');
+                            strokeText.setAttribute('font-family', 'Arial, sans-serif');
+                            strokeText.setAttribute('text-anchor', 'middle');
+                            strokeText.setAttribute('dominant-baseline', 'middle');
+                            strokeText.textContent = line;
+                            textGroup.appendChild(strokeText);
+                            
+                            // 填充文本（实际可见的文本）
+                            const fillText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                            fillText.setAttribute('x', pos.x.toString());
+                            fillText.setAttribute('y', textY.toString());
+                            fillText.setAttribute('fill', textColor);
+                            fillText.setAttribute('font-size', '14px');
+                            fillText.setAttribute('font-weight', 'bold');
+                            fillText.setAttribute('font-family', 'Arial, sans-serif');
+                            fillText.setAttribute('text-anchor', 'middle');
+                            fillText.setAttribute('dominant-baseline', 'middle');
+                            fillText.textContent = line;
+                            textGroup.appendChild(fillText);
+                        });
+                        
+                        svg.appendChild(textGroup);
+                    });
+                    
+                    // 将 SVG 转换为字符串
+                    const serializer = new XMLSerializer();
+                    let svgString = serializer.serializeToString(svg);
+                    
+                    // 确保有 XML 声明
+                    if (!svgString.startsWith('<?xml')) {
+                        svgString = '<?xml version="1.0" encoding="UTF-8"?>\n' + svgString;
+                    }
+                    
+                    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `attack-chain-${currentAttackChainConversationId || 'export'}-${Date.now()}.svg`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    setTimeout(() => URL.revokeObjectURL(url), 100);
+                } catch (err) {
+                    console.error('SVG导出错误:', err);
+                    alert('导出SVG失败: ' + (err.message || '未知错误'));
+                }
+            } else {
+                alert('不支持的导出格式: ' + format);
+            }
+        } catch (error) {
+            console.error('导出失败:', error);
+            alert('导出失败: ' + (error.message || '未知错误'));
+        }
+    }, 100); // 小延迟确保图形已渲染
+}

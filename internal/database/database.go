@@ -101,6 +101,36 @@ func (db *DB) initTables() error {
 		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);`
 
+	// 创建攻击链节点表
+	createAttackChainNodesTable := `
+	CREATE TABLE IF NOT EXISTS attack_chain_nodes (
+		id TEXT PRIMARY KEY,
+		conversation_id TEXT NOT NULL,
+		node_type TEXT NOT NULL,
+		node_name TEXT NOT NULL,
+		tool_execution_id TEXT,
+		metadata TEXT,
+		risk_score INTEGER DEFAULT 0,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+		FOREIGN KEY (tool_execution_id) REFERENCES tool_executions(id) ON DELETE SET NULL
+	);`
+
+	// 创建攻击链边表
+	createAttackChainEdgesTable := `
+	CREATE TABLE IF NOT EXISTS attack_chain_edges (
+		id TEXT PRIMARY KEY,
+		conversation_id TEXT NOT NULL,
+		source_node_id TEXT NOT NULL,
+		target_node_id TEXT NOT NULL,
+		edge_type TEXT NOT NULL,
+		weight INTEGER DEFAULT 1,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+		FOREIGN KEY (source_node_id) REFERENCES attack_chain_nodes(id) ON DELETE CASCADE,
+		FOREIGN KEY (target_node_id) REFERENCES attack_chain_nodes(id) ON DELETE CASCADE
+	);`
+
 	// 创建索引
 	createIndexes := `
 	CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
@@ -110,6 +140,10 @@ func (db *DB) initTables() error {
 	CREATE INDEX IF NOT EXISTS idx_tool_executions_tool_name ON tool_executions(tool_name);
 	CREATE INDEX IF NOT EXISTS idx_tool_executions_start_time ON tool_executions(start_time);
 	CREATE INDEX IF NOT EXISTS idx_tool_executions_status ON tool_executions(status);
+	CREATE INDEX IF NOT EXISTS idx_chain_nodes_conversation ON attack_chain_nodes(conversation_id);
+	CREATE INDEX IF NOT EXISTS idx_chain_edges_conversation ON attack_chain_edges(conversation_id);
+	CREATE INDEX IF NOT EXISTS idx_chain_edges_source ON attack_chain_edges(source_node_id);
+	CREATE INDEX IF NOT EXISTS idx_chain_edges_target ON attack_chain_edges(target_node_id);
 	`
 
 	if _, err := db.Exec(createConversationsTable); err != nil {
@@ -130,6 +164,14 @@ func (db *DB) initTables() error {
 
 	if _, err := db.Exec(createToolStatsTable); err != nil {
 		return fmt.Errorf("创建tool_stats表失败: %w", err)
+	}
+
+	if _, err := db.Exec(createAttackChainNodesTable); err != nil {
+		return fmt.Errorf("创建attack_chain_nodes表失败: %w", err)
+	}
+
+	if _, err := db.Exec(createAttackChainEdgesTable); err != nil {
+		return fmt.Errorf("创建attack_chain_edges表失败: %w", err)
 	}
 
 	if _, err := db.Exec(createIndexes); err != nil {
