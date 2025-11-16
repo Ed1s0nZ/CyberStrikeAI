@@ -2614,10 +2614,15 @@ function renderMonitorExecutions(executions = [], statusFilter = 'all') {
         })
         .join('');
 
-    // 先移除旧的表格容器（保留分页控件）
+    // 先移除旧的表格容器和加载提示（保留分页控件）
     const oldTableContainer = container.querySelector('.monitor-table-container');
     if (oldTableContainer) {
         oldTableContainer.remove();
+    }
+    // 清除"加载中..."等提示信息
+    const oldEmpty = container.querySelector('.monitor-empty');
+    if (oldEmpty) {
+        oldEmpty.remove();
     }
     
     // 创建表格容器
