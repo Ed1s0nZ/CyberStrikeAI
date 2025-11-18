@@ -247,6 +247,7 @@ function initializeChatUI() {
         addMessage('assistant', '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。');
     }
 
+    addAttackChainButton(currentConversationId);
     loadActiveTasks(true);
     if (activeTaskInterval) {
         clearInterval(activeTaskInterval);
@@ -779,6 +780,7 @@ function handleStreamEvent(event, progressElement, progressId,
                 updateProgressConversation(progressId, event.data.conversationId);
                 currentConversationId = event.data.conversationId;
                 updateActiveConversation();
+                addAttackChainButton(currentConversationId);
                 loadActiveTasks();
                 // 立即刷新对话列表，让新对话显示在历史记录中
                 loadConversations();
@@ -929,6 +931,7 @@ function handleStreamEvent(event, progressElement, progressId,
             if (responseData.conversationId) {
                 currentConversationId = responseData.conversationId;
                 updateActiveConversation();
+                addAttackChainButton(currentConversationId);
                 updateProgressConversation(progressId, responseData.conversationId);
                 loadActiveTasks();
             }
@@ -1031,6 +1034,7 @@ function handleStreamEvent(event, progressElement, progressId,
             if (event.data && event.data.conversationId) {
                 currentConversationId = event.data.conversationId;
                 updateActiveConversation();
+                addAttackChainButton(currentConversationId);
                 updateProgressConversation(progressId, event.data.conversationId);
             }
             if (progressTaskState.has(progressId)) {
@@ -1572,6 +1576,7 @@ function startNewConversation() {
     currentConversationId = null;
     document.getElementById('chat-messages').innerHTML = '';
     addMessage('assistant', '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。');
+    addAttackChainButton(null);
     updateActiveConversation();
     // 刷新对话列表，确保显示最新的历史对话
     loadConversations();
@@ -1783,6 +1788,7 @@ async function deleteConversation(conversationId) {
             currentConversationId = null;
             document.getElementById('chat-messages').innerHTML = '';
             addMessage('assistant', '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。');
+            addAttackChainButton(null);
         }
         
         // 刷新对话列表
@@ -3490,34 +3496,19 @@ let isAttackChainLoading = false; // 防止重复加载
 
 // 添加攻击链按钮
 function addAttackChainButton(conversationId) {
-    // 检查是否已存在按钮
-    let attackChainBtn = document.getElementById('attack-chain-btn');
+    const attackChainBtn = document.getElementById('attack-chain-btn');
     if (!attackChainBtn) {
-        attackChainBtn = document.createElement('button');
-        attackChainBtn.id = 'attack-chain-btn';
-        attackChainBtn.className = 'btn-secondary';
-        attackChainBtn.style.marginLeft = '10px';
-        attackChainBtn.innerHTML = '🔗 攻击链';
+        return;
+    }
+
+    if (conversationId) {
+        attackChainBtn.disabled = false;
+        attackChainBtn.title = '查看当前对话的攻击链';
         attackChainBtn.onclick = () => showAttackChain(conversationId);
-        
-        // 在消息区域上方添加按钮容器
-        const chatMessages = document.getElementById('chat-messages');
-        if (chatMessages) {
-            // 检查是否已有按钮容器
-            let btnContainer = document.getElementById('attack-chain-btn-container');
-            if (!btnContainer) {
-                btnContainer = document.createElement('div');
-                btnContainer.id = 'attack-chain-btn-container';
-                btnContainer.style.padding = '10px';
-                btnContainer.style.borderBottom = '1px solid var(--border-color)';
-                btnContainer.style.background = 'var(--bg-secondary)';
-                chatMessages.parentNode.insertBefore(btnContainer, chatMessages);
-            }
-            btnContainer.innerHTML = '';
-            btnContainer.appendChild(attackChainBtn);
-        }
     } else {
-        attackChainBtn.onclick = () => showAttackChain(conversationId);
+        attackChainBtn.disabled = true;
+        attackChainBtn.title = '请选择一个对话以查看攻击链';
+        attackChainBtn.onclick = null;
     }
 }
 

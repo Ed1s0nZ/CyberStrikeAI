@@ -141,6 +141,26 @@ header {
     color: #cfe4ff;
 }
 
+.attack-chain-btn {
+    color: #ffe08a;
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.attack-chain-btn:not(:disabled):hover {
+    background: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.45);
+    color: #fff5cc;
+}
+
+.attack-chain-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    border-color: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.6);
+}
+
 .settings-btn {
     padding: 8px;
     min-width: 44px;
