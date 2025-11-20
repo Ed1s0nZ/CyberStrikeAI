@@ -21,6 +21,7 @@
   <img src="./img/攻击链.jpg" alt="Preview" width="600">
 
 ## Changelog
+- 2025.11.20 oversized tool logs, MCP transcripts, and attachments can be losslessly compressed or summary-first compressed before being sent back to the UI or stored in SQLite. This keeps archives small without losing critical context.
 - 2025.11.17 Added attack chain visualization feature: automatically build attack chains from conversations using AI analysis, visualize tool execution flows, vulnerability discovery paths, and relationships between nodes, support interactive graph exploration with risk scoring
 - 2025.11.15 Added large result pagination feature: when tool execution results exceed the threshold (default 200KB), automatically save to file and return execution ID, support paginated queries, keyword search, conditional filtering, and regex matching through query_execution_result tool, effectively solving the problem of overly long single responses and improving large file processing capabilities
 - 2025.11.15 Added external MCP integration feature: support for integrating external MCP servers to extend tool capabilities, supports both stdio and HTTP transport modes, tool-level enable/disable control, complete configuration guide and management APIs
