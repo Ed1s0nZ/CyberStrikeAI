@@ -285,7 +285,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	// 创建一个独立的上下文用于任务执行，不随HTTP请求取消
 	// 这样即使客户端断开连接（如刷新页面），任务也能继续执行
 	baseCtx, cancelWithCause := context.WithCancelCause(context.Background())
-	taskCtx, timeoutCancel := context.WithTimeout(baseCtx, 30*time.Minute)
+	taskCtx, timeoutCancel := context.WithTimeout(baseCtx, 600*time.Minute)
 	defer timeoutCancel()
 	defer cancelWithCause(nil)
 
