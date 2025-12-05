@@ -42,9 +42,10 @@ type Chain struct {
 	Edges []Edge `json:"edges"`
 }
 
-// NewBuilder 创建新的攻击链构建器
+ // NewBuilder 创建新的攻击链构建器
 func NewBuilder(db *database.DB, openAIConfig *config.OpenAIConfig, logger *zap.Logger) *Builder {
 	transport := &http.Transport{
+		Proxy:               http.ProxyFromEnvironment,
 		MaxIdleConns:        100,
 		MaxIdleConnsPerHost: 10,
 		IdleConnTimeout:     90 * time.Second,

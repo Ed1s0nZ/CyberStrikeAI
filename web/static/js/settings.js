@@ -71,7 +71,13 @@ async function loadConfig() {
         document.getElementById('openai-api-key').value = currentConfig.openai.api_key || '';
         document.getElementById('openai-base-url').value = currentConfig.openai.base_url || '';
         document.getElementById('openai-model').value = currentConfig.openai.model || '';
-        
+
+        // 填充系统代理配置
+        const systemProxyInput = document.getElementById('system-proxy');
+        if (systemProxyInput) {
+            systemProxyInput.value = currentConfig.proxy || '';
+        }
+
         // 填充Agent配置
         document.getElementById('agent-max-iterations').value = currentConfig.agent.max_iterations || 30;
         
@@ -514,6 +520,8 @@ async function applySettings() {
         }
         
         // 收集配置
+        const proxyInput = document.getElementById('system-proxy');
+        const proxy = proxyInput ? proxyInput.value.trim() : '';
         const config = {
             openai: {
                 api_key: apiKey,
@@ -523,6 +531,7 @@ async function applySettings() {
             agent: {
                 max_iterations: parseInt(document.getElementById('agent-max-iterations').value) || 30
             },
+            proxy: proxy,
             tools: []
         };
         

@@ -75,6 +75,7 @@ func NewAgent(cfg *config.OpenAIConfig, agentCfg *config.AgentConfig, mcpServer 
 
 	// 配置HTTP Transport，优化连接管理和超时设置
 	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
 			Timeout:   300 * time.Second,
 			KeepAlive: 300 * time.Second,

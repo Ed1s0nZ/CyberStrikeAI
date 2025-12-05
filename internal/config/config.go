@@ -20,6 +20,7 @@ type Config struct {
 	Security    SecurityConfig      `yaml:"security"`
 	Database    DatabaseConfig      `yaml:"database"`
 	Auth        AuthConfig          `yaml:"auth"`
+	Proxy       string              `yaml:"proxy,omitempty" json:"proxy,omitempty"`
 	ExternalMCP ExternalMCPConfig   `yaml:"external_mcp,omitempty"`
 }
 
@@ -202,7 +203,32 @@ func Load(path string) (*Config, error) {
 		}
 	}
 
+	// 应用系统代理到环境变量
+	ApplySystemProxy(cfg.Proxy)
+
 	return &cfg, nil
+}
+
+// ApplySystemProxy 根据配置应用全局系统代理到环境变量（HTTP_PROXY/HTTPS_PROXY/ALL_PROXY）
+func ApplySystemProxy(proxy string) {
+	proxy = strings.TrimSpace(proxy)
+	if proxy == "" {
+		// 清除代理环境变量
+		_ = os.Unsetenv("HTTP_PROXY")
+		_ = os.Unsetenv("http_proxy")
+		_ = os.Unsetenv("HTTPS_PROXY")
+		_ = os.Unsetenv("https_proxy")
+		_ = os.Unsetenv("ALL_PROXY")
+		_ = os.Unsetenv("all_proxy")
+		return
+	}
+
+	_ = os.Setenv("HTTP_PROXY", proxy)
+	_ = os.Setenv("http_proxy", proxy)
+	_ = os.Setenv("HTTPS_PROXY", proxy)
+	_ = os.Setenv("https_proxy", proxy)
+	_ = os.Setenv("ALL_PROXY", proxy)
+	_ = os.Setenv("all_proxy", proxy)
 }
 
 func generateStrongPassword(length int) (string, error) {

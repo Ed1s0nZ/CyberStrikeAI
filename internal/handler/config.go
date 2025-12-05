@@ -64,6 +64,7 @@ type GetConfigResponse struct {
 	MCP     config.MCPConfig      `json:"mcp"`
 	Tools   []ToolConfigInfo      `json:"tools"`
 	Agent   config.AgentConfig    `json:"agent"`
+	Proxy   string                `json:"proxy,omitempty"`
 }
 
 // ToolConfigInfo 工具配置信息
@@ -163,6 +164,7 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 		MCP:    h.config.MCP,
 		Tools:  tools,
 		Agent:  h.config.Agent,
+		Proxy:  h.config.Proxy,
 	})
 }
 
@@ -339,8 +341,9 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 type UpdateConfigRequest struct {
 	OpenAI *config.OpenAIConfig `json:"openai,omitempty"`
 	MCP    *config.MCPConfig    `json:"mcp,omitempty"`
-	Tools  []ToolEnableStatus    `json:"tools,omitempty"`
+	Tools  []ToolEnableStatus   `json:"tools,omitempty"`
 	Agent  *config.AgentConfig  `json:"agent,omitempty"`
+	Proxy  *string              `json:"proxy,omitempty"`
 }
 
 // ToolEnableStatus 工具启用状态
@@ -386,6 +389,15 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 		h.config.Agent = *req.Agent
 		h.logger.Info("更新Agent配置",
 			zap.Int("max_iterations", h.config.Agent.MaxIterations),
+		)
+	}
+
+	// 更新系统代理配置
+	if req.Proxy != nil {
+		h.config.Proxy = strings.TrimSpace(*req.Proxy)
+		config.ApplySystemProxy(h.config.Proxy)
+		h.logger.Info("更新系统代理配置",
+			zap.String("proxy", h.config.Proxy),
 		)
 	}
 
@@ -565,6 +577,7 @@ func (h *ConfigHandler) saveConfig() error {
 	updateAgentConfig(root, h.config.Agent.MaxIterations)
 	updateMCPConfig(root, h.config.MCP)
 	updateOpenAIConfig(root, h.config.OpenAI)
+	updateProxyConfig(root, h.config.Proxy)
 	// 更新外部MCP配置（使用external_mcp.go中的函数，同一包中可直接调用）
 	// 读取原始配置以保持向后兼容
 	originalConfigs := make(map[string]map[string]bool)
@@ -706,6 +719,11 @@ func updateOpenAIConfig(doc *yaml.Node, cfg config.OpenAIConfig) {
 	setStringInMap(openaiNode, "api_key", cfg.APIKey)
 	setStringInMap(openaiNode, "base_url", cfg.BaseURL)
 	setStringInMap(openaiNode, "model", cfg.Model)
+}
+
+func updateProxyConfig(doc *yaml.Node, proxy string) {
+	root := doc.Content[0]
+	setStringInMap(root, "proxy", proxy)
 }
 
 func ensureMap(parent *yaml.Node, path ...string) *yaml.Node {
