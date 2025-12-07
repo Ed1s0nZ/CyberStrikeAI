@@ -164,7 +164,7 @@ args:
                 "total": result_data.get('total', 0),
                 "results_count": len(result_data.get('results', [])),
                 "results": result_data.get('results', []),
-                "message": f"成功获取 {len(result_data.get('results', []))} 条结果，共 {result_data.get('size', 0)} 条"
+                "message": f"成功获取 {len(result_data.get('results', []))} 条结果"
             }
 
             print(json.dumps(output, ensure_ascii=False, indent=2))
