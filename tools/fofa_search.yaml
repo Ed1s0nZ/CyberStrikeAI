@@ -24,17 +24,25 @@ args:
         # 尝试从第一个参数读取JSON配置
         if len(sys.argv) > 1:
             try:
-                config = json.loads(sys.argv[1])
-                return config
-            except (json.JSONDecodeError, TypeError):
+                # 确保 sys.argv[1] 是字符串
+                arg1 = str(sys.argv[1])
+                # 尝试解析为JSON
+                config = json.loads(arg1)
+                # 确保返回的是字典类型
+                if isinstance(config, dict):
+                    return config
+            except (json.JSONDecodeError, TypeError, ValueError):
                 # 如果不是JSON，使用传统的位置参数方式
                 pass
 
         # 传统位置参数方式（向后兼容）
         # 注意：email 和 api_key 已从参数中移除，现在从配置中读取
+        # 参数位置：query=2, size=3, page=4, fields=5, full=6
+        # 但在 sys.argv 中，由于 python3 -c "code" 的格式，实际位置需要调整
+        # sys.argv[0] 是 '-c'，sys.argv[1] 开始是实际参数
         config = {}
         if len(sys.argv) > 1:
-            config['query'] = sys.argv[1]
+            config['query'] = str(sys.argv[1])
         if len(sys.argv) > 2:
             try:
                 config['size'] = int(sys.argv[2])
@@ -46,7 +54,7 @@ args:
             except (ValueError, TypeError):
                 pass
         if len(sys.argv) > 4:
-            config['fields'] = sys.argv[4]
+            config['fields'] = str(sys.argv[4])
         if len(sys.argv) > 5:
             val = sys.argv[5]
             if isinstance(val, str):
@@ -57,6 +65,16 @@ args:
 
     try:
         config = parse_args()
+
+        # 确保 config 是字典类型
+        if not isinstance(config, dict):
+            error_result = {
+                "status": "error",
+                "message": f"参数解析错误: 期望字典类型，但得到 {type(config).__name__}",
+                "type": "TypeError"
+            }
+            print(json.dumps(error_result, ensure_ascii=False, indent=2))
+            sys.exit(1)
 
         # 从配置或环境变量获取email和api_key
         email = os.getenv('FOFA_EMAIL', FOFA_EMAIL).strip()
