@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"time"
 
 	"cyberstrike-ai/internal/config"
 	"cyberstrike-ai/internal/mcp"
@@ -383,7 +382,16 @@ func (e *Executor) buildCommandArgs(toolName string, toolConfig *config.ToolConf
 
 		// 然后处理位置参数（位置参数通常在标志参数之后）
 		// 对位置参数按位置排序
-		for i := 0; i < len(positionalParams); i++ {
+		// 首先找到最大的位置值，确定需要处理多少个位置
+		maxPosition := -1
+		for _, param := range positionalParams {
+			if param.Position != nil && *param.Position > maxPosition {
+				maxPosition = *param.Position
+			}
+		}
+
+		// 按位置顺序处理参数，确保即使某些位置没有参数或使用默认值，也能正确传递
+		for i := 0; i <= maxPosition; i++ {
 			for _, param := range positionalParams {
 				// 跳过特殊参数，它们会在后面单独处理
 				// action 参数仅用于工具内部逻辑，不传递给命令
@@ -407,13 +415,19 @@ func (e *Executor) buildCommandArgs(toolName string, toolConfig *config.ToolConf
 						if param.Default != nil {
 							value = param.Default
 						} else {
+							// 如果没有默认值，跳过这个位置，继续处理下一个位置
 							break
 						}
 					}
-					cmdArgs = append(cmdArgs, e.formatParamValue(param, value))
+					// 只有当值不为 nil 时才添加到命令参数中
+					if value != nil {
+						cmdArgs = append(cmdArgs, e.formatParamValue(param, value))
+					}
 					break
 				}
 			}
+			// 如果某个位置没有找到对应的参数，继续处理下一个位置
+			// 这样可以确保位置参数的顺序正确
 		}
 
 		// 特殊处理：additional_args 参数（需要按空格分割成多个参数）
@@ -1201,47 +1215,5 @@ func (e *Executor) convertToOpenAIType(configType string) string {
 			zap.String("type", configType),
 		)
 		return configType
-	}
-}
-
-// Vulnerability 漏洞信息
-type Vulnerability struct {
-	ID          string    `json:"id"`
-	Type        string    `json:"type"`
-	Severity    string    `json:"severity"` // low, medium, high, critical
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	Target      string    `json:"target"`
-	FoundAt     time.Time `json:"foundAt"`
-	Details     string    `json:"details"`
-}
-
-// AnalyzeResults 分析工具执行结果，提取漏洞信息
-// 注意：硬编码的漏洞解析逻辑已移除，此函数现在返回空数组
-// 漏洞检测应该由工具本身或专门的漏洞扫描工具来完成
-func (e *Executor) AnalyzeResults(toolName string, result *mcp.ToolResult) []Vulnerability {
-	// 不再进行硬编码的漏洞解析
-	// 漏洞检测应该由工具本身（如sqlmap、nmap等）的输出结果来体现
-	return []Vulnerability{}
-}
-
-// GetVulnerabilityReport 生成漏洞报告
-func (e *Executor) GetVulnerabilityReport(vulnerabilities []Vulnerability) map[string]interface{} {
-	severityCount := map[string]int{
-		"critical": 0,
-		"high":     0,
-		"medium":   0,
-		"low":      0,
-	}
-
-	for _, vuln := range vulnerabilities {
-		severityCount[vuln.Severity]++
-	}
-
-	return map[string]interface{}{
-		"total":           len(vulnerabilities),
-		"severityCount":   severityCount,
-		"vulnerabilities": vulnerabilities,
-		"generatedAt":     time.Now(),
 	}
 }
