@@ -33,6 +33,7 @@ openai:
   # - DeepSeek: https://api.deepseek.com/v1
   # - 其他兼容 OpenAI 协议的 API
   model: deepseek-chat # 模型名称（必填）
+  max_total_tokens: 120000 # LLM 相关上下文的最大 Token 数限制（内存压缩和攻击链构建会共用此配置）
   # 常用模型: gpt-4, gpt-3.5-turbo, deepseek-chat, claude-3-opus 等
 # Agent 配置
 agent:
