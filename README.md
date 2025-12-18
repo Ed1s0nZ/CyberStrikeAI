@@ -260,7 +260,7 @@ Build an attack chain for the latest engagement and export the node list with se
 
 ## Changelog (Recent)
 
-- 2025-12-08 – Optimized web frontend with enhanced sidebar navigation and improved user experience.
+- 2025-12-18 – Optimized web frontend with enhanced sidebar navigation and improved user experience.
 - 2025-12-07 – Added FOFA network space search engine tool (fofa_search) with flexible query parameters and field configuration.
 - 2025-12-07 – Fixed positional parameter handling bug: ensure correct parameter position when using default values.
 - 2025-11-20 – Added automatic compression/summarization for oversized tool logs and MCP transcripts.
