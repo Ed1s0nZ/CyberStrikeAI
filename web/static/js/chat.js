@@ -1312,11 +1312,16 @@ let isAttackChainLoading = false; // 防止重复加载
 // 添加攻击链按钮
 function addAttackChainButton(conversationId) {
     const attackChainBtn = document.getElementById('attack-chain-btn');
-    if (!attackChainBtn) {
+    const conversationHeader = document.getElementById('conversation-header');
+    
+    if (!attackChainBtn || !conversationHeader) {
         return;
     }
 
     if (conversationId) {
+        // 显示会话顶部栏
+        conversationHeader.style.display = 'block';
+        
         const isRunning = typeof isConversationTaskRunning === 'function'
             ? isConversationTaskRunning(conversationId)
             : false;
@@ -1330,6 +1335,9 @@ function addAttackChainButton(conversationId) {
             attackChainBtn.onclick = () => showAttackChain(conversationId);
         }
     } else {
+        // 隐藏会话顶部栏
+        conversationHeader.style.display = 'none';
+        
         attackChainBtn.disabled = true;
         attackChainBtn.title = '请选择一个对话以查看攻击链';
         attackChainBtn.onclick = null;

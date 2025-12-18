@@ -543,9 +543,48 @@ header {
 }
 
 .attack-chain-btn {
-    color: var(--text-primary);
-    border-color: var(--border-color);
-    background: var(--bg-primary);
+    color: var(--text-secondary);
+    border: none;
+    background: transparent;
+    padding: 6px 10px;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    box-shadow: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.attack-chain-btn svg {
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.conversation-header .attack-chain-btn {
+    background: transparent;
+    border: none;
+    backdrop-filter: none;
+    color: var(--text-secondary);
+}
+
+.conversation-header .attack-chain-btn:hover {
+    background: rgba(0, 102, 255, 0.06);
+    color: var(--accent-color);
+    transform: none;
+    border: none;
+}
+
+.conversation-header .attack-chain-btn:hover svg {
+    opacity: 1;
+}
+
+.conversation-header .attack-chain-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: transparent;
+    color: var(--text-muted);
 }
 
 /* 用户菜单样式 */
@@ -618,15 +657,16 @@ header {
 
 .attack-chain-btn:not(:disabled):hover {
     background: var(--bg-tertiary);
-    border-color: var(--accent-color);
+    border: none;
     color: var(--accent-color);
+    transform: none;
 }
 
 .attack-chain-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: not-allowed;
-    border-color: var(--border-color);
-    background: var(--bg-secondary);
+    border: none;
+    background: transparent;
     color: var(--text-muted);
 }
 
@@ -837,6 +877,21 @@ header {
     background: #f5f7fa;
     overflow: hidden;
     height: 100%;
+}
+
+/* 会话顶部栏样式 */
+.conversation-header {
+    background: transparent;
+    padding: 8px 24px;
+    flex-shrink: 0;
+    border-bottom: none;
+}
+
+.conversation-header-content {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
 }
 
 .chat-messages {

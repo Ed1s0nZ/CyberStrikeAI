@@ -36,12 +36,6 @@
                 <div class="header-right">
                     <p class="header-subtitle">AI 驱动的自动化安全测试平台</p>
                     <div class="header-actions">
-                        <button id="attack-chain-btn" class="attack-chain-btn" title="请选择一个对话以查看攻击链" disabled>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M10.5 13.5l3-3M8 8H5a4 4 0 1 0 0 8h3m8-8h3a4 4 0 0 1 0 8h-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                            <span>攻击链</span>
-                        </button>
                         <div class="user-menu-container">
                             <button class="user-avatar-btn" onclick="toggleUserMenu()" title="用户菜单">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -133,6 +127,17 @@
 
                         <!-- 对话界面 -->
                         <div class="chat-container">
+                            <!-- 会话顶部栏（只在有会话选中时显示） -->
+                            <div id="conversation-header" class="conversation-header" style="display: none;">
+                                <div class="conversation-header-content">
+                                    <button id="attack-chain-btn" class="attack-chain-btn" title="查看攻击链" disabled>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M10.5 13.5l3-3M8 8H5a4 4 0 1 0 0 8h3m8-8h3a4 4 0 0 1 0 8h-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                        <span>攻击链</span>
+                                    </button>
+                                </div>
+                            </div>
                             <div id="active-tasks-bar" class="active-tasks-bar"></div>
                             <div id="chat-messages" class="chat-messages"></div>
                             <div class="chat-input-container">
