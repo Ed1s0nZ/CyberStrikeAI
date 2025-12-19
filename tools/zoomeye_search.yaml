@@ -12,6 +12,7 @@ args:
     # ==================== ZoomEye配置 ====================
     # 请在此处配置您的ZoomEye账号信息
     # 您也可以在环境变量中设置：ZOOMEYE_API_KEY
+    # enable 默认为 false，需开启才能调用该MCP
     ZOOMEYE_API_KEY = ""  # 请填写您的ZoomEye API密钥
     # ==================================================
 
@@ -203,7 +204,7 @@ args:
         }
         print(json.dumps(error_result, ensure_ascii=False, indent=2))
         sys.exit(1)
-enabled: true
+enabled: false
 short_description: "ZoomEye网络空间搜索引擎，支持灵活的查询参数配置"
 description: |
   ZoomEye（钟馗之眼）是一个网络空间测绘搜索引擎，可以通过多种查询条件搜索互联网资产。
