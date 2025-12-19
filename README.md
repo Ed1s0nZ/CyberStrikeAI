@@ -40,6 +40,7 @@ CyberStrikeAI ships with 100+ curated tools covering the whole kill chain:
 - **Web & App Scanners** – sqlmap, nikto, dirb, gobuster, feroxbuster, ffuf, httpx
 - **Vulnerability Scanners** – nuclei, wpscan, wafw00f, dalfox, xsser
 - **Subdomain Enumeration** – subfinder, amass, findomain, dnsenum, fierce
+- **Network Space Search Engines** – fofa_search, zoomeye_search
 - **API Security** – graphql-scanner, arjun, api-fuzzer, api-schema-analyzer
 - **Container Security** – trivy, clair, docker-bench-security, kube-bench, kube-hunter
 - **Cloud Security** – prowler, scout-suite, cloudmapper, pacu, terrascan, checkov
@@ -260,6 +261,7 @@ Build an attack chain for the latest engagement and export the node list with se
 
 ## Changelog (Recent)
 
+- 2025-12-19 – Added ZoomEye network space search engine tool (zoomeye_search) with support for IPv4/IPv6/web assets, facets statistics, and flexible query parameters.
 - 2025-12-18 – Optimized web frontend with enhanced sidebar navigation and improved user experience.
 - 2025-12-07 – Added FOFA network space search engine tool (fofa_search) with flexible query parameters and field configuration.
 - 2025-12-07 – Fixed positional parameter handling bug: ensure correct parameter position when using default values.

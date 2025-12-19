@@ -39,6 +39,7 @@ CyberStrikeAI 是一款 **AI 原生渗透测试协同体**，以 Go 编写，内
 - **Web 应用扫描**：sqlmap、nikto、dirb、gobuster、feroxbuster、ffuf、httpx
 - **漏洞扫描**：nuclei、wpscan、wafw00f、dalfox、xsser
 - **子域名枚举**：subfinder、amass、findomain、dnsenum、fierce
+- **网络空间搜索引擎**：fofa_search、zoomeye_search
 - **API 安全**：graphql-scanner、arjun、api-fuzzer、api-schema-analyzer
 - **容器安全**：trivy、clair、docker-bench-security、kube-bench、kube-hunter
 - **云安全**：prowler、scout-suite、cloudmapper、pacu、terrascan、checkov
@@ -257,7 +258,7 @@ CyberStrikeAI/
 ```
 
 ## Changelog（近期）
-
+- 2025-12-19 —— 新增钟馗之眼（ZoomEye）网络空间搜索引擎工具（zoomeye_search），支持 IPv4/IPv6/Web 等资产搜索、统计项查询与灵活的查询参数配置。
 - 2025-12-18 —— 优化 Web 前端界面，增加侧边栏导航，提升用户体验。
 - 2025-12-07 —— 新增 FOFA 网络空间搜索引擎工具（fofa_search），支持灵活的查询参数与字段配置。
 - 2025-12-07 —— 修复位置参数处理 bug：当工具参数使用默认值时，确保后续参数位置正确传递。
