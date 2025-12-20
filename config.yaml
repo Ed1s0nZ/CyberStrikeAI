@@ -44,6 +44,7 @@ agent:
 # 数据库配置
 database:
   path: data/conversations.db # SQLite 数据库文件路径，用于存储对话历史和消息
+  knowledge_db_path: data/knowledge.db # 知识库数据库文件路径（可选，为空则使用会话数据库），用于存储知识库项和向量嵌入，可独立复制和复用
 # 安全工具配置
 security:
   tools_dir: tools # 工具配置文件目录（相对于配置文件所在目录）
@@ -52,3 +53,16 @@ security:
 # 外部MCP配置
 external_mcp:
   servers: {}
+# 知识库配置
+knowledge:
+  enabled: true # 是否启用知识检索功能
+  base_path: knowledge_base # 知识库目录路径（相对于配置文件所在目录）
+  embedding:
+    provider: openai # 嵌入模型提供商（目前仅支持openai）
+    model: text-embedding-v4 # 嵌入模型名称
+    base_url: https://api.deepseek.com/v1 # 留空则使用OpenAI配置的base_url
+    api_key: sk-xxxxxx # 留空则使用OpenAI配置的api_key
+  retrieval:
+    top_k: 5 # 检索返回的Top-K结果数量
+    similarity_threshold: 0.7 # 相似度阈值（0-1），低于此值的结果将被过滤
+    hybrid_weight: 0.7 # 混合检索权重（0-1），向量检索的权重，1.0表示纯向量检索，0.0表示纯关键词检索

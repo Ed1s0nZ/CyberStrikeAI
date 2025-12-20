@@ -30,6 +30,7 @@ CyberStrikeAI 是一款 **AI 原生渗透测试协同体**，以 Go 编写，内
 - 📄 大结果分页、压缩与全文检索
 - 🔗 攻击链可视化、风险打分与步骤回放
 - 🔒 Web 登录保护、审计日志、SQLite 持久化
+- 📚 知识库功能：向量检索与混合搜索，为 AI 提供安全专业知识
 
 ## 工具概览
 
@@ -173,6 +174,38 @@ CyberStrikeAI 是一款 **AI 原生渗透测试协同体**，以 Go 编写，内
    }
    ```
 
+### 知识库功能
+- **向量检索**：AI 智能体在对话过程中可自动调用 `search_knowledge_base` 工具搜索知识库中的安全知识。
+- **混合检索**：结合向量相似度搜索与关键词匹配，提升检索准确性。
+- **自动索引**：扫描 `knowledge_base/` 目录下的 Markdown 文件，自动构建向量嵌入索引。
+- **Web 管理**：通过 Web 界面创建、更新、删除知识项，支持分类管理。
+- **检索日志**：记录所有知识检索操作，便于审计与调试。
+
+**知识库配置步骤：**
+1. **启用功能**：在 `config.yaml` 中设置 `knowledge.enabled: true`：
+   ```yaml
+   knowledge:
+     enabled: true
+     base_path: knowledge_base
+     embedding:
+       provider: openai
+       model: text-embedding-v4
+       base_url: "https://api.openai.com/v1"  # 或你的嵌入模型 API
+       api_key: "sk-xxx"
+     retrieval:
+       top_k: 5
+       similarity_threshold: 0.7
+       hybrid_weight: 0.7
+   ```
+2. **添加知识文件**：将 Markdown 文件放入 `knowledge_base/` 目录，按分类组织（如 `knowledge_base/SQL注入/README.md`）。
+3. **扫描索引**：在 Web 界面中点击"扫描知识库"，系统会自动导入文件并构建向量索引。
+4. **对话中使用**：AI 智能体在需要安全知识时会自动调用知识检索工具。你也可以显式要求："搜索知识库中关于 SQL 注入的技术"。
+
+**知识库结构说明：**
+- 文件按分类组织（目录名作为分类）。
+- 每个 Markdown 文件自动切块并生成向量嵌入。
+- 支持增量更新，修改后的文件会自动重新索引。
+
 ### 自动化与安全
 - **REST API**：认证、会话、任务、监控等接口全部开放，可与 CI/CD 集成。
 - **任务控制**：支持暂停/终止长任务、修改参数后重跑、流式获取日志。
@@ -200,8 +233,21 @@ openai:
   model: "deepseek-chat"
 database:
   path: "data/conversations.db"
+  knowledge_db_path: "data/knowledge.db"  # 可选：知识库独立数据库
 security:
   tools_dir: "tools"
+knowledge:
+  enabled: false  # 是否启用知识库功能
+  base_path: "knowledge_base"  # 知识库目录路径
+  embedding:
+    provider: "openai"  # 嵌入模型提供商（目前仅支持 openai）
+    model: "text-embedding-v4"  # 嵌入模型名称
+    base_url: ""  # 留空则使用 OpenAI 配置的 base_url
+    api_key: ""  # 留空则使用 OpenAI 配置的 api_key
+  retrieval:
+    top_k: 5  # 检索返回的 Top-K 结果数量
+    similarity_threshold: 0.7  # 相似度阈值（0-1），低于此值的结果将被过滤
+    hybrid_weight: 0.7  # 混合检索权重（0-1），向量检索的权重，1.0 表示纯向量检索，0.0 表示纯关键词检索
 ```
 
 ### 工具模版示例（`tools/nmap.yaml`）
@@ -258,6 +304,7 @@ CyberStrikeAI/
 ```
 
 ## Changelog（近期）
+- 2025-12-20 —— 新增知识库功能：支持向量检索、混合搜索与自动索引，AI 智能体可在对话中自动搜索安全知识。
 - 2025-12-19 —— 新增钟馗之眼（ZoomEye）网络空间搜索引擎工具（zoomeye_search），支持 IPv4/IPv6/Web 等资产搜索、统计项查询与灵活的查询参数配置。
 - 2025-12-18 —— 优化 Web 前端界面，增加侧边栏导航，提升用户体验。
 - 2025-12-07 —— 新增 FOFA 网络空间搜索引擎工具（fofa_search），支持灵活的查询参数与字段配置。

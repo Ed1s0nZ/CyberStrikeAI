@@ -908,6 +908,13 @@ function renderProcessDetails(messageId, processDetails) {
             const success = data.success !== false;
             const statusIcon = success ? '✅' : '❌';
             itemTitle = `${statusIcon} 工具 ${escapeHtml(toolName)} 执行${success ? '完成' : '失败'}`;
+            
+            // 如果是知识检索工具，添加特殊标记
+            if (toolName === 'search_knowledge_base' && success) {
+                itemTitle = `📚 ${itemTitle} - 知识检索`;
+            }
+        } else if (eventType === 'knowledge_retrieval') {
+            itemTitle = '📚 知识检索';
         } else if (eventType === 'error') {
             itemTitle = '❌ 错误';
         } else if (eventType === 'cancelled') {

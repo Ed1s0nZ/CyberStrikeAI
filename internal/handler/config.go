@@ -20,17 +20,21 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// KnowledgeToolRegistrar 知识库工具注册器接口
+type KnowledgeToolRegistrar func() error
+
 // ConfigHandler 配置处理器
 type ConfigHandler struct {
-	configPath      string
-	config          *config.Config
-	mcpServer       *mcp.Server
-	executor        *security.Executor
-	agent           AgentUpdater // Agent接口，用于更新Agent配置
-	attackChainHandler AttackChainUpdater // 攻击链处理器接口，用于更新配置
-	externalMCPMgr  *mcp.ExternalMCPManager // 外部MCP管理器
-	logger          *zap.Logger
-	mu              sync.RWMutex
+	configPath            string
+	config                *config.Config
+	mcpServer             *mcp.Server
+	executor              *security.Executor
+	agent                 AgentUpdater // Agent接口，用于更新Agent配置
+	attackChainHandler    AttackChainUpdater // 攻击链处理器接口，用于更新配置
+	externalMCPMgr        *mcp.ExternalMCPManager // 外部MCP管理器
+	knowledgeToolRegistrar KnowledgeToolRegistrar // 知识库工具注册器（可选）
+	logger                *zap.Logger
+	mu                    sync.RWMutex
 }
 
 // AttackChainUpdater 攻击链处理器更新接口
@@ -47,23 +51,31 @@ type AgentUpdater interface {
 // NewConfigHandler 创建新的配置处理器
 func NewConfigHandler(configPath string, cfg *config.Config, mcpServer *mcp.Server, executor *security.Executor, agent AgentUpdater, attackChainHandler AttackChainUpdater, externalMCPMgr *mcp.ExternalMCPManager, logger *zap.Logger) *ConfigHandler {
 	return &ConfigHandler{
-		configPath:        configPath,
-		config:            cfg,
-		mcpServer:         mcpServer,
-		executor:          executor,
-		agent:             agent,
+		configPath:         configPath,
+		config:             cfg,
+		mcpServer:          mcpServer,
+		executor:           executor,
+		agent:              agent,
 		attackChainHandler: attackChainHandler,
 		externalMCPMgr:     externalMCPMgr,
-		logger:            logger,
+		logger:             logger,
 	}
+}
+
+// SetKnowledgeToolRegistrar 设置知识库工具注册器
+func (h *ConfigHandler) SetKnowledgeToolRegistrar(registrar KnowledgeToolRegistrar) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.knowledgeToolRegistrar = registrar
 }
 
 // GetConfigResponse 获取配置响应
 type GetConfigResponse struct {
-	OpenAI  config.OpenAIConfig   `json:"openai"`
-	MCP     config.MCPConfig      `json:"mcp"`
-	Tools   []ToolConfigInfo      `json:"tools"`
-	Agent   config.AgentConfig    `json:"agent"`
+	OpenAI    config.OpenAIConfig   `json:"openai"`
+	MCP       config.MCPConfig      `json:"mcp"`
+	Tools     []ToolConfigInfo      `json:"tools"`
+	Agent     config.AgentConfig    `json:"agent"`
+	Knowledge config.KnowledgeConfig `json:"knowledge"`
 }
 
 // ToolConfigInfo 工具配置信息
@@ -81,8 +93,11 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 	defer h.mu.RUnlock()
 
 	// 获取工具列表（包含内部和外部工具）
+	// 首先从配置文件获取工具
+	configToolMap := make(map[string]bool)
 	tools := make([]ToolConfigInfo, 0, len(h.config.Security.Tools))
 	for _, tool := range h.config.Security.Tools {
+		configToolMap[tool.Name] = true
 		tools = append(tools, ToolConfigInfo{
 			Name:        tool.Name,
 			Description: tool.ShortDescription,
@@ -96,6 +111,31 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 				desc = desc[:100] + "..."
 			}
 			tools[len(tools)-1].Description = desc
+		}
+	}
+	
+	// 从MCP服务器获取所有已注册的工具（包括直接注册的工具，如知识检索工具）
+	if h.mcpServer != nil {
+		mcpTools := h.mcpServer.GetAllTools()
+		for _, mcpTool := range mcpTools {
+			// 跳过已经在配置文件中的工具（避免重复）
+			if configToolMap[mcpTool.Name] {
+				continue
+			}
+			// 添加直接注册到MCP服务器的工具（如知识检索工具）
+			description := mcpTool.ShortDescription
+			if description == "" {
+				description = mcpTool.Description
+			}
+			if len(description) > 100 {
+				description = description[:100] + "..."
+			}
+			tools = append(tools, ToolConfigInfo{
+				Name:        mcpTool.Name,
+				Description: description,
+				Enabled:     true, // 直接注册的工具默认启用
+				IsExternal:  false,
+			})
 		}
 	}
 
@@ -159,10 +199,11 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, GetConfigResponse{
-		OpenAI: h.config.OpenAI,
-		MCP:    h.config.MCP,
-		Tools:  tools,
-		Agent:  h.config.Agent,
+		OpenAI:    h.config.OpenAI,
+		MCP:       h.config.MCP,
+		Tools:     tools,
+		Agent:     h.config.Agent,
+		Knowledge: h.config.Knowledge,
 	})
 }
 
@@ -202,8 +243,10 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 	}
 
 	// 获取所有内部工具并应用搜索过滤
+	configToolMap := make(map[string]bool)
 	allTools := make([]ToolConfigInfo, 0, len(h.config.Security.Tools))
 	for _, tool := range h.config.Security.Tools {
+		configToolMap[tool.Name] = true
 		toolInfo := ToolConfigInfo{
 			Name:        tool.Name,
 			Description: tool.ShortDescription,
@@ -229,6 +272,43 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 		}
 
 		allTools = append(allTools, toolInfo)
+	}
+	
+	// 从MCP服务器获取所有已注册的工具（包括直接注册的工具，如知识检索工具）
+	if h.mcpServer != nil {
+		mcpTools := h.mcpServer.GetAllTools()
+		for _, mcpTool := range mcpTools {
+			// 跳过已经在配置文件中的工具（避免重复）
+			if configToolMap[mcpTool.Name] {
+				continue
+			}
+			
+			description := mcpTool.ShortDescription
+			if description == "" {
+				description = mcpTool.Description
+			}
+			if len(description) > 100 {
+				description = description[:100] + "..."
+			}
+			
+			toolInfo := ToolConfigInfo{
+				Name:        mcpTool.Name,
+				Description: description,
+				Enabled:     true, // 直接注册的工具默认启用
+				IsExternal:  false,
+			}
+			
+			// 如果有关键词，进行搜索过滤
+			if searchTermLower != "" {
+				nameLower := strings.ToLower(toolInfo.Name)
+				descLower := strings.ToLower(toolInfo.Description)
+				if !strings.Contains(nameLower, searchTermLower) && !strings.Contains(descLower, searchTermLower) {
+					continue // 不匹配，跳过
+				}
+			}
+			
+			allTools = append(allTools, toolInfo)
+		}
 	}
 
 	// 获取外部MCP工具
@@ -337,10 +417,11 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 
 // UpdateConfigRequest 更新配置请求
 type UpdateConfigRequest struct {
-	OpenAI *config.OpenAIConfig `json:"openai,omitempty"`
-	MCP    *config.MCPConfig    `json:"mcp,omitempty"`
-	Tools  []ToolEnableStatus    `json:"tools,omitempty"`
-	Agent  *config.AgentConfig  `json:"agent,omitempty"`
+	OpenAI    *config.OpenAIConfig    `json:"openai,omitempty"`
+	MCP       *config.MCPConfig       `json:"mcp,omitempty"`
+	Tools     []ToolEnableStatus      `json:"tools,omitempty"`
+	Agent     *config.AgentConfig      `json:"agent,omitempty"`
+	Knowledge *config.KnowledgeConfig `json:"knowledge,omitempty"`
 }
 
 // ToolEnableStatus 工具启用状态
@@ -386,6 +467,19 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 		h.config.Agent = *req.Agent
 		h.logger.Info("更新Agent配置",
 			zap.Int("max_iterations", h.config.Agent.MaxIterations),
+		)
+	}
+
+	// 更新Knowledge配置
+	if req.Knowledge != nil {
+		h.config.Knowledge = *req.Knowledge
+		h.logger.Info("更新Knowledge配置",
+			zap.Bool("enabled", h.config.Knowledge.Enabled),
+			zap.String("base_path", h.config.Knowledge.BasePath),
+			zap.String("embedding_model", h.config.Knowledge.Embedding.Model),
+			zap.Int("retrieval_top_k", h.config.Knowledge.Retrieval.TopK),
+			zap.Float64("similarity_threshold", h.config.Knowledge.Retrieval.SimilarityThreshold),
+			zap.Float64("hybrid_weight", h.config.Knowledge.Retrieval.HybridWeight),
 		)
 	}
 
@@ -519,8 +613,18 @@ func (h *ConfigHandler) ApplyConfig(c *gin.Context) {
 	// 清空MCP服务器中的工具
 	h.mcpServer.ClearTools()
 	
-	// 重新注册工具
+	// 重新注册安全工具
 	h.executor.RegisterTools(h.mcpServer)
+	
+	// 如果知识库启用，重新注册知识库工具
+	if h.config.Knowledge.Enabled && h.knowledgeToolRegistrar != nil {
+		h.logger.Info("重新注册知识库工具")
+		if err := h.knowledgeToolRegistrar(); err != nil {
+			h.logger.Error("重新注册知识库工具失败", zap.Error(err))
+		} else {
+			h.logger.Info("知识库工具已重新注册")
+		}
+	}
 
 	// 更新Agent的OpenAI配置
 	if h.agent != nil {
@@ -565,6 +669,7 @@ func (h *ConfigHandler) saveConfig() error {
 	updateAgentConfig(root, h.config.Agent.MaxIterations)
 	updateMCPConfig(root, h.config.MCP)
 	updateOpenAIConfig(root, h.config.OpenAI)
+	updateKnowledgeConfig(root, h.config.Knowledge)
 	// 更新外部MCP配置（使用external_mcp.go中的函数，同一包中可直接调用）
 	// 读取原始配置以保持向后兼容
 	originalConfigs := make(map[string]map[string]bool)
@@ -708,6 +813,30 @@ func updateOpenAIConfig(doc *yaml.Node, cfg config.OpenAIConfig) {
 	setStringInMap(openaiNode, "model", cfg.Model)
 }
 
+func updateKnowledgeConfig(doc *yaml.Node, cfg config.KnowledgeConfig) {
+	root := doc.Content[0]
+	knowledgeNode := ensureMap(root, "knowledge")
+	setBoolInMap(knowledgeNode, "enabled", cfg.Enabled)
+	setStringInMap(knowledgeNode, "base_path", cfg.BasePath)
+	
+	// 更新嵌入配置
+	embeddingNode := ensureMap(knowledgeNode, "embedding")
+	setStringInMap(embeddingNode, "provider", cfg.Embedding.Provider)
+	setStringInMap(embeddingNode, "model", cfg.Embedding.Model)
+	if cfg.Embedding.BaseURL != "" {
+		setStringInMap(embeddingNode, "base_url", cfg.Embedding.BaseURL)
+	}
+	if cfg.Embedding.APIKey != "" {
+		setStringInMap(embeddingNode, "api_key", cfg.Embedding.APIKey)
+	}
+	
+	// 更新检索配置
+	retrievalNode := ensureMap(knowledgeNode, "retrieval")
+	setIntInMap(retrievalNode, "top_k", cfg.Retrieval.TopK)
+	setFloatInMap(retrievalNode, "similarity_threshold", cfg.Retrieval.SimilarityThreshold)
+	setFloatInMap(retrievalNode, "hybrid_weight", cfg.Retrieval.HybridWeight)
+}
+
 func ensureMap(parent *yaml.Node, path ...string) *yaml.Node {
 	current := parent
 	for _, key := range path {
@@ -816,6 +945,14 @@ func setBoolInMap(mapNode *yaml.Node, key string, value bool) {
 	} else {
 		valueNode.Value = "false"
 	}
+}
+
+func setFloatInMap(mapNode *yaml.Node, key string, value float64) {
+	_, valueNode := ensureKeyValue(mapNode, key)
+	valueNode.Kind = yaml.ScalarNode
+	valueNode.Tag = "!!float"
+	valueNode.Style = 0
+	valueNode.Value = fmt.Sprintf("%g", value)
 }
 
 

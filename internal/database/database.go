@@ -131,6 +131,20 @@ func (db *DB) initTables() error {
 		FOREIGN KEY (target_node_id) REFERENCES attack_chain_nodes(id) ON DELETE CASCADE
 	);`
 
+	// 创建知识检索日志表（保留在会话数据库中，因为有外键关联）
+	createKnowledgeRetrievalLogsTable := `
+	CREATE TABLE IF NOT EXISTS knowledge_retrieval_logs (
+		id TEXT PRIMARY KEY,
+		conversation_id TEXT,
+		message_id TEXT,
+		query TEXT NOT NULL,
+		risk_type TEXT,
+		retrieved_items TEXT,
+		created_at DATETIME NOT NULL,
+		FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE SET NULL,
+		FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE SET NULL
+	);`
+
 	// 创建索引
 	createIndexes := `
 	CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
@@ -144,6 +158,9 @@ func (db *DB) initTables() error {
 	CREATE INDEX IF NOT EXISTS idx_chain_edges_conversation ON attack_chain_edges(conversation_id);
 	CREATE INDEX IF NOT EXISTS idx_chain_edges_source ON attack_chain_edges(source_node_id);
 	CREATE INDEX IF NOT EXISTS idx_chain_edges_target ON attack_chain_edges(target_node_id);
+	CREATE INDEX IF NOT EXISTS idx_knowledge_retrieval_logs_conversation ON knowledge_retrieval_logs(conversation_id);
+	CREATE INDEX IF NOT EXISTS idx_knowledge_retrieval_logs_message ON knowledge_retrieval_logs(message_id);
+	CREATE INDEX IF NOT EXISTS idx_knowledge_retrieval_logs_created_at ON knowledge_retrieval_logs(created_at);
 	`
 
 	if _, err := db.Exec(createConversationsTable); err != nil {
@@ -174,6 +191,10 @@ func (db *DB) initTables() error {
 		return fmt.Errorf("创建attack_chain_edges表失败: %w", err)
 	}
 
+	if _, err := db.Exec(createKnowledgeRetrievalLogsTable); err != nil {
+		return fmt.Errorf("创建knowledge_retrieval_logs表失败: %w", err)
+	}
+
 	if _, err := db.Exec(createIndexes); err != nil {
 		return fmt.Errorf("创建索引失败: %w", err)
 	}
@@ -182,8 +203,98 @@ func (db *DB) initTables() error {
 	return nil
 }
 
+// NewKnowledgeDB 创建知识库数据库连接（只包含知识库相关的表）
+func NewKnowledgeDB(dbPath string, logger *zap.Logger) (*DB, error) {
+	sqlDB, err := sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_foreign_keys=1")
+	if err != nil {
+		return nil, fmt.Errorf("打开知识库数据库失败: %w", err)
+	}
+
+	if err := sqlDB.Ping(); err != nil {
+		return nil, fmt.Errorf("连接知识库数据库失败: %w", err)
+	}
+
+	database := &DB{
+		DB:     sqlDB,
+		logger: logger,
+	}
+
+	// 初始化知识库表
+	if err := database.initKnowledgeTables(); err != nil {
+		return nil, fmt.Errorf("初始化知识库表失败: %w", err)
+	}
+
+	return database, nil
+}
+
+// initKnowledgeTables 初始化知识库数据库表（只包含知识库相关的表）
+func (db *DB) initKnowledgeTables() error {
+	// 创建知识库项表
+	createKnowledgeBaseItemsTable := `
+	CREATE TABLE IF NOT EXISTS knowledge_base_items (
+		id TEXT PRIMARY KEY,
+		category TEXT NOT NULL,
+		title TEXT NOT NULL,
+		file_path TEXT NOT NULL,
+		content TEXT,
+		created_at DATETIME NOT NULL,
+		updated_at DATETIME NOT NULL
+	);`
+
+	// 创建知识库向量表
+	createKnowledgeEmbeddingsTable := `
+	CREATE TABLE IF NOT EXISTS knowledge_embeddings (
+		id TEXT PRIMARY KEY,
+		item_id TEXT NOT NULL,
+		chunk_index INTEGER NOT NULL,
+		chunk_text TEXT NOT NULL,
+		embedding TEXT NOT NULL,
+		created_at DATETIME NOT NULL,
+		FOREIGN KEY (item_id) REFERENCES knowledge_base_items(id) ON DELETE CASCADE
+	);`
+
+	// 创建知识检索日志表（在独立知识库数据库中，不使用外键约束，因为conversations和messages表可能不在这个数据库中）
+	createKnowledgeRetrievalLogsTable := `
+	CREATE TABLE IF NOT EXISTS knowledge_retrieval_logs (
+		id TEXT PRIMARY KEY,
+		conversation_id TEXT,
+		message_id TEXT,
+		query TEXT NOT NULL,
+		risk_type TEXT,
+		retrieved_items TEXT,
+		created_at DATETIME NOT NULL
+	);`
+
+	// 创建索引
+	createIndexes := `
+	CREATE INDEX IF NOT EXISTS idx_knowledge_items_category ON knowledge_base_items(category);
+	CREATE INDEX IF NOT EXISTS idx_knowledge_embeddings_item_id ON knowledge_embeddings(item_id);
+	CREATE INDEX IF NOT EXISTS idx_knowledge_retrieval_logs_conversation ON knowledge_retrieval_logs(conversation_id);
+	CREATE INDEX IF NOT EXISTS idx_knowledge_retrieval_logs_message ON knowledge_retrieval_logs(message_id);
+	CREATE INDEX IF NOT EXISTS idx_knowledge_retrieval_logs_created_at ON knowledge_retrieval_logs(created_at);
+	`
+
+	if _, err := db.Exec(createKnowledgeBaseItemsTable); err != nil {
+		return fmt.Errorf("创建knowledge_base_items表失败: %w", err)
+	}
+
+	if _, err := db.Exec(createKnowledgeEmbeddingsTable); err != nil {
+		return fmt.Errorf("创建knowledge_embeddings表失败: %w", err)
+	}
+
+	if _, err := db.Exec(createKnowledgeRetrievalLogsTable); err != nil {
+		return fmt.Errorf("创建knowledge_retrieval_logs表失败: %w", err)
+	}
+
+	if _, err := db.Exec(createIndexes); err != nil {
+		return fmt.Errorf("创建索引失败: %w", err)
+	}
+
+	db.logger.Info("知识库数据库表初始化完成")
+	return nil
+}
+
 // Close 关闭数据库连接
 func (db *DB) Close() error {
 	return db.DB.Close()
 }
-

@@ -31,6 +31,7 @@ CyberStrikeAI is an **AI-native penetration-testing copilot** built in Go. It co
 - 📄 Large-result pagination, compression, and searchable archives
 - 🔗 Attack-chain graph, risk scoring, and step-by-step replay
 - 🔒 Password-protected web UI, audit logs, and SQLite persistence
+- 📚 Knowledge base with vector search and hybrid retrieval for security expertise
 
 ## Tool Overview
 
@@ -175,6 +176,38 @@ CyberStrikeAI ships with 100+ curated tools covering the whole kill chain:
    }
    ```
 
+### Knowledge Base
+- **Vector search** – AI agent can automatically search the knowledge base for relevant security knowledge during conversations using the `search_knowledge_base` tool.
+- **Hybrid retrieval** – combines vector similarity search with keyword matching for better accuracy.
+- **Auto-indexing** – scans the `knowledge_base/` directory for Markdown files and automatically indexes them with embeddings.
+- **Web management** – create, update, delete knowledge items through the web UI, with category-based organization.
+- **Retrieval logs** – tracks all knowledge retrieval operations for audit and debugging.
+
+**Setting up the knowledge base:**
+1. **Enable in config** – set `knowledge.enabled: true` in `config.yaml`:
+   ```yaml
+   knowledge:
+     enabled: true
+     base_path: knowledge_base
+     embedding:
+       provider: openai
+       model: text-embedding-v4
+       base_url: "https://api.openai.com/v1"  # or your embedding API
+       api_key: "sk-xxx"
+     retrieval:
+       top_k: 5
+       similarity_threshold: 0.7
+       hybrid_weight: 0.7
+   ```
+2. **Add knowledge files** – place Markdown files in `knowledge_base/` directory, organized by category (e.g., `knowledge_base/SQL Injection/README.md`).
+3. **Scan and index** – use the web UI to scan the knowledge base directory, which will automatically import files and build vector embeddings.
+4. **Use in conversations** – the AI agent will automatically use `search_knowledge_base` when it needs security knowledge. You can also explicitly ask: "Search the knowledge base for SQL injection techniques".
+
+**Knowledge base structure:**
+- Files are organized by category (directory name becomes the category).
+- Each Markdown file becomes a knowledge item with automatic chunking for vector search.
+- The system supports incremental updates – modified files are re-indexed automatically.
+
 ### Automation Hooks
 - **REST APIs** – everything the UI uses (auth, conversations, tool runs, monitor) is available over JSON.
 - **Task control** – pause/resume/stop long scans, re-run steps with new params, or stream transcripts.
@@ -202,8 +235,21 @@ openai:
   model: "deepseek-chat"
 database:
   path: "data/conversations.db"
+  knowledge_db_path: "data/knowledge.db"  # Optional: separate DB for knowledge base
 security:
   tools_dir: "tools"
+knowledge:
+  enabled: false  # Enable knowledge base feature
+  base_path: "knowledge_base"  # Path to knowledge base directory
+  embedding:
+    provider: "openai"  # Embedding provider (currently only "openai")
+    model: "text-embedding-v4"  # Embedding model name
+    base_url: ""  # Leave empty to use OpenAI base_url
+    api_key: ""  # Leave empty to use OpenAI api_key
+  retrieval:
+    top_k: 5  # Number of top results to return
+    similarity_threshold: 0.7  # Minimum similarity score (0-1)
+    hybrid_weight: 0.7  # Weight for vector search (1.0 = pure vector, 0.0 = pure keyword)
 ```
 
 ### Tool Definition Example (`tools/nmap.yaml`)
@@ -261,6 +307,7 @@ Build an attack chain for the latest engagement and export the node list with se
 
 ## Changelog (Recent)
 
+- 2025-12-20 – Added knowledge base feature with vector search, hybrid retrieval, and automatic indexing. AI agent can now search security knowledge during conversations.
 - 2025-12-19 – Added ZoomEye network space search engine tool (zoomeye_search) with support for IPv4/IPv6/web assets, facets statistics, and flexible query parameters.
 - 2025-12-18 – Optimized web frontend with enhanced sidebar navigation and improved user experience.
 - 2025-12-07 – Added FOFA network space search engine tool (fofa_search) with flexible query parameters and field configuration.

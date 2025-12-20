@@ -21,6 +21,7 @@ type Config struct {
 	Database    DatabaseConfig    `yaml:"database"`
 	Auth        AuthConfig        `yaml:"auth"`
 	ExternalMCP ExternalMCPConfig `yaml:"external_mcp,omitempty"`
+	Knowledge   KnowledgeConfig   `yaml:"knowledge,omitempty"`
 }
 
 type ServerConfig struct {
@@ -52,7 +53,8 @@ type SecurityConfig struct {
 }
 
 type DatabaseConfig struct {
-	Path string `yaml:"path"`
+	Path            string `yaml:"path"`                        // 会话数据库路径
+	KnowledgeDBPath string `yaml:"knowledge_db_path,omitempty"` // 知识库数据库路径（可选，为空则使用会话数据库）
 }
 
 type AgentConfig struct {
@@ -399,10 +401,48 @@ func Default() *Config {
 			ToolsDir: "tools",        // 默认工具目录
 		},
 		Database: DatabaseConfig{
-			Path: "data/conversations.db",
+			Path:            "data/conversations.db",
+			KnowledgeDBPath: "data/knowledge.db", // 默认知识库数据库路径
 		},
 		Auth: AuthConfig{
 			SessionDurationHours: 12,
 		},
+		Knowledge: KnowledgeConfig{
+			Enabled:  true,
+			BasePath: "knowledge_base",
+			Embedding: EmbeddingConfig{
+				Provider: "openai",
+				Model:    "text-embedding-3-small",
+				BaseURL:  "https://api.openai.com/v1",
+			},
+			Retrieval: RetrievalConfig{
+				TopK:                5,
+				SimilarityThreshold: 0.7,
+				HybridWeight:        0.7,
+			},
+		},
 	}
+}
+
+// KnowledgeConfig 知识库配置
+type KnowledgeConfig struct {
+	Enabled   bool            `yaml:"enabled" json:"enabled"`     // 是否启用知识检索
+	BasePath  string          `yaml:"base_path" json:"base_path"` // 知识库路径
+	Embedding EmbeddingConfig `yaml:"embedding" json:"embedding"`
+	Retrieval RetrievalConfig `yaml:"retrieval" json:"retrieval"`
+}
+
+// EmbeddingConfig 嵌入配置
+type EmbeddingConfig struct {
+	Provider string `yaml:"provider" json:"provider"` // 嵌入模型提供商
+	Model    string `yaml:"model" json:"model"`       // 模型名称
+	BaseURL  string `yaml:"base_url" json:"base_url"` // API Base URL
+	APIKey   string `yaml:"api_key" json:"api_key"`   // API Key（从OpenAI配置继承）
+}
+
+// RetrievalConfig 检索配置
+type RetrievalConfig struct {
+	TopK                int     `yaml:"top_k" json:"top_k"`                               // 检索Top-K
+	SimilarityThreshold float64 `yaml:"similarity_threshold" json:"similarity_threshold"` // 相似度阈值
+	HybridWeight        float64 `yaml:"hybrid_weight" json:"hybrid_weight"`               // 向量检索权重（0-1）
 }

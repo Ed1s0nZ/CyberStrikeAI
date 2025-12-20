@@ -95,6 +95,27 @@
                             </div>
                         </div>
                     </div>
+                    <div class="nav-item nav-item-has-submenu" data-page="knowledge">
+                        <div class="nav-item-content" data-title="知识" onclick="toggleSubmenu('knowledge')">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M10 7h6M10 11h6M10 15h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <span>知识</span>
+                            <svg class="submenu-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <div class="nav-submenu">
+                            <div class="nav-submenu-item" data-page="knowledge-retrieval-logs" onclick="switchPage('knowledge-retrieval-logs')">
+                                <span>检索历史</span>
+                            </div>
+                            <div class="nav-submenu-item" data-page="knowledge-management" onclick="switchPage('knowledge-management')">
+                                <span>知识管理</span>
+                            </div>
+                        </div>
+                    </div>
                     <div class="nav-item" data-page="settings">
                         <div class="nav-item-content" data-title="系统设置" onclick="switchPage('settings')">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -233,6 +254,106 @@
                     </div>
                 </div>
 
+                <!-- 知识管理页面 -->
+                <div id="page-knowledge-management" class="page">
+                    <div class="page-header">
+                        <h2>知识管理</h2>
+                        <div class="page-header-actions">
+                            <button class="btn-secondary" onclick="refreshKnowledgeBase()">刷新</button>
+                            <button class="btn-secondary" onclick="rebuildKnowledgeIndex()">重建索引</button>
+                            <button class="btn-primary" onclick="showAddKnowledgeItemModal()">添加知识</button>
+                        </div>
+                    </div>
+                    <div class="page-content">
+                        <div class="knowledge-controls">
+                            <div class="knowledge-stats-bar" id="knowledge-stats">
+                                <div class="knowledge-stat-item">
+                                    <span class="knowledge-stat-label">总知识项</span>
+                                    <span class="knowledge-stat-value">-</span>
+                                </div>
+                                <div class="knowledge-stat-item">
+                                    <span class="knowledge-stat-label">分类数</span>
+                                    <span class="knowledge-stat-value">-</span>
+                                </div>
+                                <div class="knowledge-stat-item">
+                                    <span class="knowledge-stat-label">总内容</span>
+                                    <span class="knowledge-stat-value">-</span>
+                                </div>
+                            </div>
+                            <div id="knowledge-index-progress" style="display: none; margin-bottom: 16px;"></div>
+                            <div class="knowledge-filters">
+                                <label>
+                                    分类筛选
+                                    <div class="custom-select-wrapper">
+                                        <div class="custom-select" id="knowledge-category-filter-wrapper">
+                                            <div class="custom-select-trigger" id="knowledge-category-filter-trigger">
+                                                <span>全部</span>
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                    <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                                </svg>
+                                            </div>
+                                            <div class="custom-select-dropdown" id="knowledge-category-filter-dropdown">
+                                                <div class="custom-select-option" data-value="" onclick="selectKnowledgeCategory('')">全部</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </label>
+                                <div class="search-box">
+                                    <input type="text" id="knowledge-search" placeholder="搜索知识..." oninput="searchKnowledgeItems()" />
+                                    <button class="btn-search" onclick="searchKnowledgeItems()" title="搜索">🔍</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="knowledge-items-list" class="knowledge-items-list">
+                            <div class="loading-spinner">加载中...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 知识检索历史页面 -->
+                <div id="page-knowledge-retrieval-logs" class="page">
+                    <div class="page-header">
+                        <h2>检索历史</h2>
+                        <button class="btn-secondary" onclick="refreshRetrievalLogs()">刷新</button>
+                    </div>
+                    <div class="page-content">
+                        <div class="retrieval-logs-controls">
+                            <div class="retrieval-stats-bar" id="retrieval-stats">
+                                <div class="retrieval-stat-item">
+                                    <span class="retrieval-stat-label">总检索次数</span>
+                                    <span class="retrieval-stat-value">-</span>
+                                </div>
+                                <div class="retrieval-stat-item">
+                                    <span class="retrieval-stat-label">成功检索</span>
+                                    <span class="retrieval-stat-value">-</span>
+                                </div>
+                                <div class="retrieval-stat-item">
+                                    <span class="retrieval-stat-label">成功率</span>
+                                    <span class="retrieval-stat-value">-</span>
+                                </div>
+                                <div class="retrieval-stat-item">
+                                    <span class="retrieval-stat-label">检索到知识项</span>
+                                    <span class="retrieval-stat-value">-</span>
+                                </div>
+                            </div>
+                            <div class="retrieval-logs-filters">
+                                <label>
+                                    对话ID
+                                    <input type="text" id="retrieval-logs-conversation-id" placeholder="可选：筛选特定对话" />
+                                </label>
+                                <label>
+                                    消息ID
+                                    <input type="text" id="retrieval-logs-message-id" placeholder="可选：筛选特定消息" />
+                                </label>
+                                <button class="btn-secondary" onclick="filterRetrievalLogs()">筛选</button>
+                            </div>
+                        </div>
+                        <div id="retrieval-logs-list" class="retrieval-logs-list">
+                            <div class="loading-spinner">加载中...</div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 系统设置页面 -->
                 <div id="page-settings" class="page">
                     <div class="page-header">
@@ -285,6 +406,68 @@
                                         <div class="form-group">
                                             <label for="agent-max-iterations">最大迭代次数</label>
                                             <input type="number" id="agent-max-iterations" min="1" max="100" placeholder="30" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 知识库配置 -->
+                                <div class="settings-subsection">
+                                    <h4>知识库配置</h4>
+                                    <div class="settings-form">
+                                        <div class="form-group">
+                                            <label class="checkbox-label">
+                                                <input type="checkbox" id="knowledge-enabled" class="modern-checkbox" />
+                                                <span class="checkbox-custom"></span>
+                                                <span class="checkbox-text">启用知识检索功能</span>
+                                            </label>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="knowledge-base-path">知识库路径</label>
+                                            <input type="text" id="knowledge-base-path" placeholder="knowledge_base" />
+                                            <small class="form-hint">相对于配置文件所在目录的路径</small>
+                                        </div>
+                                        
+                                        <div class="settings-subsection-header">
+                                            <h5>嵌入模型配置</h5>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="knowledge-embedding-provider">提供商</label>
+                                            <select id="knowledge-embedding-provider">
+                                                <option value="openai">OpenAI</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="knowledge-embedding-model">模型名称</label>
+                                            <input type="text" id="knowledge-embedding-model" placeholder="text-embedding-v4" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="knowledge-embedding-base-url">Base URL</label>
+                                            <input type="text" id="knowledge-embedding-base-url" placeholder="留空则使用OpenAI配置的base_url" />
+                                            <small class="form-hint">留空则使用OpenAI配置的base_url</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="knowledge-embedding-api-key">API Key</label>
+                                            <input type="password" id="knowledge-embedding-api-key" placeholder="留空则使用OpenAI配置的api_key" />
+                                            <small class="form-hint">留空则使用OpenAI配置的api_key</small>
+                                        </div>
+                                        
+                                        <div class="settings-subsection-header">
+                                            <h5>检索配置</h5>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="knowledge-retrieval-top-k">Top-K 结果数量</label>
+                                            <input type="number" id="knowledge-retrieval-top-k" min="1" max="20" placeholder="5" />
+                                            <small class="form-hint">检索返回的Top-K结果数量</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="knowledge-retrieval-similarity-threshold">相似度阈值</label>
+                                            <input type="number" id="knowledge-retrieval-similarity-threshold" min="0" max="1" step="0.1" placeholder="0.7" />
+                                            <small class="form-hint">相似度阈值（0-1），低于此值的结果将被过滤</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="knowledge-retrieval-hybrid-weight">混合检索权重</label>
+                                            <input type="number" id="knowledge-retrieval-hybrid-weight" min="0" max="1" step="0.1" placeholder="0.7" />
+                                            <small class="form-hint">向量检索的权重（0-1），1.0表示纯向量检索，0.0表示纯关键词检索</small>
                                         </div>
                                     </div>
                                 </div>
@@ -540,11 +723,40 @@
     <script src="https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"></script>
     <!-- dagre layout for hierarchical layout -->
     <script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
+    <!-- 知识项编辑模态框 -->
+    <div id="knowledge-item-modal" class="modal">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h2 id="knowledge-item-modal-title">添加知识</h2>
+                <span class="modal-close" onclick="closeKnowledgeItemModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="knowledge-item-category">分类（风险类型）<span style="color: red;">*</span></label>
+                    <input type="text" id="knowledge-item-category" placeholder="例如：SQL注入" required />
+                </div>
+                <div class="form-group">
+                    <label for="knowledge-item-title">标题<span style="color: red;">*</span></label>
+                    <input type="text" id="knowledge-item-title" placeholder="知识项标题" required />
+                </div>
+                <div class="form-group">
+                    <label for="knowledge-item-content">内容（Markdown格式）<span style="color: red;">*</span></label>
+                    <textarea id="knowledge-item-content" rows="20" placeholder="输入知识内容，支持Markdown格式..." style="font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 0.875rem; line-height: 1.5;" required></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeKnowledgeItemModal()">取消</button>
+                <button class="btn-primary" onclick="saveKnowledgeItem()">保存</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/js/auth.js"></script>
     <script src="/static/js/router.js"></script>
     <script src="/static/js/monitor.js"></script>
     <script src="/static/js/chat.js"></script>
     <script src="/static/js/settings.js"></script>
+    <script src="/static/js/knowledge.js"></script>
 </body>
 </html>
 

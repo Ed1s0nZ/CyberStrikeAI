@@ -8,7 +8,7 @@ function initRouter() {
     
     // 从URL hash读取页面（如果有）
     const hash = window.location.hash.slice(1);
-    if (hash && ['chat', 'mcp-monitor', 'mcp-management', 'settings'].includes(hash)) {
+    if (hash && ['chat', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'settings'].includes(hash)) {
         switchPage(hash);
     }
 }
@@ -56,6 +56,19 @@ function updateNavState(pageId) {
             mcpItem.classList.add('active');
             // 展开MCP子菜单
             mcpItem.classList.add('expanded');
+        }
+        
+        const submenuItem = document.querySelector(`.nav-submenu-item[data-page="${pageId}"]`);
+        if (submenuItem) {
+            submenuItem.classList.add('active');
+        }
+    } else if (pageId === 'knowledge-management' || pageId === 'knowledge-retrieval-logs') {
+        // 知识子菜单项
+        const knowledgeItem = document.querySelector('.nav-item[data-page="knowledge"]');
+        if (knowledgeItem) {
+            knowledgeItem.classList.add('active');
+            // 展开知识子菜单
+            knowledgeItem.classList.add('expanded');
         }
         
         const submenuItem = document.querySelector(`.nav-submenu-item[data-page="${pageId}"]`);
@@ -202,7 +215,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 监听hash变化
     window.addEventListener('hashchange', function() {
         const hash = window.location.hash.slice(1);
-        if (hash && ['chat', 'mcp-monitor', 'mcp-management', 'settings'].includes(hash)) {
+        if (hash && ['chat', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'settings'].includes(hash)) {
             switchPage(hash);
         }
     });

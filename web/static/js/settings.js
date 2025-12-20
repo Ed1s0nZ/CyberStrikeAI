@@ -96,6 +96,60 @@ async function loadConfig(loadTools = true) {
         // 填充Agent配置
         document.getElementById('agent-max-iterations').value = currentConfig.agent.max_iterations || 30;
         
+        // 填充知识库配置
+        const knowledgeEnabledCheckbox = document.getElementById('knowledge-enabled');
+        if (knowledgeEnabledCheckbox) {
+            knowledgeEnabledCheckbox.checked = currentConfig.knowledge?.enabled !== false;
+        }
+        
+        // 填充知识库详细配置
+        if (currentConfig.knowledge) {
+            const knowledge = currentConfig.knowledge;
+            
+            // 基本配置
+            const basePathInput = document.getElementById('knowledge-base-path');
+            if (basePathInput) {
+                basePathInput.value = knowledge.base_path || 'knowledge_base';
+            }
+            
+            // 嵌入模型配置
+            const embeddingProviderSelect = document.getElementById('knowledge-embedding-provider');
+            if (embeddingProviderSelect) {
+                embeddingProviderSelect.value = knowledge.embedding?.provider || 'openai';
+            }
+            
+            const embeddingModelInput = document.getElementById('knowledge-embedding-model');
+            if (embeddingModelInput) {
+                embeddingModelInput.value = knowledge.embedding?.model || '';
+            }
+            
+            const embeddingBaseUrlInput = document.getElementById('knowledge-embedding-base-url');
+            if (embeddingBaseUrlInput) {
+                embeddingBaseUrlInput.value = knowledge.embedding?.base_url || '';
+            }
+            
+            const embeddingApiKeyInput = document.getElementById('knowledge-embedding-api-key');
+            if (embeddingApiKeyInput) {
+                embeddingApiKeyInput.value = knowledge.embedding?.api_key || '';
+            }
+            
+            // 检索配置
+            const retrievalTopKInput = document.getElementById('knowledge-retrieval-top-k');
+            if (retrievalTopKInput) {
+                retrievalTopKInput.value = knowledge.retrieval?.top_k || 5;
+            }
+            
+            const retrievalThresholdInput = document.getElementById('knowledge-retrieval-similarity-threshold');
+            if (retrievalThresholdInput) {
+                retrievalThresholdInput.value = knowledge.retrieval?.similarity_threshold || 0.7;
+            }
+            
+            const retrievalWeightInput = document.getElementById('knowledge-retrieval-hybrid-weight');
+            if (retrievalWeightInput) {
+                retrievalWeightInput.value = knowledge.retrieval?.hybrid_weight || 0.7;
+            }
+        }
+        
         // 只有在需要时才加载工具列表（MCP管理页面需要，系统设置页面不需要）
         if (loadTools) {
             // 设置每页显示数量（会在分页控件渲染时设置）
@@ -538,6 +592,26 @@ async function applySettings() {
         }
         
         // 收集配置
+        const knowledgeEnabledCheckbox = document.getElementById('knowledge-enabled');
+        const knowledgeEnabled = knowledgeEnabledCheckbox ? knowledgeEnabledCheckbox.checked : true;
+        
+        // 收集知识库配置
+        const knowledgeConfig = {
+            enabled: knowledgeEnabled,
+            base_path: document.getElementById('knowledge-base-path')?.value.trim() || 'knowledge_base',
+            embedding: {
+                provider: document.getElementById('knowledge-embedding-provider')?.value || 'openai',
+                model: document.getElementById('knowledge-embedding-model')?.value.trim() || '',
+                base_url: document.getElementById('knowledge-embedding-base-url')?.value.trim() || '',
+                api_key: document.getElementById('knowledge-embedding-api-key')?.value.trim() || ''
+            },
+            retrieval: {
+                top_k: parseInt(document.getElementById('knowledge-retrieval-top-k')?.value) || 5,
+                similarity_threshold: parseFloat(document.getElementById('knowledge-retrieval-similarity-threshold')?.value) || 0.7,
+                hybrid_weight: parseFloat(document.getElementById('knowledge-retrieval-hybrid-weight')?.value) || 0.7
+            }
+        };
+        
         const config = {
             openai: {
                 api_key: apiKey,
@@ -547,6 +621,7 @@ async function applySettings() {
             agent: {
                 max_iterations: parseInt(document.getElementById('agent-max-iterations').value) || 30
             },
+            knowledge: knowledgeConfig,
             tools: []
         };
         
