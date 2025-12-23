@@ -21,7 +21,7 @@ CyberStrikeAI is an **AI-native penetration-testing copilot** built in Go. It co
   <img src="./img/mcp-stdio2.png" alt="Preview" width="560">
 - External MCP servers & attack-chain view   
   <img src="./img/外部MCP接入.png" alt="Preview" width="560">   
-  <img src="./img/攻击链.jpg" alt="Preview" width="560">
+  <img src="./img/攻击链.png" alt="Preview" width="560">
 
 ## Highlights
 
