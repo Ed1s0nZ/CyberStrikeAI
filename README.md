@@ -32,6 +32,7 @@ CyberStrikeAI is an **AI-native penetration-testing copilot** built in Go. It co
 - 🔗 Attack-chain graph, risk scoring, and step-by-step replay
 - 🔒 Password-protected web UI, audit logs, and SQLite persistence
 - 📚 Knowledge base with vector search and hybrid retrieval for security expertise
+- 📁 Conversation grouping with pinning, rename, and batch management
 
 ## Tool Overview
 
@@ -105,6 +106,7 @@ CyberStrikeAI ships with 100+ curated tools covering the whole kill chain:
 - **Conversation testing** – Natural-language prompts trigger toolchains with streaming SSE output.
 - **Tool monitor** – Inspect running jobs, execution logs, and large-result attachments.
 - **History & audit** – Every conversation and tool invocation is stored in SQLite with replay.
+- **Conversation groups** – Organize conversations into groups, pin important groups, rename or delete groups via context menu.
 - **Settings** – Tweak provider keys, MCP enablement, tool toggles, and agent iteration limits.
 
 ### Built-in Safeguards
@@ -312,6 +314,7 @@ Build an attack chain for the latest engagement and export the node list with se
 
 ## Changelog (Recent)
 
+- 2025-12-25 – Added conversation grouping feature: organize conversations into groups, pin groups to top, rename/delete groups via context menu. All group data is persisted in the database.
 - 2025-12-24 – Refactored attack chain generation logic, achieving 2x faster generation speed. Redesigned attack chain frontend visualization for improved user experience.
 - 2025-12-20 – Added knowledge base feature with vector search, hybrid retrieval, and automatic indexing. AI agent can now search security knowledge during conversations.
 - 2025-12-19 – Added ZoomEye network space search engine tool (zoomeye_search) with support for IPv4/IPv6/web assets, facets statistics, and flexible query parameters.
