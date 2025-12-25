@@ -6,6 +6,7 @@ let mentionToolsLoaded = false;
 let mentionToolsLoadingPromise = null;
 let mentionSuggestionsEl = null;
 let mentionFilteredTools = [];
+let externalMcpNames = []; // 外部MCP名称列表
 const mentionState = {
     active: false,
     startIndex: -1,
@@ -242,6 +243,23 @@ async function fetchMentionTools() {
     const collected = [];
 
     try {
+        // 同时获取外部MCP列表
+        try {
+            const mcpResponse = await apiFetch('/api/external-mcp');
+            if (mcpResponse.ok) {
+                const mcpData = await mcpResponse.json();
+                externalMcpNames = Object.keys(mcpData.servers || {}).filter(name => {
+                    const server = mcpData.servers[name];
+                    // 只包含已连接且已启用的MCP
+                    return server.status === 'connected' && 
+                           (server.config.external_mcp_enable || (server.config.enabled && !server.config.disabled));
+                });
+            }
+        } catch (mcpError) {
+            console.warn('加载外部MCP列表失败:', mcpError);
+            externalMcpNames = [];
+        }
+
         while (page <= totalPages && page <= 20) {
             const response = await apiFetch(`/api/config/tools?page=${page}&page_size=${pageSize}`);
             if (!response.ok) {
@@ -383,15 +401,47 @@ function updateMentionCandidates() {
     let filtered = mentionTools;
 
     if (normalizedQuery) {
-        filtered = mentionTools.filter(tool => {
-            const nameMatch = tool.name.toLowerCase().includes(normalizedQuery);
-            const descMatch = tool.description && tool.description.toLowerCase().includes(normalizedQuery);
-            return nameMatch || descMatch;
-        });
+        // 检查是否精确匹配外部MCP名称
+        const exactMatchedMcp = externalMcpNames.find(mcpName => 
+            mcpName.toLowerCase() === normalizedQuery
+        );
+
+        if (exactMatchedMcp) {
+            // 如果完全匹配MCP名称，只显示该MCP下的所有工具
+            filtered = mentionTools.filter(tool => {
+                return tool.externalMcp && tool.externalMcp.toLowerCase() === exactMatchedMcp.toLowerCase();
+            });
+        } else {
+            // 检查是否部分匹配MCP名称
+            const partialMatchedMcps = externalMcpNames.filter(mcpName => 
+                mcpName.toLowerCase().includes(normalizedQuery)
+            );
+            
+            // 正常匹配：按工具名称和描述过滤，同时也匹配MCP名称
+            filtered = mentionTools.filter(tool => {
+                const nameMatch = tool.name.toLowerCase().includes(normalizedQuery);
+                const descMatch = tool.description && tool.description.toLowerCase().includes(normalizedQuery);
+                const mcpMatch = tool.externalMcp && tool.externalMcp.toLowerCase().includes(normalizedQuery);
+                
+                // 如果部分匹配到MCP名称，也包含该MCP下的所有工具
+                const mcpPartialMatch = partialMatchedMcps.some(mcpName => 
+                    tool.externalMcp && tool.externalMcp.toLowerCase() === mcpName.toLowerCase()
+                );
+                
+                return nameMatch || descMatch || mcpMatch || mcpPartialMatch;
+            });
+        }
     }
 
     filtered = filtered.slice().sort((a, b) => {
         if (normalizedQuery) {
+            // 精确匹配MCP名称的工具优先显示
+            const aMcpExact = a.externalMcp && a.externalMcp.toLowerCase() === normalizedQuery;
+            const bMcpExact = b.externalMcp && b.externalMcp.toLowerCase() === normalizedQuery;
+            if (aMcpExact !== bMcpExact) {
+                return aMcpExact ? -1 : 1;
+            }
+            
             const aStarts = a.name.toLowerCase().startsWith(normalizedQuery);
             const bStarts = b.name.toLowerCase().startsWith(normalizedQuery);
             if (aStarts !== bStarts) {
@@ -1567,10 +1617,12 @@ async function loadConversation(conversationId) {
 }
 
 // 删除对话
-async function deleteConversation(conversationId) {
-    // 确认删除
-    if (!confirm('确定要删除这个对话吗？此操作不可恢复。')) {
-        return;
+async function deleteConversation(conversationId, skipConfirm = false) {
+    // 确认删除（如果调用者没有跳过确认）
+    if (!skipConfirm) {
+        if (!confirm('确定要删除这个对话吗？此操作不可恢复。')) {
+            return;
+        }
     }
     
     try {
@@ -4603,7 +4655,7 @@ function deleteConversationFromContext() {
     if (!convId) return;
 
     if (confirm('确定要删除此对话吗？')) {
-        deleteConversation(convId);
+        deleteConversation(convId, true); // 跳过内部确认，因为这里已经确认过了
     }
     closeContextMenu();
 }
@@ -4741,7 +4793,7 @@ async function deleteSelectedConversations() {
     
     try {
         for (const id of ids) {
-            await deleteConversation(id);
+            await deleteConversation(id, true); // 跳过内部确认，因为批量删除时已经确认过了
         }
         closeBatchManageModal();
         loadConversationsWithGroups();

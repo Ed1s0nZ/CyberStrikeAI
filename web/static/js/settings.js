@@ -294,8 +294,14 @@ function renderToolsList() {
             external_mcp: tool.external_mcp || ''
         };
         
-        // 外部工具标签
-        const externalBadge = toolState.is_external ? '<span class="external-tool-badge" title="外部MCP工具">外部</span>' : '';
+        // 外部工具标签，显示来源信息
+        let externalBadge = '';
+        if (toolState.is_external) {
+            const externalMcpName = toolState.external_mcp || '';
+            const badgeText = externalMcpName ? `外部 (${escapeHtml(externalMcpName)})` : '外部';
+            const badgeTitle = externalMcpName ? `外部MCP工具 - 来源：${escapeHtml(externalMcpName)}` : '外部MCP工具';
+            externalBadge = `<span class="external-tool-badge" title="${badgeTitle}">${badgeText}</span>`;
+        }
         
         toolItem.innerHTML = `
             <input type="checkbox" id="tool-${tool.name}" ${toolState.enabled ? 'checked' : ''} ${toolState.is_external ? 'data-external="true"' : ''} onchange="handleToolCheckboxChange('${tool.name}', this.checked)" />
