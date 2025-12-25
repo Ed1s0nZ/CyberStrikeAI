@@ -76,6 +76,15 @@
                             <span>对话</span>
                         </div>
                     </div>
+                    <div class="nav-item" data-page="vulnerabilities">
+                        <div class="nav-item-content" data-title="漏洞管理" onclick="switchPage('vulnerabilities')">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <span>漏洞管理</span>
+                        </div>
+                    </div>
                     <div class="nav-item nav-item-has-submenu" data-page="mcp">
                         <div class="nav-item-content" data-title="MCP" onclick="toggleSubmenu('mcp')">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -425,6 +434,86 @@
                             </div>
                         </div>
                         <div id="retrieval-logs-list" class="retrieval-logs-list">
+                            <div class="loading-spinner">加载中...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 漏洞管理页面 -->
+                <div id="page-vulnerabilities" class="page">
+                    <div class="page-header">
+                        <h2>漏洞管理</h2>
+                        <div class="page-header-actions">
+                            <button class="btn-secondary" onclick="refreshVulnerabilities()">刷新</button>
+                            <button class="btn-primary" onclick="showAddVulnerabilityModal()">添加漏洞</button>
+                        </div>
+                    </div>
+                    <div class="page-content">
+                        <!-- 统计看板 -->
+                        <div class="vulnerability-dashboard" id="vulnerability-dashboard">
+                            <div class="dashboard-stats">
+                                <div class="stat-card">
+                                    <div class="stat-label">总漏洞数</div>
+                                    <div class="stat-value" id="stat-total">-</div>
+                                </div>
+                                <div class="stat-card stat-critical">
+                                    <div class="stat-label">严重</div>
+                                    <div class="stat-value" id="stat-critical">-</div>
+                                </div>
+                                <div class="stat-card stat-high">
+                                    <div class="stat-label">高危</div>
+                                    <div class="stat-value" id="stat-high">-</div>
+                                </div>
+                                <div class="stat-card stat-medium">
+                                    <div class="stat-label">中危</div>
+                                    <div class="stat-value" id="stat-medium">-</div>
+                                </div>
+                                <div class="stat-card stat-low">
+                                    <div class="stat-label">低危</div>
+                                    <div class="stat-value" id="stat-low">-</div>
+                                </div>
+                                <div class="stat-card stat-info">
+                                    <div class="stat-label">信息</div>
+                                    <div class="stat-value" id="stat-info">-</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 筛选和搜索 -->
+                        <div class="vulnerability-controls">
+                            <div class="vulnerability-filters">
+                                <label>
+                                    会话ID
+                                    <input type="text" id="vulnerability-conversation-filter" placeholder="筛选特定会话" />
+                                </label>
+                                <label>
+                                    严重程度
+                                    <select id="vulnerability-severity-filter">
+                                        <option value="">全部</option>
+                                        <option value="critical">严重</option>
+                                        <option value="high">高危</option>
+                                        <option value="medium">中危</option>
+                                        <option value="low">低危</option>
+                                        <option value="info">信息</option>
+                                    </select>
+                                </label>
+                                <label>
+                                    状态
+                                    <select id="vulnerability-status-filter">
+                                        <option value="">全部</option>
+                                        <option value="open">待处理</option>
+                                        <option value="confirmed">已确认</option>
+                                        <option value="fixed">已修复</option>
+                                        <option value="false_positive">误报</option>
+                                    </select>
+                                </label>
+                                <button class="btn-secondary" onclick="filterVulnerabilities()">筛选</button>
+                                <button class="btn-secondary" onclick="clearVulnerabilityFilters()">清除</button>
+                            </div>
+                        </div>
+
+                        <!-- 漏洞列表 -->
+                        <div id="vulnerabilities-list" class="vulnerabilities-list">
                             <div class="loading-spinner">加载中...</div>
                         </div>
                     </div>
@@ -952,12 +1041,81 @@
         </div>
     </div>
 
+    <!-- 漏洞编辑模态框 -->
+    <div id="vulnerability-modal" class="modal">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h2 id="vulnerability-modal-title">添加漏洞</h2>
+                <span class="modal-close" onclick="closeVulnerabilityModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="vulnerability-conversation-id">会话ID <span style="color: red;">*</span></label>
+                    <input type="text" id="vulnerability-conversation-id" placeholder="输入会话ID" required />
+                </div>
+                <div class="form-group">
+                    <label for="vulnerability-title">标题 <span style="color: red;">*</span></label>
+                    <input type="text" id="vulnerability-title" placeholder="漏洞标题" required />
+                </div>
+                <div class="form-group">
+                    <label for="vulnerability-description">描述</label>
+                    <textarea id="vulnerability-description" rows="5" placeholder="漏洞详细描述"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="vulnerability-severity">严重程度 <span style="color: red;">*</span></label>
+                    <select id="vulnerability-severity" required>
+                        <option value="">请选择</option>
+                        <option value="critical">严重</option>
+                        <option value="high">高危</option>
+                        <option value="medium">中危</option>
+                        <option value="low">低危</option>
+                        <option value="info">信息</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="vulnerability-status">状态</label>
+                    <select id="vulnerability-status">
+                        <option value="open">待处理</option>
+                        <option value="confirmed">已确认</option>
+                        <option value="fixed">已修复</option>
+                        <option value="false_positive">误报</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="vulnerability-type">漏洞类型</label>
+                    <input type="text" id="vulnerability-type" placeholder="如：SQL注入、XSS、CSRF等" />
+                </div>
+                <div class="form-group">
+                    <label for="vulnerability-target">目标</label>
+                    <input type="text" id="vulnerability-target" placeholder="受影响的目标（URL、IP地址等）" />
+                </div>
+                <div class="form-group">
+                    <label for="vulnerability-proof">证明（POC）</label>
+                    <textarea id="vulnerability-proof" rows="5" placeholder="漏洞证明，如请求/响应、截图等"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="vulnerability-impact">影响</label>
+                    <textarea id="vulnerability-impact" rows="3" placeholder="漏洞影响说明"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="vulnerability-recommendation">修复建议</label>
+                    <textarea id="vulnerability-recommendation" rows="3" placeholder="修复建议"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeVulnerabilityModal()">取消</button>
+                <button class="btn-primary" onclick="saveVulnerability()">保存</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/js/auth.js"></script>
     <script src="/static/js/router.js"></script>
     <script src="/static/js/monitor.js"></script>
     <script src="/static/js/chat.js"></script>
     <script src="/static/js/settings.js"></script>
     <script src="/static/js/knowledge.js"></script>
+    <script src="/static/js/vulnerability.js?v=4"></script>
 </body>
 </html>
 

@@ -4634,15 +4634,31 @@ async function removeConversationFromGroup(convId, groupId) {
 async function loadConversationGroupMapping() {
     try {
         // 获取所有分组，然后获取每个分组的对话
-        const groups = groupsCache.length > 0 ? groupsCache : await (await apiFetch('/api/groups')).json();
+        let groups;
+        if (Array.isArray(groupsCache) && groupsCache.length > 0) {
+            groups = groupsCache;
+        } else {
+            const response = await apiFetch('/api/groups');
+            groups = await response.json();
+        }
+        
+        // 确保groups是有效数组
+        if (!Array.isArray(groups)) {
+            console.warn('loadConversationGroupMapping: groups不是有效数组，使用空数组');
+            groups = [];
+        }
+        
         conversationGroupMappingCache = {};
 
         for (const group of groups) {
             const response = await apiFetch(`/api/groups/${group.id}/conversations`);
             const conversations = await response.json();
-            conversations.forEach(conv => {
-                conversationGroupMappingCache[conv.id] = group.id;
-            });
+            // 确保conversations是有效数组
+            if (Array.isArray(conversations)) {
+                conversations.forEach(conv => {
+                    conversationGroupMappingCache[conv.id] = group.id;
+                });
+            }
         }
     } catch (error) {
         console.error('加载对话分组映射失败:', error);
@@ -4866,7 +4882,19 @@ async function createGroup(event) {
 
     // 前端校验：检查名称是否已存在
     try {
-        const groups = groupsCache.length > 0 ? groupsCache : await (await apiFetch('/api/groups')).json();
+        let groups;
+        if (Array.isArray(groupsCache) && groupsCache.length > 0) {
+            groups = groupsCache;
+        } else {
+            const response = await apiFetch('/api/groups');
+            groups = await response.json();
+        }
+        
+        // 确保groups是有效数组
+        if (!Array.isArray(groups)) {
+            groups = [];
+        }
+        
         const nameExists = groups.some(g => g.name === name);
         if (nameExists) {
             alert('分组名称已存在，请使用其他名称');
@@ -5175,7 +5203,19 @@ async function editGroup() {
         const trimmedName = newName.trim();
         
         // 前端校验：检查名称是否已存在（排除当前分组）
-        const groups = groupsCache.length > 0 ? groupsCache : await (await apiFetch('/api/groups')).json();
+        let groups;
+        if (Array.isArray(groupsCache) && groupsCache.length > 0) {
+            groups = groupsCache;
+        } else {
+            const response = await apiFetch('/api/groups');
+            groups = await response.json();
+        }
+        
+        // 确保groups是有效数组
+        if (!Array.isArray(groups)) {
+            groups = [];
+        }
+        
         const nameExists = groups.some(g => g.name === trimmedName && g.id !== currentGroupId);
         if (nameExists) {
             alert('分组名称已存在，请使用其他名称');
@@ -5273,7 +5313,19 @@ async function renameGroupFromContext() {
         const trimmedName = newName.trim();
         
         // 前端校验：检查名称是否已存在（排除当前分组）
-        const groups = groupsCache.length > 0 ? groupsCache : await (await apiFetch('/api/groups')).json();
+        let groups;
+        if (Array.isArray(groupsCache) && groupsCache.length > 0) {
+            groups = groupsCache;
+        } else {
+            const response = await apiFetch('/api/groups');
+            groups = await response.json();
+        }
+        
+        // 确保groups是有效数组
+        if (!Array.isArray(groups)) {
+            groups = [];
+        }
+        
         const nameExists = groups.some(g => g.name === trimmedName && g.id !== groupId);
         if (nameExists) {
             alert('分组名称已存在，请使用其他名称');

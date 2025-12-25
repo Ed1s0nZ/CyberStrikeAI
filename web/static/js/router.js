@@ -8,7 +8,7 @@ function initRouter() {
     
     // 从URL hash读取页面（如果有）
     const hash = window.location.hash.slice(1);
-    if (hash && ['chat', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'settings'].includes(hash)) {
+    if (hash && ['chat', 'vulnerabilities', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'settings'].includes(hash)) {
         switchPage(hash);
     }
 }
@@ -198,6 +198,12 @@ function initPage(pageId) {
                 loadToolsList(1, '');
             }
             break;
+        case 'vulnerabilities':
+            // 初始化漏洞管理页面
+            if (typeof initVulnerabilityPage === 'function') {
+                initVulnerabilityPage();
+            }
+            break;
         case 'settings':
             // 初始化设置页面（不需要加载工具列表）
             if (typeof loadConfig === 'function') {
@@ -215,7 +221,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 监听hash变化
     window.addEventListener('hashchange', function() {
         const hash = window.location.hash.slice(1);
-        if (hash && ['chat', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'settings'].includes(hash)) {
+        if (hash && ['chat', 'vulnerabilities', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'settings'].includes(hash)) {
             switchPage(hash);
         }
     });

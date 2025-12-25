@@ -20,18 +20,19 @@ import (
 
 // Agent AI代理
 type Agent struct {
-	openAIClient         *openai.Client
-	config               *config.OpenAIConfig
-	agentConfig          *config.AgentConfig
-	memoryCompressor     *MemoryCompressor
-	mcpServer            *mcp.Server
-	externalMCPMgr       *mcp.ExternalMCPManager // 外部MCP管理器
-	logger               *zap.Logger
-	maxIterations        int
-	resultStorage        ResultStorage     // 结果存储
-	largeResultThreshold int               // 大结果阈值（字节）
-	mu                   sync.RWMutex      // 添加互斥锁以支持并发更新
-	toolNameMapping      map[string]string // 工具名称映射：OpenAI格式 -> 原始格式（用于外部MCP工具）
+	openAIClient          *openai.Client
+	config                *config.OpenAIConfig
+	agentConfig           *config.AgentConfig
+	memoryCompressor      *MemoryCompressor
+	mcpServer             *mcp.Server
+	externalMCPMgr        *mcp.ExternalMCPManager // 外部MCP管理器
+	logger                *zap.Logger
+	maxIterations         int
+	resultStorage         ResultStorage     // 结果存储
+	largeResultThreshold  int               // 大结果阈值（字节）
+	mu                    sync.RWMutex      // 添加互斥锁以支持并发更新
+	toolNameMapping       map[string]string // 工具名称映射：OpenAI格式 -> 原始格式（用于外部MCP工具）
+	currentConversationID string            // 当前对话ID（用于自动传递给工具）
 }
 
 // ResultStorage 结果存储接口（直接使用 storage 包的类型）
@@ -301,11 +302,20 @@ type ProgressCallback func(eventType, message string, data interface{})
 
 // AgentLoop 执行Agent循环
 func (a *Agent) AgentLoop(ctx context.Context, userInput string, historyMessages []ChatMessage) (*AgentLoopResult, error) {
-	return a.AgentLoopWithProgress(ctx, userInput, historyMessages, nil)
+	return a.AgentLoopWithProgress(ctx, userInput, historyMessages, "", nil)
 }
 
-// AgentLoopWithProgress 执行Agent循环（带进度回调）
-func (a *Agent) AgentLoopWithProgress(ctx context.Context, userInput string, historyMessages []ChatMessage, callback ProgressCallback) (*AgentLoopResult, error) {
+// AgentLoopWithConversationID 执行Agent循环（带对话ID）
+func (a *Agent) AgentLoopWithConversationID(ctx context.Context, userInput string, historyMessages []ChatMessage, conversationID string) (*AgentLoopResult, error) {
+	return a.AgentLoopWithProgress(ctx, userInput, historyMessages, conversationID, nil)
+}
+
+// AgentLoopWithProgress 执行Agent循环（带进度回调和对话ID）
+func (a *Agent) AgentLoopWithProgress(ctx context.Context, userInput string, historyMessages []ChatMessage, conversationID string, callback ProgressCallback) (*AgentLoopResult, error) {
+	// 设置当前对话ID
+	a.mu.Lock()
+	a.currentConversationID = conversationID
+	a.mu.Unlock()
 	// 发送进度更新
 	sendProgress := func(eventType, message string, data interface{}) {
 		if callback != nil {
@@ -388,7 +398,19 @@ func (a *Agent) AgentLoopWithProgress(ctx context.Context, userInput string, his
 5. 如果确实无法使用某个工具，向用户说明问题，并建议替代方案或手动操作
 6. 不要因为单个工具失败就停止整个测试流程，尝试其他方法继续完成任务
 
-当工具返回错误时，错误信息会包含在工具响应中，请仔细阅读并做出合理的决策。`
+当工具返回错误时，错误信息会包含在工具响应中，请仔细阅读并做出合理的决策。
+
+漏洞记录要求：
+- 当你发现有效漏洞时，必须使用 record_vulnerability 工具记录漏洞详情
+- 漏洞记录应包含：标题、描述、严重程度、类型、目标、证明（POC）、影响和修复建议
+- 严重程度评估标准：
+  * critical（严重）：可导致系统完全被控制、数据泄露、服务中断等
+  * high（高）：可导致敏感信息泄露、权限提升、重要功能被绕过等
+  * medium（中）：可导致部分信息泄露、功能受限、需要特定条件才能利用等
+  * low（低）：影响较小，难以利用或影响范围有限
+  * info（信息）：安全配置问题、信息泄露但不直接可利用等
+- 确保漏洞证明（proof）包含足够的证据，如请求/响应、截图、命令输出等
+- 在记录漏洞后，继续测试以发现更多问题`
 
 	messages := []ChatMessage{
 		{
@@ -1111,6 +1133,22 @@ func (a *Agent) executeToolViaMCP(ctx context.Context, toolName string, args map
 		zap.String("tool", toolName),
 		zap.Any("args", args),
 	)
+
+	// 如果是record_vulnerability工具，自动添加conversation_id
+	if toolName == "record_vulnerability" {
+		a.mu.RLock()
+		conversationID := a.currentConversationID
+		a.mu.RUnlock()
+
+		if conversationID != "" {
+			args["conversation_id"] = conversationID
+			a.logger.Debug("自动添加conversation_id到record_vulnerability工具",
+				zap.String("conversation_id", conversationID),
+			)
+		} else {
+			a.logger.Warn("record_vulnerability工具调用时conversation_id为空")
+		}
+	}
 
 	var result *mcp.ToolResult
 	var executionID string

@@ -170,6 +170,25 @@ func (db *DB) initTables() error {
 		UNIQUE(conversation_id, group_id)
 	);`
 
+	// 创建漏洞表
+	createVulnerabilitiesTable := `
+	CREATE TABLE IF NOT EXISTS vulnerabilities (
+		id TEXT PRIMARY KEY,
+		conversation_id TEXT NOT NULL,
+		title TEXT NOT NULL,
+		description TEXT,
+		severity TEXT NOT NULL,
+		status TEXT NOT NULL DEFAULT 'open',
+		vulnerability_type TEXT,
+		target TEXT,
+		proof TEXT,
+		impact TEXT,
+		recommendation TEXT,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+	);`
+
 	// 创建索引
 	createIndexes := `
 	CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
@@ -189,6 +208,10 @@ func (db *DB) initTables() error {
 	CREATE INDEX IF NOT EXISTS idx_conversation_group_mappings_conversation ON conversation_group_mappings(conversation_id);
 	CREATE INDEX IF NOT EXISTS idx_conversation_group_mappings_group ON conversation_group_mappings(group_id);
 	CREATE INDEX IF NOT EXISTS idx_conversations_pinned ON conversations(pinned);
+	CREATE INDEX IF NOT EXISTS idx_vulnerabilities_conversation_id ON vulnerabilities(conversation_id);
+	CREATE INDEX IF NOT EXISTS idx_vulnerabilities_severity ON vulnerabilities(severity);
+	CREATE INDEX IF NOT EXISTS idx_vulnerabilities_status ON vulnerabilities(status);
+	CREATE INDEX IF NOT EXISTS idx_vulnerabilities_created_at ON vulnerabilities(created_at);
 	`
 
 	if _, err := db.Exec(createConversationsTable); err != nil {
@@ -229,6 +252,10 @@ func (db *DB) initTables() error {
 
 	if _, err := db.Exec(createConversationGroupMappingsTable); err != nil {
 		return fmt.Errorf("创建conversation_group_mappings表失败: %w", err)
+	}
+
+	if _, err := db.Exec(createVulnerabilitiesTable); err != nil {
+		return fmt.Errorf("创建vulnerabilities表失败: %w", err)
 	}
 
 	// 为已有表添加新字段（如果不存在）- 必须在创建索引之前

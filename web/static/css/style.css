@@ -5645,3 +5645,336 @@ header {
 .context-submenu-item.add-group-item:hover {
     background: rgba(0, 102, 255, 0.1);
 }
+
+/* 漏洞管理页面样式 */
+.vulnerability-dashboard {
+    margin-bottom: 24px;
+}
+
+.dashboard-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.stat-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s ease;
+}
+
+.stat-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.stat-card.stat-critical {
+    border-left: 4px solid #dc3545;
+}
+
+.stat-card.stat-high {
+    border-left: 4px solid #fd7e14;
+}
+
+.stat-card.stat-medium {
+    border-left: 4px solid #ffc107;
+}
+
+.stat-card.stat-low {
+    border-left: 4px solid #20c997;
+}
+
+.stat-card.stat-info {
+    border-left: 4px solid #6c757d;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.vulnerability-controls {
+    margin-bottom: 24px;
+}
+
+.vulnerability-filters {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+}
+
+.vulnerability-filters label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.vulnerability-filters input,
+.vulnerability-filters select {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.875rem;
+    min-width: 150px;
+}
+
+.vulnerabilities-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.vulnerability-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s ease;
+}
+
+.vulnerability-card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.vulnerability-card.severity-critical {
+    border-left: 4px solid #dc3545;
+}
+
+.vulnerability-card.severity-high {
+    border-left: 4px solid #fd7e14;
+}
+
+.vulnerability-card.severity-medium {
+    border-left: 4px solid #ffc107;
+}
+
+.vulnerability-card.severity-low {
+    border-left: 4px solid #20c997;
+}
+
+.vulnerability-card.severity-info {
+    border-left: 4px solid #6c757d;
+}
+
+.vulnerability-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0;
+    padding: 4px 0;
+    transition: background-color 0.2s ease;
+}
+
+.vulnerability-header:hover {
+    background-color: var(--bg-secondary);
+    border-radius: 4px;
+    padding: 4px 8px;
+    margin: -4px -8px;
+}
+
+.vulnerability-title-section {
+    flex: 1;
+}
+
+.vulnerability-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    flex: 1;
+}
+
+.vulnerability-expand-icon {
+    color: var(--text-secondary);
+    transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.vulnerability-header:hover .vulnerability-expand-icon {
+    color: var(--accent-color);
+}
+
+.vulnerability-meta {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.severity-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.severity-badge.severity-critical {
+    background: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+.severity-badge.severity-high {
+    background: rgba(253, 126, 20, 0.1);
+    color: #fd7e14;
+}
+
+.severity-badge.severity-medium {
+    background: rgba(255, 193, 7, 0.1);
+    color: #ffc107;
+}
+
+.severity-badge.severity-low {
+    background: rgba(32, 201, 151, 0.1);
+    color: #20c997;
+}
+
+.severity-badge.severity-info {
+    background: rgba(108, 117, 125, 0.1);
+    color: #6c757d;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+.status-badge.status-open {
+    background: rgba(0, 102, 255, 0.1);
+    color: #0066ff;
+}
+
+.status-badge.status-confirmed {
+    background: rgba(40, 167, 69, 0.1);
+    color: #28a745;
+}
+
+.status-badge.status-fixed {
+    background: rgba(108, 117, 125, 0.1);
+    color: #6c757d;
+}
+
+.status-badge.status-false_positive {
+    background: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+.vulnerability-date {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.vulnerability-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.vulnerability-content {
+    margin-top: 16px;
+    padding-left: 24px;
+    animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+    }
+    to {
+        opacity: 1;
+        max-height: 5000px;
+    }
+}
+
+.vulnerability-description {
+    margin-bottom: 16px;
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+.vulnerability-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 12px;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+}
+
+.detail-item {
+    font-size: 0.875rem;
+}
+
+.detail-item strong {
+    color: var(--text-secondary);
+    margin-right: 4px;
+}
+
+.detail-item code {
+    background: var(--bg-tertiary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.vulnerability-proof,
+.vulnerability-impact,
+.vulnerability-recommendation {
+    margin-top: 12px;
+    padding: 12px;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    font-size: 0.875rem;
+    line-height: 1.6;
+}
+
+.vulnerability-proof pre {
+    margin-top: 8px;
+    padding: 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    overflow-x: auto;
+    font-size: 0.8rem;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.vulnerability-proof strong,
+.vulnerability-impact strong,
+.vulnerability-recommendation strong {
+    color: var(--text-primary);
+    display: block;
+    margin-bottom: 8px;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 48px;
+    color: var(--text-secondary);
+    font-size: 1rem;
+}

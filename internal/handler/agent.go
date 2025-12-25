@@ -117,8 +117,8 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 		h.logger.Error("保存用户消息失败", zap.Error(err))
 	}
 
-	// 执行Agent Loop，传入历史消息
-	result, err := h.agent.AgentLoop(c.Request.Context(), req.Message, agentHistoryMessages)
+	// 执行Agent Loop，传入历史消息和对话ID
+	result, err := h.agent.AgentLoopWithConversationID(c.Request.Context(), req.Message, agentHistoryMessages, conversationID)
 	if err != nil {
 		h.logger.Error("Agent Loop执行失败", zap.Error(err))
 
@@ -492,7 +492,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 
 	// 执行Agent Loop，传入独立的上下文，确保任务不会因客户端断开而中断
 	sendEvent("progress", "正在分析您的请求...", nil)
-	result, err := h.agent.AgentLoopWithProgress(taskCtx, req.Message, agentHistoryMessages, progressCallback)
+	result, err := h.agent.AgentLoopWithProgress(taskCtx, req.Message, agentHistoryMessages, conversationID, progressCallback)
 	if err != nil {
 		h.logger.Error("Agent Loop执行失败", zap.Error(err))
 		cause := context.Cause(baseCtx)

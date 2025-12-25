@@ -77,6 +77,9 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	// 注册工具
 	executor.RegisterTools(mcpServer)
 
+	// 注册漏洞记录工具
+	registerVulnerabilityTool(mcpServer, db, log.Logger)
+
 	if cfg.Auth.GeneratedPassword != "" {
 		config.PrintGeneratedPasswordWarning(cfg.Auth.GeneratedPassword, cfg.Auth.GeneratedPasswordPersisted, cfg.Auth.GeneratedPasswordPersistErr)
 		cfg.Auth.GeneratedPassword = ""
@@ -237,6 +240,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	groupHandler := handler.NewGroupHandler(db, log.Logger)
 	authHandler := handler.NewAuthHandler(authManager, cfg, configPath, log.Logger)
 	attackChainHandler := handler.NewAttackChainHandler(db, &cfg.OpenAI, log.Logger)
+	vulnerabilityHandler := handler.NewVulnerabilityHandler(db, log.Logger)
 	configHandler := handler.NewConfigHandler(configPath, cfg, mcpServer, executor, agent, attackChainHandler, externalMCPMgr, log.Logger)
 	// 如果知识库已启用，设置知识库工具注册器，以便在ApplyConfig时重新注册知识库工具
 	if cfg.Knowledge.Enabled && knowledgeRetriever != nil && knowledgeManager != nil {
@@ -261,6 +265,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 		externalMCPHandler,
 		attackChainHandler,
 		knowledgeHandler,
+		vulnerabilityHandler,
 		mcpServer,
 		authManager,
 	)
@@ -330,6 +335,7 @@ func setupRoutes(
 	externalMCPHandler *handler.ExternalMCPHandler,
 	attackChainHandler *handler.AttackChainHandler,
 	knowledgeHandler *handler.KnowledgeHandler,
+	vulnerabilityHandler *handler.VulnerabilityHandler,
 	mcpServer *mcp.Server,
 	authManager *security.AuthManager,
 ) {
@@ -417,6 +423,14 @@ func setupRoutes(
 			protected.POST("/knowledge/search", knowledgeHandler.Search)
 		}
 
+		// 漏洞管理
+		protected.GET("/vulnerabilities", vulnerabilityHandler.ListVulnerabilities)
+		protected.GET("/vulnerabilities/stats", vulnerabilityHandler.GetVulnerabilityStats)
+		protected.GET("/vulnerabilities/:id", vulnerabilityHandler.GetVulnerability)
+		protected.POST("/vulnerabilities", vulnerabilityHandler.CreateVulnerability)
+		protected.PUT("/vulnerabilities/:id", vulnerabilityHandler.UpdateVulnerability)
+		protected.DELETE("/vulnerabilities/:id", vulnerabilityHandler.DeleteVulnerability)
+
 		// MCP端点
 		protected.POST("/mcp", func(c *gin.Context) {
 			mcpServer.HandleHTTP(c.Writer, c.Request)
@@ -431,6 +445,195 @@ func setupRoutes(
 	router.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.html", nil)
 	})
+}
+
+// registerVulnerabilityTool 注册漏洞记录工具到MCP服务器
+func registerVulnerabilityTool(mcpServer *mcp.Server, db *database.DB, logger *zap.Logger) {
+	tool := mcp.Tool{
+		Name:             "record_vulnerability",
+		Description:      "记录发现的漏洞详情到漏洞管理系统。当发现有效漏洞时，使用此工具记录漏洞信息，包括标题、描述、严重程度、类型、目标、证明、影响和建议等。",
+		ShortDescription: "记录发现的漏洞详情到漏洞管理系统",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"title": map[string]interface{}{
+					"type":        "string",
+					"description": "漏洞标题（必需）",
+				},
+				"description": map[string]interface{}{
+					"type":        "string",
+					"description": "漏洞详细描述",
+				},
+				"severity": map[string]interface{}{
+					"type":        "string",
+					"description": "漏洞严重程度：critical（严重）、high（高）、medium（中）、low（低）、info（信息）",
+					"enum":        []string{"critical", "high", "medium", "low", "info"},
+				},
+				"vulnerability_type": map[string]interface{}{
+					"type":        "string",
+					"description": "漏洞类型，如：SQL注入、XSS、CSRF、命令注入等",
+				},
+				"target": map[string]interface{}{
+					"type":        "string",
+					"description": "受影响的目标（URL、IP地址、服务等）",
+				},
+				"proof": map[string]interface{}{
+					"type":        "string",
+					"description": "漏洞证明（POC、截图、请求/响应等）",
+				},
+				"impact": map[string]interface{}{
+					"type":        "string",
+					"description": "漏洞影响说明",
+				},
+				"recommendation": map[string]interface{}{
+					"type":        "string",
+					"description": "修复建议",
+				},
+			},
+			"required": []string{"title", "severity"},
+		},
+	}
+
+	handler := func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		// 从参数中获取conversation_id（由Agent自动添加）
+		conversationID, _ := args["conversation_id"].(string)
+		if conversationID == "" {
+			return &mcp.ToolResult{
+				Content: []mcp.Content{
+					{
+						Type: "text",
+						Text: "错误: conversation_id 未设置。这是系统错误，请重试。",
+					},
+				},
+				IsError: true,
+			}, nil
+		}
+
+		title, ok := args["title"].(string)
+		if !ok || title == "" {
+			return &mcp.ToolResult{
+				Content: []mcp.Content{
+					{
+						Type: "text",
+						Text: "错误: title 参数必需且不能为空",
+					},
+				},
+				IsError: true,
+			}, nil
+		}
+
+		severity, ok := args["severity"].(string)
+		if !ok || severity == "" {
+			return &mcp.ToolResult{
+				Content: []mcp.Content{
+					{
+						Type: "text",
+						Text: "错误: severity 参数必需且不能为空",
+					},
+				},
+				IsError: true,
+			}, nil
+		}
+
+		// 验证严重程度
+		validSeverities := map[string]bool{
+			"critical": true,
+			"high":     true,
+			"medium":   true,
+			"low":      true,
+			"info":     true,
+		}
+		if !validSeverities[severity] {
+			return &mcp.ToolResult{
+				Content: []mcp.Content{
+					{
+						Type: "text",
+						Text: fmt.Sprintf("错误: severity 必须是 critical、high、medium、low 或 info 之一，当前值: %s", severity),
+					},
+				},
+				IsError: true,
+			}, nil
+		}
+
+		// 获取可选参数
+		description := ""
+		if d, ok := args["description"].(string); ok {
+			description = d
+		}
+
+		vulnType := ""
+		if t, ok := args["vulnerability_type"].(string); ok {
+			vulnType = t
+		}
+
+		target := ""
+		if t, ok := args["target"].(string); ok {
+			target = t
+		}
+
+		proof := ""
+		if p, ok := args["proof"].(string); ok {
+			proof = p
+		}
+
+		impact := ""
+		if i, ok := args["impact"].(string); ok {
+			impact = i
+		}
+
+		recommendation := ""
+		if r, ok := args["recommendation"].(string); ok {
+			recommendation = r
+		}
+
+		// 创建漏洞记录
+		vuln := &database.Vulnerability{
+			ConversationID: conversationID,
+			Title:          title,
+			Description:    description,
+			Severity:       severity,
+			Status:          "open",
+			Type:           vulnType,
+			Target:         target,
+			Proof:          proof,
+			Impact:         impact,
+			Recommendation: recommendation,
+		}
+
+		created, err := db.CreateVulnerability(vuln)
+		if err != nil {
+			logger.Error("记录漏洞失败", zap.Error(err))
+			return &mcp.ToolResult{
+				Content: []mcp.Content{
+					{
+						Type: "text",
+						Text: fmt.Sprintf("记录漏洞失败: %v", err),
+					},
+				},
+				IsError: true,
+			}, nil
+		}
+
+		logger.Info("漏洞记录成功",
+			zap.String("id", created.ID),
+			zap.String("title", created.Title),
+			zap.String("severity", created.Severity),
+			zap.String("conversation_id", conversationID),
+		)
+
+		return &mcp.ToolResult{
+			Content: []mcp.Content{
+				{
+					Type: "text",
+					Text: fmt.Sprintf("漏洞已成功记录！\n\n漏洞ID: %s\n标题: %s\n严重程度: %s\n状态: %s\n\n你可以在漏洞管理页面查看和管理此漏洞。", created.ID, created.Title, created.Severity, created.Status),
+				},
+			},
+			IsError: false,
+		}, nil
+	}
+
+	mcpServer.RegisterTool(tool, handler)
+	logger.Info("漏洞记录工具注册成功")
 }
 
 // corsMiddleware CORS中间件
