@@ -222,6 +222,25 @@ function setupMentionSupport() {
     });
 }
 
+// 刷新工具列表（重置已加载状态，强制重新加载）
+function refreshMentionTools() {
+    mentionToolsLoaded = false;
+    mentionTools = [];
+    externalMcpNames = [];
+    mentionToolsLoadingPromise = null;
+    // 如果当前正在使用@功能，立即触发重新加载
+    if (mentionState.active) {
+        ensureMentionToolsLoaded().catch(() => {
+            // 忽略加载错误
+        });
+    }
+}
+
+// 将刷新函数暴露到window对象，供其他模块调用
+if (typeof window !== 'undefined') {
+    window.refreshMentionTools = refreshMentionTools;
+}
+
 function ensureMentionToolsLoaded() {
     if (mentionToolsLoaded) {
         return Promise.resolve(mentionTools);

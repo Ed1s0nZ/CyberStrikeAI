@@ -1299,6 +1299,10 @@ async function saveExternalMCP() {
         
         closeExternalMCPModal();
         await loadExternalMCPs();
+        // 刷新对话界面的工具列表，使新添加的MCP工具立即可用
+        if (typeof window !== 'undefined' && typeof window.refreshMentionTools === 'function') {
+            window.refreshMentionTools();
+        }
         alert('保存成功');
     } catch (error) {
         console.error('保存外部MCP失败:', error);
@@ -1325,6 +1329,10 @@ async function deleteExternalMCP(name) {
         }
         
         await loadExternalMCPs();
+        // 刷新对话界面的工具列表，移除已删除的MCP工具
+        if (typeof window !== 'undefined' && typeof window.refreshMentionTools === 'function') {
+            window.refreshMentionTools();
+        }
         alert('删除成功');
     } catch (error) {
         console.error('删除外部MCP失败:', error);
@@ -1370,6 +1378,10 @@ async function toggleExternalMCP(name, currentStatus) {
                     if (status === 'connected') {
                         // 已经连接，立即刷新
                         await loadExternalMCPs();
+                        // 刷新对话界面的工具列表
+                        if (typeof window !== 'undefined' && typeof window.refreshMentionTools === 'function') {
+                            window.refreshMentionTools();
+                        }
                         return;
                     }
                 }
@@ -1382,6 +1394,10 @@ async function toggleExternalMCP(name, currentStatus) {
         } else {
             // 停止操作，直接刷新
             await loadExternalMCPs();
+            // 刷新对话界面的工具列表
+            if (typeof window !== 'undefined' && typeof window.refreshMentionTools === 'function') {
+                window.refreshMentionTools();
+            }
         }
     } catch (error) {
         console.error('切换外部MCP状态失败:', error);
@@ -1397,6 +1413,10 @@ async function toggleExternalMCP(name, currentStatus) {
         
         // 刷新状态
         await loadExternalMCPs();
+        // 刷新对话界面的工具列表
+        if (typeof window !== 'undefined' && typeof window.refreshMentionTools === 'function') {
+            window.refreshMentionTools();
+        }
     }
 }
 
@@ -1421,10 +1441,18 @@ async function pollExternalMCPStatus(name, maxAttempts = 30) {
                 if (status === 'connected') {
                     // 连接成功，刷新列表
                     await loadExternalMCPs();
+                    // 刷新对话界面的工具列表
+                    if (typeof window !== 'undefined' && typeof window.refreshMentionTools === 'function') {
+                        window.refreshMentionTools();
+                    }
                     return;
                 } else if (status === 'error' || status === 'disconnected') {
                     // 连接失败，刷新列表并显示错误
                     await loadExternalMCPs();
+                    // 刷新对话界面的工具列表
+                    if (typeof window !== 'undefined' && typeof window.refreshMentionTools === 'function') {
+                        window.refreshMentionTools();
+                    }
                     if (status === 'error') {
                         alert('连接失败，请检查配置和网络连接');
                     }
@@ -1444,6 +1472,10 @@ async function pollExternalMCPStatus(name, maxAttempts = 30) {
     
     // 超时，刷新列表
     await loadExternalMCPs();
+    // 刷新对话界面的工具列表
+    if (typeof window !== 'undefined' && typeof window.refreshMentionTools === 'function') {
+        window.refreshMentionTools();
+    }
     alert('连接超时，请检查配置和网络连接');
 }
 
