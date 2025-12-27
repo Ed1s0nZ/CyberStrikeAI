@@ -31,18 +31,21 @@ func NewManager(db *sql.DB, basePath string, logger *zap.Logger) *Manager {
 }
 
 // ScanKnowledgeBase 扫描知识库目录，更新数据库
-func (m *Manager) ScanKnowledgeBase() error {
+// 返回需要索引的知识项ID列表（新添加的或更新的）
+func (m *Manager) ScanKnowledgeBase() ([]string, error) {
 	if m.basePath == "" {
-		return fmt.Errorf("知识库路径未配置")
+		return nil, fmt.Errorf("知识库路径未配置")
 	}
 
 	// 确保目录存在
 	if err := os.MkdirAll(m.basePath, 0755); err != nil {
-		return fmt.Errorf("创建知识库目录失败: %w", err)
+		return nil, fmt.Errorf("创建知识库目录失败: %w", err)
 	}
 
+	var itemsToIndex []string
+
 	// 遍历知识库目录
-	return filepath.WalkDir(m.basePath, func(path string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(m.basePath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -77,10 +80,12 @@ func (m *Manager) ScanKnowledgeBase() error {
 
 		// 检查是否已存在
 		var existingID string
+		var existingContent string
+		var existingUpdatedAt time.Time
 		err = m.db.QueryRow(
-			"SELECT id FROM knowledge_base_items WHERE file_path = ?",
+			"SELECT id, content, updated_at FROM knowledge_base_items WHERE file_path = ?",
 			path,
-		).Scan(&existingID)
+		).Scan(&existingID, &existingContent, &existingUpdatedAt)
 
 		if err == sql.ErrNoRows {
 			// 创建新项
@@ -94,22 +99,38 @@ func (m *Manager) ScanKnowledgeBase() error {
 				return fmt.Errorf("插入知识项失败: %w", err)
 			}
 			m.logger.Info("添加知识项", zap.String("id", id), zap.String("title", title), zap.String("category", category))
+			// 新添加的项需要索引
+			itemsToIndex = append(itemsToIndex, id)
 		} else if err == nil {
-			// 更新现有项
-			_, err = m.db.Exec(
-				"UPDATE knowledge_base_items SET category = ?, title = ?, content = ?, updated_at = ? WHERE id = ?",
-				category, title, string(content), time.Now(), existingID,
-			)
-			if err != nil {
-				return fmt.Errorf("更新知识项失败: %w", err)
+			// 检查内容是否有变化
+			contentChanged := existingContent != string(content)
+			if contentChanged {
+				// 更新现有项
+				_, err = m.db.Exec(
+					"UPDATE knowledge_base_items SET category = ?, title = ?, content = ?, updated_at = ? WHERE id = ?",
+					category, title, string(content), time.Now(), existingID,
+				)
+				if err != nil {
+					return fmt.Errorf("更新知识项失败: %w", err)
+				}
+				m.logger.Info("更新知识项", zap.String("id", existingID), zap.String("title", title))
+				// 内容已更新的项需要重新索引
+				itemsToIndex = append(itemsToIndex, existingID)
+			} else {
+				m.logger.Debug("知识项未变化，跳过", zap.String("id", existingID), zap.String("title", title))
 			}
-			m.logger.Debug("更新知识项", zap.String("id", existingID), zap.String("title", title))
 		} else {
 			return fmt.Errorf("查询知识项失败: %w", err)
 		}
 
 		return nil
 	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return itemsToIndex, nil
 }
 
 // GetCategories 获取所有分类（风险类型）
@@ -170,7 +191,7 @@ func (m *Manager) GetItems(category string) ([]*KnowledgeItem, error) {
 			time.RFC3339,
 			time.RFC3339Nano,
 		}
-		
+
 		// 解析创建时间
 		if createdAt != "" {
 			for _, format := range timeFormats {
@@ -181,7 +202,7 @@ func (m *Manager) GetItems(category string) ([]*KnowledgeItem, error) {
 				}
 			}
 		}
-		
+
 		// 解析更新时间
 		if updatedAt != "" {
 			for _, format := range timeFormats {
@@ -192,7 +213,7 @@ func (m *Manager) GetItems(category string) ([]*KnowledgeItem, error) {
 				}
 			}
 		}
-		
+
 		// 如果更新时间为空，使用创建时间
 		if item.UpdatedAt.IsZero() && !item.CreatedAt.IsZero() {
 			item.UpdatedAt = item.CreatedAt
@@ -230,7 +251,7 @@ func (m *Manager) GetItem(id string) (*KnowledgeItem, error) {
 		time.RFC3339,
 		time.RFC3339Nano,
 	}
-	
+
 	// 解析创建时间
 	if createdAt != "" {
 		for _, format := range timeFormats {
@@ -241,7 +262,7 @@ func (m *Manager) GetItem(id string) (*KnowledgeItem, error) {
 			}
 		}
 	}
-	
+
 	// 解析更新时间
 	if updatedAt != "" {
 		for _, format := range timeFormats {
@@ -252,7 +273,7 @@ func (m *Manager) GetItem(id string) (*KnowledgeItem, error) {
 			}
 		}
 	}
-	
+
 	// 如果更新时间为空，使用创建时间
 	if item.UpdatedAt.IsZero() && !item.CreatedAt.IsZero() {
 		item.UpdatedAt = item.CreatedAt
@@ -418,10 +439,10 @@ func (m *Manager) GetIndexStatus() (map[string]interface{}, error) {
 	isComplete := indexedItems >= totalItems && totalItems > 0
 
 	return map[string]interface{}{
-		"total_items":     totalItems,
-		"indexed_items":   indexedItems,
+		"total_items":      totalItems,
+		"indexed_items":    indexedItems,
 		"progress_percent": progressPercent,
-		"is_complete":     isComplete,
+		"is_complete":      isComplete,
 	}, nil
 }
 
@@ -472,17 +493,17 @@ func (m *Manager) GetRetrievalLogs(conversationID, messageID string, limit int) 
 			time.RFC3339,
 			time.RFC3339Nano,
 		}
-		
+
 		for _, format := range timeFormats {
 			log.CreatedAt, err = time.Parse(format, createdAt)
 			if err == nil && !log.CreatedAt.IsZero() {
 				break
 			}
 		}
-		
+
 		// 如果所有格式都失败，记录警告但继续处理
 		if log.CreatedAt.IsZero() {
-			m.logger.Warn("解析检索日志时间失败", 
+			m.logger.Warn("解析检索日志时间失败",
 				zap.String("timeStr", createdAt),
 				zap.Error(err),
 			)
@@ -519,4 +540,3 @@ func (m *Manager) DeleteRetrievalLog(id string) error {
 
 	return nil
 }
-

@@ -170,21 +170,36 @@ func (h *KnowledgeHandler) RebuildIndex(c *gin.Context) {
 
 // ScanKnowledgeBase 扫描知识库
 func (h *KnowledgeHandler) ScanKnowledgeBase(c *gin.Context) {
-	if err := h.manager.ScanKnowledgeBase(); err != nil {
+	itemsToIndex, err := h.manager.ScanKnowledgeBase()
+	if err != nil {
 		h.logger.Error("扫描知识库失败", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// 异步重建索引
+	if len(itemsToIndex) == 0 {
+		c.JSON(http.StatusOK, gin.H{"message": "扫描完成，没有需要索引的新项或更新项"})
+		return
+	}
+
+	// 异步索引新添加或更新的项（增量索引）
 	go func() {
 		ctx := context.Background()
-		if err := h.indexer.RebuildIndex(ctx); err != nil {
-			h.logger.Error("重建索引失败", zap.Error(err))
+		h.logger.Info("开始增量索引", zap.Int("count", len(itemsToIndex)))
+		for i, itemID := range itemsToIndex {
+			if err := h.indexer.IndexItem(ctx, itemID); err != nil {
+				h.logger.Warn("索引知识项失败", zap.String("itemId", itemID), zap.Error(err))
+				continue
+			}
+			h.logger.Info("索引进度", zap.Int("current", i+1), zap.Int("total", len(itemsToIndex)))
 		}
+		h.logger.Info("增量索引完成", zap.Int("totalItems", len(itemsToIndex)))
 	}()
 
-	c.JSON(http.StatusOK, gin.H{"message": "扫描完成，索引重建已开始"})
+	c.JSON(http.StatusOK, gin.H{
+		"message":      fmt.Sprintf("扫描完成，开始索引 %d 个新添加或更新的知识项", len(itemsToIndex)),
+		"items_to_index": len(itemsToIndex),
+	})
 }
 
 // GetRetrievalLogs 获取检索日志

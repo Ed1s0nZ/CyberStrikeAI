@@ -22,6 +22,32 @@ async function loadKnowledgeCategories() {
             throw new Error('获取分类失败');
         }
         const data = await response.json();
+        
+        // 检查知识库功能是否启用
+        if (data.enabled === false) {
+            // 功能未启用，显示友好提示
+            const container = document.getElementById('knowledge-items-list');
+            if (container) {
+                container.innerHTML = `
+                    <div class="empty-state" style="text-align: center; padding: 40px 20px;">
+                        <div style="font-size: 48px; margin-bottom: 20px;">📚</div>
+                        <h3 style="margin-bottom: 10px; color: #666;">知识库功能未启用</h3>
+                        <p style="color: #999; margin-bottom: 20px;">${data.message || '请前往系统设置启用知识检索功能'}</p>
+                        <button onclick="switchToSettings()" style="
+                            background: #007bff;
+                            color: white;
+                            border: none;
+                            padding: 10px 20px;
+                            border-radius: 5px;
+                            cursor: pointer;
+                            font-size: 14px;
+                        ">前往设置</button>
+                    </div>
+                `;
+            }
+            return [];
+        }
+        
         knowledgeCategories = data.categories || [];
         
         // 更新分类筛选下拉框
@@ -43,7 +69,10 @@ async function loadKnowledgeCategories() {
         return knowledgeCategories;
     } catch (error) {
         console.error('加载分类失败:', error);
-        showNotification('加载分类失败: ' + error.message, 'error');
+        // 只在非功能未启用的情况下显示错误
+        if (!error.message.includes('知识库功能未启用')) {
+            showNotification('加载分类失败: ' + error.message, 'error');
+        }
         return [];
     }
 }
@@ -70,12 +99,42 @@ async function loadKnowledgeItems(category = '') {
             throw new Error('获取知识项失败');
         }
         const data = await response.json();
+        
+        // 检查知识库功能是否启用
+        if (data.enabled === false) {
+            // 功能未启用，显示友好提示（如果还没有显示的话）
+            const container = document.getElementById('knowledge-items-list');
+            if (container && !container.querySelector('.empty-state')) {
+                container.innerHTML = `
+                    <div class="empty-state" style="text-align: center; padding: 40px 20px;">
+                        <div style="font-size: 48px; margin-bottom: 20px;">📚</div>
+                        <h3 style="margin-bottom: 10px; color: #666;">知识库功能未启用</h3>
+                        <p style="color: #999; margin-bottom: 20px;">${data.message || '请前往系统设置启用知识检索功能'}</p>
+                        <button onclick="switchToSettings()" style="
+                            background: #007bff;
+                            color: white;
+                            border: none;
+                            padding: 10px 20px;
+                            border-radius: 5px;
+                            cursor: pointer;
+                            font-size: 14px;
+                        ">前往设置</button>
+                    </div>
+                `;
+            }
+            knowledgeItems = [];
+            return [];
+        }
+        
         knowledgeItems = data.items || [];
         renderKnowledgeItems(knowledgeItems);
         return knowledgeItems;
     } catch (error) {
         console.error('加载知识项失败:', error);
-        showNotification('加载知识项失败: ' + error.message, 'error');
+        // 只在非功能未启用的情况下显示错误
+        if (!error.message.includes('知识库功能未启用')) {
+            showNotification('加载知识项失败: ' + error.message, 'error');
+        }
         return [];
     }
 }
@@ -252,6 +311,17 @@ async function updateIndexProgress() {
         const progressContainer = document.getElementById('knowledge-index-progress');
         if (!progressContainer) return;
         
+        // 检查知识库功能是否启用
+        if (status.enabled === false) {
+            // 功能未启用，隐藏进度条
+            progressContainer.style.display = 'none';
+            if (indexProgressInterval) {
+                clearInterval(indexProgressInterval);
+                indexProgressInterval = null;
+            }
+            return;
+        }
+        
         const totalItems = status.total_items || 0;
         const indexedItems = status.indexed_items || 0;
         const progressPercent = status.progress_percent || 0;
@@ -373,16 +443,35 @@ async function refreshKnowledgeBase() {
         if (!response.ok) {
             throw new Error('扫描知识库失败');
         }
-        showNotification('扫描完成，索引重建已开始', 'success');
+        const data = await response.json();
+        // 根据返回的消息显示不同的提示
+        if (data.items_to_index && data.items_to_index > 0) {
+            showNotification(`扫描完成，开始索引 ${data.items_to_index} 个新添加或更新的知识项`, 'success');
+        } else {
+            showNotification(data.message || '扫描完成，没有需要索引的新项或更新项', 'success');
+        }
         // 重新加载知识项
         await loadKnowledgeCategories();
         await loadKnowledgeItems();
         
-        // 开始轮询进度
+        // 停止现有的轮询
         if (indexProgressInterval) {
             clearInterval(indexProgressInterval);
+            indexProgressInterval = null;
         }
-        updateIndexProgress(); // 立即更新一次
+        
+        // 如果有需要索引的项，等待一小段时间后立即更新进度
+        if (data.items_to_index && data.items_to_index > 0) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            updateIndexProgress();
+            // 开始轮询进度（每2秒刷新一次）
+            if (!indexProgressInterval) {
+                indexProgressInterval = setInterval(updateIndexProgress, 2000);
+            }
+        } else {
+            // 没有需要索引的项，也更新一次以显示当前状态
+            updateIndexProgress();
+        }
     } catch (error) {
         console.error('刷新知识库失败:', error);
         showNotification('刷新知识库失败: ' + error.message, 'error');
@@ -396,6 +485,31 @@ async function rebuildKnowledgeIndex() {
             return;
         }
         showNotification('正在重建索引...', 'info');
+        
+        // 先停止现有的轮询
+        if (indexProgressInterval) {
+            clearInterval(indexProgressInterval);
+            indexProgressInterval = null;
+        }
+        
+        // 立即显示"正在重建"状态，因为重建开始时会清空旧索引
+        const progressContainer = document.getElementById('knowledge-index-progress');
+        if (progressContainer) {
+            progressContainer.style.display = 'block';
+            progressContainer.innerHTML = `
+                <div class="knowledge-index-progress">
+                    <div class="progress-header">
+                        <span class="progress-icon">🔨</span>
+                        <span class="progress-text">正在重建索引: 准备中...</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" style="width: 0%"></div>
+                    </div>
+                    <div class="progress-hint">索引构建完成后，语义搜索功能将可用</div>
+                </div>
+            `;
+        }
+        
         const response = await apiFetch('/api/knowledge/index', {
             method: 'POST'
         });
@@ -404,11 +518,16 @@ async function rebuildKnowledgeIndex() {
         }
         showNotification('索引重建已开始，将在后台进行', 'success');
         
-        // 开始轮询进度
-        if (indexProgressInterval) {
-            clearInterval(indexProgressInterval);
+        // 等待一小段时间，确保后端已经开始处理并清空了旧索引
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // 立即更新一次进度
+        updateIndexProgress();
+        
+        // 开始轮询进度（每2秒刷新一次，比默认的3秒更频繁）
+        if (!indexProgressInterval) {
+            indexProgressInterval = setInterval(updateIndexProgress, 2000);
         }
-        updateIndexProgress(); // 立即更新一次
     } catch (error) {
         console.error('重建索引失败:', error);
         showNotification('重建索引失败: ' + error.message, 'error');
@@ -1528,8 +1647,8 @@ function formatTime(timeStr) {
 
 // 显示通知
 function showNotification(message, type = 'info') {
-    // 如果存在全局通知系统，使用它
-    if (typeof window.showNotification === 'function') {
+    // 如果存在全局通知系统（且不是当前函数），使用它
+    if (typeof window.showNotification === 'function' && window.showNotification !== showNotification) {
         window.showNotification(message, type);
         return;
     }
@@ -1679,6 +1798,39 @@ window.addEventListener('click', function(event) {
         closeKnowledgeItemModal();
     }
 });
+
+// 切换到设置页面（用于功能未启用时的提示）
+function switchToSettings() {
+    if (typeof switchPage === 'function') {
+        switchPage('settings');
+        // 等待设置页面加载后，切换到知识库配置部分
+        setTimeout(() => {
+            if (typeof switchSettingsSection === 'function') {
+                // 查找知识库配置部分（通常在基本设置中）
+                const knowledgeSection = document.querySelector('[data-section="knowledge"]');
+                if (knowledgeSection) {
+                    switchSettingsSection('knowledge');
+                } else {
+                    // 如果没有独立的知识库部分，切换到基本设置
+                    switchSettingsSection('basic');
+                    // 滚动到知识库配置区域
+                    setTimeout(() => {
+                        const knowledgeEnabledCheckbox = document.getElementById('knowledge-enabled');
+                        if (knowledgeEnabledCheckbox) {
+                            knowledgeEnabledCheckbox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            // 高亮显示
+                            knowledgeEnabledCheckbox.parentElement.style.transition = 'background-color 0.3s';
+                            knowledgeEnabledCheckbox.parentElement.style.backgroundColor = '#e3f2fd';
+                            setTimeout(() => {
+                                knowledgeEnabledCheckbox.parentElement.style.backgroundColor = '';
+                            }, 2000);
+                        }
+                    }, 300);
+                }
+            }
+        }, 100);
+    }
+}
 
 // 自定义下拉组件交互
 document.addEventListener('DOMContentLoaded', function() {

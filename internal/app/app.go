@@ -26,16 +26,21 @@ import (
 
 // App 应用
 type App struct {
-	config         *config.Config
-	logger         *logger.Logger
-	router         *gin.Engine
-	mcpServer      *mcp.Server
-	externalMCPMgr *mcp.ExternalMCPManager
-	agent          *agent.Agent
-	executor       *security.Executor
-	db             *database.DB
-	knowledgeDB    *database.DB // 知识库数据库连接（如果使用独立数据库）
-	auth           *security.AuthManager
+	config             *config.Config
+	logger             *logger.Logger
+	router             *gin.Engine
+	mcpServer          *mcp.Server
+	externalMCPMgr     *mcp.ExternalMCPManager
+	agent              *agent.Agent
+	executor           *security.Executor
+	db                 *database.DB
+	knowledgeDB        *database.DB // 知识库数据库连接（如果使用独立数据库）
+	auth               *security.AuthManager
+	knowledgeManager   *knowledge.Manager        // 知识库管理器（用于动态初始化）
+	knowledgeRetriever *knowledge.Retriever      // 知识库检索器（用于动态初始化）
+	knowledgeIndexer   *knowledge.Indexer        // 知识库索引器（用于动态初始化）
+	knowledgeHandler   *handler.KnowledgeHandler // 知识库处理器（用于动态初始化）
+	agentHandler       *handler.AgentHandler     // Agent处理器（用于更新知识库管理器）
 }
 
 // New 创建新应用
@@ -196,12 +201,13 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 
 		// 扫描知识库并建立索引（异步）
 		go func() {
-			if err := knowledgeManager.ScanKnowledgeBase(); err != nil {
+			itemsToIndex, err := knowledgeManager.ScanKnowledgeBase()
+			if err != nil {
 				log.Logger.Warn("扫描知识库失败", zap.Error(err))
 				return
 			}
 
-			// 检查是否已有索引，如果有则跳过自动重建
+			// 检查是否已有索引
 			hasIndex, err := knowledgeIndexer.HasIndex()
 			if err != nil {
 				log.Logger.Warn("检查索引状态失败", zap.Error(err))
@@ -209,7 +215,20 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 			}
 
 			if hasIndex {
-				log.Logger.Info("检测到已有知识库索引，跳过自动重建。如需重建，请手动点击重建索引按钮")
+				// 如果已有索引，只索引新添加或更新的项
+				if len(itemsToIndex) > 0 {
+					log.Logger.Info("检测到已有知识库索引，开始增量索引", zap.Int("count", len(itemsToIndex)))
+					ctx := context.Background()
+					for _, itemID := range itemsToIndex {
+						if err := knowledgeIndexer.IndexItem(ctx, itemID); err != nil {
+							log.Logger.Warn("索引知识项失败", zap.String("itemId", itemID), zap.Error(err))
+							continue
+						}
+					}
+					log.Logger.Info("增量索引完成", zap.Int("totalItems", len(itemsToIndex)))
+				} else {
+					log.Logger.Info("检测到已有知识库索引，没有需要索引的新项或更新项")
+				}
 				return
 			}
 
@@ -242,6 +261,51 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	attackChainHandler := handler.NewAttackChainHandler(db, &cfg.OpenAI, log.Logger)
 	vulnerabilityHandler := handler.NewVulnerabilityHandler(db, log.Logger)
 	configHandler := handler.NewConfigHandler(configPath, cfg, mcpServer, executor, agent, attackChainHandler, externalMCPMgr, log.Logger)
+	externalMCPHandler := handler.NewExternalMCPHandler(externalMCPMgr, cfg, configPath, log.Logger)
+
+	// 创建 App 实例（部分字段稍后填充）
+	app := &App{
+		config:             cfg,
+		logger:             log,
+		router:             router,
+		mcpServer:          mcpServer,
+		externalMCPMgr:     externalMCPMgr,
+		agent:              agent,
+		executor:           executor,
+		db:                 db,
+		knowledgeDB:        knowledgeDBConn,
+		auth:               authManager,
+		knowledgeManager:   knowledgeManager,
+		knowledgeRetriever: knowledgeRetriever,
+		knowledgeIndexer:   knowledgeIndexer,
+		knowledgeHandler:   knowledgeHandler,
+		agentHandler:       agentHandler,
+	}
+
+	// 设置知识库初始化器（用于动态初始化，需要在 App 创建后设置）
+	configHandler.SetKnowledgeInitializer(func() (*handler.KnowledgeHandler, error) {
+		knowledgeHandler, err := initializeKnowledge(cfg, db, knowledgeDBConn, mcpServer, agentHandler, app, log.Logger)
+		if err != nil {
+			return nil, err
+		}
+
+		// 动态初始化后，设置知识库工具注册器和检索器更新器
+		// 这样后续 ApplyConfig 时就能重新注册工具了
+		if app.knowledgeRetriever != nil && app.knowledgeManager != nil {
+			// 创建闭包，捕获knowledgeRetriever和knowledgeManager的引用
+			registrar := func() error {
+				knowledge.RegisterKnowledgeTool(mcpServer, app.knowledgeRetriever, app.knowledgeManager, log.Logger)
+				return nil
+			}
+			configHandler.SetKnowledgeToolRegistrar(registrar)
+			// 设置检索器更新器，以便在ApplyConfig时更新检索器配置
+			configHandler.SetRetrieverUpdater(app.knowledgeRetriever)
+			log.Logger.Info("动态初始化后已设置知识库工具注册器和检索器更新器")
+		}
+
+		return knowledgeHandler, nil
+	})
+
 	// 如果知识库已启用，设置知识库工具注册器和检索器更新器
 	if cfg.Knowledge.Enabled && knowledgeRetriever != nil && knowledgeManager != nil {
 		// 创建闭包，捕获knowledgeRetriever和knowledgeManager的引用
@@ -253,9 +317,8 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 		// 设置检索器更新器，以便在ApplyConfig时更新检索器配置
 		configHandler.SetRetrieverUpdater(knowledgeRetriever)
 	}
-	externalMCPHandler := handler.NewExternalMCPHandler(externalMCPMgr, cfg, configPath, log.Logger)
 
-	// 设置路由
+	// 设置路由（使用 App 实例以便动态获取 handler）
 	setupRoutes(
 		router,
 		authHandler,
@@ -266,24 +329,14 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 		configHandler,
 		externalMCPHandler,
 		attackChainHandler,
-		knowledgeHandler,
+		app, // 传递 App 实例以便动态获取 knowledgeHandler
 		vulnerabilityHandler,
 		mcpServer,
 		authManager,
 	)
 
-	return &App{
-		config:         cfg,
-		logger:         log,
-		router:         router,
-		mcpServer:      mcpServer,
-		externalMCPMgr: externalMCPMgr,
-		agent:          agent,
-		executor:       executor,
-		db:             db,
-		knowledgeDB:    knowledgeDBConn,
-		auth:           authManager,
-	}, nil
+	return app, nil
+
 }
 
 // Run 启动应用
@@ -336,7 +389,7 @@ func setupRoutes(
 	configHandler *handler.ConfigHandler,
 	externalMCPHandler *handler.ExternalMCPHandler,
 	attackChainHandler *handler.AttackChainHandler,
-	knowledgeHandler *handler.KnowledgeHandler,
+	app *App, // 传递 App 实例以便动态获取 knowledgeHandler
 	vulnerabilityHandler *handler.VulnerabilityHandler,
 	mcpServer *mcp.Server,
 	authManager *security.AuthManager,
@@ -409,20 +462,137 @@ func setupRoutes(
 		protected.GET("/attack-chain/:conversationId", attackChainHandler.GetAttackChain)
 		protected.POST("/attack-chain/:conversationId/regenerate", attackChainHandler.RegenerateAttackChain)
 
-		// 知识库管理（如果启用）
-		if knowledgeHandler != nil {
-			protected.GET("/knowledge/categories", knowledgeHandler.GetCategories)
-			protected.GET("/knowledge/items", knowledgeHandler.GetItems)
-			protected.GET("/knowledge/items/:id", knowledgeHandler.GetItem)
-			protected.POST("/knowledge/items", knowledgeHandler.CreateItem)
-			protected.PUT("/knowledge/items/:id", knowledgeHandler.UpdateItem)
-			protected.DELETE("/knowledge/items/:id", knowledgeHandler.DeleteItem)
-			protected.GET("/knowledge/index-status", knowledgeHandler.GetIndexStatus)
-			protected.POST("/knowledge/index", knowledgeHandler.RebuildIndex)
-			protected.POST("/knowledge/scan", knowledgeHandler.ScanKnowledgeBase)
-			protected.GET("/knowledge/retrieval-logs", knowledgeHandler.GetRetrievalLogs)
-			protected.DELETE("/knowledge/retrieval-logs/:id", knowledgeHandler.DeleteRetrievalLog)
-			protected.POST("/knowledge/search", knowledgeHandler.Search)
+		// 知识库管理（始终注册路由，通过 App 实例动态获取 handler）
+		knowledgeRoutes := protected.Group("/knowledge")
+		{
+			knowledgeRoutes.GET("/categories", func(c *gin.Context) {
+				if app.knowledgeHandler == nil {
+					c.JSON(http.StatusOK, gin.H{
+						"categories": []string{},
+						"enabled":    false,
+						"message":    "知识库功能未启用，请前往系统设置启用知识检索功能",
+					})
+					return
+				}
+				app.knowledgeHandler.GetCategories(c)
+			})
+			knowledgeRoutes.GET("/items", func(c *gin.Context) {
+				if app.knowledgeHandler == nil {
+					c.JSON(http.StatusOK, gin.H{
+						"items":   []interface{}{},
+						"enabled": false,
+						"message": "知识库功能未启用，请前往系统设置启用知识检索功能",
+					})
+					return
+				}
+				app.knowledgeHandler.GetItems(c)
+			})
+			knowledgeRoutes.GET("/items/:id", func(c *gin.Context) {
+				if app.knowledgeHandler == nil {
+					c.JSON(http.StatusOK, gin.H{
+						"enabled": false,
+						"message": "知识库功能未启用，请前往系统设置启用知识检索功能",
+					})
+					return
+				}
+				app.knowledgeHandler.GetItem(c)
+			})
+			knowledgeRoutes.POST("/items", func(c *gin.Context) {
+				if app.knowledgeHandler == nil {
+					c.JSON(http.StatusOK, gin.H{
+						"enabled": false,
+						"error":   "知识库功能未启用，请前往系统设置启用知识检索功能",
+					})
+					return
+				}
+				app.knowledgeHandler.CreateItem(c)
+			})
+			knowledgeRoutes.PUT("/items/:id", func(c *gin.Context) {
+				if app.knowledgeHandler == nil {
+					c.JSON(http.StatusOK, gin.H{
+						"enabled": false,
+						"error":   "知识库功能未启用，请前往系统设置启用知识检索功能",
+					})
+					return
+				}
+				app.knowledgeHandler.UpdateItem(c)
+			})
+			knowledgeRoutes.DELETE("/items/:id", func(c *gin.Context) {
+				if app.knowledgeHandler == nil {
+					c.JSON(http.StatusOK, gin.H{
+						"enabled": false,
+						"error":   "知识库功能未启用，请前往系统设置启用知识检索功能",
+					})
+					return
+				}
+				app.knowledgeHandler.DeleteItem(c)
+			})
+			knowledgeRoutes.GET("/index-status", func(c *gin.Context) {
+				if app.knowledgeHandler == nil {
+					c.JSON(http.StatusOK, gin.H{
+						"enabled":          false,
+						"total_items":      0,
+						"indexed_items":    0,
+						"progress_percent": 0,
+						"is_complete":      false,
+						"message":          "知识库功能未启用，请前往系统设置启用知识检索功能",
+					})
+					return
+				}
+				app.knowledgeHandler.GetIndexStatus(c)
+			})
+			knowledgeRoutes.POST("/index", func(c *gin.Context) {
+				if app.knowledgeHandler == nil {
+					c.JSON(http.StatusOK, gin.H{
+						"enabled": false,
+						"error":   "知识库功能未启用，请前往系统设置启用知识检索功能",
+					})
+					return
+				}
+				app.knowledgeHandler.RebuildIndex(c)
+			})
+			knowledgeRoutes.POST("/scan", func(c *gin.Context) {
+				if app.knowledgeHandler == nil {
+					c.JSON(http.StatusOK, gin.H{
+						"enabled": false,
+						"error":   "知识库功能未启用，请前往系统设置启用知识检索功能",
+					})
+					return
+				}
+				app.knowledgeHandler.ScanKnowledgeBase(c)
+			})
+			knowledgeRoutes.GET("/retrieval-logs", func(c *gin.Context) {
+				if app.knowledgeHandler == nil {
+					c.JSON(http.StatusOK, gin.H{
+						"logs":    []interface{}{},
+						"enabled": false,
+						"message": "知识库功能未启用，请前往系统设置启用知识检索功能",
+					})
+					return
+				}
+				app.knowledgeHandler.GetRetrievalLogs(c)
+			})
+			knowledgeRoutes.DELETE("/retrieval-logs/:id", func(c *gin.Context) {
+				if app.knowledgeHandler == nil {
+					c.JSON(http.StatusOK, gin.H{
+						"enabled": false,
+						"error":   "知识库功能未启用，请前往系统设置启用知识检索功能",
+					})
+					return
+				}
+				app.knowledgeHandler.DeleteRetrievalLog(c)
+			})
+			knowledgeRoutes.POST("/search", func(c *gin.Context) {
+				if app.knowledgeHandler == nil {
+					c.JSON(http.StatusOK, gin.H{
+						"results": []interface{}{},
+						"enabled": false,
+						"message": "知识库功能未启用，请前往系统设置启用知识检索功能",
+					})
+					return
+				}
+				app.knowledgeHandler.Search(c)
+			})
 		}
 
 		// 漏洞管理
@@ -594,7 +764,7 @@ func registerVulnerabilityTool(mcpServer *mcp.Server, db *database.DB, logger *z
 			Title:          title,
 			Description:    description,
 			Severity:       severity,
-			Status:          "open",
+			Status:         "open",
 			Type:           vulnType,
 			Target:         target,
 			Proof:          proof,
@@ -636,6 +806,136 @@ func registerVulnerabilityTool(mcpServer *mcp.Server, db *database.DB, logger *z
 
 	mcpServer.RegisterTool(tool, handler)
 	logger.Info("漏洞记录工具注册成功")
+}
+
+// initializeKnowledge 初始化知识库组件（用于动态初始化）
+func initializeKnowledge(
+	cfg *config.Config,
+	db *database.DB,
+	knowledgeDBConn *database.DB,
+	mcpServer *mcp.Server,
+	agentHandler *handler.AgentHandler,
+	app *App, // 传递 App 引用以便更新知识库组件
+	logger *zap.Logger,
+) (*handler.KnowledgeHandler, error) {
+	// 确定知识库数据库路径
+	knowledgeDBPath := cfg.Database.KnowledgeDBPath
+	var knowledgeDB *sql.DB
+
+	if knowledgeDBPath != "" {
+		// 使用独立的知识库数据库
+		// 确保目录存在
+		if err := os.MkdirAll(filepath.Dir(knowledgeDBPath), 0755); err != nil {
+			return nil, fmt.Errorf("创建知识库数据库目录失败: %w", err)
+		}
+
+		var err error
+		knowledgeDBConn, err = database.NewKnowledgeDB(knowledgeDBPath, logger)
+		if err != nil {
+			return nil, fmt.Errorf("初始化知识库数据库失败: %w", err)
+		}
+		knowledgeDB = knowledgeDBConn.DB
+		logger.Info("使用独立的知识库数据库", zap.String("path", knowledgeDBPath))
+	} else {
+		// 向后兼容：使用会话数据库
+		knowledgeDB = db.DB
+		logger.Info("使用会话数据库存储知识库数据（建议配置knowledge_db_path以分离数据）")
+	}
+
+	// 创建知识库管理器
+	knowledgeManager := knowledge.NewManager(knowledgeDB, cfg.Knowledge.BasePath, logger)
+
+	// 创建嵌入器
+	// 使用OpenAI配置的API Key（如果知识库配置中没有指定）
+	if cfg.Knowledge.Embedding.APIKey == "" {
+		cfg.Knowledge.Embedding.APIKey = cfg.OpenAI.APIKey
+	}
+	if cfg.Knowledge.Embedding.BaseURL == "" {
+		cfg.Knowledge.Embedding.BaseURL = cfg.OpenAI.BaseURL
+	}
+
+	httpClient := &http.Client{
+		Timeout: 30 * time.Minute,
+	}
+	openAIClient := openai.NewClient(&cfg.OpenAI, httpClient, logger)
+	embedder := knowledge.NewEmbedder(&cfg.Knowledge, &cfg.OpenAI, openAIClient, logger)
+
+	// 创建检索器
+	retrievalConfig := &knowledge.RetrievalConfig{
+		TopK:                cfg.Knowledge.Retrieval.TopK,
+		SimilarityThreshold: cfg.Knowledge.Retrieval.SimilarityThreshold,
+		HybridWeight:        cfg.Knowledge.Retrieval.HybridWeight,
+	}
+	knowledgeRetriever := knowledge.NewRetriever(knowledgeDB, embedder, retrievalConfig, logger)
+
+	// 创建索引器
+	knowledgeIndexer := knowledge.NewIndexer(knowledgeDB, embedder, logger)
+
+	// 注册知识检索工具到MCP服务器
+	knowledge.RegisterKnowledgeTool(mcpServer, knowledgeRetriever, knowledgeManager, logger)
+
+	// 创建知识库API处理器
+	knowledgeHandler := handler.NewKnowledgeHandler(knowledgeManager, knowledgeRetriever, knowledgeIndexer, db, logger)
+	logger.Info("知识库模块初始化完成", zap.Bool("handler_created", knowledgeHandler != nil))
+
+	// 设置知识库管理器到AgentHandler以便记录检索日志
+	agentHandler.SetKnowledgeManager(knowledgeManager)
+
+	// 更新 App 中的知识库组件（如果 App 不为 nil，说明是动态初始化）
+	if app != nil {
+		app.knowledgeManager = knowledgeManager
+		app.knowledgeRetriever = knowledgeRetriever
+		app.knowledgeIndexer = knowledgeIndexer
+		app.knowledgeHandler = knowledgeHandler
+		// 如果使用独立数据库，更新 knowledgeDB
+		if knowledgeDBPath != "" {
+			app.knowledgeDB = knowledgeDBConn
+		}
+		logger.Info("App 中的知识库组件已更新")
+	}
+
+	// 扫描知识库并建立索引（异步）
+	go func() {
+		itemsToIndex, err := knowledgeManager.ScanKnowledgeBase()
+		if err != nil {
+			logger.Warn("扫描知识库失败", zap.Error(err))
+			return
+		}
+
+		// 检查是否已有索引
+		hasIndex, err := knowledgeIndexer.HasIndex()
+		if err != nil {
+			logger.Warn("检查索引状态失败", zap.Error(err))
+			return
+		}
+
+		if hasIndex {
+			// 如果已有索引，只索引新添加或更新的项
+			if len(itemsToIndex) > 0 {
+				logger.Info("检测到已有知识库索引，开始增量索引", zap.Int("count", len(itemsToIndex)))
+				ctx := context.Background()
+				for _, itemID := range itemsToIndex {
+					if err := knowledgeIndexer.IndexItem(ctx, itemID); err != nil {
+						logger.Warn("索引知识项失败", zap.String("itemId", itemID), zap.Error(err))
+						continue
+					}
+				}
+				logger.Info("增量索引完成", zap.Int("totalItems", len(itemsToIndex)))
+			} else {
+				logger.Info("检测到已有知识库索引，没有需要索引的新项或更新项")
+			}
+			return
+		}
+
+		// 只有在没有索引时才自动重建
+		logger.Info("未检测到知识库索引，开始自动构建索引")
+		ctx := context.Background()
+		if err := knowledgeIndexer.RebuildIndex(ctx); err != nil {
+			logger.Warn("重建知识库索引失败", zap.Error(err))
+		}
+	}()
+
+	return knowledgeHandler, nil
 }
 
 // corsMiddleware CORS中间件

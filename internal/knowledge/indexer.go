@@ -257,7 +257,7 @@ func (idx *Indexer) IndexItem(ctx context.Context, itemID string) error {
 		return fmt.Errorf("获取知识项失败: %w", err)
 	}
 
-	// 删除旧的向量
+	// 删除旧的向量（在 RebuildIndex 中已经统一清空，这里保留是为了单独调用 IndexItem 时的兼容性）
 	_, err = idx.db.Exec("DELETE FROM knowledge_embeddings WHERE item_id = ?", itemID)
 	if err != nil {
 		return fmt.Errorf("删除旧向量失败: %w", err)
@@ -338,12 +338,22 @@ func (idx *Indexer) RebuildIndex(ctx context.Context) error {
 
 	idx.logger.Info("开始重建索引", zap.Int("totalItems", len(itemIDs)))
 
+	// 在开始重建前，先清空所有旧的向量，确保进度从0开始
+	// 这样 GetIndexStatus 可以准确反映重建进度
+	_, err = idx.db.Exec("DELETE FROM knowledge_embeddings")
+	if err != nil {
+		idx.logger.Warn("清空旧索引失败", zap.Error(err))
+		// 继续执行，即使清空失败也尝试重建
+	} else {
+		idx.logger.Info("已清空旧索引，开始重建")
+	}
+
 	for i, itemID := range itemIDs {
 		if err := idx.IndexItem(ctx, itemID); err != nil {
 			idx.logger.Warn("索引知识项失败", zap.String("itemId", itemID), zap.Error(err))
 			continue
 		}
-		idx.logger.Debug("索引进度", zap.Int("current", i+1), zap.Int("total", len(itemIDs)))
+		idx.logger.Info("索引进度", zap.Int("current", i+1), zap.Int("total", len(itemIDs)))
 	}
 
 	idx.logger.Info("索引重建完成", zap.Int("totalItems", len(itemIDs)))
