@@ -16,6 +16,45 @@ type KnowledgeItem struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
+// KnowledgeItemSummary 知识库项摘要（用于列表，不包含完整内容）
+type KnowledgeItemSummary struct {
+	ID        string    `json:"id"`
+	Category  string    `json:"category"`
+	Title     string    `json:"title"`
+	FilePath  string    `json:"filePath"`
+	Content   string    `json:"content,omitempty"` // 可选：内容预览（如果提供，通常只包含前150字符）
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// MarshalJSON 自定义JSON序列化，确保时间格式正确
+func (k *KnowledgeItemSummary) MarshalJSON() ([]byte, error) {
+	type Alias KnowledgeItemSummary
+	aux := &struct {
+		*Alias
+		CreatedAt string `json:"createdAt"`
+		UpdatedAt string `json:"updatedAt"`
+	}{
+		Alias: (*Alias)(k),
+	}
+
+	// 格式化创建时间
+	if k.CreatedAt.IsZero() {
+		aux.CreatedAt = ""
+	} else {
+		aux.CreatedAt = k.CreatedAt.Format(time.RFC3339)
+	}
+
+	// 格式化更新时间
+	if k.UpdatedAt.IsZero() {
+		aux.UpdatedAt = ""
+	} else {
+		aux.UpdatedAt = k.UpdatedAt.Format(time.RFC3339)
+	}
+
+	return json.Marshal(aux)
+}
+
 // MarshalJSON 自定义JSON序列化，确保时间格式正确
 func (k *KnowledgeItem) MarshalJSON() ([]byte, error) {
 	type Alias KnowledgeItem
@@ -83,6 +122,13 @@ func (r *RetrievalLog) MarshalJSON() ([]byte, error) {
 		Alias:     (*Alias)(r),
 		CreatedAt: r.CreatedAt.Format(time.RFC3339),
 	})
+}
+
+// CategoryWithItems 分类及其下的知识项（用于按分类分页）
+type CategoryWithItems struct {
+	Category string                `json:"category"`           // 分类名称
+	ItemCount int                  `json:"itemCount"`          // 该分类下的知识项总数
+	Items     []*KnowledgeItemSummary `json:"items"`          // 该分类下的知识项列表
 }
 
 // SearchRequest 搜索请求

@@ -384,7 +384,7 @@
                                     </div>
                                 </label>
                                 <div class="search-box">
-                                    <input type="text" id="knowledge-search" placeholder="搜索知识..." oninput="searchKnowledgeItems()" />
+                                    <input type="text" id="knowledge-search" placeholder="搜索知识..." oninput="handleKnowledgeSearchInput()" onkeydown="if(event.key==='Enter') searchKnowledgeItems()" />
                                     <button class="btn-search" onclick="searchKnowledgeItems()" title="搜索">🔍</button>
                                 </div>
                             </div>
@@ -392,6 +392,7 @@
                         <div id="knowledge-items-list" class="knowledge-items-list">
                             <div class="loading-spinner">加载中...</div>
                         </div>
+                        <div id="knowledge-pagination"></div>
                     </div>
                 </div>
 

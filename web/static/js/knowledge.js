@@ -4,6 +4,13 @@ let knowledgeItems = [];
 let currentEditingItemId = null;
 let isSavingKnowledgeItem = false; // 防止重复提交
 let retrievalLogsData = []; // 存储检索日志数据，用于详情查看
+let knowledgePagination = {
+    currentPage: 1,
+    pageSize: 10, // 每页分类数（改为按分类分页）
+    total: 0,
+    currentCategory: ''
+};
+let searchTimeout = null; // 搜索防抖定时器
 
 // 加载知识分类
 async function loadKnowledgeCategories() {
@@ -77,14 +84,21 @@ async function loadKnowledgeCategories() {
     }
 }
 
-// 加载知识项列表
-async function loadKnowledgeItems(category = '') {
+// 加载知识项列表（支持按分类分页，默认不加载完整内容）
+async function loadKnowledgeItems(category = '', page = 1, pageSize = 10) {
     try {
-        // 添加时间戳参数避免缓存
+        // 更新分页状态
+        knowledgePagination.currentCategory = category;
+        knowledgePagination.currentPage = page;
+        knowledgePagination.pageSize = pageSize;
+        
+        // 构建URL（按分类分页模式，不包含完整内容）
         const timestamp = Date.now();
-        const url = category 
-            ? `/api/knowledge/items?category=${encodeURIComponent(category)}&_t=${timestamp}` 
-            : `/api/knowledge/items?_t=${timestamp}`;
+        const offset = (page - 1) * pageSize;
+        let url = `/api/knowledge/items?categoryPage=true&limit=${pageSize}&offset=${offset}&_t=${timestamp}`;
+        if (category) {
+            url += `&category=${encodeURIComponent(category)}`;
+        }
         
         const response = await apiFetch(url, {
             method: 'GET',
@@ -123,12 +137,27 @@ async function loadKnowledgeItems(category = '') {
                 `;
             }
             knowledgeItems = [];
+            knowledgePagination.total = 0;
+            renderKnowledgePagination();
             return [];
         }
         
-        knowledgeItems = data.items || [];
-        renderKnowledgeItems(knowledgeItems);
-        return knowledgeItems;
+        // 处理按分类分页的响应数据
+        const categoriesWithItems = data.categories || [];
+        knowledgePagination.total = data.total || 0; // 总分类数
+        
+        renderKnowledgeItemsByCategories(categoriesWithItems);
+        
+        // 如果选择了单个分类，不显示分页（因为只显示一个分类）
+        if (category) {
+            const paginationContainer = document.getElementById('knowledge-pagination');
+            if (paginationContainer) {
+                paginationContainer.innerHTML = '';
+            }
+        } else {
+            renderKnowledgePagination();
+        }
+        return categoriesWithItems;
     } catch (error) {
         console.error('加载知识项失败:', error);
         // 只在非功能未启用的情况下显示错误
@@ -139,7 +168,51 @@ async function loadKnowledgeItems(category = '') {
     }
 }
 
-// 渲染知识项列表
+// 渲染知识项列表（按分类分页的数据结构）
+function renderKnowledgeItemsByCategories(categoriesWithItems) {
+    const container = document.getElementById('knowledge-items-list');
+    if (!container) return;
+    
+    if (categoriesWithItems.length === 0) {
+        container.innerHTML = '<div class="empty-state">暂无知识项</div>';
+        return;
+    }
+    
+    // 计算总项数和分类数
+    const totalItems = categoriesWithItems.reduce((sum, cat) => sum + (cat.items?.length || 0), 0);
+    const categoryCount = categoriesWithItems.length;
+    
+    // 更新统计信息
+    updateKnowledgeStats(categoriesWithItems, categoryCount);
+    
+    // 渲染分类及知识项
+    let html = '<div class="knowledge-categories-container">';
+    
+    categoriesWithItems.forEach(categoryData => {
+        const category = categoryData.category || '未分类';
+        const categoryItems = categoryData.items || [];
+        const categoryCount = categoryData.itemCount || categoryItems.length;
+        
+        html += `
+            <div class="knowledge-category-section" data-category="${escapeHtml(category)}">
+                <div class="knowledge-category-header">
+                    <div class="knowledge-category-info">
+                        <h3 class="knowledge-category-title">${escapeHtml(category)}</h3>
+                        <span class="knowledge-category-count">${categoryCount} 项</span>
+                    </div>
+                </div>
+                <div class="knowledge-items-grid">
+                    ${categoryItems.map(item => renderKnowledgeItemCard(item)).join('')}
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+// 渲染知识项列表（向后兼容，用于按项分页的旧代码）
 function renderKnowledgeItems(items) {
     const container = document.getElementById('knowledge-items-list');
     if (!container) return;
@@ -189,22 +262,66 @@ function renderKnowledgeItems(items) {
     container.innerHTML = html;
 }
 
+// 渲染分页控件（按分类分页）
+function renderKnowledgePagination() {
+    const container = document.getElementById('knowledge-pagination');
+    if (!container) return;
+    
+    const { currentPage, pageSize, total } = knowledgePagination;
+    const totalPages = Math.ceil(total / pageSize); // total是总分类数
+    
+    if (totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    let html = '<div class="knowledge-pagination" style="display: flex; justify-content: center; align-items: center; gap: 8px; padding: 20px; flex-wrap: wrap;">';
+    
+    // 上一页按钮
+    html += `<button class="pagination-btn" onclick="loadKnowledgePage(${currentPage - 1})" ${currentPage <= 1 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>上一页</button>`;
+    
+    // 页码显示（显示分类数）
+    html += `<span style="padding: 0 12px;">第 ${currentPage} 页，共 ${totalPages} 页（共 ${total} 个分类）</span>`;
+    
+    // 下一页按钮
+    html += `<button class="pagination-btn" onclick="loadKnowledgePage(${currentPage + 1})" ${currentPage >= totalPages ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>下一页</button>`;
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+// 加载指定页码的知识项
+function loadKnowledgePage(page) {
+    const { currentCategory, pageSize, total } = knowledgePagination;
+    const totalPages = Math.ceil(total / pageSize);
+    
+    if (page < 1 || page > totalPages) {
+        return;
+    }
+    
+    loadKnowledgeItems(currentCategory, page, pageSize);
+}
+
 // 渲染单个知识项卡片
 function renderKnowledgeItemCard(item) {
-    // 提取内容预览（去除markdown格式，取前150字符）
-    let preview = item.content || '';
-    // 移除markdown标题标记
-    preview = preview.replace(/^#+\s+/gm, '');
-    // 移除代码块
-    preview = preview.replace(/```[\s\S]*?```/g, '');
-    // 移除行内代码
-    preview = preview.replace(/`[^`]+`/g, '');
-    // 移除链接
-    preview = preview.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
-    // 清理多余空白
-    preview = preview.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
-    
-    const previewText = preview.length > 150 ? preview.substring(0, 150) + '...' : preview;
+    // 提取内容预览（如果item没有content字段，说明是摘要，不显示预览）
+    let previewText = '';
+    if (item.content) {
+        // 去除markdown格式，取前150字符
+        let preview = item.content;
+        // 移除markdown标题标记
+        preview = preview.replace(/^#+\s+/gm, '');
+        // 移除代码块
+        preview = preview.replace(/```[\s\S]*?```/g, '');
+        // 移除行内代码
+        preview = preview.replace(/`[^`]+`/g, '');
+        // 移除链接
+        preview = preview.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+        // 清理多余空白
+        preview = preview.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+        
+        previewText = preview.length > 150 ? preview.substring(0, 150) + '...' : preview;
+    }
     
     // 提取文件路径显示
     const filePath = item.filePath || '';
@@ -248,9 +365,11 @@ function renderKnowledgeItemCard(item) {
                 </div>
                 ${relativePath ? `<div class="knowledge-item-path">📁 ${escapeHtml(relativePath)}</div>` : ''}
             </div>
+            ${previewText ? `
             <div class="knowledge-item-card-content">
-                <p class="knowledge-item-preview">${escapeHtml(previewText || '无内容预览')}</p>
+                <p class="knowledge-item-preview">${escapeHtml(previewText)}</p>
             </div>
+            ` : ''}
             <div class="knowledge-item-card-footer">
                 <div class="knowledge-item-meta">
                     ${displayTime ? `<span class="knowledge-item-time" title="${timeLabel}">🕒 ${displayTime}</span>` : ''}
@@ -261,27 +380,39 @@ function renderKnowledgeItemCard(item) {
     `;
 }
 
-// 更新统计信息
-function updateKnowledgeStats(items, categoryCount) {
+// 更新统计信息（支持按分类分页的数据结构）
+function updateKnowledgeStats(data, categoryCount) {
     const statsContainer = document.getElementById('knowledge-stats');
     if (!statsContainer) return;
     
-    const totalItems = items.length;
-    const totalSize = items.reduce((sum, item) => sum + (item.content?.length || 0), 0);
-    const sizeKB = (totalSize / 1024).toFixed(1);
+    // 计算当前页的知识项数
+    let currentPageItemCount = 0;
+    if (Array.isArray(data) && data.length > 0) {
+        // 判断是categoriesWithItems还是items数组
+        if (data[0].category !== undefined && data[0].items !== undefined) {
+            // 是按分类分页的数据结构
+            currentPageItemCount = data.reduce((sum, cat) => sum + (cat.items?.length || 0), 0);
+        } else {
+            // 是按项分页的数据结构（向后兼容）
+            currentPageItemCount = data.length;
+        }
+    }
+    
+    // 总分类数（来自分页信息）
+    const totalCategories = knowledgePagination.total || categoryCount;
     
     statsContainer.innerHTML = `
         <div class="knowledge-stat-item">
-            <span class="knowledge-stat-label">总知识项</span>
-            <span class="knowledge-stat-value">${totalItems}</span>
+            <span class="knowledge-stat-label">总分类数</span>
+            <span class="knowledge-stat-value">${totalCategories}</span>
         </div>
         <div class="knowledge-stat-item">
-            <span class="knowledge-stat-label">分类数</span>
-            <span class="knowledge-stat-value">${categoryCount}</span>
+            <span class="knowledge-stat-label">当前页分类</span>
+            <span class="knowledge-stat-value">${categoryCount} 个</span>
         </div>
         <div class="knowledge-stat-item">
-            <span class="knowledge-stat-label">总内容</span>
-            <span class="knowledge-stat-value">${sizeKB} KB</span>
+            <span class="knowledge-stat-label">当前页知识项</span>
+            <span class="knowledge-stat-value">${currentPageItemCount} 项</span>
         </div>
     `;
     
@@ -396,7 +527,8 @@ function selectKnowledgeCategory(category) {
             }
         });
     }
-    loadKnowledgeItems(category);
+    // 切换分类时重置到第一页（如果选择了分类，API会返回该分类的所有项）
+    loadKnowledgeItems(category, 1, knowledgePagination.pageSize);
 }
 
 // 筛选知识项
@@ -405,32 +537,149 @@ function filterKnowledgeItems() {
     if (wrapper) {
         const selectedOption = wrapper.querySelector('.custom-select-option.selected');
         const category = selectedOption ? selectedOption.getAttribute('data-value') : '';
-        loadKnowledgeItems(category);
+        // 重置到第一页
+        loadKnowledgeItems(category, 1, knowledgePagination.pageSize);
     }
 }
 
-// 搜索知识项
-function searchKnowledgeItems() {
-    const searchTerm = document.getElementById('knowledge-search').value.toLowerCase().trim();
+// 处理搜索输入（带防抖）
+function handleKnowledgeSearchInput() {
+    const searchInput = document.getElementById('knowledge-search');
+    const searchTerm = searchInput?.value.trim() || '';
+    
+    // 清除之前的定时器
+    if (searchTimeout) {
+        clearTimeout(searchTimeout);
+    }
+    
+    // 如果搜索框为空，立即恢复列表
     if (!searchTerm) {
-        // 恢复原始列表
         const wrapper = document.getElementById('knowledge-category-filter-wrapper');
         let category = '';
         if (wrapper) {
             const selectedOption = wrapper.querySelector('.custom-select-option.selected');
             category = selectedOption ? selectedOption.getAttribute('data-value') : '';
         }
-        loadKnowledgeItems(category);
+        loadKnowledgeItems(category, 1, knowledgePagination.pageSize);
         return;
     }
     
-    const filtered = knowledgeItems.filter(item => 
-        item.title.toLowerCase().includes(searchTerm) ||
-        item.content.toLowerCase().includes(searchTerm) ||
-        item.category.toLowerCase().includes(searchTerm) ||
-        (item.filePath && item.filePath.toLowerCase().includes(searchTerm))
-    );
-    renderKnowledgeItems(filtered);
+    // 有搜索词时，延迟500ms后执行搜索（防抖）
+    searchTimeout = setTimeout(() => {
+        searchKnowledgeItems();
+    }, 500);
+}
+
+// 搜索知识项（后端关键字匹配，在所有数据中搜索）
+async function searchKnowledgeItems() {
+    const searchInput = document.getElementById('knowledge-search');
+    const searchTerm = searchInput?.value.trim() || '';
+    
+    if (!searchTerm) {
+        // 恢复原始列表（重置到第一页）
+        const wrapper = document.getElementById('knowledge-category-filter-wrapper');
+        let category = '';
+        if (wrapper) {
+            const selectedOption = wrapper.querySelector('.custom-select-option.selected');
+            category = selectedOption ? selectedOption.getAttribute('data-value') : '';
+        }
+        await loadKnowledgeItems(category, 1, knowledgePagination.pageSize);
+        return;
+    }
+    
+    try {
+        // 获取当前选择的分类
+        const wrapper = document.getElementById('knowledge-category-filter-wrapper');
+        let category = '';
+        if (wrapper) {
+            const selectedOption = wrapper.querySelector('.custom-select-option.selected');
+            category = selectedOption ? selectedOption.getAttribute('data-value') : '';
+        }
+        
+        // 调用后端API进行全量搜索
+        const timestamp = Date.now();
+        let url = `/api/knowledge/items?search=${encodeURIComponent(searchTerm)}&_t=${timestamp}`;
+        if (category) {
+            url += `&category=${encodeURIComponent(category)}`;
+        }
+        
+        const response = await apiFetch(url, {
+            method: 'GET',
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('搜索失败');
+        }
+        
+        const data = await response.json();
+        
+        // 检查知识库功能是否启用
+        if (data.enabled === false) {
+            const container = document.getElementById('knowledge-items-list');
+            if (container) {
+                container.innerHTML = `
+                    <div class="empty-state" style="text-align: center; padding: 40px 20px;">
+                        <div style="font-size: 48px; margin-bottom: 20px;">📚</div>
+                        <h3 style="margin-bottom: 10px; color: #666;">知识库功能未启用</h3>
+                        <p style="color: #999; margin-bottom: 20px;">${data.message || '请前往系统设置启用知识检索功能'}</p>
+                        <button onclick="switchToSettings()" style="
+                            background: #007bff;
+                            color: white;
+                            border: none;
+                            padding: 10px 20px;
+                            border-radius: 5px;
+                            cursor: pointer;
+                            font-size: 14px;
+                        ">前往设置</button>
+                    </div>
+                `;
+            }
+            return;
+        }
+        
+        // 处理搜索结果
+        const categoriesWithItems = data.categories || [];
+        
+        // 渲染搜索结果
+        const container = document.getElementById('knowledge-items-list');
+        if (!container) return;
+        
+        if (categoriesWithItems.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state" style="text-align: center; padding: 40px 20px;">
+                    <div style="font-size: 48px; margin-bottom: 20px;">🔍</div>
+                    <h3 style="margin-bottom: 10px;">未找到匹配的知识项</h3>
+                    <p style="color: #999;">关键词 "<strong>${escapeHtml(searchTerm)}</strong>" 在所有数据中没有匹配结果</p>
+                    <p style="color: #999; margin-top: 10px; font-size: 0.9em;">请尝试其他关键词，或使用分类筛选功能</p>
+                </div>
+            `;
+        } else {
+            // 计算总项数和分类数
+            const totalItems = categoriesWithItems.reduce((sum, cat) => sum + (cat.items?.length || 0), 0);
+            const categoryCount = categoriesWithItems.length;
+            
+            // 更新统计信息
+            updateKnowledgeStats(categoriesWithItems, categoryCount);
+            
+            // 渲染搜索结果
+            renderKnowledgeItemsByCategories(categoriesWithItems);
+        }
+        
+        // 搜索时隐藏分页（因为搜索结果显示所有匹配结果）
+        const paginationContainer = document.getElementById('knowledge-pagination');
+        if (paginationContainer) {
+            paginationContainer.innerHTML = '';
+        }
+        
+    } catch (error) {
+        console.error('搜索知识项失败:', error);
+        showNotification('搜索失败: ' + error.message, 'error');
+    }
 }
 
 // 刷新知识库
@@ -450,9 +699,9 @@ async function refreshKnowledgeBase() {
         } else {
             showNotification(data.message || '扫描完成，没有需要索引的新项或更新项', 'success');
         }
-        // 重新加载知识项
+        // 重新加载知识项（重置到第一页）
         await loadKnowledgeCategories();
-        await loadKnowledgeItems();
+        await loadKnowledgeItems(knowledgePagination.currentCategory, 1, knowledgePagination.pageSize);
         
         // 停止现有的轮询
         if (indexProgressInterval) {
@@ -686,8 +935,8 @@ async function saveKnowledgeItem() {
                 showNotification(`✅ ${action}成功！已切换到分类"${newItemCategory}"查看新添加的知识项。`, 'success');
             }
             
-            // 刷新知识项列表
-            await loadKnowledgeItems(categoryToShow);
+            // 刷新知识项列表（重置到第一页）
+            await loadKnowledgeItems(categoryToShow, 1, knowledgePagination.pageSize);
             console.log('知识项刷新完成');
         } catch (err) {
             console.error('刷新数据失败:', err);
@@ -805,9 +1054,9 @@ async function deleteKnowledgeItem(id) {
         // 显示成功通知
         showNotification('✅ 删除成功！知识项已从系统中移除。', 'success');
         
-        // 重新加载数据以确保数据同步
+        // 重新加载数据以确保数据同步（保持当前页码）
         await loadKnowledgeCategories();
-        await loadKnowledgeItems();
+        await loadKnowledgeItems(knowledgePagination.currentCategory, knowledgePagination.currentPage, knowledgePagination.pageSize);
         
     } catch (error) {
         console.error('删除知识项失败:', error);
@@ -821,8 +1070,8 @@ async function deleteKnowledgeItem(id) {
             
             // 如果分类被移除了，需要恢复
             if (categorySection && !categorySection.parentElement) {
-                // 需要重新加载来恢复
-                await loadKnowledgeItems();
+                // 需要重新加载来恢复（保持当前分页状态）
+                await loadKnowledgeItems(knowledgePagination.currentCategory, knowledgePagination.currentPage, knowledgePagination.pageSize);
             }
         }
         
@@ -1537,7 +1786,7 @@ if (typeof switchPage === 'function') {
         
         if (page === 'knowledge-management') {
             loadKnowledgeCategories();
-            loadKnowledgeItems();
+            loadKnowledgeItems(knowledgePagination.currentCategory, 1, knowledgePagination.pageSize);
             updateIndexProgress(); // 更新索引进度
         } else if (page === 'knowledge-retrieval-logs') {
             loadRetrievalLogs();

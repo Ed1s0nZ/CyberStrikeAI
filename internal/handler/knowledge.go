@@ -50,18 +50,168 @@ func (h *KnowledgeHandler) GetCategories(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"categories": categories})
 }
 
-// GetItems 获取知识项列表
+// GetItems 获取知识项列表（支持按分类分页和关键字搜索，默认不返回完整内容）
 func (h *KnowledgeHandler) GetItems(c *gin.Context) {
 	category := c.Query("category")
+	searchKeyword := c.Query("search") // 搜索关键字
+	
+	// 如果提供了搜索关键字，执行关键字搜索（在所有数据中搜索）
+	if searchKeyword != "" {
+		items, err := h.manager.SearchItemsByKeyword(searchKeyword, category)
+		if err != nil {
+			h.logger.Error("搜索知识项失败", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 
-	items, err := h.manager.GetItems(category)
-	if err != nil {
-		h.logger.Error("获取知识项失败", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		// 按分类分组结果
+		groupedByCategory := make(map[string][]*knowledge.KnowledgeItemSummary)
+		for _, item := range items {
+			cat := item.Category
+			if cat == "" {
+				cat = "未分类"
+			}
+			groupedByCategory[cat] = append(groupedByCategory[cat], item)
+		}
+
+		// 转换为CategoryWithItems格式
+		categoriesWithItems := make([]*knowledge.CategoryWithItems, 0, len(groupedByCategory))
+		for cat, catItems := range groupedByCategory {
+			categoriesWithItems = append(categoriesWithItems, &knowledge.CategoryWithItems{
+				Category:  cat,
+				ItemCount: len(catItems),
+				Items:     catItems,
+			})
+		}
+
+		// 按分类名称排序
+		for i := 0; i < len(categoriesWithItems)-1; i++ {
+			for j := i + 1; j < len(categoriesWithItems); j++ {
+				if categoriesWithItems[i].Category > categoriesWithItems[j].Category {
+					categoriesWithItems[i], categoriesWithItems[j] = categoriesWithItems[j], categoriesWithItems[i]
+				}
+			}
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"categories": categoriesWithItems,
+			"total":      len(categoriesWithItems),
+			"search":     searchKeyword,
+			"is_search":  true,
+		})
+		return
+	}
+	
+	// 分页模式：categoryPage=true 表示按分类分页，否则按项分页（向后兼容）
+	categoryPageMode := c.Query("categoryPage") != "false" // 默认使用分类分页
+	
+	// 分页参数
+	limit := 50 // 默认每页50条（分类分页时为分类数，项分页时为项数）
+	offset := 0
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if parsed, err := parseInt(limitStr); err == nil && parsed > 0 && parsed <= 500 {
+			limit = parsed
+		}
+	}
+	if offsetStr := c.Query("offset"); offsetStr != "" {
+		if parsed, err := parseInt(offsetStr); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+
+	// 如果指定了category参数，且使用分类分页模式，则只返回该分类
+	if category != "" && categoryPageMode {
+		// 单分类模式：返回该分类的所有知识项（不分页）
+		items, total, err := h.manager.GetItemsSummary(category, 0, 0)
+		if err != nil {
+			h.logger.Error("获取知识项失败", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		// 包装成分类结构
+		categoriesWithItems := []*knowledge.CategoryWithItems{
+			{
+				Category:  category,
+				ItemCount: total,
+				Items:     items,
+			},
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"categories": categoriesWithItems,
+			"total":      1, // 只有一个分类
+			"limit":      limit,
+			"offset":     offset,
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	if categoryPageMode {
+		// 按分类分页模式（默认）
+		// limit表示每页分类数，推荐5-10个分类
+		if limit <= 0 || limit > 100 {
+			limit = 10 // 默认每页10个分类
+		}
+
+		categoriesWithItems, totalCategories, err := h.manager.GetCategoriesWithItems(limit, offset)
+		if err != nil {
+			h.logger.Error("获取分类知识项失败", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"categories": categoriesWithItems,
+			"total":      totalCategories,
+			"limit":      limit,
+			"offset":     offset,
+		})
+		return
+	}
+
+	// 按项分页模式（向后兼容）
+	// 是否包含完整内容（默认false，只返回摘要）
+	includeContent := c.Query("includeContent") == "true"
+
+	if includeContent {
+		// 返回完整内容（向后兼容）
+		items, err := h.manager.GetItemsWithOptions(category, limit, offset, true)
+		if err != nil {
+			h.logger.Error("获取知识项失败", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		// 获取总数
+		total, err := h.manager.GetItemsCount(category)
+		if err != nil {
+			h.logger.Warn("获取知识项总数失败", zap.Error(err))
+			total = len(items)
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"items": items,
+			"total": total,
+			"limit": limit,
+			"offset": offset,
+		})
+	} else {
+		// 返回摘要（不包含完整内容，推荐方式）
+		items, total, err := h.manager.GetItemsSummary(category, limit, offset)
+		if err != nil {
+			h.logger.Error("获取知识项失败", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"items": items,
+			"total": total,
+			"limit": limit,
+			"offset": offset,
+		})
+	}
 }
 
 // GetItem 获取单个知识项

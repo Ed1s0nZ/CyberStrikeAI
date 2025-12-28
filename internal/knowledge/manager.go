@@ -153,21 +153,115 @@ func (m *Manager) GetCategories() ([]string, error) {
 	return categories, nil
 }
 
-// GetItems 获取知识项列表
+// GetCategoriesWithItems 按分类分页获取知识项（每个分类包含其下的所有知识项）
+// limit: 每页分类数量（0表示不限制）
+// offset: 偏移量（按分类偏移）
+func (m *Manager) GetCategoriesWithItems(limit, offset int) ([]*CategoryWithItems, int, error) {
+	// 首先获取所有分类（带数量统计）
+	rows, err := m.db.Query(`
+		SELECT category, COUNT(*) as item_count 
+		FROM knowledge_base_items 
+		GROUP BY category 
+		ORDER BY category
+	`)
+	if err != nil {
+		return nil, 0, fmt.Errorf("查询分类失败: %w", err)
+	}
+	defer rows.Close()
+
+	// 收集所有分类信息
+	type categoryInfo struct {
+		name      string
+		itemCount int
+	}
+	var allCategories []categoryInfo
+	for rows.Next() {
+		var info categoryInfo
+		if err := rows.Scan(&info.name, &info.itemCount); err != nil {
+			return nil, 0, fmt.Errorf("扫描分类失败: %w", err)
+		}
+		allCategories = append(allCategories, info)
+	}
+
+	totalCategories := len(allCategories)
+
+	// 应用分页（按分类分页）
+	var paginatedCategories []categoryInfo
+	if limit > 0 {
+		start := offset
+		end := offset + limit
+		if start >= totalCategories {
+			paginatedCategories = []categoryInfo{}
+		} else {
+			if end > totalCategories {
+				end = totalCategories
+			}
+			paginatedCategories = allCategories[start:end]
+		}
+	} else {
+		paginatedCategories = allCategories
+	}
+
+	// 为每个分类获取其下的知识项（只返回摘要，不包含完整内容）
+	result := make([]*CategoryWithItems, 0, len(paginatedCategories))
+	for _, catInfo := range paginatedCategories {
+		// 获取该分类下的所有知识项
+		items, _, err := m.GetItemsSummary(catInfo.name, 0, 0)
+		if err != nil {
+			return nil, 0, fmt.Errorf("获取分类 %s 的知识项失败: %w", catInfo.name, err)
+		}
+
+		result = append(result, &CategoryWithItems{
+			Category:  catInfo.name,
+			ItemCount: catInfo.itemCount,
+			Items:     items,
+		})
+	}
+
+	return result, totalCategories, nil
+}
+
+// GetItems 获取知识项列表（完整内容，用于向后兼容）
 func (m *Manager) GetItems(category string) ([]*KnowledgeItem, error) {
+	return m.GetItemsWithOptions(category, 0, 0, true)
+}
+
+// GetItemsWithOptions 获取知识项列表（支持分页和可选内容）
+// category: 分类筛选（空字符串表示所有分类）
+// limit: 每页数量（0表示不限制）
+// offset: 偏移量
+// includeContent: 是否包含完整内容（false时只返回摘要）
+func (m *Manager) GetItemsWithOptions(category string, limit, offset int, includeContent bool) ([]*KnowledgeItem, error) {
 	var rows *sql.Rows
 	var err error
 
-	if category != "" {
-		rows, err = m.db.Query(
-			"SELECT id, category, title, file_path, content, created_at, updated_at FROM knowledge_base_items WHERE category = ? ORDER BY title",
-			category,
-		)
+	// 构建SQL查询
+	var query string
+	var args []interface{}
+
+	if includeContent {
+		query = "SELECT id, category, title, file_path, content, created_at, updated_at FROM knowledge_base_items"
 	} else {
-		rows, err = m.db.Query(
-			"SELECT id, category, title, file_path, content, created_at, updated_at FROM knowledge_base_items ORDER BY category, title",
-		)
+		query = "SELECT id, category, title, file_path, created_at, updated_at FROM knowledge_base_items"
 	}
+
+	if category != "" {
+		query += " WHERE category = ?"
+		args = append(args, category)
+	}
+
+	query += " ORDER BY category, title"
+
+	if limit > 0 {
+		query += " LIMIT ?"
+		args = append(args, limit)
+		if offset > 0 {
+			query += " OFFSET ?"
+			args = append(args, offset)
+		}
+	}
+
+	rows, err = m.db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("查询知识项失败: %w", err)
 	}
@@ -177,8 +271,17 @@ func (m *Manager) GetItems(category string) ([]*KnowledgeItem, error) {
 	for rows.Next() {
 		item := &KnowledgeItem{}
 		var createdAt, updatedAt string
-		if err := rows.Scan(&item.ID, &item.Category, &item.Title, &item.FilePath, &item.Content, &createdAt, &updatedAt); err != nil {
-			return nil, fmt.Errorf("扫描知识项失败: %w", err)
+
+		if includeContent {
+			if err := rows.Scan(&item.ID, &item.Category, &item.Title, &item.FilePath, &item.Content, &createdAt, &updatedAt); err != nil {
+				return nil, fmt.Errorf("扫描知识项失败: %w", err)
+			}
+		} else {
+			if err := rows.Scan(&item.ID, &item.Category, &item.Title, &item.FilePath, &createdAt, &updatedAt); err != nil {
+				return nil, fmt.Errorf("扫描知识项失败: %w", err)
+			}
+			// 不包含内容时，Content为空字符串
+			item.Content = ""
 		}
 
 		// 解析时间 - 支持多种格式
@@ -223,6 +326,196 @@ func (m *Manager) GetItems(category string) ([]*KnowledgeItem, error) {
 	}
 
 	return items, nil
+}
+
+// GetItemsCount 获取知识项总数
+func (m *Manager) GetItemsCount(category string) (int, error) {
+	var count int
+	var err error
+
+	if category != "" {
+		err = m.db.QueryRow("SELECT COUNT(*) FROM knowledge_base_items WHERE category = ?", category).Scan(&count)
+	} else {
+		err = m.db.QueryRow("SELECT COUNT(*) FROM knowledge_base_items").Scan(&count)
+	}
+
+	if err != nil {
+		return 0, fmt.Errorf("查询知识项总数失败: %w", err)
+	}
+
+	return count, nil
+}
+
+// SearchItemsByKeyword 按关键字搜索知识项（在所有数据中搜索，支持标题、分类、路径匹配）
+func (m *Manager) SearchItemsByKeyword(keyword string, category string) ([]*KnowledgeItemSummary, error) {
+	if keyword == "" {
+		return nil, fmt.Errorf("搜索关键字不能为空")
+	}
+
+	// 构建SQL查询，使用LIKE进行关键字匹配（不区分大小写）
+	var query string
+	var args []interface{}
+
+	// SQLite的LIKE不区分大小写，使用COLLATE NOCASE或LOWER()函数
+	// 使用%keyword%进行模糊匹配
+	searchPattern := "%" + keyword + "%"
+	
+	query = `
+		SELECT id, category, title, file_path, created_at, updated_at 
+		FROM knowledge_base_items 
+		WHERE (LOWER(title) LIKE LOWER(?) OR LOWER(category) LIKE LOWER(?) OR LOWER(file_path) LIKE LOWER(?))
+	`
+	args = append(args, searchPattern, searchPattern, searchPattern)
+
+	// 如果指定了分类，添加分类过滤
+	if category != "" {
+		query += " AND category = ?"
+		args = append(args, category)
+	}
+
+	query += " ORDER BY category, title"
+
+	rows, err := m.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("搜索知识项失败: %w", err)
+	}
+	defer rows.Close()
+
+	var items []*KnowledgeItemSummary
+	for rows.Next() {
+		item := &KnowledgeItemSummary{}
+		var createdAt, updatedAt string
+
+		if err := rows.Scan(&item.ID, &item.Category, &item.Title, &item.FilePath, &createdAt, &updatedAt); err != nil {
+			return nil, fmt.Errorf("扫描知识项失败: %w", err)
+		}
+
+		// 解析时间
+		timeFormats := []string{
+			"2006-01-02 15:04:05.999999999-07:00",
+			"2006-01-02 15:04:05.999999999",
+			"2006-01-02T15:04:05.999999999Z07:00",
+			"2006-01-02T15:04:05Z",
+			"2006-01-02 15:04:05",
+			time.RFC3339,
+			time.RFC3339Nano,
+		}
+
+		if createdAt != "" {
+			for _, format := range timeFormats {
+				parsed, err := time.Parse(format, createdAt)
+				if err == nil && !parsed.IsZero() {
+					item.CreatedAt = parsed
+					break
+				}
+			}
+		}
+
+		if updatedAt != "" {
+			for _, format := range timeFormats {
+				parsed, err := time.Parse(format, updatedAt)
+				if err == nil && !parsed.IsZero() {
+					item.UpdatedAt = parsed
+					break
+				}
+			}
+		}
+
+		if item.UpdatedAt.IsZero() && !item.CreatedAt.IsZero() {
+			item.UpdatedAt = item.CreatedAt
+		}
+
+		items = append(items, item)
+	}
+
+	return items, nil
+}
+
+// GetItemsSummary 获取知识项摘要列表（不包含完整内容，支持分页）
+func (m *Manager) GetItemsSummary(category string, limit, offset int) ([]*KnowledgeItemSummary, int, error) {
+	// 获取总数
+	total, err := m.GetItemsCount(category)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// 获取列表数据（不包含内容）
+	var rows *sql.Rows
+	var query string
+	var args []interface{}
+
+	query = "SELECT id, category, title, file_path, created_at, updated_at FROM knowledge_base_items"
+
+	if category != "" {
+		query += " WHERE category = ?"
+		args = append(args, category)
+	}
+
+	query += " ORDER BY category, title"
+
+	if limit > 0 {
+		query += " LIMIT ?"
+		args = append(args, limit)
+		if offset > 0 {
+			query += " OFFSET ?"
+			args = append(args, offset)
+		}
+	}
+
+	rows, err = m.db.Query(query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("查询知识项失败: %w", err)
+	}
+	defer rows.Close()
+
+	var items []*KnowledgeItemSummary
+	for rows.Next() {
+		item := &KnowledgeItemSummary{}
+		var createdAt, updatedAt string
+
+		if err := rows.Scan(&item.ID, &item.Category, &item.Title, &item.FilePath, &createdAt, &updatedAt); err != nil {
+			return nil, 0, fmt.Errorf("扫描知识项失败: %w", err)
+		}
+
+		// 解析时间
+		timeFormats := []string{
+			"2006-01-02 15:04:05.999999999-07:00",
+			"2006-01-02 15:04:05.999999999",
+			"2006-01-02T15:04:05.999999999Z07:00",
+			"2006-01-02T15:04:05Z",
+			"2006-01-02 15:04:05",
+			time.RFC3339,
+			time.RFC3339Nano,
+		}
+
+		if createdAt != "" {
+			for _, format := range timeFormats {
+				parsed, err := time.Parse(format, createdAt)
+				if err == nil && !parsed.IsZero() {
+					item.CreatedAt = parsed
+					break
+				}
+			}
+		}
+
+		if updatedAt != "" {
+			for _, format := range timeFormats {
+				parsed, err := time.Parse(format, updatedAt)
+				if err == nil && !parsed.IsZero() {
+					item.UpdatedAt = parsed
+					break
+				}
+			}
+		}
+
+		if item.UpdatedAt.IsZero() && !item.CreatedAt.IsZero() {
+			item.UpdatedAt = item.CreatedAt
+		}
+
+		items = append(items, item)
+	}
+
+	return items, total, nil
 }
 
 // GetItem 获取单个知识项
