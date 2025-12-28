@@ -11,12 +11,6 @@ CyberStrikeAI 是一款 **AI 原生渗透测试协同体**，以 Go 编写，内
 在安全领域，真正稀缺的从来不是工具，而是判断。判断来自经验，而经验往往只能依附在个人身上，难以继承、难以复用。CyberStrikeAI 尝试解决的不是“如何自动化攻击”，而是：在复杂、多变、充满不确定性的环境中，下一步“应该做什么”，以及“为什么”。它不追求更激进的自动化，而是试图把安全专家的思考方式、决策路径与失败经验，转化为一个可约束、可复盘、可演进的系统能力。如果经验可以脱离个人而存在，那么安全，才真正具备了被系统性继承的可能。
 
 
-<div align="left">
-  <a href="https://zc.tencent.com/competition/competitionHackathon?code=cha004" target="_blank">
-    <img src="./img/tch.png" alt="TCH Top-Ranked Intelligent Pentest Project" width="300">
-  </a>
-</div>
-
 - Web 控制台  
   <img src="./img/效果.png" alt="Preview" width="560">
 - MCP stdio 模式  
