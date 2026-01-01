@@ -874,11 +874,12 @@ function renderBatchQueues(queues) {
         });
         
         const progress = stats.total > 0 ? Math.round((stats.completed + stats.failed + stats.cancelled) / stats.total * 100) : 0;
+        const canDelete = queue.status === 'pending'; // 只有待执行状态的队列可以删除
         
         return `
-            <div class="batch-queue-item" onclick="showBatchQueueDetail('${queue.id}')">
+            <div class="batch-queue-item" data-queue-id="${queue.id}" onclick="showBatchQueueDetail('${queue.id}')">
                 <div class="batch-queue-header">
-                    <div class="batch-queue-info">
+                    <div class="batch-queue-info" style="flex: 1;">
                         <span class="batch-queue-status ${status.class}">${status.text}</span>
                         <span class="batch-queue-id">队列ID: ${escapeHtml(queue.id)}</span>
                         <span class="batch-queue-time">创建时间: ${new Date(queue.createdAt).toLocaleString('zh-CN')}</span>
@@ -888,6 +889,9 @@ function renderBatchQueues(queues) {
                             <div class="batch-queue-progress-fill" style="width: ${progress}%"></div>
                         </div>
                         <span class="batch-queue-progress-text">${progress}% (${stats.completed + stats.failed + stats.cancelled}/${stats.total})</span>
+                    </div>
+                    <div class="batch-queue-actions" style="display: flex; align-items: center; gap: 8px; margin-left: 12px;" onclick="event.stopPropagation();">
+                        ${canDelete ? `<button class="btn-secondary btn-small btn-danger" onclick="deleteBatchQueueFromList('${queue.id}')" title="删除队列">删除</button>` : ''}
                     </div>
                 </div>
                 <div class="batch-queue-stats">
@@ -926,7 +930,7 @@ async function showBatchQueueDetail(queueId) {
         batchQueuesState.currentQueueId = queueId;
         
         if (title) {
-            title.textContent = `批量任务队列 - ${queue.id}`;
+            title.textContent = '批量任务队列';
         }
         
         // 更新按钮显示
@@ -940,7 +944,8 @@ async function showBatchQueueDetail(queueId) {
             cancelBtn.style.display = (queue.status === 'running' || queue.status === 'paused') ? 'inline-block' : 'none';
         }
         if (deleteBtn) {
-            deleteBtn.style.display = (queue.status === 'completed' || queue.status === 'cancelled') ? 'inline-block' : 'none';
+            // 允许删除待执行、已完成或已取消状态的队列
+            deleteBtn.style.display = (queue.status === 'pending' || queue.status === 'completed' || queue.status === 'cancelled') ? 'inline-block' : 'none';
         }
         
         // 渲染任务列表
@@ -1059,7 +1064,7 @@ async function cancelBatchQueue() {
     }
 }
 
-// 删除批量任务队列
+// 删除批量任务队列（从详情模态框）
 async function deleteBatchQueue() {
     const queueId = batchQueuesState.currentQueueId;
     if (!queueId) return;
@@ -1079,6 +1084,37 @@ async function deleteBatchQueue() {
         }
         
         closeBatchQueueDetailModal();
+        refreshBatchQueues();
+    } catch (error) {
+        console.error('删除批量任务队列失败:', error);
+        alert('删除批量任务队列失败: ' + error.message);
+    }
+}
+
+// 从列表删除批量任务队列
+async function deleteBatchQueueFromList(queueId) {
+    if (!queueId) return;
+    
+    if (!confirm('确定要删除这个批量任务队列吗？此操作不可恢复。')) {
+        return;
+    }
+    
+    try {
+        const response = await apiFetch(`/api/batch-tasks/${queueId}`, {
+            method: 'DELETE',
+        });
+        
+        if (!response.ok) {
+            const result = await response.json().catch(() => ({}));
+            throw new Error(result.error || '删除批量任务队列失败');
+        }
+        
+        // 如果当前正在查看这个队列的详情，关闭详情模态框
+        if (batchQueuesState.currentQueueId === queueId) {
+            closeBatchQueueDetailModal();
+        }
+        
+        // 刷新队列列表
         refreshBatchQueues();
     } catch (error) {
         console.error('删除批量任务队列失败:', error);
@@ -1464,3 +1500,4 @@ window.showAddBatchTaskModal = showAddBatchTaskModal;
 window.closeAddBatchTaskModal = closeAddBatchTaskModal;
 window.saveAddBatchTask = saveAddBatchTask;
 window.deleteBatchTaskFromElement = deleteBatchTaskFromElement;
+window.deleteBatchQueueFromList = deleteBatchQueueFromList;
