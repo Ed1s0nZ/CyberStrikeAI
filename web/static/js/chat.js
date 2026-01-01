@@ -871,10 +871,6 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
 
 // 渲染过程详情
 function renderProcessDetails(messageId, processDetails) {
-    if (!processDetails || processDetails.length === 0) {
-        return;
-    }
-    
     const messageElement = document.getElementById(messageId);
     if (!messageElement) {
         return;
@@ -942,7 +938,7 @@ function renderProcessDetails(messageId, processDetails) {
         }
     }
     
-    // 创建时间线
+    // 创建时间线（即使没有processDetails也要创建，以便展开详情按钮能正常工作）
     const timelineId = detailsId + '-timeline';
     let timeline = document.getElementById(timelineId);
     
@@ -958,8 +954,18 @@ function renderProcessDetails(messageId, processDetails) {
         detailsContainer.appendChild(contentDiv);
     }
     
+    // 如果没有processDetails或为空，显示空状态
+    if (!processDetails || processDetails.length === 0) {
+        // 显示空状态提示
+        timeline.innerHTML = '<div class="progress-timeline-empty">暂无过程详情（可能执行过快或未触发详细事件）</div>';
+        // 默认折叠
+        timeline.classList.remove('expanded');
+        return;
+    }
+    
     // 清空时间线并重新渲染
     timeline.innerHTML = '';
+    
     
     // 渲染每个过程详情事件
     processDetails.forEach(detail => {
@@ -1606,17 +1612,19 @@ async function loadConversation(conversationId) {
                 
                 // 传递消息的创建时间
                 const messageId = addMessage(msg.role, displayContent, msg.mcpExecutionIds || [], null, msg.createdAt);
-                // 如果有过程详情，显示它们
-                if (msg.processDetails && msg.processDetails.length > 0 && msg.role === 'assistant') {
+                // 对于助手消息，总是渲染过程详情（即使没有processDetails也要显示展开详情按钮）
+                if (msg.role === 'assistant') {
                     // 延迟一下，确保消息已经渲染
                     setTimeout(() => {
-                        renderProcessDetails(messageId, msg.processDetails);
-                        // 检查是否有错误或取消事件，如果有，确保详情默认折叠
-                        const hasErrorOrCancelled = msg.processDetails.some(d => 
-                            d.eventType === 'error' || d.eventType === 'cancelled'
-                        );
-                        if (hasErrorOrCancelled) {
-                            collapseAllProgressDetails(messageId, null);
+                        renderProcessDetails(messageId, msg.processDetails || []);
+                        // 如果有过程详情，检查是否有错误或取消事件，如果有，确保详情默认折叠
+                        if (msg.processDetails && msg.processDetails.length > 0) {
+                            const hasErrorOrCancelled = msg.processDetails.some(d => 
+                                d.eventType === 'error' || d.eventType === 'cancelled'
+                            );
+                            if (hasErrorOrCancelled) {
+                                collapseAllProgressDetails(messageId, null);
+                            }
                         }
                     }, 100);
                 }

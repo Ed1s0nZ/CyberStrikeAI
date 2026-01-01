@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -212,6 +214,100 @@ func (m *BatchTaskManager) GetAllQueues() []*BatchTaskQueue {
 	}
 
 	return result
+}
+
+// ListQueues 列出队列（支持筛选和分页）
+func (m *BatchTaskManager) ListQueues(limit, offset int, status, keyword string) ([]*BatchTaskQueue, int, error) {
+	var queues []*BatchTaskQueue
+	var total int
+
+	// 如果数据库可用，从数据库查询
+	if m.db != nil {
+		// 获取总数
+		count, err := m.db.CountBatchQueues(status, keyword)
+		if err != nil {
+			return nil, 0, fmt.Errorf("统计队列总数失败: %w", err)
+		}
+		total = count
+
+		// 获取队列列表（只获取ID）
+		queueRows, err := m.db.ListBatchQueues(limit, offset, status, keyword)
+		if err != nil {
+			return nil, 0, fmt.Errorf("查询队列列表失败: %w", err)
+		}
+
+		// 加载完整的队列信息（从内存或数据库）
+		m.mu.Lock()
+		for _, queueRow := range queueRows {
+			var queue *BatchTaskQueue
+			// 先从内存查找
+			if cached, exists := m.queues[queueRow.ID]; exists {
+				queue = cached
+			} else {
+				// 从数据库加载
+				queue = m.loadQueueFromDB(queueRow.ID)
+				if queue != nil {
+					m.queues[queueRow.ID] = queue
+				}
+			}
+			if queue != nil {
+				queues = append(queues, queue)
+			}
+		}
+		m.mu.Unlock()
+	} else {
+		// 没有数据库，从内存中筛选和分页
+		m.mu.RLock()
+		allQueues := make([]*BatchTaskQueue, 0, len(m.queues))
+		for _, queue := range m.queues {
+			allQueues = append(allQueues, queue)
+		}
+		m.mu.RUnlock()
+
+		// 筛选
+		filtered := make([]*BatchTaskQueue, 0)
+		for _, queue := range allQueues {
+			// 状态筛选
+			if status != "" && status != "all" && queue.Status != status {
+				continue
+			}
+			// 关键字搜索
+			if keyword != "" {
+				keywordLower := strings.ToLower(keyword)
+				queueIDLower := strings.ToLower(queue.ID)
+				if !strings.Contains(queueIDLower, keywordLower) {
+					// 也可以搜索创建时间
+					createdAtStr := queue.CreatedAt.Format("2006-01-02 15:04:05")
+					if !strings.Contains(createdAtStr, keyword) {
+						continue
+					}
+				}
+			}
+			filtered = append(filtered, queue)
+		}
+
+		// 按创建时间倒序排序
+		sort.Slice(filtered, func(i, j int) bool {
+			return filtered[i].CreatedAt.After(filtered[j].CreatedAt)
+		})
+
+		total = len(filtered)
+
+		// 分页
+		start := offset
+		if start > len(filtered) {
+			start = len(filtered)
+		}
+		end := start + limit
+		if end > len(filtered) {
+			end = len(filtered)
+		}
+		if start < len(filtered) {
+			queues = filtered[start:end]
+		}
+	}
+
+	return queues, total, nil
 }
 
 // LoadFromDB 从数据库加载所有队列
@@ -534,7 +630,42 @@ func (m *BatchTaskManager) SetTaskCancel(queueID string, cancel context.CancelFu
 	}
 }
 
-// CancelQueue 取消队列
+// PauseQueue 暂停队列
+func (m *BatchTaskManager) PauseQueue(queueID string) bool {
+	m.mu.Lock()
+
+	queue, exists := m.queues[queueID]
+	if !exists {
+		m.mu.Unlock()
+		return false
+	}
+
+	if queue.Status != "running" {
+		m.mu.Unlock()
+		return false
+	}
+
+	queue.Status = "paused"
+
+	// 取消当前正在执行的任务（通过取消context）
+	if cancel, exists := m.taskCancels[queueID]; exists {
+		cancel()
+		delete(m.taskCancels, queueID)
+	}
+
+	m.mu.Unlock()
+
+	// 同步队列状态到数据库
+	if m.db != nil {
+		if err := m.db.UpdateBatchQueueStatus(queueID, "paused"); err != nil {
+			// 记录错误但继续（使用内存缓存）
+		}
+	}
+
+	return true
+}
+
+// CancelQueue 取消队列（保留此方法以保持向后兼容，但建议使用PauseQueue）
 func (m *BatchTaskManager) CancelQueue(queueID string) bool {
 	m.mu.Lock()
 

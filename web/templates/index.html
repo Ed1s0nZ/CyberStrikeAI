@@ -571,7 +571,28 @@
                             <div class="batch-queues-header">
                                 <h3>批量任务队列</h3>
                             </div>
+                            <!-- 筛选控件 -->
+                            <div class="batch-queues-filters tasks-filters">
+                                <label>
+                                    <span>状态筛选</span>
+                                    <select id="batch-queues-status-filter" onchange="filterBatchQueues()">
+                                        <option value="all">全部</option>
+                                        <option value="pending">待执行</option>
+                                        <option value="running">执行中</option>
+                                        <option value="paused">已暂停</option>
+                                        <option value="completed">已完成</option>
+                                        <option value="cancelled">已取消</option>
+                                    </select>
+                                </label>
+                                <label style="flex: 1; max-width: 300px;">
+                                    <span>搜索队列ID或创建时间</span>
+                                    <input type="text" id="batch-queues-search" placeholder="输入关键字搜索..." 
+                                           oninput="filterBatchQueues()">
+                                </label>
+                            </div>
                             <div id="batch-queues-list" class="batch-queues-list"></div>
+                            <!-- 分页控件 -->
+                            <div id="batch-queues-pagination"></div>
                         </div>
                     </div>
                 </div>
@@ -1166,7 +1187,7 @@
                     <div class="modal-header-actions">
                         <button class="btn-secondary" id="batch-queue-add-task-btn" onclick="showAddBatchTaskModal()" style="display: none;">添加任务</button>
                         <button class="btn-primary" id="batch-queue-start-btn" onclick="startBatchQueue()" style="display: none;">开始执行</button>
-                        <button class="btn-secondary btn-danger" id="batch-queue-cancel-btn" onclick="cancelBatchQueue()" style="display: none;">取消队列</button>
+                        <button class="btn-secondary" id="batch-queue-pause-btn" onclick="pauseBatchQueue()" style="display: none;">暂停队列</button>
                         <button class="btn-secondary btn-danger" id="batch-queue-delete-btn" onclick="deleteBatchQueue()" style="display: none;">删除队列</button>
                     </div>
                     <span class="modal-close" onclick="closeBatchQueueDetailModal()">&times;</span>

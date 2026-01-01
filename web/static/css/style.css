@@ -6246,6 +6246,27 @@ header {
     border-color: var(--accent-color);
 }
 
+.tasks-filters input[type="text"] {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.875rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    width: 100%;
+    transition: all 0.2s;
+}
+
+.tasks-filters input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(0, 102, 255, 0.1);
+}
+
+.tasks-filters input[type="text"]:hover {
+    border-color: var(--accent-color);
+}
+
 .tasks-batch-actions {
     display: flex;
     align-items: center;

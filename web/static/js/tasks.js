@@ -706,7 +706,14 @@ window.clearTasksHistory = clearTasksHistory;
 const batchQueuesState = {
     queues: [],
     currentQueueId: null,
-    refreshInterval: null
+    refreshInterval: null,
+    // 筛选和分页状态
+    filterStatus: 'all', // 'all', 'pending', 'running', 'paused', 'completed', 'cancelled'
+    searchKeyword: '',
+    currentPage: 1,
+    pageSize: 10,
+    total: 0,
+    totalPages: 1
 };
 
 // 显示批量导入模态框
@@ -802,19 +809,37 @@ async function createBatchQueue() {
 }
 
 // 加载批量任务队列列表
-async function loadBatchQueues() {
+async function loadBatchQueues(page) {
     const section = document.getElementById('batch-queues-section');
     if (!section) return;
     
+    // 如果指定了page，使用它；否则使用当前页
+    if (page !== undefined) {
+        batchQueuesState.currentPage = page;
+    }
+    
+    // 构建查询参数
+    const params = new URLSearchParams();
+    params.append('page', batchQueuesState.currentPage.toString());
+    params.append('limit', batchQueuesState.pageSize.toString());
+    if (batchQueuesState.filterStatus && batchQueuesState.filterStatus !== 'all') {
+        params.append('status', batchQueuesState.filterStatus);
+    }
+    if (batchQueuesState.searchKeyword) {
+        params.append('keyword', batchQueuesState.searchKeyword);
+    }
+    
     try {
-        const response = await apiFetch('/api/batch-tasks');
+        const response = await apiFetch(`/api/batch-tasks?${params.toString()}`);
         if (!response.ok) {
             throw new Error('获取批量任务队列失败');
         }
         
         const result = await response.json();
         batchQueuesState.queues = result.queues || [];
-        renderBatchQueues(batchQueuesState.queues);
+        batchQueuesState.total = result.total || 0;
+        batchQueuesState.totalPages = result.total_pages || 1;
+        renderBatchQueues();
     } catch (error) {
         console.error('加载批量任务队列失败:', error);
         section.style.display = 'block';
@@ -825,26 +850,42 @@ async function loadBatchQueues() {
     }
 }
 
+// 筛选批量任务队列
+function filterBatchQueues() {
+    const statusFilter = document.getElementById('batch-queues-status-filter');
+    const searchInput = document.getElementById('batch-queues-search');
+    
+    if (statusFilter) {
+        batchQueuesState.filterStatus = statusFilter.value;
+    }
+    if (searchInput) {
+        batchQueuesState.searchKeyword = searchInput.value.trim();
+    }
+    
+    // 重置到第一页并重新加载
+    batchQueuesState.currentPage = 1;
+    loadBatchQueues(1);
+}
+
 // 渲染批量任务队列列表
-function renderBatchQueues(queues) {
+function renderBatchQueues() {
     const section = document.getElementById('batch-queues-section');
     const list = document.getElementById('batch-queues-list');
+    const pagination = document.getElementById('batch-queues-pagination');
     
     if (!section || !list) return;
     
     section.style.display = 'block';
     
+    const queues = batchQueuesState.queues;
+    
     if (queues.length === 0) {
         list.innerHTML = '<div class="tasks-empty"><p>当前没有批量任务队列</p></div>';
+        if (pagination) pagination.style.display = 'none';
         return;
     }
     
-    // 按创建时间倒序排序
-    const sortedQueues = [...queues].sort((a, b) => 
-        new Date(b.createdAt) - new Date(a.createdAt)
-    );
-    
-    list.innerHTML = sortedQueues.map(queue => {
+    list.innerHTML = queues.map(queue => {
         const statusMap = {
             'pending': { text: '待执行', class: 'batch-queue-status-pending' },
             'running': { text: '执行中', class: 'batch-queue-status-running' },
@@ -874,7 +915,8 @@ function renderBatchQueues(queues) {
         });
         
         const progress = stats.total > 0 ? Math.round((stats.completed + stats.failed + stats.cancelled) / stats.total * 100) : 0;
-        const canDelete = queue.status === 'pending'; // 只有待执行状态的队列可以删除
+        // 允许删除待执行、已完成或已取消状态的队列
+        const canDelete = queue.status === 'pending' || queue.status === 'completed' || queue.status === 'cancelled';
         
         return `
             <div class="batch-queue-item" data-queue-id="${queue.id}" onclick="showBatchQueueDetail('${queue.id}')">
@@ -905,6 +947,134 @@ function renderBatchQueues(queues) {
             </div>
         `;
     }).join('');
+    
+    // 渲染分页控件
+    renderBatchQueuesPagination();
+}
+
+// 渲染批量任务队列分页控件
+function renderBatchQueuesPagination() {
+    const paginationContainer = document.getElementById('batch-queues-pagination');
+    if (!paginationContainer) return;
+    
+    const { currentPage, pageSize, total, totalPages } = batchQueuesState;
+    
+    // 如果没有数据，不显示分页控件
+    if (total === 0) {
+        paginationContainer.innerHTML = '';
+        return;
+    }
+    
+    // 即使只有一页，也显示分页信息（总数和每页条数选择器）
+    
+    // 计算显示的页码范围
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, currentPage + 2);
+    
+    // 确保显示5个页码（如果可能）
+    if (endPage - startPage < 4) {
+        if (startPage === 1) {
+            endPage = Math.min(totalPages, startPage + 4);
+        } else if (endPage === totalPages) {
+            startPage = Math.max(1, endPage - 4);
+        }
+    }
+    
+    let paginationHTML = '<div class="pagination">';
+    
+    const startItem = (currentPage - 1) * pageSize + 1;
+    const endItem = Math.min(currentPage * pageSize, total);
+    paginationHTML += `<div class="pagination-info">显示 ${startItem}-${endItem} / 共 ${total} 条</div>`;
+    
+    // 每页条数选择器
+    paginationHTML += `
+        <div class="pagination-page-size">
+            <label for="batch-queues-page-size-pagination">每页:</label>
+            <select id="batch-queues-page-size-pagination" onchange="changeBatchQueuesPageSize()">
+                <option value="10" ${pageSize === 10 ? 'selected' : ''}>10</option>
+                <option value="20" ${pageSize === 20 ? 'selected' : ''}>20</option>
+                <option value="50" ${pageSize === 50 ? 'selected' : ''}>50</option>
+                <option value="100" ${pageSize === 100 ? 'selected' : ''}>100</option>
+            </select>
+        </div>
+    `;
+    
+    // 只有当有多页时才显示页码导航
+    if (totalPages > 1) {
+        paginationHTML += '<div class="pagination-controls">';
+        
+        // 上一页按钮
+        if (currentPage > 1) {
+            paginationHTML += `<button class="pagination-btn" onclick="goBatchQueuesPage(${currentPage - 1})" title="上一页">‹</button>`;
+        } else {
+            paginationHTML += '<button class="pagination-btn disabled" disabled>‹</button>';
+        }
+        
+        // 第一页
+        if (startPage > 1) {
+            paginationHTML += `<button class="pagination-btn" onclick="goBatchQueuesPage(1)">1</button>`;
+            if (startPage > 2) {
+                paginationHTML += '<span class="pagination-ellipsis">...</span>';
+            }
+        }
+        
+        // 页码按钮
+        for (let i = startPage; i <= endPage; i++) {
+            if (i === currentPage) {
+                paginationHTML += `<button class="pagination-btn active">${i}</button>`;
+            } else {
+                paginationHTML += `<button class="pagination-btn" onclick="goBatchQueuesPage(${i})">${i}</button>`;
+            }
+        }
+        
+        // 最后一页
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                paginationHTML += '<span class="pagination-ellipsis">...</span>';
+            }
+            paginationHTML += `<button class="pagination-btn" onclick="goBatchQueuesPage(${totalPages})">${totalPages}</button>`;
+        }
+        
+        // 下一页按钮
+        if (currentPage < totalPages) {
+            paginationHTML += `<button class="pagination-btn" onclick="goBatchQueuesPage(${currentPage + 1})" title="下一页">›</button>`;
+        } else {
+            paginationHTML += '<button class="pagination-btn disabled" disabled>›</button>';
+        }
+        
+        paginationHTML += '</div>';
+    }
+    
+    paginationHTML += '</div>';
+    
+    paginationContainer.innerHTML = paginationHTML;
+}
+
+// 跳转到指定页面
+function goBatchQueuesPage(page) {
+    const { totalPages } = batchQueuesState;
+    if (page < 1 || page > totalPages) return;
+    
+    loadBatchQueues(page);
+    
+    // 滚动到列表顶部
+    const list = document.getElementById('batch-queues-list');
+    if (list) {
+        list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+// 改变每页显示数量
+function changeBatchQueuesPageSize() {
+    const pageSizeSelect = document.getElementById('batch-queues-page-size-pagination');
+    if (!pageSizeSelect) return;
+    
+    const newPageSize = parseInt(pageSizeSelect.value, 10);
+    if (newPageSize && newPageSize > 0) {
+        batchQueuesState.pageSize = newPageSize;
+        batchQueuesState.currentPage = 1; // 重置到第一页
+        loadBatchQueues(1);
+    }
 }
 
 // 显示批量任务队列详情
@@ -934,22 +1104,39 @@ async function showBatchQueueDetail(queueId) {
         }
         
         // 更新按钮显示
+        const pauseBtn = document.getElementById('batch-queue-pause-btn');
         if (addTaskBtn) {
             addTaskBtn.style.display = queue.status === 'pending' ? 'inline-block' : 'none';
         }
         if (startBtn) {
+            // pending状态显示"开始执行"，paused状态显示"继续执行"
             startBtn.style.display = (queue.status === 'pending' || queue.status === 'paused') ? 'inline-block' : 'none';
+            if (startBtn && queue.status === 'paused') {
+                startBtn.textContent = '继续执行';
+            } else if (startBtn && queue.status === 'pending') {
+                startBtn.textContent = '开始执行';
+            }
         }
-        if (cancelBtn) {
-            cancelBtn.style.display = (queue.status === 'running' || queue.status === 'paused') ? 'inline-block' : 'none';
+        if (pauseBtn) {
+            // running状态显示"暂停队列"
+            pauseBtn.style.display = queue.status === 'running' ? 'inline-block' : 'none';
         }
         if (deleteBtn) {
             // 允许删除待执行、已完成或已取消状态的队列
-            deleteBtn.style.display = (queue.status === 'pending' || queue.status === 'completed' || queue.status === 'cancelled') ? 'inline-block' : 'none';
+            deleteBtn.style.display = (queue.status === 'pending' || queue.status === 'completed' || queue.status === 'cancelled' || queue.status === 'paused') ? 'inline-block' : 'none';
         }
         
-        // 渲染任务列表
-        const statusMap = {
+        // 队列状态映射
+        const queueStatusMap = {
+            'pending': { text: '待执行', class: 'batch-queue-status-pending' },
+            'running': { text: '执行中', class: 'batch-queue-status-running' },
+            'paused': { text: '已暂停', class: 'batch-queue-status-paused' },
+            'completed': { text: '已完成', class: 'batch-queue-status-completed' },
+            'cancelled': { text: '已取消', class: 'batch-queue-status-cancelled' }
+        };
+        
+        // 任务状态映射
+        const taskStatusMap = {
             'pending': { text: '待执行', class: 'batch-task-status-pending' },
             'running': { text: '执行中', class: 'batch-task-status-running' },
             'completed': { text: '已完成', class: 'batch-task-status-completed' },
@@ -963,7 +1150,7 @@ async function showBatchQueueDetail(queueId) {
                     <strong>队列ID:</strong> <code>${escapeHtml(queue.id)}</code>
                 </div>
                 <div class="detail-item">
-                    <strong>状态:</strong> <span class="batch-queue-status ${statusMap[queue.status]?.class || ''}">${statusMap[queue.status]?.text || queue.status}</span>
+                    <strong>状态:</strong> <span class="batch-queue-status ${queueStatusMap[queue.status]?.class || ''}">${queueStatusMap[queue.status]?.text || queue.status}</span>
                 </div>
                 <div class="detail-item">
                     <strong>创建时间:</strong> ${new Date(queue.createdAt).toLocaleString('zh-CN')}
@@ -977,7 +1164,7 @@ async function showBatchQueueDetail(queueId) {
             <div class="batch-queue-tasks-list">
                 <h4>任务列表</h4>
                 ${queue.tasks.map((task, index) => {
-                    const taskStatus = statusMap[task.status] || { text: task.status, class: 'batch-task-status-unknown' };
+                    const taskStatus = taskStatusMap[task.status] || { text: task.status, class: 'batch-task-status-unknown' };
                     const canEdit = queue.status === 'pending' && task.status === 'pending';
                     const taskMessageEscaped = escapeHtml(task.message).replace(/'/g, "&#39;").replace(/"/g, "&quot;").replace(/\n/g, "\\n");
                     return `
@@ -1036,31 +1223,31 @@ async function startBatchQueue() {
     }
 }
 
-// 取消批量任务队列
-async function cancelBatchQueue() {
+// 暂停批量任务队列
+async function pauseBatchQueue() {
     const queueId = batchQueuesState.currentQueueId;
     if (!queueId) return;
     
-    if (!confirm('确定要取消这个批量任务队列吗？当前正在执行的任务将被停止，后续任务也不会执行。')) {
+    if (!confirm('确定要暂停这个批量任务队列吗？当前正在执行的任务将被停止，后续任务将保留待执行状态。')) {
         return;
     }
     
     try {
-        const response = await apiFetch(`/api/batch-tasks/${queueId}/cancel`, {
+        const response = await apiFetch(`/api/batch-tasks/${queueId}/pause`, {
             method: 'POST',
         });
         
         if (!response.ok) {
             const result = await response.json().catch(() => ({}));
-            throw new Error(result.error || '取消批量任务失败');
+            throw new Error(result.error || '暂停批量任务失败');
         }
         
         // 刷新详情
         showBatchQueueDetail(queueId);
         refreshBatchQueues();
     } catch (error) {
-        console.error('取消批量任务失败:', error);
-        alert('取消批量任务失败: ' + error.message);
+        console.error('暂停批量任务失败:', error);
+        alert('暂停批量任务失败: ' + error.message);
     }
 }
 
@@ -1158,7 +1345,7 @@ function stopBatchQueueRefresh() {
 
 // 刷新批量任务队列列表
 async function refreshBatchQueues() {
-    await loadBatchQueues();
+    await loadBatchQueues(batchQueuesState.currentPage);
 }
 
 // 查看批量任务的对话
@@ -1487,7 +1674,7 @@ window.closeBatchImportModal = closeBatchImportModal;
 window.createBatchQueue = createBatchQueue;
 window.showBatchQueueDetail = showBatchQueueDetail;
 window.startBatchQueue = startBatchQueue;
-window.cancelBatchQueue = cancelBatchQueue;
+window.pauseBatchQueue = pauseBatchQueue;
 window.deleteBatchQueue = deleteBatchQueue;
 window.closeBatchQueueDetailModal = closeBatchQueueDetailModal;
 window.refreshBatchQueues = refreshBatchQueues;
@@ -1496,6 +1683,9 @@ window.editBatchTask = editBatchTask;
 window.editBatchTaskFromElement = editBatchTaskFromElement;
 window.closeEditBatchTaskModal = closeEditBatchTaskModal;
 window.saveBatchTask = saveBatchTask;
+window.filterBatchQueues = filterBatchQueues;
+window.goBatchQueuesPage = goBatchQueuesPage;
+window.changeBatchQueuesPageSize = changeBatchQueuesPageSize;
 window.showAddBatchTaskModal = showAddBatchTaskModal;
 window.closeAddBatchTaskModal = closeAddBatchTaskModal;
 window.saveAddBatchTask = saveAddBatchTask;

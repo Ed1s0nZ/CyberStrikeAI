@@ -131,6 +131,80 @@ func (db *DB) GetAllBatchQueues() ([]*BatchTaskQueueRow, error) {
 	return queues, nil
 }
 
+// ListBatchQueues 列出批量任务队列（支持筛选和分页）
+func (db *DB) ListBatchQueues(limit, offset int, status, keyword string) ([]*BatchTaskQueueRow, error) {
+	query := "SELECT id, status, created_at, started_at, completed_at, current_index FROM batch_task_queues WHERE 1=1"
+	args := []interface{}{}
+
+	// 状态筛选
+	if status != "" && status != "all" {
+		query += " AND status = ?"
+		args = append(args, status)
+	}
+
+	// 关键字搜索（搜索队列ID）
+	if keyword != "" {
+		query += " AND id LIKE ?"
+		args = append(args, "%"+keyword+"%")
+	}
+
+	query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
+
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("查询批量任务队列列表失败: %w", err)
+	}
+	defer rows.Close()
+
+	var queues []*BatchTaskQueueRow
+	for rows.Next() {
+		var row BatchTaskQueueRow
+		var createdAt string
+		if err := rows.Scan(&row.ID, &row.Status, &createdAt, &row.StartedAt, &row.CompletedAt, &row.CurrentIndex); err != nil {
+			return nil, fmt.Errorf("扫描批量任务队列失败: %w", err)
+		}
+		parsedTime, parseErr := time.Parse("2006-01-02 15:04:05", createdAt)
+		if parseErr != nil {
+			parsedTime, parseErr = time.Parse(time.RFC3339, createdAt)
+			if parseErr != nil {
+				db.logger.Warn("解析创建时间失败", zap.String("createdAt", createdAt), zap.Error(parseErr))
+				parsedTime = time.Now()
+			}
+		}
+		row.CreatedAt = parsedTime
+		queues = append(queues, &row)
+	}
+
+	return queues, nil
+}
+
+// CountBatchQueues 统计批量任务队列总数（支持筛选条件）
+func (db *DB) CountBatchQueues(status, keyword string) (int, error) {
+	query := "SELECT COUNT(*) FROM batch_task_queues WHERE 1=1"
+	args := []interface{}{}
+
+	// 状态筛选
+	if status != "" && status != "all" {
+		query += " AND status = ?"
+		args = append(args, status)
+	}
+
+	// 关键字搜索
+	if keyword != "" {
+		query += " AND id LIKE ?"
+		args = append(args, "%"+keyword+"%")
+	}
+
+	var count int
+	err := db.QueryRow(query, args...).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("统计批量任务队列总数失败: %w", err)
+	}
+
+	return count, nil
+}
+
 // GetBatchTasks 获取批量任务队列的所有任务
 func (db *DB) GetBatchTasks(queueID string) ([]*BatchTaskRow, error) {
 	rows, err := db.Query(
