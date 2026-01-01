@@ -6752,19 +6752,53 @@ header {
 
 .batch-queue-detail-info {
     margin-bottom: 24px;
-    padding: 16px;
+    padding: 20px;
     background: var(--bg-secondary);
-    border-radius: 8px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
 }
 
 .batch-queue-detail-info .detail-item {
-    margin-bottom: 8px;
-    font-size: 0.875rem;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+    background: var(--bg-primary);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
 }
 
-.batch-queue-detail-info .detail-item strong {
+.batch-queue-detail-info .detail-item:hover {
+    border-color: var(--accent-color);
+    box-shadow: 0 2px 8px rgba(0, 102, 255, 0.08);
+}
+
+.batch-queue-detail-info .detail-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+.batch-queue-detail-info .detail-value {
+    font-size: 0.9375rem;
     color: var(--text-primary);
-    margin-right: 8px;
+    font-weight: 500;
+    word-break: break-word;
+}
+
+.batch-queue-detail-info .detail-value code {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.875rem;
+    background: var(--bg-secondary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--accent-color);
 }
 
 .batch-queue-tasks-list {

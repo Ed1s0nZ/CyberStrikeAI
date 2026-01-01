@@ -1147,18 +1147,28 @@ async function showBatchQueueDetail(queueId) {
         content.innerHTML = `
             <div class="batch-queue-detail-info">
                 <div class="detail-item">
-                    <strong>队列ID:</strong> <code>${escapeHtml(queue.id)}</code>
+                    <span class="detail-label">队列ID</span>
+                    <span class="detail-value"><code>${escapeHtml(queue.id)}</code></span>
                 </div>
                 <div class="detail-item">
-                    <strong>状态:</strong> <span class="batch-queue-status ${queueStatusMap[queue.status]?.class || ''}">${queueStatusMap[queue.status]?.text || queue.status}</span>
+                    <span class="detail-label">状态</span>
+                    <span class="detail-value"><span class="batch-queue-status ${queueStatusMap[queue.status]?.class || ''}">${queueStatusMap[queue.status]?.text || queue.status}</span></span>
                 </div>
                 <div class="detail-item">
-                    <strong>创建时间:</strong> ${new Date(queue.createdAt).toLocaleString('zh-CN')}
+                    <span class="detail-label">创建时间</span>
+                    <span class="detail-value">${new Date(queue.createdAt).toLocaleString('zh-CN')}</span>
                 </div>
-                ${queue.startedAt ? `<div class="detail-item"><strong>开始时间:</strong> ${new Date(queue.startedAt).toLocaleString('zh-CN')}</div>` : ''}
-                ${queue.completedAt ? `<div class="detail-item"><strong>完成时间:</strong> ${new Date(queue.completedAt).toLocaleString('zh-CN')}</div>` : ''}
+                ${queue.startedAt ? `<div class="detail-item">
+                    <span class="detail-label">开始时间</span>
+                    <span class="detail-value">${new Date(queue.startedAt).toLocaleString('zh-CN')}</span>
+                </div>` : ''}
+                ${queue.completedAt ? `<div class="detail-item">
+                    <span class="detail-label">完成时间</span>
+                    <span class="detail-value">${new Date(queue.completedAt).toLocaleString('zh-CN')}</span>
+                </div>` : ''}
                 <div class="detail-item">
-                    <strong>任务总数:</strong> ${queue.tasks.length}
+                    <span class="detail-label">任务总数</span>
+                    <span class="detail-value">${queue.tasks.length}</span>
                 </div>
             </div>
             <div class="batch-queue-tasks-list">
