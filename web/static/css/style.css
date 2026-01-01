@@ -6584,9 +6584,8 @@ header {
 
 /* 批量任务相关样式 */
 .batch-queues-section {
-    margin-top: 32px;
-    padding-top: 24px;
-    border-top: 2px solid var(--border-color);
+    margin-top: 16px;
+    padding-top: 8px;
 }
 
 .batch-queues-header {
