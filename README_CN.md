@@ -343,7 +343,7 @@ CyberStrikeAI/
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Ed1s0nZ/CyberStrikeAI&type=date&legend=top-left)]
+![Star History Chart](https://api.star-history.com/svg?repos=Ed1s0nZ/CyberStrikeAI&type=date&legend=top-left)
 
 ## 404星链计划 
 <img src="./img/404StarLinkLogo.png" width="30%">
