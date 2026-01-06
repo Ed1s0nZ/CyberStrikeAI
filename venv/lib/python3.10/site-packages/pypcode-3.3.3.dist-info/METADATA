@@ -1,0 +1,64 @@
+Metadata-Version: 2.4
+Name: pypcode
+Version: 3.3.3
+Summary: Machine code disassembly and IR translation library
+License: pypcode is a library built around the SLEIGH library.
+        
+        SLEIGH and the processor definition files under the pypcode/processors directory
+        originate from the Ghidra project (https://ghidra-sre.org/). SLEIGH is released
+        under the terms of the Apache 2 license as defined in docs/ghidra/LICENSE. See
+        NOTICE file in docs/ghidra/NOTICE.
+        
+        The remaining code of pypcode, unless stated otherwise, is licensed under the
+        terms of the 2-clause BSD license below.
+        
+        ================================================================================
+        
+        Copyright (c) 2021, Arizona Board of Regents
+        
+        Redistribution and use in source and binary forms, with or without
+        modification, are permitted provided that the following conditions are met:
+        
+        1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+        2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+        
+        THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+        
+Project-URL: Homepage, https://api.angr.io/projects/pypcode/en/latest/
+Project-URL: Repository, https://github.com/angr/pypcode
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE.txt
+Provides-Extra: docs
+Requires-Dist: furo; extra == "docs"
+Requires-Dist: ipython; extra == "docs"
+Requires-Dist: myst-parser; extra == "docs"
+Requires-Dist: sphinx; extra == "docs"
+Requires-Dist: sphinx-autodoc-typehints; extra == "docs"
+Provides-Extra: testing
+Requires-Dist: pytest; extra == "testing"
+Requires-Dist: pytest-cov; extra == "testing"
+Requires-Dist: coverage; extra == "testing"
+Requires-Dist: gcovr; extra == "testing"
+Dynamic: license-file
+
+pypcode
+=======
+[![pypi](https://img.shields.io/pypi/v/pypcode)](https://pypi.org/project/pypcode/)
+[![codecov](https://codecov.io/gh/angr/pypcode/graph/badge.svg?token=JCV27I1SPZ)](https://codecov.io/gh/angr/pypcode)
+
+Machine code disassembly and IR translation library for Python using the
+excellent SLEIGH library from the [Ghidra](https://ghidra-sre.org/) framework.
+
+This library was created primarily for use with [angr](http://angr.io), which
+provides analyses and symbolic execution of p-code.
+
+Documentation covering how to install and use pypcode is
+[available here](https://api.angr.io/projects/pypcode/en/latest/).

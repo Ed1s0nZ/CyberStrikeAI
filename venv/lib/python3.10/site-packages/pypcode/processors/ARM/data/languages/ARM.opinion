@@ -1,0 +1,68 @@
+<opinions>
+    <!--
+      NOTE: secondary key constraints can be matched at the bit level or as a hex value (if the
+      key is an integer value).
+      When matching at the bit level, prefix the secondary key constraint value with "0b", followed
+      by a sequence of 0's and 1's to specify the key value.  Dots (".") can be used as a wild card
+      for individual bits.  Space and underscores ("_") are ignored and can be used for formatting.
+      When matching a hex value, prefix the secondary key constraint value with "0x", followed
+      by the hex value.  No wildcarding is supported. 
+    -->
+    <constraint loader="Portable Executable (PE)">
+        <constraint compilerSpecID="windows">
+            <constraint primary="448"   processor="ARM"     endian="little" size="32" variant="v8" />
+            <constraint primary="450"   processor="ARM"     endian="little" size="32" variant="v8" />  <!-- ARM and Thumb, spec says only Thumb -->
+            <constraint primary="452"   processor="ARM"     endian="little" size="32" variant="v8" />
+        </constraint>
+        <constraint compilerSpecID="default">
+            <constraint primary="2560"  processor="ARM"     endian="big"    size="32" variant="v8" />
+        </constraint>
+    </constraint>
+    <constraint loader="Debug Symbols (DBG)" compilerSpecID="windows">
+        <constraint primary="448"   processor="ARM"     endian="little" size="32" variant="v8" />
+        <constraint primary="450"   processor="ARM"     endian="little" size="32" variant="v8" />  <!-- ARM and Thumb, spec says only Thumb -->
+        <constraint primary="452"   processor="ARM"     endian="little" size="32" variant="v8" />
+    </constraint>
+    
+    <constraint loader="Executable and Linking Format (ELF)" compilerSpecID="default">
+      <!--
+        Elf e_flags are used for the secondary attribute, the following are pulled from binutils include/elf/arm.h
+
+        /* Constants defined in AAELF.  */
+        EF_ARM_BE8	         0x00800000
+        EF_ARM_LE8	         0x00400000
+
+        EF_ARM_EABIMASK      0xFF000000
+        EF_ARM_EABI_VERSION(flags) ((flags) & EF_ARM_EABIMASK)
+        EF_ARM_EABI_UNKNOWN  0x00000000
+        EF_ARM_EABI_VER1     0x01000000
+        EF_ARM_EABI_VER2     0x02000000
+        EF_ARM_EABI_VER3     0x03000000
+        EF_ARM_EABI_VER4     0x04000000
+        EF_ARM_EABI_VER5     0x05000000
+      -->
+        <constraint primary="40"   processor="ARM"                      size="32" variant="v8"
+            secondary= "0b .... .... 0... .... .... .... .... ...."/>
+        <constraint primary="40"   processor="ARM"                      size="32" variant="v8LEInstruction"
+            secondary= "0b .... .... 1... .... .... .... .... ...."/>  <!-- EF_ARM_BE8 -->
+    </constraint>
+    
+    <constraint loader="Mac OS X Mach-O" compilerSpecID="default">
+        <constraint primary="12.0"     processor="ARM"     endian="little" size="32" variant="v8"  /><!-- ARM all -->
+        <constraint primary="12.5"     processor="ARM"     endian="little" size="32" variant="v4t" /><!-- ARM v4T -->
+        <constraint primary="12.6"     processor="ARM"     endian="little" size="32" variant="v6"  /><!-- ARM v6  -->
+        <constraint primary="12.9"     processor="ARM"     endian="little" size="32" variant="v8"  /><!-- ARM v8  -->
+        <constraint primary="12.10"    processor="ARM"     endian="little" size="32" variant="v8"  /><!-- ARM v8f -->
+        <constraint primary="12.11"    processor="ARM"     endian="little" size="32" variant="v8"  /><!-- ARM v8s -->
+        <constraint primary="12.12"    processor="ARM"     endian="little" size="32" variant="v8"  /><!-- ARM v8k -->
+    </constraint>
+    <constraint loader="DYLD Cache" compilerSpecID="default">
+        <constraint primary="armv6"    processor="ARM"     endian="little" size="32" variant="v6" />
+        <constraint primary="arm7"     processor="ARM"     endian="little" size="32" variant="v7" />
+    </constraint>
+    <constraint loader="MS Common Object File Format (COFF)" compilerSpecID="windows">
+        <constraint primary="448"   processor="ARM"     endian="little" size="32" variant="v8" />
+        <constraint primary="450"   processor="ARM"     endian="little" size="32" variant="v8T" /> <!-- THUMB -->
+        <constraint primary="452"   processor="ARM"     endian="little" size="32" variant="v8T" /> <!-- THUMB -->
+    </constraint>
+</opinions>

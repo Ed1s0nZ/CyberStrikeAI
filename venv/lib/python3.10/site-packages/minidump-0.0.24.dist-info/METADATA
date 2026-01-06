@@ -1,0 +1,14 @@
+Metadata-Version: 2.1
+Name: minidump
+Version: 0.0.24
+Summary: Python library to parse Windows minidump file format
+Home-page: https://github.com/skelsec/minidump
+Author: Tamas Jos
+Author-email: skelsecprojects@gmail.com
+Classifier: Programming Language :: Python :: 3.6
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.6
+License-File: LICENSE
+
+Python library to parse Windows minidump file format

@@ -1,0 +1,42 @@
+Metadata-Version: 2.4
+Name: archinfo
+Version: 9.2.191
+Summary: Classes with architecture-specific information useful to other projects.
+License-Expression: BSD-2-Clause
+Project-URL: Homepage, https://api.angr.io/projects/archinfo/en/latest/
+Project-URL: Repository, https://github.com/angr/archinfo
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: backports-strenum>=1.2.8; python_version < "3.11"
+Provides-Extra: docs
+Requires-Dist: furo; extra == "docs"
+Requires-Dist: myst-parser; extra == "docs"
+Requires-Dist: sphinx; extra == "docs"
+Requires-Dist: sphinx-autodoc-typehints; extra == "docs"
+Provides-Extra: pcode
+Requires-Dist: pypcode>=1.1; extra == "pcode"
+Provides-Extra: testing
+Requires-Dist: pytest; extra == "testing"
+Requires-Dist: pytest-xdist; extra == "testing"
+Dynamic: license-file
+
+# archinfo
+[![Latest Release](https://img.shields.io/pypi/v/archinfo.svg)](https://pypi.python.org/pypi/archinfo/)
+[![Python Version](https://img.shields.io/pypi/pyversions/archinfo)](https://pypi.python.org/pypi/archinfo/)
+[![PyPI Statistics](https://img.shields.io/pypi/dm/archinfo.svg)](https://pypistats.org/packages/archinfo)
+[![License](https://img.shields.io/github/license/angr/archinfo.svg)](https://github.com/angr/archinfo/blob/master/LICENSE)
+
+archinfo is a collection of classes that contain architecture-specific information.
+It is useful for cross-architecture tools (such as pyvex).
+
+## Project links
+Project repository: https://github.com/angr/archinfo
+
+Documentation: https://api.angr.io/projects/archinfo/en/latest/

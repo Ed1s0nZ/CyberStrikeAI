@@ -1,0 +1,199 @@
+#!/home/hamoud/s3-file-sync/CyberStrikeAI/venv/bin/python3
+# -*- coding: utf-8 -*-
+
+import argparse
+import json
+import logging
+import os
+import sys
+from datetime import datetime
+
+from uefi_firmware.uefi import *
+from uefi_firmware.generator import uefi as uefi_generator
+from uefi_firmware import AutoParser
+import uefi_firmware.utils # import nocolor
+
+def _process_show_extract(parsed_object):
+    global FILENAME
+    if not args.quiet:
+        parsed_object.showinfo('')
+
+    if args.outputfolder:
+        autodir = "%s_output" % FILENAME
+        if os.path.exists(autodir):
+            print("Skipping %s (_output directory exists)..." % (FILENAME))
+            if not args.brute:
+                return
+        else:
+            os.makedirs(autodir)
+        args.output = autodir
+
+    if args.extract:
+        print("Dumping...")
+        parsed_object.dump(args.output)
+
+
+def superbrute_search(data):
+    for i in range(len(data)):
+        # TODO: use memoryview to avoid long memory copy
+        bdata = data[i:]
+        parser = AutoParser(bdata, search=False)
+        if parser.type() != 'unknown':
+            _process_show_extract(parser.parse())
+            break
+
+
+def brute_search_volumes(data, to_json=False):
+    volumes = search_firmware_volumes(data)
+    res = []
+    for index in volumes:
+        fv = parse_firmware_volume(data[index - 40:], name=index - 40, to_json=to_json)
+        if fv:
+            res.append(fv.to_dict())
+    if to_json:
+        out = { 'regions': [
+            {
+                'type': 'bios',
+                'data': { 'firmwareVolumes': res },
+            }
+        ] }
+        print(json.dumps(out))
+    pass
+
+
+def parse_firmware_volume(data, name=0, to_json=False):
+    firmware_volume = FirmwareVolume(data, name)
+    if not firmware_volume.valid_header or not firmware_volume.process():
+        return
+    if to_json:
+        return firmware_volume
+    print("Found volume magic at 0x%x" % name)
+    _process_show_extract(firmware_volume)
+
+    if args.generate is not None:
+        print("Generating FDF...")
+        firmware_volume.dump(args.generate)
+        generator = uefi_generator.FirmwareVolumeGenerator(firmware_volume)
+        path = os.path.join(args.generate, "%s-%s.fdf" % (args.generate, name))
+        dump_data(path, generator.output)
+
+
+if __name__ == "__main__":
+    argparser = argparse.ArgumentParser(
+        description="Parse, and optionally output, details and data on UEFI-related firmware.")
+    argparser.add_argument(
+        '-b', "--brute", default=False, action="store_true",
+        help='The input is a blob and may contain FV headers.')
+    argparser.add_argument(
+        '--superbrute', default=False, action="store_true",
+        help='The input is a blob and may contain any sort of firmware object')
+    argparser.add_argument(
+        '--depex', default=False, action="store_true",
+        help='The input is a DEPEX blob')
+
+    argparser.add_argument(
+        '-q', "--quiet", default=False, action="store_true",
+        help="Do not show info.")
+    argparser.add_argument(
+        "--color", default="auto", choices=("always", "never", "auto"),
+        help="Control the use of ANSI colors in the output. (auto is default)")
+    argparser.add_argument(
+        '-p', "--nocolor", const="never", dest="color", action="store_const",
+        help="Plain text output. Do not use ANSI colors. (Alias for --color=never)")
+    argparser.add_argument(
+        '-o', "--output", default=".",
+        help="Dump firmware objects to this folder.")
+    argparser.add_argument(
+        '-O', "--outputfolder", default=False, action="store_true",
+        help="Dump firmware objects to a folder based on filename ${FILENAME}_output/ ")
+    argparser.add_argument(
+        '-c', "--echo", default=False, action="store_true",
+        help="Echo the filename before parsing or extracting.")
+    argparser.add_argument(
+        '-e', "--extract", action="store_true",
+        help="Extract all files/sections/volumes.")
+    argparser.add_argument(
+        '-g', "--generate", default=None,
+        help="Generate a FDF, implies extraction (volumes only)")
+    argparser.add_argument(
+        '-j', "--json", default=False, action='store_true',
+        help="Output in JSON format")
+    argparser.add_argument(
+        "--test", default=False, action='store_true',
+        help="Test file parsing, output name/success.")
+    argparser.add_argument('--verbose', default=False, action='store_true',
+        help='Enable verbose logging while parsing')
+    argparser.add_argument(
+        "file", nargs='+',
+        help="The file(s) to work on")
+    args = argparser.parse_args()
+
+    if args.verbose:
+        logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+    else:
+        logging.basicConfig(level=logging.WARNING, stream=sys.stdout)
+
+    # Do not use colors when piping the output
+    if args.color == "auto":
+        args.color = "always" if sys.stdout.isatty() else "never"
+    # Pass the color flag to the util config
+    uefi_firmware.utils.nocolor = (args.color == "never")
+
+    errcode = 0
+
+    for file_name in args.file:
+        FILENAME = file_name
+        START = datetime.now()
+        if args.echo:
+            print(FILENAME)
+
+        try:
+            with open(file_name, 'rb') as fh:
+                input_data = fh.read()
+        except Exception as e:
+            print("Error: Cannot read file (%s) (%s)." % (file_name, str(e)))
+            errcode = max(errcode, 1)
+            continue
+
+        if args.depex:
+            depex = parse_depex(input_data)
+            for op in depex:
+                if 'guid' in op:
+                    if 'name' in op and op['name'] is not None:
+                        print("{} {} ({})".format(op['op'], op['guid'], op['name']))
+                    else:
+                        print("{} {}".format(op['op'], op['guid']))
+                else:
+                    print("{}".format(op['op']))
+            continue
+
+        if args.superbrute:
+            superbrute_search(input_data)
+            logging.info("%s scanned in %s", FILENAME, str(datetime.now() - START))
+            continue
+
+        if args.brute:
+            brute_search_volumes(input_data, to_json=args.json)
+            continue
+
+        parser = AutoParser(input_data, search=True)
+        if args.test:
+            print("%s: %s" % (file_name, red(parser.type())))
+            continue
+
+        if parser.type() == 'unknown':
+            print("Error: cannot parse %s, could not detect firmware type." % (file_name))
+            errcode = max(errcode, 2)
+            continue
+
+        firmware = parser.parse()
+
+        if args.json:
+            res = firmware.to_dict()
+            print(json.dumps(res))
+            continue
+
+        _process_show_extract(firmware)
+
+    if errcode:
+        sys.exit(errcode)

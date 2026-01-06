@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- see: -->
+<!-- https://docs.microsoft.com/en-us/cpp/build/x64-software-conventions#register-usage -->
+<!-- https://docs.microsoft.com/en-us/cpp/build/x64-calling-convention -->
+<!-- https://docs.microsoft.com/en-us/cpp/c-runtime-library/direction-flag -->
+<!-- https://docs.microsoft.com/en-us/cpp/cpp/vectorcall -->
+
+<compiler_spec>
+
+  <data_organization>
+     <absolute_max_alignment value="0" />
+     <machine_alignment value="2" />
+     <default_alignment value="1" />
+     <default_pointer_alignment value="8" />
+     <pointer_size value="8" />
+     <wchar_size value="2" />
+     <short_size value="2" />
+     <integer_size value="4" />
+     <long_size value="4" />
+     <long_long_size value="8" />
+     <float_size value="4" />
+     <double_size value="8" />
+     <long_double_size value="8" />
+     <size_alignment_map>
+          <entry size="1" alignment="1" />
+          <entry size="2" alignment="2" />
+          <entry size="4" alignment="4" />
+          <entry size="8" alignment="8" />
+     </size_alignment_map>
+     <bitfield_packing>
+     	  <use_MS_convention value="true"/>
+     </bitfield_packing>
+  </data_organization>
+  
+  <global>
+    <range space="ram"/>
+    <register name="MXCSR"/>
+  </global>
+  <stackpointer register="RSP" space="ram"/>
+  <returnaddress>
+    <varnode space="stack" offset="0" size="8"/>
+  </returnaddress>
+  <default_proto>
+    <prototype name="__fastcall" extrapop="8" stackshift="8">
+      <input pointermax="8">
+      <group>
+        <pentry minsize="4" maxsize="8" metatype="float">
+          <register name="XMM0_Qa"/>
+        </pentry>
+        <pentry minsize="1" maxsize="8">
+          <register name="RCX"/>
+        </pentry>
+      </group>
+      <group>
+        <pentry minsize="4" maxsize="8" metatype="float">
+          <register name="XMM1_Qa"/>
+        </pentry>
+        <pentry minsize="1" maxsize="8">
+          <register name="RDX"/>
+        </pentry>
+      </group>
+      <group>
+        <pentry minsize="4" maxsize="8" metatype="float">
+          <register name="XMM2_Qa"/>
+        </pentry>
+        <pentry minsize="1" maxsize="8">
+          <register name="R8"/>
+        </pentry>
+      </group>
+      <group>
+        <pentry minsize="4" maxsize="8" metatype="float">
+          <register name="XMM3_Qa"/>
+        </pentry>
+        <pentry minsize="1" maxsize="8">
+          <register name="R9"/>
+        </pentry>
+      </group>
+      <pentry minsize="1" maxsize="500" align="8">
+        <addr offset="40" space="stack"/>
+      </pentry>
+      <!-- only structs of size 8,16,32,64 bits can be packed to register -->  
+      <rule>
+      	<datatype name="struct" sizes="3,5,6,7"/>
+      	<convert_to_ptr/>
+      </rule>
+    </input> 
+      <output>
+        <pentry minsize="4" maxsize="8" metatype="float">
+          <register name="XMM0_Qa"/>
+        </pentry>
+        <pentry minsize="1" maxsize="8">
+          <register name="RAX"/>
+        </pentry>
+        <!-- only structs of size 8,16,32,64 bits can be returned via register -->
+        <rule>
+      	  <datatype name="struct" sizes="3,5,6,7"/>
+      	  <hidden_return/>
+        </rule>
+      </output>
+      <unaffected>
+        <varnode space="ram" offset="0" size="8"/>
+        <register name="RBX"/>
+        <register name="RBP"/>
+        <register name="RDI"/>
+        <register name="RSI"/>
+        <register name="RSP"/>
+        <register name="R12"/>
+        <register name="R13"/>
+        <register name="R14"/>
+        <register name="R15"/>
+        <register name="DF"/>
+        <register name="GS_OFFSET"/>
+        <register name="XMM6"/>
+        <register name="XMM7"/>
+        <register name="XMM8"/>
+        <register name="XMM9"/>
+        <register name="XMM10"/>
+        <register name="XMM11"/>
+        <register name="XMM12"/>
+        <register name="XMM13"/>
+        <register name="XMM14"/>
+        <register name="XMM15"/>
+      </unaffected>
+      <killedbycall>
+        <register name="RAX"/>
+        <register name="XMM0"/>
+      </killedbycall>
+      <localrange>
+        <range space="stack" first="0xfffffffffff0bdc1" last="0xffffffffffffffff"/>
+        <range space="stack" first="8" last="39"/>
+      </localrange>
+    </prototype>
+  </default_proto>
+  <prototype name="__thiscall" extrapop="8" stackshift="8">
+    <input pointermax="8" thisbeforeretpointer="true">
+      <group>
+        <pentry minsize="4" maxsize="8" metatype="float">
+          <register name="XMM0_Qa"/>
+        </pentry>
+        <pentry minsize="1" maxsize="8">
+          <register name="RCX"/>
+        </pentry>
+      </group>
+      <group>
+        <pentry minsize="4" maxsize="8" metatype="float">
+          <register name="XMM1_Qa"/>
+        </pentry>
+        <pentry minsize="1" maxsize="8">
+          <register name="RDX"/>
+        </pentry>
+      </group>
+      <group>
+        <pentry minsize="4" maxsize="8" metatype="float">
+          <register name="XMM2_Qa"/>
+        </pentry>
+        <pentry minsize="1" maxsize="8">
+          <register name="R8"/>
+        </pentry>
+      </group>
+      <group>
+        <pentry minsize="4" maxsize="8" metatype="float">
+          <register name="XMM3_Qa"/>
+        </pentry>
+        <pentry minsize="1" maxsize="8">
+          <register name="R9"/>
+        </pentry>
+      </group>
+      <pentry minsize="1" maxsize="500" align="8">
+        <addr offset="40" space="stack"/>
+      </pentry>  
+    </input> 
+    <output>
+      <pentry minsize="4" maxsize="8" metatype="float">
+        <register name="XMM0_Qa"/>
+      </pentry>
+      <pentry minsize="1" maxsize="8">
+        <register name="RAX"/>
+      </pentry>
+    </output>
+    <unaffected>
+      <varnode space="ram" offset="0" size="8"/>
+        <register name="RBX"/>
+        <register name="RBP"/>
+        <register name="RDI"/>
+        <register name="RSI"/>
+        <register name="RSP"/>
+        <register name="R12"/>
+        <register name="R13"/>
+        <register name="R14"/>
+        <register name="R15"/>
+        <register name="DF"/>
+        <register name="GS_OFFSET"/>
+        <register name="XMM6"/>
+        <register name="XMM7"/>
+        <register name="XMM8"/>
+        <register name="XMM9"/>
+        <register name="XMM10"/>
+        <register name="XMM11"/>
+        <register name="XMM12"/>
+        <register name="XMM13"/>
+        <register name="XMM14"/>
+        <register name="XMM15"/>
+    </unaffected>
+    <killedbycall>
+      <register name="RAX"/>
+      <register name="XMM0"/>
+    </killedbycall>
+    <localrange>
+      <range space="stack" first="0xfffffffffff0bdc1" last="0xffffffffffffffff"/>
+      <range space="stack" first="8" last="39"/>
+    </localrange>
+  </prototype>
+  <modelalias name="__cdecl" parent="__fastcall"/>
+  <modelalias name="__stdcall" parent="__fastcall"/>
+  <callfixup name="alloca_probe">
+    <target name="_alloca_probe"/>
+    <target name="_alloca_probe2"/>
+    <target name="__chkstk"/>
+    <target name="__chkstk2"/>
+    <target name="___chkstk_ms"/>
+    <pcode>
+     <body><![CDATA[
+       RSP = RSP + 8;
+     ]]></body>
+    </pcode>
+  </callfixup>
+  <callfixup name="guard_dispatch_icall">
+    <target name="_guard_dispatch_icall"/>
+    <pcode>
+      <body><![CDATA[
+        call [RAX];
+      ]]></body>
+    </pcode>
+  </callfixup>
+</compiler_spec>

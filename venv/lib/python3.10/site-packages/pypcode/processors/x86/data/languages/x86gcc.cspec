@@ -1,0 +1,469 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<compiler_spec>
+  <data_organization>
+     <machine_alignment value="2" />
+     <default_alignment value="1" />
+     <default_pointer_alignment value="4" />
+     <pointer_size value="4" />
+     <wchar_size value="4" />
+     <short_size value="2" />
+     <integer_size value="4" />
+     <long_size value="4" />
+     <long_long_size value="8" />
+     <float_size value="4" />
+     <double_size value="8" />
+     <long_double_size value="10" /> <!-- aligned-length=12 -->
+     <size_alignment_map>
+          <entry size="1" alignment="1" />
+          <entry size="2" alignment="2" />
+          <entry size="4" alignment="4" />
+          <entry size="8" alignment="4" />
+          <entry size="16" alignment="16" />
+     </size_alignment_map>
+  </data_organization>
+  <global>
+    <range space="ram"/>
+    <range space="OTHER"/>
+    <register name="MXCSR"/>
+  </global>
+  <stackpointer register="ESP" space="ram"/>
+  <returnaddress>
+    <varnode space="stack" offset="0" size="4"/>
+  </returnaddress>
+  <default_proto>
+    <prototype name="__cdecl" extrapop="4" stackshift="4">
+      <input>
+        <pentry minsize="1" maxsize="500" align="4">
+          <addr offset="4" space="stack"/>
+        </pentry>
+      </input>
+      <output killedbycall="true">
+        <pentry minsize="4" maxsize="10" metatype="float" extension="float">
+          <register name="ST0"/>
+        </pentry>
+        <pentry minsize="1" maxsize="4">
+          <register name="EAX"/>
+        </pentry>
+        <pentry minsize="5" maxsize="8">
+          <addr space="join" piece1="EDX" piece2="EAX"/>
+        </pentry>
+        <!-- Any struct type is returned by pointer, regardless of size -->
+        <rule>
+        	<datatype name="struct"/>
+        	<hidden_return/>
+        </rule>
+      </output>
+      <unaffected>
+        <register name="ESP"/>
+        <register name="EBP"/>
+        <register name="ESI"/>
+        <register name="EDI"/>
+        <register name="EBX"/>
+      </unaffected>
+      <killedbycall>
+        <register name="ECX"/>
+        <register name="EDX"/>
+        <register name="ST0"/>
+        <register name="ST1"/>
+      </killedbycall>
+      <likelytrash>
+        <register name="EAX"/>
+      </likelytrash>
+    </prototype>
+  </default_proto>
+  <prototype name="__cdeclf" extrapop="4" stackshift="4">
+    <input>
+      <pentry minsize="1" maxsize="500" align="4">
+        <addr offset="4" space="stack"/>
+      </pentry>
+    </input>
+    <output killedbycall="true">
+      <pentry minsize="1" maxsize="10">
+        <register name="ST0"/>
+      </pentry>
+    </output>
+    <unaffected>
+      <register name="ESP"/>
+      <register name="EBP"/>
+      <register name="ESI"/>
+      <register name="EDI"/>
+      <register name="EBX"/>
+    </unaffected>
+    <killedbycall>
+      <register name="ECX"/>
+      <register name="EDX"/>
+    </killedbycall>
+    <likelytrash>
+      <register name="EAX"/>
+    </likelytrash>
+  </prototype>
+  <prototype name="__thiscall" extrapop="4" stackshift="4">
+    <input>
+      <pentry minsize="1" maxsize="500" align="4">
+        <addr offset="4" space="stack"/>
+      </pentry>
+    </input>
+    <output killedbycall="true">
+      <pentry minsize="4" maxsize="10" metatype="float" extension="float">
+        <register name="ST0"/>
+      </pentry>
+      <pentry minsize="1" maxsize="4">
+        <register name="EAX"/>
+      </pentry>
+      <pentry minsize="5" maxsize="8">
+        <addr space="join" piece1="EDX" piece2="EAX"/>
+      </pentry>
+    </output>
+    <unaffected>
+      <register name="ESP"/>
+      <register name="EBP"/>
+      <register name="ESI"/>
+      <register name="EDI"/>
+      <register name="EBX"/>
+    </unaffected>
+    <killedbycall>
+      <register name="ECX"/>
+      <register name="EDX"/>
+      <register name="ST0"/>
+      <register name="ST1"/>
+    </killedbycall>
+    <likelytrash>
+      <register name="EAX"/>
+    </likelytrash>
+  </prototype>
+  <prototype name="__regparm3" extrapop="4" stackshift="4">   <!-- Used particularly by linux kernel -->
+    <input>
+      <pentry minsize="1" maxsize="4">
+        <register name="EAX"/>
+      </pentry>
+      <pentry minsize="1" maxsize="4">
+        <register name="EDX"/>
+      </pentry>
+      <pentry minsize="1" maxsize="4">
+        <register name="ECX"/>
+      </pentry>
+      <pentry minsize="1" maxsize="500" align="4">
+        <addr offset="4" space="stack"/>
+      </pentry>
+    </input>
+    <output killedbycall="true">
+      <pentry minsize="4" maxsize="10" metatype="float" extension="float">
+        <register name="ST0"/>
+      </pentry>
+      <pentry minsize="1" maxsize="4">
+        <register name="EAX"/>
+      </pentry>
+      <pentry minsize="5" maxsize="8">
+        <addr space="join" piece1="EDX" piece2="EAX"/>
+      </pentry>
+    </output>
+    <unaffected>
+      <register name="ESP"/>
+      <register name="EBP"/>
+      <register name="ESI"/>
+      <register name="EDI"/>
+      <register name="EBX"/>
+    </unaffected>
+    <killedbycall>
+      <register name="ECX"/>
+      <register name="EDX"/>
+      <register name="ST0"/>
+      <register name="ST1"/>
+    </killedbycall>
+    <likelytrash>
+      <register name="EAX"/>
+    </likelytrash>
+  </prototype>
+  <prototype name="__regparm2" extrapop="4" stackshift="4">
+    <input>
+      <pentry minsize="1" maxsize="4">
+        <register name="EAX"/>
+      </pentry>
+      <pentry minsize="1" maxsize="4">
+        <register name="EDX"/>
+      </pentry>
+      <pentry minsize="1" maxsize="500" align="4">
+        <addr offset="4" space="stack"/>
+      </pentry>
+    </input>
+    <output killedbycall="true">
+      <pentry minsize="4" maxsize="10" metatype="float" extension="float">
+        <register name="ST0"/>
+      </pentry>
+      <pentry minsize="1" maxsize="4">
+        <register name="EAX"/>
+      </pentry>
+      <pentry minsize="5" maxsize="8">
+        <addr space="join" piece1="EDX" piece2="EAX"/>
+      </pentry>
+    </output>
+    <unaffected>
+      <register name="ESP"/>
+      <register name="EBP"/>
+      <register name="ESI"/>
+      <register name="EDI"/>
+      <register name="EBX"/>
+    </unaffected>
+    <killedbycall>
+      <register name="ECX"/>
+      <register name="EDX"/>
+      <register name="ST0"/>
+      <register name="ST1"/>
+    </killedbycall>
+    <likelytrash>
+      <register name="EAX"/>
+    </likelytrash>
+  </prototype>
+  <prototype name="__regparm1" extrapop="4" stackshift="4">
+    <input>
+      <pentry minsize="1" maxsize="4">
+        <register name="EAX"/>
+      </pentry>
+      <pentry minsize="1" maxsize="500" align="4">
+        <addr offset="4" space="stack"/>
+      </pentry>
+    </input>
+    <output killedbycall="true">
+      <pentry minsize="4" maxsize="10" metatype="float" extension="float">
+        <register name="ST0"/>
+      </pentry>
+      <pentry minsize="1" maxsize="4">
+        <register name="EAX"/>
+      </pentry>
+      <pentry minsize="5" maxsize="8">
+        <addr space="join" piece1="EDX" piece2="EAX"/>
+      </pentry>
+    </output>
+    <unaffected>
+      <register name="ESP"/>
+      <register name="EBP"/>
+      <register name="ESI"/>
+      <register name="EDI"/>
+      <register name="EBX"/>
+    </unaffected>
+    <killedbycall>
+      <register name="ECX"/>
+      <register name="EDX"/>
+      <register name="ST0"/>
+      <register name="ST1"/>
+    </killedbycall>
+    <likelytrash>
+      <register name="EAX"/>
+    </likelytrash>
+  </prototype>
+  <prototype name="syscall" extrapop="4" stackshift="4">
+    <input>
+      <pentry minsize="1" maxsize="4">
+        <register name="EBX"/>
+      </pentry>
+       <pentry minsize="1" maxsize="4">
+        <register name="ECX"/>
+      </pentry>
+       <pentry minsize="1" maxsize="4">
+        <register name="EDX"/>
+      </pentry>
+       <pentry minsize="1" maxsize="4">
+        <register name="ESI"/>
+      </pentry>
+       <pentry minsize="1" maxsize="4">
+        <register name="EDI"/>
+      </pentry>
+       <pentry minsize="1" maxsize="4">
+        <register name="EBP"/>
+      </pentry>
+    </input>
+    <output killedbycall="true">
+      <pentry minsize="1" maxsize="4">
+        <register name="EAX"/>
+      </pentry>
+    </output>
+    <unaffected>
+      <register name="EBX"/>
+      <register name="ECX"/>
+      <register name="EDX"/>
+      <register name="EBP"/>
+      <register name="EDI"/>
+      <register name="ESI"/>
+      <register name="ESP"/>
+      <register name="DF"/>
+    </unaffected>
+    <killedbycall>
+      <register name="EAX"/>
+    </killedbycall>
+  </prototype>
+  <prototype name="processEntry" extrapop="0" stackshift="0">
+      <input pointermax="4">
+        <pentry minsize="1" maxsize="4">
+          <register name="EDX"/>
+        </pentry>
+        <pentry minsize="1" maxsize="500" align="4">
+          <addr offset="0" space="stack"/>
+        </pentry>
+      </input>
+      <output killedbycall="true">
+        <pentry minsize="1" maxsize="4">
+          <register name="EAX"/>
+        </pentry>
+      </output>
+      <unaffected>
+          <register name="ESP"/>
+      </unaffected>
+      <!-- Functions with this prototype don't have a return address. But, if we don't specify one, this prototype will
+           use the default, which is to have the return address on the stack. That conflicts with how this prototype actually
+           uses the stack, so we set a fake return address at a EBP, which is unspecified at process entry -->
+      <returnaddress>
+         <register name="EBP"/>
+      </returnaddress>
+  </prototype>
+
+  
+  <resolveprototype name="__cdecl/__regparm">
+    <model name="__cdecl"/>        <!-- The default case -->
+    <model name="__regparm3"/>
+    <model name="__regparm2"/>
+    <model name="__regparm1"/>
+  </resolveprototype>
+  <eval_current_prototype name="__cdecl/__regparm"/>
+
+  <callfixup name="get_pc_thunk_ax">
+    <target name="__i686.get_pc_thunk.ax"/>
+    <target name="__x86.get_pc_thunk.ax"/>
+    <pcode>
+      <body><![CDATA[
+      EAX = * ESP;
+      ESP = ESP + 4;
+      ]]></body>
+    </pcode>
+  </callfixup>
+  
+  <callfixup name="get_pc_thunk.bp">
+    <target name="__i686.get_pc_thunk.bp"/>
+    <target name="__x86.get_pc_thunk.bp"/>
+    <pcode>
+      <body><![CDATA[
+      EBP = * ESP;
+      ESP = ESP + 4;
+      ]]></body>
+    </pcode>
+  </callfixup>
+  
+  <callfixup name="get_pc_thunk_bx">
+    <target name="__i686.get_pc_thunk.bx"/>
+    <target name="__x86.get_pc_thunk.bx"/>
+    <pcode>
+      <body><![CDATA[
+      EBX = * ESP;
+      ESP = ESP + 4;
+      ]]></body>
+    </pcode>
+  </callfixup>
+
+  <callfixup name="get_pc_thunk_cx">
+    <target name="__i686.get_pc_thunk.cx"/>
+    <target name="__x86.get_pc_thunk.cx"/>
+    <pcode>
+      <body><![CDATA[
+      ECX = * ESP;
+      ESP = ESP + 4;
+      ]]></body>
+    </pcode>
+  </callfixup>
+
+  <callfixup name="get_pc_thunk_dx">
+    <target name="__i686.get_pc_thunk.dx"/>
+    <target name="__x86.get_pc_thunk.dx"/>
+    <pcode>
+      <body><![CDATA[
+      EDX = * ESP;
+      ESP = ESP + 4;
+      ]]></body>
+    </pcode>
+  </callfixup>
+  
+  <callfixup name="get_pc_thunk_si">
+    <target name="__i686.get_pc_thunk.si"/>
+    <target name="__x86.get_pc_thunk.si"/>
+    <pcode>
+      <body><![CDATA[
+      ESI = * ESP;
+      ESP = ESP + 4;
+      ]]></body>
+    </pcode>
+  </callfixup>
+
+  <callfixup name="x86_return_thunk">
+	<target name="__x86_return_thunk"/>
+	<pcode>
+	  <body><![CDATA[
+	  EIP = *:4 ESP;
+	  ESP = ESP + 4;
+	  return [EIP];
+	  ]]></body>
+	</pcode>
+  </callfixup>
+  
+  <callfixup name="fentry">
+    <target name="__fentry__"/>
+    <pcode>
+      <body><![CDATA[
+	  temp:1 = 0;
+      ]]></body>
+    </pcode>
+  </callfixup>
+  
+  <callfixup name="mcount">
+    <target name="mcount"/>
+    <pcode>
+      <body><![CDATA[
+	  temp:1 = 0;
+      ]]></body>
+    </pcode>
+  </callfixup>
+  
+  <callfixup name="x86_indirect_thunk_ebp">
+    <target name="__x86_indirect_thunk_ebp"/>
+    <pcode>
+      <body><![CDATA[
+	  call [EBP];
+      ]]></body>
+    </pcode>
+  </callfixup>
+  
+  <callfixup name="x86_indirect_thunk_eax">
+    <target name="__x86_indirect_thunk_eax"/>
+    <pcode>
+      <body><![CDATA[
+	  call [EAX];
+      ]]></body>
+    </pcode>
+  </callfixup>
+  
+  <callfixup name="x86_indirect_thunk_ebx">
+    <target name="__x86_indirect_thunk_ebx"/>
+    <pcode>
+      <body><![CDATA[
+	  call [EBX];
+      ]]></body>
+    </pcode>
+  </callfixup>
+  
+  <callfixup name="x86_indirect_thunk_ecx">
+    <target name="__x86_indirect_thunk_ecx"/>
+    <pcode>
+      <body><![CDATA[
+	  call [ECX];
+      ]]></body>
+    </pcode>
+  </callfixup>
+  
+  <callfixup name="x86_indirect_thunk_edx">
+    <target name="__x86_indirect_thunk_edx"/>
+    <pcode>
+      <body><![CDATA[
+	  call [EDX];
+      ]]></body>
+    </pcode>
+  </callfixup>
+  
+</compiler_spec>

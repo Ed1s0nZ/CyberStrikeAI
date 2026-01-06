@@ -1,0 +1,2 @@
+[console_scripts]
+bloodhound-python = bloodhound:main

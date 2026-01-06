@@ -1,0 +1,24 @@
+Metadata-Version: 2.1
+Name: unique_log_filter
+Version: 0.1.0
+Summary: A log filter that removes duplicate log messages
+Author-email: Kevin Phoenix <kevin@kphoenix.us>
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Topic :: System :: Logging
+Project-URL: Home, https://github.com/twizmwazin/unique-log-filter
+
+unique_log_filter
+=================
+
+A simple tool to filter out duplicate lines from a log file. Usage is simple:
+
+```python
+from logging import getLogger
+from unique_log_filter import UniqueLogFilter
+
+logger = getLogger("my_logger")
+logger.addFilter(UniqueLogFilter())
+```
+

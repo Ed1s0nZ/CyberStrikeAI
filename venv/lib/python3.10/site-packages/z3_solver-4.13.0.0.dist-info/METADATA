@@ -1,0 +1,17 @@
+Metadata-Version: 2.1
+Name: z3-solver
+Version: 4.13.0.0
+Summary: an efficient SMT solver library
+Home-page: https://github.com/Z3Prover/z3
+Author: The Z3 Theorem Prover Project
+Maintainer: Audrey Dutcher and Nikolaj Bjorner
+Maintainer-email: audrey@rhelmot.io
+License: MIT License
+Keywords: z3,smt,sat,prover,theorem
+Requires-Dist: importlib-resources ; python_version < "3.9"
+
+Z3 is a theorem prover from Microsoft Research with support for bitvectors, booleans, arrays, floating point numbers, strings, and other data types.
+
+For documentation, please read http://z3prover.github.io/api/html/z3.html
+
+In the event of technical difficulties related to configuration, compilation, or installation, please submit issues to https://github.com/z3prover/z3.git

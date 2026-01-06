@@ -1,0 +1,19 @@
+
+@include "Scalar_SPFP.sinc"
+@ifdef IS_ISA
+@include "SPE_APU.sinc"
+@endif
+
+:lvx vrD, RA_OR_ZERO, RB  is OP=31 & vrD & RA_OR_ZERO & RB & XOP_1_10=103 & BIT_0=0
+{
+    ea:$(REGISTER_SIZE) = RA_OR_ZERO + RB;
+    vrD = *:16 ($(EATRUNC));
+}
+
+:stvx vrS, RA_OR_ZERO, RB  is OP=31 & vrS & RA_OR_ZERO & RB & XOP_1_10=231 & BIT_0=0
+{
+    ea:$(REGISTER_SIZE) = RA_OR_ZERO + RB;
+    *:16 ($(EATRUNC)) = vrS;
+}
+
+

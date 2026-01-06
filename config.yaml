@@ -11,7 +11,7 @@ server:
   port: 8080 # HTTP 服务端口，可通过浏览器访问 http://localhost:8080
 # 认证配置
 auth:
-  password:  # Web 登录密码，请修改为强密码
+  password: 9knf9QqY2-PPv15-ZAuLIWh_ # Web 登录密码，请修改为强密码
   session_duration_hours: 12 # 登录有效期（小时），超时后需重新登录
 # 日志配置
 log:

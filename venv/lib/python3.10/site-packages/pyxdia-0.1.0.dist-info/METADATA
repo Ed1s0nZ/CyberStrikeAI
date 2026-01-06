@@ -1,0 +1,82 @@
+Metadata-Version: 2.4
+Name: pyxdia
+Version: 0.1.0
+Summary: Extract useful program information from PDB files
+License: Copyright 2024 Matt Borgerson
+        
+        Permission is hereby granted, free of charge, to any person obtaining a copy of
+        this software and associated documentation files (the “Software”), to deal in
+        the Software without restriction, including without limitation the rights to
+        use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+        of the Software, and to permit persons to whom the Software is furnished to do
+        so, subject to the following conditions:
+        
+        The above copyright notice and this permission notice shall be included in all
+        copies or substantial portions of the Software.
+        
+        THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+        SOFTWARE.
+        
+        --------------------------------------------------------------------------------
+        Dependencies
+        --------------------------------------------------------------------------------
+        
+        pyxdia releases include binaries which are governed under separate licenses.
+        See respective *.LICENSE.txt files in release package for more details.
+        
+Project-URL: Homepage, https://github.com/mborgerson/xdia
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE.txt
+Dynamic: license-file
+
+pyxdia
+======
+pyxdia is a Python library for extracting useful program information from a [PDB file](https://en.wikipedia.org/wiki/Program_database). pyxdia runs on Windows, macOS, Linux, and other platforms.
+
+## Dependencies
+
+pyxdia depends on [xdia](https://github.com/mborgerson/xdia), a native Windows executable. For cross-platform support, a thin loader and compatibility layer (xdialdr) and emulator ([Blink](https://github.com/jart/blink)) are used to run xdia. These dependencies are included in wheels for convenient installation, and in source distributions will be downloaded at installation time.
+
+## License
+
+pyxdia source is released under MIT license. pyxdia wheels include binaries that are released under individual licenses, with license text available within the wheel.
+
+## Installation
+
+Install pyxdia with:
+
+```
+pip install pyxdia
+```
+
+## Usage
+
+Read globals:
+
+```py
+In [1]: from pyxdia import PDB
+
+In [2]: pdb = PDB("./hello-wdm.pdb")
+
+In [3]: pdb.globals[0]
+Out[3]:
+{'addressOffset': 48,
+ 'addressSection': 1,
+ 'name': '_guard_dispatch_icall_nop',
+ 'relativeVirtualAddress': 4144,
+ 'symTag': 'Function',
+ 'undecoratedName': '_guard_dispatch_icall_nop'}
+```

@@ -1,0 +1,33 @@
+Metadata-Version: 2.4
+Name: bloodhound
+Version: 1.9.0
+Summary: Python based ingestor for BloodHound
+Home-page: https://github.com/dirkjanm/bloodhound.py
+Author: Dirk-jan Mollema, Edwin van Vliet, Matthijs Gielen
+Author-email: dirkjan@dirkjanm.io, edwin.vanvliet@fox-it.com, matthijs.gielen@fox-it.com
+Maintainer: Dirk-jan Mollema
+Maintainer-email: dirkjan@dirkjanm.io
+License: MIT
+Classifier: Intended Audience :: Information Technology
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+License-File: LICENSE
+Requires-Dist: dnspython
+Requires-Dist: impacket>=0.9.17
+Requires-Dist: ldap3!=2.5.0,!=2.5.2,!=2.6,>=2.5
+Requires-Dist: pyasn1>=0.4
+Requires-Dist: pycryptodome
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: home-page
+Dynamic: license
+Dynamic: license-file
+Dynamic: maintainer
+Dynamic: maintainer-email
+Dynamic: requires-dist
+Dynamic: summary

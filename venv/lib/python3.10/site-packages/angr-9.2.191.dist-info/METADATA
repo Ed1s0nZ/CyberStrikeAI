@@ -1,0 +1,112 @@
+Metadata-Version: 2.4
+Name: angr
+Version: 9.2.191
+Summary: A multi-architecture binary analysis toolkit, with the ability to perform dynamic symbolic execution and various static analyses on binaries
+License-Expression: BSD-2-Clause
+Project-URL: Homepage, https://angr.io/
+Project-URL: Repository, https://github.com/angr/angr
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: cxxheaderparser
+Requires-Dist: GitPython
+Requires-Dist: archinfo==9.2.191
+Requires-Dist: cachetools
+Requires-Dist: capstone==5.0.3
+Requires-Dist: cffi>=1.14.0
+Requires-Dist: claripy==9.2.191
+Requires-Dist: cle==9.2.191
+Requires-Dist: msgspec
+Requires-Dist: mulpyplexer
+Requires-Dist: networkx!=2.8.1,>=2.0
+Requires-Dist: protobuf>=6.33.0
+Requires-Dist: psutil
+Requires-Dist: pycparser>=2.18
+Requires-Dist: pydemumble
+Requires-Dist: pyformlang
+Requires-Dist: pypcode<4.0,>=3.2.1
+Requires-Dist: pyvex==9.2.191
+Requires-Dist: rich>=13.1.0
+Requires-Dist: sortedcontainers
+Requires-Dist: sympy
+Requires-Dist: typing-extensions
+Requires-Dist: unique-log-filter
+Requires-Dist: colorama; platform_system == "Windows"
+Provides-Extra: angrdb
+Requires-Dist: sqlalchemy; extra == "angrdb"
+Provides-Extra: keystone
+Requires-Dist: keystone-engine; extra == "keystone"
+Provides-Extra: telemetry
+Requires-Dist: opentelemetry-api; extra == "telemetry"
+Provides-Extra: unicorn
+Requires-Dist: unicorn==2.0.1.post1; extra == "unicorn"
+Requires-Dist: setuptools; extra == "unicorn"
+Dynamic: license-file
+
+# angr
+
+[![Latest Release](https://img.shields.io/pypi/v/angr.svg)](https://pypi.python.org/pypi/angr/)
+[![Python Version](https://img.shields.io/pypi/pyversions/angr)](https://pypi.python.org/pypi/angr/)
+[![PyPI Statistics](https://img.shields.io/pypi/dm/angr.svg)](https://pypistats.org/packages/angr)
+[![License](https://img.shields.io/github/license/angr/angr.svg)](https://github.com/angr/angr/blob/master/LICENSE)
+
+angr is a platform-agnostic binary analysis framework.
+It is brought to you by [the Computer Security Lab at UC Santa Barbara](https://seclab.cs.ucsb.edu), [SEFCOM at Arizona State University](https://sefcom.asu.edu), their associated CTF team, [Shellphish](https://shellphish.net), the open source community, and **[@rhelmot](https://github.com/rhelmot)**.
+
+## Project Links
+Homepage: https://angr.io
+
+Project repository: https://github.com/angr/angr
+
+Documentation: https://docs.angr.io
+
+API Documentation: https://docs.angr.io/en/latest/api.html
+
+## What is angr?
+
+angr is a suite of Python 3 libraries that let you load a binary and do a lot of cool things to it:
+
+- Disassembly and intermediate-representation lifting
+- Program instrumentation
+- Symbolic execution
+- Control-flow analysis
+- Data-dependency analysis
+- Value-set analysis (VSA)
+- Decompilation
+
+The most common angr operation is loading a binary: `p = angr.Project('/bin/bash')` If you do this in an enhanced REPL like IPython, you can use tab-autocomplete to browse the [top-level-accessible methods](https://docs.angr.io/core-concepts/toplevel) and their docstrings.
+
+The short version of "how to install angr" is `mkvirtualenv --python=$(which python3) angr && python -m pip install angr`.
+
+## Example
+
+angr does a lot of binary analysis stuff.
+To get you started, here's a simple example of using symbolic execution to get a flag in a CTF challenge.
+
+```python
+import angr
+
+project = angr.Project("angr-doc/examples/defcamp_r100/r100", auto_load_libs=False)
+
+@project.hook(0x400844)
+def print_flag(state):
+    print("FLAG SHOULD BE:", state.posix.dumps(0))
+    project.terminate_execution()
+
+project.execute()
+```
+
+# Quick Start
+
+- [Install Instructions](https://docs.angr.io/introductory-errata/install)
+- Documentation as [HTML](https://docs.angr.io/) and sources in the angr [Github repository](https://github.com/angr/angr/tree/master/docs)
+- Dive right in: [top-level-accessible methods](https://docs.angr.io/core-concepts/toplevel)
+- [Examples using angr to solve CTF challenges](https://docs.angr.io/examples).
+- [API Reference](https://docs.angr.io/en/latest/api.html)
+- [awesome-angr repo](https://github.com/degrigis/awesome-angr)

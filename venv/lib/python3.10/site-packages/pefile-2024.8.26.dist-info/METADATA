@@ -1,0 +1,34 @@
+Metadata-Version: 2.1
+Name: pefile
+Version: 2024.8.26
+Summary: Python PE parsing module
+Home-page: https://github.com/erocarrera/pefile
+Download-URL: https://github.com/erocarrera/pefile/releases/download/v2024.8.26/pefile-2024.8.26.tar.gz
+Author: Ero Carrera
+Author-email: ero.carrera@gmail.com
+License: MIT
+Keywords: pe,exe,dll,pefile,pecoff
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Science/Research
+Classifier: Natural Language :: English
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Requires-Python: >=3.6.0
+License-File: LICENSE
+
+pefile, Portable Executable reader module
+
+All the PE file basic structures are available with their default names as
+attributes of the instance returned.
+
+Processed elements such as the import table are made available with lowercase
+names, to differentiate them from the upper case basic structure names.
+
+pefile has been tested against many edge cases such as corrupted and malformed
+PEs as well as malware, which often attempts to abuse the format way beyond its
+standard use. To the best of my knowledge most of the abuse is handled
+gracefully.
+
+Copyright (c) 2005-2024 Ero Carrera <ero.carrera@gmail.com>

@@ -1,0 +1,72 @@
+from __future__ import annotations
+import logging
+
+from angr import ailment
+from angr.utils.types import dereference_simtype_by_lib
+from angr.sim_type import SimTypeBottom
+from angr.calling_conventions import SimRegArg
+from .ailgraph_walker import AILGraphWalker
+
+l = logging.getLogger(__name__)
+
+
+class ReturnMaker(AILGraphWalker):
+    """
+    Traverse the AILBlock graph of a function and update .ret_exprs of all return statements.
+    """
+
+    def __init__(self, ail_manager, arch, function, ail_graph):
+        super().__init__(ail_graph, self._handler, replace_nodes=True)
+        self.ail_manager = ail_manager
+        self.arch = arch
+        self.function = function
+
+        self.walk()
+
+    def _next_atom(self) -> int:
+        return self.ail_manager.next_atom()
+
+    def _handle_Return(
+        self, stmt_idx: int, stmt: ailment.Stmt.Return, block: ailment.Block | None
+    ):  # pylint:disable=unused-argument
+        if (
+            block is not None
+            and not stmt.ret_exprs
+            and self.function.prototype is not None
+            and self.function.prototype.returnty is not None
+            and type(self.function.prototype.returnty) is not SimTypeBottom
+        ):
+            new_stmt = stmt.copy()
+            returnty = (
+                dereference_simtype_by_lib(self.function.prototype.returnty, self.function.prototype_libname)
+                if self.function.prototype_libname
+                else self.function.prototype.returnty
+            )
+            ret_val = self.function.calling_convention.return_val(returnty)
+            if isinstance(ret_val, SimRegArg):
+                reg = self.arch.registers[ret_val.reg_name]
+                new_stmt.ret_exprs.append(
+                    ailment.Expr.Register(
+                        self._next_atom(),
+                        None,
+                        reg[0],
+                        ret_val.size * self.arch.byte_width,
+                        reg_name=self.arch.translate_register_name(reg[0], ret_val.size),
+                        ins_addr=stmt.tags["ins_addr"],
+                    )
+                )
+            else:
+                l.warning("Unsupported type of return expression %s.", type(ret_val))
+            return new_stmt
+        return stmt
+
+    def _handler(self, block):
+        # we don't need to handle any statement besides Returns
+        walker = ailment.AILBlockRewriter(
+            update_block=False, expr_handlers={}, stmt_handlers={ailment.statement.Return: self._handle_Return}
+        )
+
+        result = walker.walk(block)
+        if result is block:
+            return None
+        return result

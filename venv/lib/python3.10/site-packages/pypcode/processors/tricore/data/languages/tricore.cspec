@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<compiler_spec>
+  <data_organization>
+	<absolute_max_alignment value="0" />
+	<machine_alignment value="8" />
+	<default_alignment value="1" />
+	<default_pointer_alignment value="4" />
+	<pointer_size value="4" />
+	<short_size value="2" />
+	<integer_size value="4" />
+	<long_size value="4" />
+	<long_long_size value="8" />
+	<float_size value="4" />
+	<double_size value="8" />
+	<size_alignment_map>
+		<entry size="1" alignment="1" />
+		<entry size="2" alignment="2" />
+		<entry size="4" alignment="4" />
+		<entry size="8" alignment="4" />
+	</size_alignment_map>
+  </data_organization>
+  <global>
+    <range space="ram"/>
+    <register name="a0"/>
+    <register name="a1"/>
+    <register name="a8"/>
+    <register name="a9"/>
+  </global>
+  
+  <returnaddress>
+    <register name="a11"/>
+  </returnaddress>
+  
+  <stackpointer register="a10" space="ram"/>
+  
+  <prefersplit style="inhalf">
+    <register name="e4"/>
+    <register name="e6"/>
+    <register name="p0"/>
+    <register name="p8"/>
+  </prefersplit>
+    
+  <default_proto>
+    <prototype name="__stdcall" extrapop="0" stackshift="0">
+      <input>
+          <pentry minsize="4" maxsize="4" storage="hiddenret">
+              <register name="a4"/>
+          </pentry>
+          <pentry minsize="4" maxsize="4" metatype="ptr">   <!-- This is the first pointer -->
+              <register name="a4"/>
+          </pentry>
+          <pentry minsize="4" maxsize="4" metatype="ptr">
+              <register name="a5"/>
+          </pentry>
+          <pentry minsize="4" maxsize="4" metatype="ptr">
+              <register name="a6"/>
+          </pentry>
+          <pentry minsize="4" maxsize="4" metatype="ptr">
+              <register name="a7"/>
+          </pentry>
+          <pentry minsize="1" maxsize="4" extension="inttype">   <!-- This is the first non pointer -->
+              <register name="d4"/>
+          </pentry>
+          <pentry minsize="1" maxsize="4" extension="inttype">
+              <register name="d5"/>
+          </pentry>
+          <pentry minsize="5" maxsize="8">    <!-- This is the first >4 byte non pointer -->
+              <register name="e4"/>
+          </pentry>
+          <pentry minsize="1" maxsize="4" extension="inttype">
+              <register name="d6"/>
+          </pentry>
+          <pentry minsize="1" maxsize="4" extension="inttype">
+              <register name="d7"/>
+          </pentry>
+          <pentry minsize="5" maxsize="8">
+              <register name="e6"/>
+          </pentry>
+          <pentry minsize="1" maxsize="500" align="4">
+              <addr offset="0" space="stack"/>
+          </pentry>
+          <rule>
+             <datatype name="struct" minsize="17"/>
+             <convert_to_ptr/>
+          </rule>
+      </input>
+         
+      <output>
+        <pentry minsize="4" maxsize="4" metatype="ptr">
+          <register name="a2"/>
+        </pentry>
+        <pentry minsize="1" maxsize="4" extension="inttype">
+          <register name="d2"/>
+        </pentry>        
+        <pentry minsize="5" maxsize="8">
+          <register name="e2"/>
+        </pentry>
+      </output>
+      <unaffected>
+		<register name="d8"/>
+		<register name="d9"/>
+		<register name="d10"/>
+		<register name="d11"/>
+		<register name="d12"/>
+		<register name="d13"/>
+		<register name="d14"/>
+		<register name="d15"/>
+		<register name="a0"/>
+		<register name="a1"/>
+		<register name="a8"/>
+		<register name="a9"/>
+		<register name="a10"/>
+		<register name="a11"/>
+		<register name="a12"/>
+		<register name="a13"/>
+		<register name="a14"/>
+		<register name="a15"/>
+      </unaffected>
+    </prototype>
+  </default_proto>
+
+    <!-- __stdcall_data calling convention removed, no longer necessary as decompiler will return
+         the correct return storage location when there are multiple return location types
+    -->
+    
+  <callotherfixup targetop="saveCallerState">
+     <pcode>
+      <input name="fcx"/>
+      <input name="lcx"/>
+      <input name="pcxi"/>
+      <body><![CDATA[
+            tmpptr:4 = 0;
+      ]]></body>
+    </pcode>
+   </callotherfixup>
+   
+   <callotherfixup targetop="restoreCallerState">
+    <pcode>
+      <input name="fcx"/>
+      <input name="lcx"/>
+      <input name="pcxi"/>
+      <body><![CDATA[
+            tmpptr:4 = 0;
+      ]]></body>
+    </pcode>
+   </callotherfixup>
+</compiler_spec>

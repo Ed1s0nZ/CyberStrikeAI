@@ -1,0 +1,3 @@
+[console_scripts]
+arjun = arjun.__main__:main
+

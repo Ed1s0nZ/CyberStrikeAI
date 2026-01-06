@@ -1,0 +1,45 @@
+<patternlist>
+
+  <patternpairs totalbits="27" postbits="11">
+    <!--  Higher confidence patterns, after a return and more defined bits -->
+    <prepatterns>
+      <data>10000010 10000000</data>                    <!-- ret -->
+      <data>10000010 10000000 00000000 00000000 </data> <!-- ret; padding -->
+    </prepatterns>
+    <postpatterns>
+      <data>0.....01 01110001</data>                   <!-- c.addi16sp sp,-imm -->
+      <data>0.....01 00010001</data>                   <!-- c.addi sp,-imm -->
+      <data>00010011 00000001 ....0001 1.......</data> <!--  addi sp,sp,-imm -->
+      <funcstart/>
+    </postpatterns>
+  </patternpairs>
+  
+  <patternpairs totalbits="16" postbits="11">
+    <!--  Medium confidence, more bits, but prepattern are jumps, not return -->
+    <prepatterns>
+      <data>01101111 ....0000 ........ ........</data>  <!-- j imm -->
+      <data>......01 101..... </data>                   <!-- c.j imm -->
+      <data>......01 101..... 00000000 00000000 </data> <!-- c.j imm; padding -->
+    </prepatterns>
+    <postpatterns>
+      <data>0.....01 01110001</data>                   <!-- c.addi16sp sp,-imm -->
+      <data>0.....01 00010001</data>                   <!-- c.addi sp,-imm -->
+      <data>00010011 00000001 ....0001 1.......</data> <!--  addi sp,sp,-imm -->
+      <possiblefuncstart/>
+    </postpatterns>
+  </patternpairs>
+  
+  <patternpairs totalbits="20" postbits="7">
+    <!--  Lower confidence, too few bits on start pattern -->
+    <prepatterns>
+      <data>10000010 10000000</data>                    <!-- ret -->
+      <data>10000010 10000000 00000000 00000000 </data> <!-- ret; padding -->
+      <data>......01 101..... 00000000 00000000 </data> <!-- c.j imm; padding -->
+      <data>01101111 ....0000 ........ ........</data>  <!-- j imm -->
+    </prepatterns>
+    <postpatterns>
+      <data>.0010111 ........ ........ ........</data> <!--  auipc rd,imm-->
+      <possiblefuncstart/>
+    </postpatterns>
+  </patternpairs>
+</patternlist>

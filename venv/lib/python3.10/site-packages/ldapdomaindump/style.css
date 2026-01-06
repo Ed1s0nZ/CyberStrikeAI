@@ -1,0 +1,28 @@
+tbody th {
+    border: 1px solid #000;
+}
+tbody td {
+    border: 1px solid #ababab;
+    border-spacing: 0px;
+    padding: 4px;
+    border-collapse: collapse;
+}
+body {
+    font-family: verdana;
+}
+table {
+    font-size: 13px;
+    border-collapse: collapse;
+    width: 100%;
+}
+tbody tr:nth-child(odd) td {
+    background-color: #eee;
+}
+tbody tr:hover td {
+    background-color: lightblue;
+}
+thead td {
+    font-size: 19px;
+    font-weight: bold;
+    padding: 10px 0px;
+}

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<language_definitions>
+  <language processor="SuperH4"
+            endian="big"
+            size="32"
+            variant="default"
+            version="1.01"
+            slafile="SuperH4_be.sla"
+            processorspec="SuperH4.pspec"
+            manualindexfile="../manuals/superh4.idx"
+            id="SuperH4:BE:32:default">
+    <description>SuperH-4(a) (SH4) big endian</description>
+    <compiler name="default" spec="SuperH4_be.cspec" id="default"/>
+    <external_name tool="IDA-PRO" name="sh4b"/>
+    <external_name tool="gnu" name="sh4"/>
+    <external_name tool="qemu" name="qemu-sh4eb"/>
+    <external_name tool="qemu_system" name="qemu-system-sh4eb"/>
+  </language>
+  <language processor="SuperH4"
+            endian="little"
+            size="32"
+            variant="default"
+            version="1.01"
+            slafile="SuperH4_le.sla"
+            processorspec="SuperH4.pspec"
+            manualindexfile="../manuals/superh4.idx"
+            id="SuperH4:LE:32:default">
+    <description>SuperH-4(a) (SH4) little endian</description>
+    <compiler name="default" spec="SuperH4_le.cspec" id="default"/>
+    <compiler name="Visual Studio" spec="SuperH4_le.cspec" id="windows"/>
+    <external_name tool="IDA-PRO" name="sh4"/>
+    <external_name tool="gnu" name="sh4"/>
+    <external_name tool="qemu" name="qemu-sh4"/>
+    <external_name tool="qemu_system" name="qemu-system-sh4"/>
+  </language>
+</language_definitions>

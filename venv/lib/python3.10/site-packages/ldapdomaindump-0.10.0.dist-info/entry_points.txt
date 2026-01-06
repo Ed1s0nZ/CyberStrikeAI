@@ -1,0 +1,4 @@
+[console_scripts]
+ldapdomaindump = ldapdomaindump:main
+ldd2bloodhound = ldapdomaindump.convert:ldd2bloodhound
+ldd2pretty = ldapdomaindump.pretty:main

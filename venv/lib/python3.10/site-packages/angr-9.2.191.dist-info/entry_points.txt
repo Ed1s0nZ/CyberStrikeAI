@@ -1,0 +1,2 @@
+[console_scripts]
+angr = angr.__main__:main
