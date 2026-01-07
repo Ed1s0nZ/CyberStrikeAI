@@ -720,8 +720,12 @@ const batchQueuesState = {
 function showBatchImportModal() {
     const modal = document.getElementById('batch-import-modal');
     const input = document.getElementById('batch-tasks-input');
+    const titleInput = document.getElementById('batch-queue-title');
     if (modal && input) {
         input.value = '';
+        if (titleInput) {
+            titleInput.value = '';
+        }
         updateBatchImportStats('');
         modal.style.display = 'block';
         input.focus();
@@ -765,6 +769,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // 创建批量任务队列
 async function createBatchQueue() {
     const input = document.getElementById('batch-tasks-input');
+    const titleInput = document.getElementById('batch-queue-title');
     if (!input) return;
     
     const text = input.value.trim();
@@ -780,13 +785,16 @@ async function createBatchQueue() {
         return;
     }
     
+    // 获取标题（可选）
+    const title = titleInput ? titleInput.value.trim() : '';
+    
     try {
         const response = await apiFetch('/api/batch-tasks', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ tasks }),
+            body: JSON.stringify({ title, tasks }),
         });
         
         if (!response.ok) {
@@ -918,10 +926,13 @@ function renderBatchQueues() {
         // 允许删除待执行、已完成或已取消状态的队列
         const canDelete = queue.status === 'pending' || queue.status === 'completed' || queue.status === 'cancelled';
         
+        const titleDisplay = queue.title ? `<span class="batch-queue-title" style="font-weight: 600; color: var(--text-primary); margin-right: 8px;">${escapeHtml(queue.title)}</span>` : '';
+        
         return `
             <div class="batch-queue-item" data-queue-id="${queue.id}" onclick="showBatchQueueDetail('${queue.id}')">
                 <div class="batch-queue-header">
                     <div class="batch-queue-info" style="flex: 1;">
+                        ${titleDisplay}
                         <span class="batch-queue-status ${status.class}">${status.text}</span>
                         <span class="batch-queue-id">队列ID: ${escapeHtml(queue.id)}</span>
                         <span class="batch-queue-time">创建时间: ${new Date(queue.createdAt).toLocaleString('zh-CN')}</span>
@@ -1100,7 +1111,7 @@ async function showBatchQueueDetail(queueId) {
         batchQueuesState.currentQueueId = queueId;
         
         if (title) {
-            title.textContent = '批量任务队列';
+            title.textContent = queue.title ? `批量任务队列 - ${escapeHtml(queue.title)}` : '批量任务队列';
         }
         
         // 更新按钮显示
@@ -1146,6 +1157,10 @@ async function showBatchQueueDetail(queueId) {
         
         content.innerHTML = `
             <div class="batch-queue-detail-info">
+                ${queue.title ? `<div class="detail-item">
+                    <span class="detail-label">任务标题</span>
+                    <span class="detail-value">${escapeHtml(queue.title)}</span>
+                </div>` : ''}
                 <div class="detail-item">
                     <span class="detail-label">队列ID</span>
                     <span class="detail-value"><code>${escapeHtml(queue.id)}</code></span>

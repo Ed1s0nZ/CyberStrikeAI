@@ -568,9 +568,6 @@
                     <div class="page-content">
                         <!-- 批量任务队列列表 -->
                         <div class="batch-queues-section" id="batch-queues-section" style="display: none;">
-                            <div class="batch-queues-header">
-                                <h3>批量任务队列</h3>
-                            </div>
                             <!-- 筛选控件 -->
                             <div class="batch-queues-filters tasks-filters">
                                 <label>
@@ -585,7 +582,7 @@
                                     </select>
                                 </label>
                                 <label style="flex: 1; max-width: 300px;">
-                                    <span>搜索队列ID或创建时间</span>
+                                    <span>搜索队列ID、标题或创建时间</span>
                                     <input type="text" id="batch-queues-search" placeholder="输入关键字搜索..." 
                                            oninput="filterBatchQueues()">
                                 </label>
@@ -1160,6 +1157,13 @@
                 <span class="modal-close" onclick="closeBatchImportModal()">&times;</span>
             </div>
             <div class="modal-body">
+                <div class="form-group">
+                    <label for="batch-queue-title">任务标题</label>
+                    <input type="text" id="batch-queue-title" placeholder="请输入任务标题（可选，用于标识和筛选）" />
+                    <div class="form-hint" style="margin-top: 4px;">
+                        为批量任务队列设置一个标题，方便后续查找和管理。
+                    </div>
+                </div>
                 <div class="form-group">
                     <label for="batch-tasks-input">任务列表（每行一个任务）<span style="color: red;">*</span></label>
                     <textarea id="batch-tasks-input" rows="15" placeholder="请输入任务列表，每行一个任务，例如：&#10;扫描 192.168.1.1 的开放端口&#10;检查 https://example.com 是否存在SQL注入&#10;枚举 example.com 的子域名" style="font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 0.875rem; line-height: 1.5;"></textarea>

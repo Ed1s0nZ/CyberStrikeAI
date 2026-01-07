@@ -193,6 +193,7 @@ func (db *DB) initTables() error {
 	createBatchTaskQueuesTable := `
 	CREATE TABLE IF NOT EXISTS batch_task_queues (
 		id TEXT PRIMARY KEY,
+		title TEXT,
 		status TEXT NOT NULL,
 		created_at DATETIME NOT NULL,
 		started_at DATETIME,
@@ -240,6 +241,7 @@ func (db *DB) initTables() error {
 	CREATE INDEX IF NOT EXISTS idx_vulnerabilities_created_at ON vulnerabilities(created_at);
 	CREATE INDEX IF NOT EXISTS idx_batch_tasks_queue_id ON batch_tasks(queue_id);
 	CREATE INDEX IF NOT EXISTS idx_batch_task_queues_created_at ON batch_task_queues(created_at);
+	CREATE INDEX IF NOT EXISTS idx_batch_task_queues_title ON batch_task_queues(title);
 	`
 
 	if _, err := db.Exec(createConversationsTable); err != nil {
@@ -307,6 +309,11 @@ func (db *DB) initTables() error {
 
 	if err := db.migrateConversationGroupMappingsTable(); err != nil {
 		db.logger.Warn("迁移conversation_group_mappings表失败", zap.Error(err))
+		// 不返回错误，允许继续运行
+	}
+
+	if err := db.migrateBatchTaskQueuesTable(); err != nil {
+		db.logger.Warn("迁移batch_task_queues表失败", zap.Error(err))
 		// 不返回错误，允许继续运行
 	}
 
@@ -420,6 +427,30 @@ func (db *DB) migrateConversationGroupMappingsTable() error {
 		// 字段不存在，添加它
 		if _, err := db.Exec("ALTER TABLE conversation_group_mappings ADD COLUMN pinned INTEGER DEFAULT 0"); err != nil {
 			db.logger.Warn("添加pinned字段失败", zap.Error(err))
+		}
+	}
+
+	return nil
+}
+
+// migrateBatchTaskQueuesTable 迁移batch_task_queues表，添加title字段
+func (db *DB) migrateBatchTaskQueuesTable() error {
+	// 检查title字段是否存在
+	var count int
+	err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('batch_task_queues') WHERE name='title'").Scan(&count)
+	if err != nil {
+		// 如果查询失败，尝试添加字段
+		if _, addErr := db.Exec("ALTER TABLE batch_task_queues ADD COLUMN title TEXT"); addErr != nil {
+			// 如果字段已存在，忽略错误
+			errMsg := strings.ToLower(addErr.Error())
+			if !strings.Contains(errMsg, "duplicate column") && !strings.Contains(errMsg, "already exists") {
+				db.logger.Warn("添加title字段失败", zap.Error(addErr))
+			}
+		}
+	} else if count == 0 {
+		// 字段不存在，添加它
+		if _, err := db.Exec("ALTER TABLE batch_task_queues ADD COLUMN title TEXT"); err != nil {
+			db.logger.Warn("添加title字段失败", zap.Error(err))
 		}
 	}
 

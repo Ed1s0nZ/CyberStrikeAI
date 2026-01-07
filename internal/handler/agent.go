@@ -759,6 +759,7 @@ func (h *AgentHandler) ListCompletedTasks(c *gin.Context) {
 
 // BatchTaskRequest 批量任务请求
 type BatchTaskRequest struct {
+	Title string   `json:"title"` // 任务标题（可选）
 	Tasks []string `json:"tasks" binding:"required"` // 任务列表，每行一个任务
 }
 
@@ -788,7 +789,7 @@ func (h *AgentHandler) CreateBatchQueue(c *gin.Context) {
 		return
 	}
 
-	queue := h.batchTaskManager.CreateBatchQueue(validTasks)
+	queue := h.batchTaskManager.CreateBatchQueue(req.Title, validTasks)
 	c.JSON(http.StatusOK, gin.H{
 		"queueId": queue.ID,
 		"queue":   queue,

@@ -11,6 +11,7 @@ import (
 // BatchTaskQueueRow 批量任务队列数据库行
 type BatchTaskQueueRow struct {
 	ID           string
+	Title        sql.NullString
 	Status       string
 	CreatedAt    time.Time
 	StartedAt    sql.NullTime
@@ -32,7 +33,7 @@ type BatchTaskRow struct {
 }
 
 // CreateBatchQueue 创建批量任务队列
-func (db *DB) CreateBatchQueue(queueID string, tasks []map[string]interface{}) error {
+func (db *DB) CreateBatchQueue(queueID string, title string, tasks []map[string]interface{}) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("开始事务失败: %w", err)
@@ -41,8 +42,8 @@ func (db *DB) CreateBatchQueue(queueID string, tasks []map[string]interface{}) e
 
 	now := time.Now()
 	_, err = tx.Exec(
-		"INSERT INTO batch_task_queues (id, status, created_at, current_index) VALUES (?, ?, ?, ?)",
-		queueID, "pending", now, 0,
+		"INSERT INTO batch_task_queues (id, title, status, created_at, current_index) VALUES (?, ?, ?, ?, ?)",
+		queueID, title, "pending", now, 0,
 	)
 	if err != nil {
 		return fmt.Errorf("创建批量任务队列失败: %w", err)
@@ -76,9 +77,9 @@ func (db *DB) GetBatchQueue(queueID string) (*BatchTaskQueueRow, error) {
 	var row BatchTaskQueueRow
 	var createdAt string
 	err := db.QueryRow(
-		"SELECT id, status, created_at, started_at, completed_at, current_index FROM batch_task_queues WHERE id = ?",
+		"SELECT id, title, status, created_at, started_at, completed_at, current_index FROM batch_task_queues WHERE id = ?",
 		queueID,
-	).Scan(&row.ID, &row.Status, &createdAt, &row.StartedAt, &row.CompletedAt, &row.CurrentIndex)
+	).Scan(&row.ID, &row.Title, &row.Status, &createdAt, &row.StartedAt, &row.CompletedAt, &row.CurrentIndex)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -102,7 +103,7 @@ func (db *DB) GetBatchQueue(queueID string) (*BatchTaskQueueRow, error) {
 // GetAllBatchQueues 获取所有批量任务队列
 func (db *DB) GetAllBatchQueues() ([]*BatchTaskQueueRow, error) {
 	rows, err := db.Query(
-		"SELECT id, status, created_at, started_at, completed_at, current_index FROM batch_task_queues ORDER BY created_at DESC",
+		"SELECT id, title, status, created_at, started_at, completed_at, current_index FROM batch_task_queues ORDER BY created_at DESC",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("查询批量任务队列列表失败: %w", err)
@@ -113,7 +114,7 @@ func (db *DB) GetAllBatchQueues() ([]*BatchTaskQueueRow, error) {
 	for rows.Next() {
 		var row BatchTaskQueueRow
 		var createdAt string
-		if err := rows.Scan(&row.ID, &row.Status, &createdAt, &row.StartedAt, &row.CompletedAt, &row.CurrentIndex); err != nil {
+		if err := rows.Scan(&row.ID, &row.Title, &row.Status, &createdAt, &row.StartedAt, &row.CompletedAt, &row.CurrentIndex); err != nil {
 			return nil, fmt.Errorf("扫描批量任务队列失败: %w", err)
 		}
 		parsedTime, parseErr := time.Parse("2006-01-02 15:04:05", createdAt)
@@ -133,7 +134,7 @@ func (db *DB) GetAllBatchQueues() ([]*BatchTaskQueueRow, error) {
 
 // ListBatchQueues 列出批量任务队列（支持筛选和分页）
 func (db *DB) ListBatchQueues(limit, offset int, status, keyword string) ([]*BatchTaskQueueRow, error) {
-	query := "SELECT id, status, created_at, started_at, completed_at, current_index FROM batch_task_queues WHERE 1=1"
+	query := "SELECT id, title, status, created_at, started_at, completed_at, current_index FROM batch_task_queues WHERE 1=1"
 	args := []interface{}{}
 
 	// 状态筛选
@@ -142,10 +143,10 @@ func (db *DB) ListBatchQueues(limit, offset int, status, keyword string) ([]*Bat
 		args = append(args, status)
 	}
 
-	// 关键字搜索（搜索队列ID）
+	// 关键字搜索（搜索队列ID和标题）
 	if keyword != "" {
-		query += " AND id LIKE ?"
-		args = append(args, "%"+keyword+"%")
+		query += " AND (id LIKE ? OR title LIKE ?)"
+		args = append(args, "%"+keyword+"%", "%"+keyword+"%")
 	}
 
 	query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
@@ -161,7 +162,7 @@ func (db *DB) ListBatchQueues(limit, offset int, status, keyword string) ([]*Bat
 	for rows.Next() {
 		var row BatchTaskQueueRow
 		var createdAt string
-		if err := rows.Scan(&row.ID, &row.Status, &createdAt, &row.StartedAt, &row.CompletedAt, &row.CurrentIndex); err != nil {
+		if err := rows.Scan(&row.ID, &row.Title, &row.Status, &createdAt, &row.StartedAt, &row.CompletedAt, &row.CurrentIndex); err != nil {
 			return nil, fmt.Errorf("扫描批量任务队列失败: %w", err)
 		}
 		parsedTime, parseErr := time.Parse("2006-01-02 15:04:05", createdAt)
@@ -190,10 +191,10 @@ func (db *DB) CountBatchQueues(status, keyword string) (int, error) {
 		args = append(args, status)
 	}
 
-	// 关键字搜索
+	// 关键字搜索（搜索队列ID和标题）
 	if keyword != "" {
-		query += " AND id LIKE ?"
-		args = append(args, "%"+keyword+"%")
+		query += " AND (id LIKE ? OR title LIKE ?)"
+		args = append(args, "%"+keyword+"%", "%"+keyword+"%")
 	}
 
 	var count int
