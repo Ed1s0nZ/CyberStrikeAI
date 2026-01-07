@@ -344,9 +344,8 @@ Build an attack chain for the latest engagement and export the node list with se
 - 2025-11-13 – Added web authentication, settings UI, and MCP stdio mode integration.
 
 
-## Star History
-
-![Star History Chart](https://api.star-history.com/svg?repos=Ed1s0nZ/CyberStrikeAI&type=date&legend=top-left)
+## Stargazers over time
+[![Stargazers over time](https://starchart.cc/Ed1s0nZ/CyberStrikeAI.svg?variant=adaptive)](https://starchart.cc/Ed1s0nZ/CyberStrikeAI)
 
 ## 404Starlink 
 
