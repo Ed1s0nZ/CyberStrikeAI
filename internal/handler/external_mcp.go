@@ -446,6 +446,13 @@ func updateExternalMCPConfig(doc *yaml.Node, cfg config.ExternalMCPConfig, origi
 		if len(serverCfg.Args) > 0 {
 			setStringArrayInMap(serverNode, "args", serverCfg.Args)
 		}
+		// 保存 env 字段（环境变量）
+		if serverCfg.Env != nil && len(serverCfg.Env) > 0 {
+			envNode := ensureMap(serverNode, "env")
+			for envKey, envValue := range serverCfg.Env {
+				setStringInMap(envNode, envKey, envValue)
+			}
+		}
 		if serverCfg.Transport != "" {
 			setStringInMap(serverNode, "transport", serverCfg.Transport)
 		}

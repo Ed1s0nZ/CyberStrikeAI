@@ -738,7 +738,7 @@ func (m *ExternalMCPManager) createClient(serverCfg config.ExternalMCPServerConf
 		if serverCfg.Command == "" {
 			return nil
 		}
-		return NewStdioMCPClient(serverCfg.Command, serverCfg.Args, timeout, m.logger)
+		return NewStdioMCPClient(serverCfg.Command, serverCfg.Args, serverCfg.Env, timeout, m.logger)
 	case "sse":
 		if serverCfg.URL == "" {
 			return nil

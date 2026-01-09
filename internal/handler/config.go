@@ -47,17 +47,17 @@ type ConfigHandler struct {
 	config                     *config.Config
 	mcpServer                  *mcp.Server
 	executor                   *security.Executor
-	agent                      AgentUpdater                // Agent接口，用于更新Agent配置
-	attackChainHandler         AttackChainUpdater          // 攻击链处理器接口，用于更新配置
+	agent                      AgentUpdater               // Agent接口，用于更新Agent配置
+	attackChainHandler         AttackChainUpdater         // 攻击链处理器接口，用于更新配置
 	externalMCPMgr             *mcp.ExternalMCPManager    // 外部MCP管理器
-	knowledgeToolRegistrar     KnowledgeToolRegistrar      // 知识库工具注册器（可选）
+	knowledgeToolRegistrar     KnowledgeToolRegistrar     // 知识库工具注册器（可选）
 	vulnerabilityToolRegistrar VulnerabilityToolRegistrar // 漏洞工具注册器（可选）
-	retrieverUpdater           RetrieverUpdater            // 检索器更新器（可选）
-	knowledgeInitializer       KnowledgeInitializer         // 知识库初始化器（可选）
-	appUpdater                 AppUpdater                  // App更新器（可选）
+	retrieverUpdater           RetrieverUpdater           // 检索器更新器（可选）
+	knowledgeInitializer       KnowledgeInitializer       // 知识库初始化器（可选）
+	appUpdater                 AppUpdater                 // App更新器（可选）
 	logger                     *zap.Logger
 	mu                         sync.RWMutex
-	lastEmbeddingConfig        *config.EmbeddingConfig     // 上一次的嵌入模型配置（用于检测变更）
+	lastEmbeddingConfig        *config.EmbeddingConfig // 上一次的嵌入模型配置（用于检测变更）
 }
 
 // AttackChainUpdater 攻击链处理器更新接口
@@ -790,30 +790,30 @@ func (h *ConfigHandler) ApplyConfig(c *gin.Context) {
 		h.logger.Info("AttackChainHandler配置已更新")
 	}
 
-		// 更新检索器配置（如果知识库启用）
-		if h.config.Knowledge.Enabled && h.retrieverUpdater != nil {
-			retrievalConfig := &knowledge.RetrievalConfig{
-				TopK:                h.config.Knowledge.Retrieval.TopK,
-				SimilarityThreshold: h.config.Knowledge.Retrieval.SimilarityThreshold,
-				HybridWeight:        h.config.Knowledge.Retrieval.HybridWeight,
-			}
-			h.retrieverUpdater.UpdateConfig(retrievalConfig)
-			h.logger.Info("检索器配置已更新",
-				zap.Int("top_k", retrievalConfig.TopK),
-				zap.Float64("similarity_threshold", retrievalConfig.SimilarityThreshold),
-				zap.Float64("hybrid_weight", retrievalConfig.HybridWeight),
-			)
+	// 更新检索器配置（如果知识库启用）
+	if h.config.Knowledge.Enabled && h.retrieverUpdater != nil {
+		retrievalConfig := &knowledge.RetrievalConfig{
+			TopK:                h.config.Knowledge.Retrieval.TopK,
+			SimilarityThreshold: h.config.Knowledge.Retrieval.SimilarityThreshold,
+			HybridWeight:        h.config.Knowledge.Retrieval.HybridWeight,
 		}
+		h.retrieverUpdater.UpdateConfig(retrievalConfig)
+		h.logger.Info("检索器配置已更新",
+			zap.Int("top_k", retrievalConfig.TopK),
+			zap.Float64("similarity_threshold", retrievalConfig.SimilarityThreshold),
+			zap.Float64("hybrid_weight", retrievalConfig.HybridWeight),
+		)
+	}
 
-		// 更新嵌入模型配置记录（如果知识库启用）
-		if h.config.Knowledge.Enabled {
-			h.lastEmbeddingConfig = &config.EmbeddingConfig{
-				Provider: h.config.Knowledge.Embedding.Provider,
-				Model:    h.config.Knowledge.Embedding.Model,
-				BaseURL:  h.config.Knowledge.Embedding.BaseURL,
-				APIKey:   h.config.Knowledge.Embedding.APIKey,
-			}
+	// 更新嵌入模型配置记录（如果知识库启用）
+	if h.config.Knowledge.Enabled {
+		h.lastEmbeddingConfig = &config.EmbeddingConfig{
+			Provider: h.config.Knowledge.Embedding.Provider,
+			Model:    h.config.Knowledge.Embedding.Model,
+			BaseURL:  h.config.Knowledge.Embedding.BaseURL,
+			APIKey:   h.config.Knowledge.Embedding.APIKey,
 		}
+	}
 
 	h.logger.Info("配置已应用",
 		zap.Int("tools_count", len(h.config.Security.Tools)),

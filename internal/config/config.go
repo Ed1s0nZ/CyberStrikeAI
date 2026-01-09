@@ -81,6 +81,7 @@ type ExternalMCPServerConfig struct {
 	// stdio模式配置
 	Command string   `yaml:"command,omitempty" json:"command,omitempty"`
 	Args    []string `yaml:"args,omitempty" json:"args,omitempty"`
+	Env     map[string]string `yaml:"env,omitempty" json:"env,omitempty"` // 环境变量（用于stdio模式）
 
 	// HTTP模式配置
 	Transport string `yaml:"transport,omitempty" json:"transport,omitempty"` // "http" 或 "stdio"

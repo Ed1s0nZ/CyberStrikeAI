@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -246,6 +247,7 @@ func (c *HTTPMCPClient) Close() error {
 type StdioMCPClient struct {
 	command     string
 	args        []string
+	env         map[string]string
 	timeout     time.Duration
 	cmd         *exec.Cmd
 	stdin       io.WriteCloser
@@ -263,7 +265,7 @@ type StdioMCPClient struct {
 }
 
 // NewStdioMCPClient 创建stdio模式的MCP客户端
-func NewStdioMCPClient(command string, args []string, timeout time.Duration, logger *zap.Logger) *StdioMCPClient {
+func NewStdioMCPClient(command string, args []string, env map[string]string, timeout time.Duration, logger *zap.Logger) *StdioMCPClient {
 	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
@@ -271,6 +273,7 @@ func NewStdioMCPClient(command string, args []string, timeout time.Duration, log
 	return &StdioMCPClient{
 		command:   command,
 		args:      args,
+		env:       env,
 		timeout:   timeout,
 		logger:    logger,
 		status:    "disconnected",
@@ -353,6 +356,27 @@ func (c *StdioMCPClient) Initialize(ctx context.Context) error {
 
 func (c *StdioMCPClient) startProcess() error {
 	cmd := exec.CommandContext(c.ctx, c.command, c.args...)
+
+	// 设置环境变量
+	if c.env != nil && len(c.env) > 0 {
+		// 获取当前环境变量
+		cmd.Env = os.Environ()
+		// 添加或覆盖配置的环境变量
+		for key, value := range c.env {
+			// 检查是否已存在该环境变量
+			found := false
+			for i, envVar := range cmd.Env {
+				if strings.HasPrefix(envVar, key+"=") {
+					cmd.Env[i] = key + "=" + value
+					found = true
+					break
+				}
+			}
+			if !found {
+				cmd.Env = append(cmd.Env, key+"="+value)
+			}
+		}
+	}
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

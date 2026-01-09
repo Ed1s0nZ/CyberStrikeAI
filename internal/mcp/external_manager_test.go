@@ -180,7 +180,7 @@ func TestStdioMCPClient_Initialize(t *testing.T) {
 	// 注意：这个测试需要一个真实的stdio MCP服务器
 	// 如果没有服务器，这个测试会失败
 	logger := zap.NewNop()
-	client := NewStdioMCPClient("echo", []string{"test"}, 5*time.Second, logger)
+	client := NewStdioMCPClient("echo", []string{"test"}, nil, 5*time.Second, logger)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
