@@ -1275,47 +1275,60 @@ header {
 /* 消息复制按钮 - 位于消息气泡右下角 */
 .message-copy-btn {
     position: absolute;
-    bottom: 8px;
-    right: 8px;
+    bottom: 12px;
+    right: 12px;
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 6px 12px;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    color: var(--text-secondary);
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 20px;
+    color: #666;
     font-size: 0.8125rem;
     cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
     z-index: 10;
     opacity: 0;
+    transform: translateY(4px);
+    font-weight: 500;
 }
 
 .message-bubble:hover .message-copy-btn {
     opacity: 1;
+    transform: translateY(0);
 }
 
 .message-copy-btn:hover {
-    background: var(--bg-secondary);
-    border-color: var(--accent-color);
-    color: var(--accent-color);
-    box-shadow: 0 2px 8px rgba(0, 102, 255, 0.2);
+    background: rgba(255, 255, 255, 1);
+    border-color: rgba(0, 102, 255, 0.2);
+    color: #0066ff;
+    box-shadow: 0 4px 12px rgba(0, 102, 255, 0.15), 0 2px 4px rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
 }
 
 .message-copy-btn:active {
-    transform: scale(0.95);
+    transform: translateY(0) scale(0.98);
+    box-shadow: 0 2px 6px rgba(0, 102, 255, 0.12), 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 .message-copy-btn svg {
     width: 16px;
     height: 16px;
     flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+.message-copy-btn:hover svg {
+    transform: scale(1.1);
 }
 
 .message-copy-btn span {
     font-weight: 500;
+    letter-spacing: 0.01em;
 }
 
 /* 用户消息中的表格样式 */

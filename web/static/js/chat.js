@@ -844,7 +844,7 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
     if (role === 'assistant') {
         const copyBtn = document.createElement('button');
         copyBtn.className = 'message-copy-btn';
-        copyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="currentColor"/></svg><span>复制</span>';
+        copyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg><span>复制</span>';
         copyBtn.title = '复制消息内容';
         copyBtn.onclick = function(e) {
             e.stopPropagation();
@@ -972,11 +972,15 @@ function copyMessageToClipboard(messageDiv, button) {
 function showCopySuccess(button) {
     if (button) {
         const originalText = button.innerHTML;
-        button.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>已复制</span>';
-        button.style.color = '#28a745';
+        button.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg><span>已复制</span>';
+        button.style.color = '#10b981';
+        button.style.background = 'rgba(16, 185, 129, 0.1)';
+        button.style.borderColor = 'rgba(16, 185, 129, 0.3)';
         setTimeout(() => {
             button.innerHTML = originalText;
             button.style.color = '';
+            button.style.background = '';
+            button.style.borderColor = '';
         }, 2000);
     }
 }
