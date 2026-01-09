@@ -254,6 +254,16 @@ function ensureMentionToolsLoaded() {
     return mentionToolsLoadingPromise;
 }
 
+// 生成工具的唯一标识符，用于区分同名但来源不同的工具
+function getToolKeyForMention(tool) {
+    // 如果是外部工具，使用 external_mcp::tool.name 作为唯一标识
+    // 如果是内部工具，使用 tool.name 作为标识
+    if (tool.is_external && tool.external_mcp) {
+        return `${tool.external_mcp}::${tool.name}`;
+    }
+    return tool.name;
+}
+
 async function fetchMentionTools() {
     const pageSize = 100;
     let page = 1;
@@ -287,16 +297,22 @@ async function fetchMentionTools() {
             const result = await response.json();
             const tools = Array.isArray(result.tools) ? result.tools : [];
             tools.forEach(tool => {
-                if (!tool || !tool.name || seen.has(tool.name)) {
+                if (!tool || !tool.name) {
                     return;
                 }
-                seen.add(tool.name);
+                // 使用唯一标识符来去重，而不是只使用工具名称
+                const toolKey = getToolKeyForMention(tool);
+                if (seen.has(toolKey)) {
+                    return;
+                }
+                seen.add(toolKey);
                 collected.push({
                     name: tool.name,
                     description: tool.description || '',
                     enabled: tool.enabled !== false,
                     isExternal: !!tool.is_external,
                     externalMcp: tool.external_mcp || '',
+                    toolKey: toolKey, // 保存唯一标识符
                 });
             });
             totalPages = result.total_pages || 1;

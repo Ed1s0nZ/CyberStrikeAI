@@ -2,8 +2,18 @@
 let currentConfig = null;
 let allTools = [];
 // 全局工具状态映射，用于保存用户在所有页面的修改
-// key: tool.name, value: { enabled: boolean, is_external: boolean, external_mcp: string }
+// key: 唯一工具标识符（toolKey），value: { enabled: boolean, is_external: boolean, external_mcp: string }
 let toolStateMap = new Map();
+
+// 生成工具的唯一标识符，用于区分同名但来源不同的工具
+function getToolKey(tool) {
+    // 如果是外部工具，使用 external_mcp::tool.name 作为唯一标识
+    // 如果是内部工具，使用 tool.name 作为标识
+    if (tool.is_external && tool.external_mcp) {
+        return `${tool.external_mcp}::${tool.name}`;
+    }
+    return tool.name;
+}
 // 从localStorage读取每页显示数量，默认为20
 const getToolsPageSize = () => {
     const saved = localStorage.getItem('toolsPageSize');
@@ -199,11 +209,13 @@ async function loadToolsList(page = 1, searchKeyword = '') {
         
         // 初始化工具状态映射（如果工具不在映射中，使用服务器返回的状态）
         allTools.forEach(tool => {
-            if (!toolStateMap.has(tool.name)) {
-                toolStateMap.set(tool.name, {
+            const toolKey = getToolKey(tool);
+            if (!toolStateMap.has(toolKey)) {
+                toolStateMap.set(toolKey, {
                     enabled: tool.enabled,
                     is_external: tool.is_external || false,
-                    external_mcp: tool.external_mcp || ''
+                    external_mcp: tool.external_mcp || '',
+                    name: tool.name // 保存原始工具名称
                 });
             }
         });
@@ -223,14 +235,16 @@ async function loadToolsList(page = 1, searchKeyword = '') {
 function saveCurrentPageToolStates() {
     document.querySelectorAll('#tools-list .tool-item').forEach(item => {
         const checkbox = item.querySelector('input[type="checkbox"]');
+        const toolKey = item.dataset.toolKey; // 使用唯一标识符
         const toolName = item.dataset.toolName;
         const isExternal = item.dataset.isExternal === 'true';
         const externalMcp = item.dataset.externalMcp || '';
-        if (toolName && checkbox) {
-            toolStateMap.set(toolName, {
+        if (toolKey && checkbox) {
+            toolStateMap.set(toolKey, {
                 enabled: checkbox.checked,
                 is_external: isExternal,
-                external_mcp: externalMcp
+                external_mcp: externalMcp,
+                name: toolName // 保存原始工具名称
             });
         }
     });
@@ -283,14 +297,16 @@ function renderToolsList() {
     }
     
     allTools.forEach(tool => {
+        const toolKey = getToolKey(tool); // 生成唯一标识符
         const toolItem = document.createElement('div');
         toolItem.className = 'tool-item';
+        toolItem.dataset.toolKey = toolKey; // 保存唯一标识符
         toolItem.dataset.toolName = tool.name; // 保存原始工具名称
         toolItem.dataset.isExternal = tool.is_external ? 'true' : 'false';
         toolItem.dataset.externalMcp = tool.external_mcp || '';
         
         // 从全局状态映射获取工具状态，如果不存在则使用服务器返回的状态
-        const toolState = toolStateMap.get(tool.name) || {
+        const toolState = toolStateMap.get(toolKey) || {
             enabled: tool.enabled,
             is_external: tool.is_external || false,
             external_mcp: tool.external_mcp || ''
@@ -298,15 +314,18 @@ function renderToolsList() {
         
         // 外部工具标签，显示来源信息
         let externalBadge = '';
-        if (toolState.is_external) {
-            const externalMcpName = toolState.external_mcp || '';
+        if (toolState.is_external || tool.is_external) {
+            const externalMcpName = toolState.external_mcp || tool.external_mcp || '';
             const badgeText = externalMcpName ? `外部 (${escapeHtml(externalMcpName)})` : '外部';
             const badgeTitle = externalMcpName ? `外部MCP工具 - 来源：${escapeHtml(externalMcpName)}` : '外部MCP工具';
             externalBadge = `<span class="external-tool-badge" title="${badgeTitle}">${badgeText}</span>`;
         }
         
+        // 生成唯一的checkbox id，使用工具唯一标识符
+        const checkboxId = `tool-${escapeHtml(toolKey).replace(/::/g, '--')}`;
+        
         toolItem.innerHTML = `
-            <input type="checkbox" id="tool-${tool.name}" ${toolState.enabled ? 'checked' : ''} ${toolState.is_external ? 'data-external="true"' : ''} onchange="handleToolCheckboxChange('${tool.name}', this.checked)" />
+            <input type="checkbox" id="${checkboxId}" ${toolState.enabled ? 'checked' : ''} ${toolState.is_external || tool.is_external ? 'data-external="true"' : ''} onchange="handleToolCheckboxChange('${escapeHtml(toolKey)}', this.checked)" />
             <div class="tool-item-info">
                 <div class="tool-item-name">
                     ${escapeHtml(tool.name)}
@@ -376,16 +395,18 @@ function renderToolsPagination() {
 }
 
 // 处理工具checkbox状态变化
-function handleToolCheckboxChange(toolName, enabled) {
+function handleToolCheckboxChange(toolKey, enabled) {
     // 更新全局状态映射
-    const toolItem = document.querySelector(`.tool-item[data-tool-name="${toolName}"]`);
+    const toolItem = document.querySelector(`.tool-item[data-tool-key="${toolKey}"]`);
     if (toolItem) {
+        const toolName = toolItem.dataset.toolName;
         const isExternal = toolItem.dataset.isExternal === 'true';
         const externalMcp = toolItem.dataset.externalMcp || '';
-        toolStateMap.set(toolName, {
+        toolStateMap.set(toolKey, {
             enabled: enabled,
             is_external: isExternal,
-            external_mcp: externalMcp
+            external_mcp: externalMcp,
+            name: toolName // 保存原始工具名称
         });
     }
     updateToolsStats();
@@ -398,14 +419,16 @@ function selectAllTools() {
         // 更新全局状态映射
         const toolItem = checkbox.closest('.tool-item');
         if (toolItem) {
+            const toolKey = toolItem.dataset.toolKey;
             const toolName = toolItem.dataset.toolName;
             const isExternal = toolItem.dataset.isExternal === 'true';
             const externalMcp = toolItem.dataset.externalMcp || '';
-            if (toolName) {
-                toolStateMap.set(toolName, {
+            if (toolKey) {
+                toolStateMap.set(toolKey, {
                     enabled: true,
                     is_external: isExternal,
-                    external_mcp: externalMcp
+                    external_mcp: externalMcp,
+                    name: toolName // 保存原始工具名称
                 });
             }
         }
@@ -420,14 +443,16 @@ function deselectAllTools() {
         // 更新全局状态映射
         const toolItem = checkbox.closest('.tool-item');
         if (toolItem) {
+            const toolKey = toolItem.dataset.toolKey;
             const toolName = toolItem.dataset.toolName;
             const isExternal = toolItem.dataset.isExternal === 'true';
             const externalMcp = toolItem.dataset.externalMcp || '';
-            if (toolName) {
-                toolStateMap.set(toolName, {
+            if (toolKey) {
+                toolStateMap.set(toolKey, {
                     enabled: false,
                     is_external: isExternal,
-                    external_mcp: externalMcp
+                    external_mcp: externalMcp,
+                    name: toolName // 保存原始工具名称
                 });
             }
         }
@@ -484,11 +509,13 @@ async function updateToolsStats() {
             totalTools = allTools.length;
             totalEnabled = allTools.filter(tool => {
                 // 优先使用全局状态映射，否则使用checkbox状态，最后使用服务器返回的状态
-                const savedState = toolStateMap.get(tool.name);
+                const toolKey = getToolKey(tool);
+                const savedState = toolStateMap.get(toolKey);
                 if (savedState !== undefined) {
                     return savedState.enabled;
                 }
-                const checkbox = document.getElementById(`tool-${tool.name}`);
+                const checkboxId = `tool-${toolKey.replace(/::/g, '--')}`;
+                const checkbox = document.getElementById(checkboxId);
                 return checkbox ? checkbox.checked : tool.enabled;
             }).length;
         } else {
@@ -498,16 +525,18 @@ async function updateToolsStats() {
             
             // 从当前页的checkbox获取状态（如果全局映射中没有）
             allTools.forEach(tool => {
-                const savedState = toolStateMap.get(tool.name);
+                const toolKey = getToolKey(tool);
+                const savedState = toolStateMap.get(toolKey);
                 if (savedState !== undefined) {
-                    localStateMap.set(tool.name, savedState.enabled);
+                    localStateMap.set(toolKey, savedState.enabled);
                 } else {
-                    const checkbox = document.getElementById(`tool-${tool.name}`);
+                    const checkboxId = `tool-${toolKey.replace(/::/g, '--')}`;
+                    const checkbox = document.getElementById(checkboxId);
                     if (checkbox) {
-                        localStateMap.set(tool.name, checkbox.checked);
+                        localStateMap.set(toolKey, checkbox.checked);
                     } else {
                         // 如果checkbox不存在（不在当前页），使用工具原始状态
-                        localStateMap.set(tool.name, tool.enabled);
+                        localStateMap.set(toolKey, tool.enabled);
                     }
                 }
             });
@@ -527,9 +556,10 @@ async function updateToolsStats() {
                     const pageResult = await pageResponse.json();
                     pageResult.tools.forEach(tool => {
                         // 优先使用全局状态映射，否则使用服务器返回的状态
-                        if (!localStateMap.has(tool.name)) {
-                            const savedState = toolStateMap.get(tool.name);
-                            localStateMap.set(tool.name, savedState ? savedState.enabled : tool.enabled);
+                        const toolKey = getToolKey(tool);
+                        if (!localStateMap.has(toolKey)) {
+                            const savedState = toolStateMap.get(toolKey);
+                            localStateMap.set(toolKey, savedState ? savedState.enabled : tool.enabled);
                         }
                     });
                     
@@ -665,8 +695,9 @@ async function applySettings() {
                 // 将工具添加到映射中
                 // 优先使用全局状态映射中的状态（用户修改过的），否则使用服务器返回的状态
                 pageResult.tools.forEach(tool => {
-                    const savedState = toolStateMap.get(tool.name);
-                    allToolsMap.set(tool.name, {
+                    const toolKey = getToolKey(tool);
+                    const savedState = toolStateMap.get(toolKey);
+                    allToolsMap.set(toolKey, {
                         name: tool.name,
                         enabled: savedState ? savedState.enabled : tool.enabled,
                         is_external: savedState ? savedState.is_external : (tool.is_external || false),
@@ -683,7 +714,7 @@ async function applySettings() {
             }
             
             // 将所有工具添加到配置中
-            allToolsMap.forEach(tool => {
+            allToolsMap.forEach((tool, toolKey) => {
                 config.tools.push({
                     name: tool.name,
                     enabled: tool.enabled,
@@ -694,7 +725,9 @@ async function applySettings() {
         } catch (error) {
             console.warn('获取所有工具列表失败，仅使用全局状态映射', error);
             // 如果获取失败，使用全局状态映射
-            toolStateMap.forEach((toolData, toolName) => {
+            toolStateMap.forEach((toolData, toolKey) => {
+                // toolData.name 保存了原始工具名称
+                const toolName = toolData.name || toolKey.split('::').pop();
                 config.tools.push({
                     name: toolName,
                     enabled: toolData.enabled,
@@ -777,8 +810,9 @@ async function saveToolsConfig() {
                 
                 // 将工具添加到映射中
                 pageResult.tools.forEach(tool => {
-                    const savedState = toolStateMap.get(tool.name);
-                    allToolsMap.set(tool.name, {
+                    const toolKey = getToolKey(tool);
+                    const savedState = toolStateMap.get(toolKey);
+                    allToolsMap.set(toolKey, {
                         name: tool.name,
                         enabled: savedState ? savedState.enabled : tool.enabled,
                         is_external: savedState ? savedState.is_external : (tool.is_external || false),
@@ -795,7 +829,7 @@ async function saveToolsConfig() {
             }
             
             // 将所有工具添加到配置中
-            allToolsMap.forEach(tool => {
+            allToolsMap.forEach((tool, toolKey) => {
                 config.tools.push({
                     name: tool.name,
                     enabled: tool.enabled,
@@ -806,7 +840,9 @@ async function saveToolsConfig() {
         } catch (error) {
             console.warn('获取所有工具列表失败，仅使用全局状态映射', error);
             // 如果获取失败，使用全局状态映射
-            toolStateMap.forEach((toolData, toolName) => {
+            toolStateMap.forEach((toolData, toolKey) => {
+                // toolData.name 保存了原始工具名称
+                const toolName = toolData.name || toolKey.split('::').pop();
                 config.tools.push({
                     name: toolName,
                     enabled: toolData.enabled,
