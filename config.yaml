@@ -66,3 +66,7 @@ knowledge:
     top_k: 5 # 检索返回的Top-K结果数量
     similarity_threshold: 0.7 # 相似度阈值（0-1），低于此值的结果将被过滤
     hybrid_weight: 0.7 # 混合检索权重（0-1），向量检索的权重，1.0表示纯向量检索，0.0表示纯关键词检索
+# 角色配置
+roles_dir: roles # 角色配置文件目录（相对于配置文件所在目录）
+# 系统会从该目录加载所有 .yaml 格式的角色配置文件
+# 每个角色应创建独立的配置文件，例如：roles/CTF.yaml, roles/默认.yaml 等
