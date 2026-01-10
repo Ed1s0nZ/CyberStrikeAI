@@ -42,6 +42,7 @@ CyberStrikeAI is an **AI-native security testing platform** built in Go. It inte
 - 📁 Conversation grouping with pinning, rename, and batch management
 - 🛡️ Vulnerability management with CRUD operations, severity tracking, status workflow, and statistics
 - 📋 Batch task management: create task queues, add multiple tasks, and execute them sequentially
+- 🎭 Role-based testing: predefined security testing roles (Penetration Testing, CTF, Web App Scanning, etc.) with custom prompts and tool restrictions
 
 ## Tool Overview
 
@@ -121,6 +122,7 @@ go build -o cyberstrike-ai cmd/server/main.go
 
 ### Core Workflows
 - **Conversation testing** – Natural-language prompts trigger toolchains with streaming SSE output.
+- **Role-based testing** – Select from predefined security testing roles (Penetration Testing, CTF, Web App Scanning, API Security Testing, etc.) to customize AI behavior and tool availability. Each role applies custom system prompts and can restrict available tools for focused testing scenarios.
 - **Tool monitor** – Inspect running jobs, execution logs, and large-result attachments.
 - **History & audit** – Every conversation and tool invocation is stored in SQLite with replay.
 - **Conversation groups** – Organize conversations into groups, pin important groups, rename or delete groups via context menu.
@@ -135,6 +137,28 @@ go build -o cyberstrike-ai cmd/server/main.go
 - Timeout and sandbox guards per tool, plus structured logging for triage.
 
 ## Advanced Usage
+
+### Role-Based Testing
+- **Predefined roles** – System includes 12+ predefined security testing roles (Penetration Testing, CTF, Web App Scanning, API Security Testing, Binary Analysis, Cloud Security Audit, etc.) in the `roles/` directory.
+- **Custom prompts** – Each role can define a `user_prompt` that prepends to user messages, guiding the AI to adopt specialized testing methodologies and focus areas.
+- **Tool restrictions** – Roles can specify a `tools` list to limit available tools, ensuring focused testing workflows (e.g., CTF role restricts to CTF-specific utilities).
+- **Easy role creation** – Create custom roles by adding YAML files to the `roles/` directory. Each role defines `name`, `description`, `user_prompt`, `icon`, `tools`, and `enabled` fields.
+- **Web UI integration** – Select roles from a dropdown in the chat interface. Role selection affects both AI behavior and available tool suggestions.
+
+**Creating a custom role (example):**
+1. Create a YAML file in `roles/` (e.g., `roles/custom-role.yaml`):
+   ```yaml
+   name: Custom Role
+   description: Specialized testing scenario
+   user_prompt: You are a specialized security tester focusing on API security...
+   icon: "\U0001F4E1"
+   tools:
+     - api-fuzzer
+     - arjun
+     - graphql-scanner
+   enabled: true
+   ```
+2. Restart the server or reload configuration; the role appears in the role selector dropdown.
 
 ### Tool Orchestration & Extensions
 - **YAML recipes** in `tools/*.yaml` describe commands, arguments, prompts, and metadata.
@@ -292,7 +316,8 @@ A test SSE MCP server is available at `cmd/test-sse-mcp-server/` for validation 
 
 
 ### Automation Hooks
-- **REST APIs** – everything the UI uses (auth, conversations, tool runs, monitor, vulnerabilities) is available over JSON.
+- **REST APIs** – everything the UI uses (auth, conversations, tool runs, monitor, vulnerabilities, roles) is available over JSON.
+- **Role APIs** – manage security testing roles via `/api/roles` endpoints: `GET /api/roles` (list all roles), `GET /api/roles/:name` (get role), `POST /api/roles` (create role), `PUT /api/roles/:name` (update role), `DELETE /api/roles/:name` (delete role). Roles are stored as YAML files in the `roles/` directory and support hot-reload.
 - **Vulnerability APIs** – manage vulnerabilities via `/api/vulnerabilities` endpoints: `GET /api/vulnerabilities` (list with filters), `POST /api/vulnerabilities` (create), `GET /api/vulnerabilities/:id` (get), `PUT /api/vulnerabilities/:id` (update), `DELETE /api/vulnerabilities/:id` (delete), `GET /api/vulnerabilities/stats` (statistics).
 - **Batch Task APIs** – manage batch task queues via `/api/batch-tasks` endpoints: `POST /api/batch-tasks` (create queue), `GET /api/batch-tasks` (list queues), `GET /api/batch-tasks/:queueId` (get queue), `POST /api/batch-tasks/:queueId/start` (start execution), `POST /api/batch-tasks/:queueId/cancel` (cancel), `DELETE /api/batch-tasks/:queueId` (delete), `POST /api/batch-tasks/:queueId/tasks` (add task), `PUT /api/batch-tasks/:queueId/tasks/:taskId` (update task), `DELETE /api/batch-tasks/:queueId/tasks/:taskId` (delete task). Tasks execute sequentially, each creating a separate conversation with full status tracking.
 - **Task control** – pause/resume/stop long scans, re-run steps with new params, or stream transcripts.
@@ -335,6 +360,7 @@ knowledge:
     top_k: 5  # Number of top results to return
     similarity_threshold: 0.7  # Minimum similarity score (0-1)
     hybrid_weight: 0.7  # Weight for vector search (1.0 = pure vector, 0.0 = pure keyword)
+roles_dir: "roles"  # Role configuration directory (relative to config file)
 ```
 
 ### Tool Definition Example (`tools/nmap.yaml`)
@@ -357,6 +383,26 @@ parameters:
     description: "Range, e.g. 1-1000"
 ```
 
+### Role Definition Example (`roles/penetration-testing.yaml`)
+
+```yaml
+name: Penetration Testing
+description: Professional penetration testing expert for comprehensive security testing
+user_prompt: You are a professional cybersecurity penetration testing expert. Please use professional penetration testing methods and tools to conduct comprehensive security testing on targets, including but not limited to SQL injection, XSS, CSRF, file inclusion, command execution and other common vulnerabilities.
+icon: "\U0001F3AF"
+tools:
+  - nmap
+  - sqlmap
+  - nuclei
+  - burpsuite
+  - metasploit
+  - httpx
+  - record_vulnerability
+  - list_knowledge_risk_types
+  - search_knowledge_base
+enabled: true
+```
+
 ## Project Layout
 
 ```
@@ -365,6 +411,7 @@ CyberStrikeAI/
 ├── internal/            # Agent, MCP core, handlers, security executor
 ├── web/                 # Static SPA + templates
 ├── tools/               # YAML tool recipes (100+ examples provided)
+├── roles/               # Role configurations (12+ predefined security testing roles)
 ├── img/                 # Docs screenshots & diagrams
 ├── config.yaml          # Runtime configuration
 ├── run.sh               # Convenience launcher
@@ -392,6 +439,7 @@ Build an attack chain for the latest engagement and export the node list with se
 
 ## Changelog (Recent)
 
+- 2026-01-11 – Added role-based testing feature: predefined security testing roles with custom system prompts and tool restrictions. Users can select roles (Penetration Testing, CTF, Web App Scanning, etc.) from the chat interface to customize AI behavior and available tools. Roles are defined as YAML files in the `roles/` directory with support for hot-reload.
 - 2026-01-08 – Added SSE (Server-Sent Events) transport mode support for external MCP servers. External MCP federation now supports HTTP, stdio, and SSE modes. SSE mode enables real-time streaming communication for push-based scenarios.
 - 2026-01-01 – Added batch task management feature: create task queues with multiple tasks, add/edit/delete tasks before execution, and execute them sequentially. Each task runs as a separate conversation with status tracking (pending/running/completed/failed/cancelled). All queues and tasks are persisted in the database.
 - 2025-12-25 – Added vulnerability management feature: full CRUD operations for tracking vulnerabilities discovered during testing. Supports severity levels (critical/high/medium/low/info), status workflow (open/confirmed/fixed/false_positive), filtering by conversation/severity/status, and comprehensive statistics dashboard.

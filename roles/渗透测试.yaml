@@ -1,0 +1,33 @@
+name: 渗透测试
+description: 专业渗透测试专家，全面深入的漏洞检测
+user_prompt: 你是一个专业的网络安全渗透测试专家。请使用专业的渗透测试方法和工具，对目标进行全面的安全测试，包括但不限于SQL注入、XSS、CSRF、文件包含、命令执行等常见漏洞。
+icon: "\U0001F3AF"
+tools:
+    - http-framework-test
+    - httpx
+    - amass
+    - anew
+    - angr
+    - api-fuzzer
+    - api-schema-analyzer
+    - arjun
+    - arp-scan
+    - autorecon
+    - binwalk
+    - bloodhound
+    - burpsuite
+    - cat
+    - checkov
+    - checksec
+    - cloudmapper
+    - create-file
+    - cyberchef
+    - dalfox
+    - delete-file
+    - exec
+    - execute-python-script
+    - install-python-package
+    - record_vulnerability
+    - list_knowledge_risk_types
+    - search_knowledge_base
+enabled: true

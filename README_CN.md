@@ -41,6 +41,7 @@ CyberStrikeAI 是一款 **AI 原生安全测试平台**，基于 Go 构建，集
 - 📁 对话分组管理：支持分组创建、置顶、重命名、删除等操作
 - 🛡️ 漏洞管理功能：完整的漏洞 CRUD 操作，支持严重程度分级、状态流转、按对话/严重程度/状态过滤，以及统计看板
 - 📋 批量任务管理：创建任务队列，批量添加任务，依次顺序执行，支持任务编辑与状态跟踪
+- 🎭 角色化测试：预设安全测试角色（渗透测试、CTF、Web 应用扫描等），支持自定义提示词和工具限制
 
 ## 工具概览
 
@@ -120,6 +121,7 @@ go build -o cyberstrike-ai cmd/server/main.go
 
 ### 常用流程
 - **对话测试**：自然语言触发多步工具编排，SSE 实时输出。
+- **角色化测试**：从预设的安全测试角色（渗透测试、CTF、Web 应用扫描、API 安全测试等）中选择，自定义 AI 行为和可用工具。每个角色可应用自定义系统提示词，并可限制可用工具列表，实现聚焦的测试场景。
 - **工具监控**：查看任务队列、执行日志、大文件附件。
 - **会话历史**：所有对话与工具调用保存在 SQLite，可随时重放。
 - **对话分组**：将对话按项目或主题组织到不同分组，支持置顶、重命名、删除等操作，所有数据持久化存储。
@@ -134,6 +136,28 @@ go build -o cyberstrike-ai cmd/server/main.go
 - 每个工具执行都带有超时、日志和错误隔离。
 
 ## 进阶使用
+
+### 角色化测试
+- **预设角色**：系统内置 12+ 个预设的安全测试角色（渗透测试、CTF、Web 应用扫描、API 安全测试、二进制分析、云安全审计等），位于 `roles/` 目录。
+- **自定义提示词**：每个角色可定义 `user_prompt`，会在用户消息前自动添加，引导 AI 采用特定的测试方法和关注重点。
+- **工具限制**：角色可指定 `tools` 列表，限制可用工具，实现聚焦的测试流程（如 CTF 角色限制为 CTF 专用工具）。
+- **轻松创建角色**：通过在 `roles/` 目录添加 YAML 文件即可创建自定义角色。每个角色定义 `name`、`description`、`user_prompt`、`icon`、`tools`、`enabled` 字段。
+- **Web 界面集成**：在聊天界面通过下拉菜单选择角色。角色选择会影响 AI 行为和可用工具建议。
+
+**创建自定义角色示例：**
+1. 在 `roles/` 目录创建 YAML 文件（如 `roles/custom-role.yaml`）：
+   ```yaml
+   name: 自定义角色
+   description: 专用测试场景
+   user_prompt: 你是一个专注于 API 安全的专业安全测试人员...
+   icon: "\U0001F4E1"
+   tools:
+     - api-fuzzer
+     - arjun
+     - graphql-scanner
+   enabled: true
+   ```
+2. 重启服务或重新加载配置，角色会出现在角色选择下拉菜单中。
 
 ### 工具编排与扩展
 - `tools/*.yaml` 定义命令、参数、提示词与元数据，可热加载。
@@ -291,7 +315,8 @@ CyberStrikeAI 支持通过三种传输模式连接外部 MCP 服务器：
 
 
 ### 自动化与安全
-- **REST API**：认证、会话、任务、监控、漏洞管理等接口全部开放，可与 CI/CD 集成。
+- **REST API**：认证、会话、任务、监控、漏洞管理、角色管理等接口全部开放，可与 CI/CD 集成。
+- **角色管理 API**：通过 `/api/roles` 端点管理安全测试角色：`GET /api/roles`（列表）、`GET /api/roles/:name`（获取角色）、`POST /api/roles`（创建角色）、`PUT /api/roles/:name`（更新角色）、`DELETE /api/roles/:name`（删除角色）。角色以 YAML 文件形式存储在 `roles/` 目录，支持热加载。
 - **漏洞管理 API**：通过 `/api/vulnerabilities` 端点管理漏洞：`GET /api/vulnerabilities`（列表，支持过滤）、`POST /api/vulnerabilities`（创建）、`GET /api/vulnerabilities/:id`（获取）、`PUT /api/vulnerabilities/:id`（更新）、`DELETE /api/vulnerabilities/:id`（删除）、`GET /api/vulnerabilities/stats`（统计）。
 - **批量任务 API**：通过 `/api/batch-tasks` 端点管理批量任务队列：`POST /api/batch-tasks`（创建队列）、`GET /api/batch-tasks`（列表）、`GET /api/batch-tasks/:queueId`（获取队列）、`POST /api/batch-tasks/:queueId/start`（开始执行）、`POST /api/batch-tasks/:queueId/cancel`（取消）、`DELETE /api/batch-tasks/:queueId`（删除队列）、`POST /api/batch-tasks/:queueId/tasks`（添加任务）、`PUT /api/batch-tasks/:queueId/tasks/:taskId`（更新任务）、`DELETE /api/batch-tasks/:queueId/tasks/:taskId`（删除任务）。任务依次顺序执行，每个任务创建独立对话，支持完整状态跟踪。
 - **任务控制**：支持暂停/终止长任务、修改参数后重跑、流式获取日志。
@@ -334,6 +359,7 @@ knowledge:
     top_k: 5  # 检索返回的 Top-K 结果数量
     similarity_threshold: 0.7  # 相似度阈值（0-1），低于此值的结果将被过滤
     hybrid_weight: 0.7  # 混合检索权重（0-1），向量检索的权重，1.0 表示纯向量检索，0.0 表示纯关键词检索
+roles_dir: "roles"  # 角色配置文件目录（相对于配置文件所在目录）
 ```
 
 ### 工具模版示例（`tools/nmap.yaml`）
@@ -356,6 +382,26 @@ parameters:
     description: "端口范围，如 1-1000"
 ```
 
+### 角色配置示例（`roles/渗透测试.yaml`）
+
+```yaml
+name: 渗透测试
+description: 专业渗透测试专家，全面深入的漏洞检测
+user_prompt: 你是一个专业的网络安全渗透测试专家。请使用专业的渗透测试方法和工具，对目标进行全面的安全测试，包括但不限于SQL注入、XSS、CSRF、文件包含、命令执行等常见漏洞。
+icon: "\U0001F3AF"
+tools:
+  - nmap
+  - sqlmap
+  - nuclei
+  - burpsuite
+  - metasploit
+  - httpx
+  - record_vulnerability
+  - list_knowledge_risk_types
+  - search_knowledge_base
+enabled: true
+```
+
 ## 项目结构
 
 ```
@@ -364,6 +410,7 @@ CyberStrikeAI/
 ├── internal/            # Agent、MCP 核心、路由与执行器
 ├── web/                 # 前端静态资源与模板
 ├── tools/               # YAML 工具目录（含 100+ 示例）
+├── roles/               # 角色配置文件目录（含 12+ 预设安全测试角色）
 ├── img/                 # 文档配图
 ├── config.yaml          # 运行配置
 ├── run.sh               # 启动脚本
@@ -390,6 +437,7 @@ CyberStrikeAI/
 ```
 
 ## Changelog（近期）
+- 2026-01-11 —— 新增角色化测试功能：预设安全测试角色，支持自定义系统提示词和工具限制。用户可在聊天界面选择角色（渗透测试、CTF、Web 应用扫描等），以自定义 AI 行为和可用工具。角色以 YAML 文件形式定义在 `roles/` 目录，支持热加载。
 - 2026-01-08 —— 新增 SSE（Server-Sent Events）传输模式支持，外部 MCP 联邦现支持 HTTP、stdio 和 SSE 三种模式。SSE 模式支持实时流式通信，适用于基于推送的场景。
 - 2026-01-01 —— 新增批量任务管理功能：支持创建任务队列，批量添加多个任务，执行前可编辑或删除任务，然后依次顺序执行。每个任务作为独立对话运行，支持状态跟踪（待执行/执行中/已完成/失败/已取消），所有队列和任务数据持久化存储到数据库。
 - 2025-12-25 —— 新增漏洞管理功能：完整的漏洞 CRUD 操作，支持跟踪测试过程中发现的漏洞。支持严重程度分级（严重/高/中/低/信息）、状态流转（待确认/已确认/已修复/误报）、按对话/严重程度/状态过滤，以及统计看板。

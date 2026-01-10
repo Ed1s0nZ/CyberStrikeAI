@@ -136,6 +136,23 @@
                             </div>
                         </div>
                     </div>
+                    <div class="nav-item nav-item-has-submenu" data-page="roles">
+                        <div class="nav-item-content" data-title="角色" onclick="toggleSubmenu('roles')">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <span>角色</span>
+                            <svg class="submenu-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <div class="nav-submenu">
+                            <div class="nav-submenu-item" data-page="roles-management" onclick="switchPage('roles-management')">
+                                <span>角色管理</span>
+                            </div>
+                        </div>
+                    </div>
                     <div class="nav-item" data-page="settings">
                         <div class="nav-item-content" data-title="系统设置" onclick="switchPage('settings')">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -162,7 +179,7 @@
                             </div>
                             <div class="sidebar-content">
                                 <!-- 全局搜索 -->
-                                <div class="conversation-search-box" style="margin-bottom: 16px;">
+                                <div class="conversation-search-box" style="margin-bottom: 16px; margin-top: 16px;">
                                     <input type="text" id="conversation-search-input" placeholder="搜索历史记录..." 
                                            oninput="handleConversationSearch(this.value)" 
                                            onkeypress="if(event.key === 'Enter') handleConversationSearch(this.value)" />
@@ -269,11 +286,37 @@
                             <div id="active-tasks-bar" class="active-tasks-bar"></div>
                             <div id="chat-messages" class="chat-messages"></div>
                             <div class="chat-input-container">
+                                <div class="role-selector-wrapper">
+                                    <button id="role-selector-btn" class="role-selector-btn" onclick="toggleRoleSelectionPanel()" title="选择角色">
+                                        <span id="role-selector-icon" class="role-selector-icon">🔵</span>
+                                        <span id="role-selector-text" class="role-selector-text">默认</span>
+                                        <svg class="role-selector-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                    </button>
+                                    <!-- 角色选择下拉面板 -->
+                                    <div id="role-selection-panel" class="role-selection-panel" style="display: none;">
+                                        <div class="role-selection-panel-header">
+                                            <h3 class="role-selection-panel-title">选择角色</h3>
+                                            <button class="role-selection-panel-close" onclick="closeRoleSelectionPanel()" title="关闭">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                    <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                        <div id="role-selection-list" class="role-selection-list-main"></div>
+                                    </div>
+                                </div>
                                 <div class="chat-input-field">
                                     <textarea id="chat-input" placeholder="输入测试目标或命令... (输入 @ 选择工具 | Shift+Enter 换行，Enter 发送)" rows="1"></textarea>
                                     <div id="mention-suggestions" class="mention-suggestions" role="listbox" aria-label="工具提及候选"></div>
                                 </div>
-                                <button onclick="sendMessage()">发送</button>
+                                <button class="send-btn" onclick="sendMessage()">
+                                    <span>发送</span>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -605,6 +648,34 @@
                     </div>
                 </div>
 
+                <!-- 角色管理页面 -->
+                <div id="page-roles-management" class="page">
+                    <div class="page-header">
+                        <h2>角色管理</h2>
+                        <div class="page-header-actions">
+                            <button class="btn-secondary" onclick="refreshRoles()">刷新</button>
+                            <button class="btn-primary" onclick="showAddRoleModal()">添加角色</button>
+                        </div>
+                    </div>
+                    <div class="page-content">
+                        <div class="roles-controls">
+                            <div class="roles-stats-bar" id="roles-stats">
+                                <div class="role-stat-item">
+                                    <span class="role-stat-label">总角色数</span>
+                                    <span class="role-stat-value">-</span>
+                                </div>
+                                <div class="role-stat-item">
+                                    <span class="role-stat-label">已启用</span>
+                                    <span class="role-stat-value">-</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="roles-list" class="roles-list">
+                            <div class="loading-spinner">加载中...</div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 系统设置页面 -->
                 <div id="page-settings" class="page">
                     <div class="page-header">
@@ -688,10 +759,6 @@
                                             </select>
                                         </div>
                                         <div class="form-group">
-                                            <label for="knowledge-embedding-model">模型名称</label>
-                                            <input type="text" id="knowledge-embedding-model" placeholder="text-embedding-v4" />
-                                        </div>
-                                        <div class="form-group">
                                             <label for="knowledge-embedding-base-url">Base URL</label>
                                             <input type="text" id="knowledge-embedding-base-url" placeholder="留空则使用OpenAI配置的base_url" />
                                             <small class="form-hint">留空则使用OpenAI配置的base_url</small>
@@ -700,6 +767,10 @@
                                             <label for="knowledge-embedding-api-key">API Key</label>
                                             <input type="password" id="knowledge-embedding-api-key" placeholder="留空则使用OpenAI配置的api_key" />
                                             <small class="form-hint">留空则使用OpenAI配置的api_key</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="knowledge-embedding-model">模型名称</label>
+                                            <input type="text" id="knowledge-embedding-model" placeholder="text-embedding-v4" />
                                         </div>
                                         
                                         <div class="settings-subsection-header">
@@ -1329,6 +1400,96 @@
         </div>
     </div>
 
+    <!-- 角色选择弹窗 -->
+    <div id="role-select-modal" class="modal">
+        <div class="modal-content role-select-modal-content">
+            <div class="modal-header">
+                <h2>选择角色</h2>
+                <span class="modal-close" onclick="closeRoleSelectModal()">&times;</span>
+            </div>
+            <div class="modal-body role-select-body">
+                <div id="role-select-list" class="role-select-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 角色编辑模态框 -->
+    <div id="role-modal" class="modal">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h2 id="role-modal-title">添加角色</h2>
+                <span class="modal-close" onclick="closeRoleModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="role-name">角色名称 <span style="color: red;">*</span></label>
+                    <input type="text" id="role-name" placeholder="输入角色名称" required />
+                </div>
+                <div class="form-group">
+                    <label for="role-description">角色描述</label>
+                    <input type="text" id="role-description" placeholder="输入角色描述" />
+                </div>
+                <div class="form-group">
+                    <label for="role-icon">角色图标</label>
+                    <input type="text" id="role-icon" placeholder="输入emoji图标，例如: 🏆" maxlength="10" />
+                    <small class="form-hint">输入一个emoji作为角色的图标，将显示在角色选择器中。</small>
+                </div>
+                <div class="form-group">
+                    <label for="role-user-prompt">用户提示词</label>
+                    <textarea id="role-user-prompt" rows="10" placeholder="输入用户提示词，会在用户消息前追加此提示词..."></textarea>
+                    <small class="form-hint">此提示词会追加到用户消息前，用于指导AI的行为。注意：这不会修改系统提示词。</small>
+                </div>
+                <div class="form-group" id="role-tools-section">
+                    <label>关联的工具（可选）</label>
+                    <div id="role-tools-default-hint" class="role-tools-default-hint" style="display: none;">
+                        <div class="role-tools-default-info">
+                            <span class="role-tools-default-icon">ℹ️</span>
+                            <div class="role-tools-default-content">
+                                <div class="role-tools-default-title">默认角色使用所有工具</div>
+                                <div class="role-tools-default-desc">默认角色会自动使用MCP管理中启用的所有工具，无需单独配置。</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="role-tools-controls">
+                        <div class="role-tools-actions">
+                            <button type="button" class="btn-secondary" onclick="selectAllRoleTools()">全选</button>
+                            <button type="button" class="btn-secondary" onclick="deselectAllRoleTools()">全不选</button>
+                            <div class="role-tools-search-box">
+                                <input type="text" id="role-tools-search" placeholder="搜索工具..." 
+                                       oninput="searchRoleTools(this.value)" 
+                                       onkeypress="if(event.key === 'Enter') searchRoleTools(this.value)" />
+                                <button class="role-tools-search-clear" id="role-tools-search-clear" 
+                                        onclick="clearRoleToolsSearch()" style="display: none;" title="清除搜索">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                                        <path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="role-tools-stats" class="role-tools-stats"></div>
+                    </div>
+                    <div id="role-tools-list" class="role-tools-list">
+                        <div class="tools-loading">正在加载工具列表...</div>
+                    </div>
+                    <small class="form-hint">勾选要关联的工具，留空则使用MCP管理中的全部工具配置。</small>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="role-enabled" class="modern-checkbox" checked />
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-text">启用此角色</span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeRoleModal()">取消</button>
+                <button class="btn-primary" onclick="saveRole()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/builtin-tools.js"></script>
     <script src="/static/js/auth.js"></script>
     <script src="/static/js/router.js"></script>
     <script src="/static/js/monitor.js"></script>
@@ -1337,6 +1498,7 @@
     <script src="/static/js/knowledge.js"></script>
     <script src="/static/js/vulnerability.js?v=4"></script>
     <script src="/static/js/tasks.js"></script>
+    <script src="/static/js/roles.js"></script>
 </body>
 </html>
 

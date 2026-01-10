@@ -12,6 +12,7 @@ import (
 
 	"cyberstrike-ai/internal/config"
 	"cyberstrike-ai/internal/mcp"
+	"cyberstrike-ai/internal/mcp/builtin"
 	"cyberstrike-ai/internal/openai"
 	"cyberstrike-ai/internal/storage"
 
@@ -302,16 +303,16 @@ type ProgressCallback func(eventType, message string, data interface{})
 
 // AgentLoop 执行Agent循环
 func (a *Agent) AgentLoop(ctx context.Context, userInput string, historyMessages []ChatMessage) (*AgentLoopResult, error) {
-	return a.AgentLoopWithProgress(ctx, userInput, historyMessages, "", nil)
+	return a.AgentLoopWithProgress(ctx, userInput, historyMessages, "", nil, nil)
 }
 
 // AgentLoopWithConversationID 执行Agent循环（带对话ID）
 func (a *Agent) AgentLoopWithConversationID(ctx context.Context, userInput string, historyMessages []ChatMessage, conversationID string) (*AgentLoopResult, error) {
-	return a.AgentLoopWithProgress(ctx, userInput, historyMessages, conversationID, nil)
+	return a.AgentLoopWithProgress(ctx, userInput, historyMessages, conversationID, nil, nil)
 }
 
 // AgentLoopWithProgress 执行Agent循环（带进度回调和对话ID）
-func (a *Agent) AgentLoopWithProgress(ctx context.Context, userInput string, historyMessages []ChatMessage, conversationID string, callback ProgressCallback) (*AgentLoopResult, error) {
+func (a *Agent) AgentLoopWithProgress(ctx context.Context, userInput string, historyMessages []ChatMessage, conversationID string, callback ProgressCallback, roleTools []string) (*AgentLoopResult, error) {
 	// 设置当前对话ID
 	a.mu.Lock()
 	a.currentConversationID = conversationID
@@ -401,8 +402,8 @@ func (a *Agent) AgentLoopWithProgress(ctx context.Context, userInput string, his
 当工具返回错误时，错误信息会包含在工具响应中，请仔细阅读并做出合理的决策。
 
 漏洞记录要求：
-- 当你发现有效漏洞时，必须使用 record_vulnerability 工具记录漏洞详情
-- 漏洞记录应包含：标题、描述、严重程度、类型、目标、证明（POC）、影响和修复建议
+- 当你发现有效漏洞时，必须使用 ` + builtin.ToolRecordVulnerability + ` 工具记录漏洞详情
+` + `- 漏洞记录应包含：标题、描述、严重程度、类型、目标、证明（POC）、影响和修复建议
 - 严重程度评估标准：
   * critical（严重）：可导致系统完全被控制、数据泄露、服务中断等
   * high（高）：可导致敏感信息泄露、权限提升、重要功能被绕过等
@@ -512,7 +513,7 @@ func (a *Agent) AgentLoopWithProgress(ctx context.Context, userInput string, his
 		}
 
 		// 获取可用工具
-		tools := a.getAvailableTools()
+		tools := a.getAvailableTools(roleTools)
 
 		// 记录当前上下文的Token用量，展示压缩器运行状态
 		if a.memoryCompressor != nil {
@@ -837,13 +838,29 @@ func (a *Agent) AgentLoopWithProgress(ctx context.Context, userInput string, his
 
 // getAvailableTools 获取可用工具
 // 从MCP服务器动态获取工具列表，使用简短描述以减少token消耗
-func (a *Agent) getAvailableTools() []Tool {
+// roleTools: 角色配置的工具列表（toolKey格式），如果为空或nil，则使用所有工具（默认角色）
+func (a *Agent) getAvailableTools(roleTools []string) []Tool {
+	// 构建角色工具集合（用于快速查找）
+	roleToolSet := make(map[string]bool)
+	if len(roleTools) > 0 {
+		for _, toolKey := range roleTools {
+			roleToolSet[toolKey] = true
+		}
+	}
+
 	// 从MCP服务器获取所有已注册的内部工具
 	mcpTools := a.mcpServer.GetAllTools()
 
 	// 转换为OpenAI格式的工具定义
 	tools := make([]Tool, 0, len(mcpTools))
 	for _, mcpTool := range mcpTools {
+		// 如果指定了角色工具列表，只添加在列表中的工具
+		if len(roleToolSet) > 0 {
+			toolKey := mcpTool.Name // 内置工具使用工具名称作为key
+			if !roleToolSet[toolKey] {
+				continue // 不在角色工具列表中，跳过
+			}
+		}
 		// 使用简短描述（如果存在），否则使用详细描述
 		description := mcpTool.ShortDescription
 		if description == "" {
@@ -883,6 +900,16 @@ func (a *Agent) getAvailableTools() []Tool {
 
 			// 将外部MCP工具添加到工具列表（只添加启用的工具）
 			for _, externalTool := range externalTools {
+				// 外部工具使用 "mcpName::toolName" 作为toolKey
+				externalToolKey := externalTool.Name
+
+				// 如果指定了角色工具列表，只添加在列表中的工具
+				if len(roleToolSet) > 0 {
+					if !roleToolSet[externalToolKey] {
+						continue // 不在角色工具列表中，跳过
+					}
+				}
+
 				// 解析工具名称：mcpName::toolName
 				var mcpName, actualToolName string
 				if idx := strings.Index(externalTool.Name, "::"); idx > 0 {
@@ -1136,7 +1163,7 @@ func (a *Agent) executeToolViaMCP(ctx context.Context, toolName string, args map
 	)
 
 	// 如果是record_vulnerability工具，自动添加conversation_id
-	if toolName == "record_vulnerability" {
+	if toolName == builtin.ToolRecordVulnerability {
 		a.mu.RLock()
 		conversationID := a.currentConversationID
 		a.mu.RUnlock()

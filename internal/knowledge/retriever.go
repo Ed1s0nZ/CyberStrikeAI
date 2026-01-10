@@ -161,14 +161,14 @@ func (r *Retriever) Search(ctx context.Context, req *SearchRequest) ([]*Retrieva
 
 	// 查询所有向量（或按风险类型过滤）
 	// 使用精确匹配（=）以提高性能和准确性
-	// 由于系统提供了 list_knowledge_risk_types 工具，用户应该使用准确的category名称
-	// 同时，向量嵌入中已包含category信息，即使SQL过滤不完全匹配，向量相似度也能帮助匹配
-	var rows *sql.Rows
-	if req.RiskType != "" {
-		// 使用精确匹配（=），性能更好且更准确
-		// 使用 COLLATE NOCASE 实现大小写不敏感匹配，提高容错性
-		// 注意：如果用户输入的risk_type与category不完全一致，可能匹配不到
-		// 建议用户先调用 list_knowledge_risk_types 获取准确的category名称
+	// 由于系统提供了内置工具来获取风险类型列表，用户应该使用准确的category名称
+		// 同时，向量嵌入中已包含category信息，即使SQL过滤不完全匹配，向量相似度也能帮助匹配
+		var rows *sql.Rows
+		if req.RiskType != "" {
+			// 使用精确匹配（=），性能更好且更准确
+			// 使用 COLLATE NOCASE 实现大小写不敏感匹配，提高容错性
+			// 注意：如果用户输入的risk_type与category不完全一致，可能匹配不到
+			// 建议用户先调用相应的内置工具获取准确的category名称
 		rows, err = r.db.Query(`
 			SELECT e.id, e.item_id, e.chunk_index, e.chunk_text, e.embedding, i.category, i.title
 			FROM knowledge_embeddings e

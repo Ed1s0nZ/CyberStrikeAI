@@ -16,6 +16,7 @@ import (
 	"cyberstrike-ai/internal/knowledge"
 	"cyberstrike-ai/internal/logger"
 	"cyberstrike-ai/internal/mcp"
+	"cyberstrike-ai/internal/mcp/builtin"
 	"cyberstrike-ai/internal/openai"
 	"cyberstrike-ai/internal/security"
 	"cyberstrike-ai/internal/storage"
@@ -278,7 +279,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	}
 
 	// 创建处理器
-	agentHandler := handler.NewAgentHandler(agent, db, log.Logger)
+	agentHandler := handler.NewAgentHandler(agent, db, cfg, log.Logger)
 	// 如果知识库已启用，设置知识库管理器到AgentHandler以便记录检索日志
 	if knowledgeManager != nil {
 		agentHandler.SetKnowledgeManager(knowledgeManager)
@@ -292,6 +293,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	vulnerabilityHandler := handler.NewVulnerabilityHandler(db, log.Logger)
 	configHandler := handler.NewConfigHandler(configPath, cfg, mcpServer, executor, agent, attackChainHandler, externalMCPMgr, log.Logger)
 	externalMCPHandler := handler.NewExternalMCPHandler(externalMCPMgr, cfg, configPath, log.Logger)
+	roleHandler := handler.NewRoleHandler(cfg, configPath, log.Logger)
 
 	// 创建 App 实例（部分字段稍后填充）
 	app := &App{
@@ -368,6 +370,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 		attackChainHandler,
 		app, // 传递 App 实例以便动态获取 knowledgeHandler
 		vulnerabilityHandler,
+		roleHandler,
 		mcpServer,
 		authManager,
 	)
@@ -428,6 +431,7 @@ func setupRoutes(
 	attackChainHandler *handler.AttackChainHandler,
 	app *App, // 传递 App 实例以便动态获取 knowledgeHandler
 	vulnerabilityHandler *handler.VulnerabilityHandler,
+	roleHandler *handler.RoleHandler,
 	mcpServer *mcp.Server,
 	authManager *security.AuthManager,
 ) {
@@ -653,6 +657,13 @@ func setupRoutes(
 		protected.PUT("/vulnerabilities/:id", vulnerabilityHandler.UpdateVulnerability)
 		protected.DELETE("/vulnerabilities/:id", vulnerabilityHandler.DeleteVulnerability)
 
+		// 角色管理
+		protected.GET("/roles", roleHandler.GetRoles)
+		protected.GET("/roles/:name", roleHandler.GetRole)
+		protected.POST("/roles", roleHandler.CreateRole)
+		protected.PUT("/roles/:name", roleHandler.UpdateRole)
+		protected.DELETE("/roles/:name", roleHandler.DeleteRole)
+
 		// MCP端点
 		protected.POST("/mcp", func(c *gin.Context) {
 			mcpServer.HandleHTTP(c.Writer, c.Request)
@@ -672,7 +683,7 @@ func setupRoutes(
 // registerVulnerabilityTool 注册漏洞记录工具到MCP服务器
 func registerVulnerabilityTool(mcpServer *mcp.Server, db *database.DB, logger *zap.Logger) {
 	tool := mcp.Tool{
-		Name:             "record_vulnerability",
+		Name:             builtin.ToolRecordVulnerability,
 		Description:      "记录发现的漏洞详情到漏洞管理系统。当发现有效漏洞时，使用此工具记录漏洞信息，包括标题、描述、严重程度、类型、目标、证明、影响和建议等。",
 		ShortDescription: "记录发现的漏洞详情到漏洞管理系统",
 		InputSchema: map[string]interface{}{

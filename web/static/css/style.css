@@ -1476,13 +1476,21 @@ header {
 
 .chat-input-container {
     display: flex;
-    gap: 12px;
-    padding: 20px 24px;
+    flex-direction: row;
+    gap: 8px;
+    align-items: center;
+    padding: 12px 16px;
     background: var(--bg-primary);
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
     flex-shrink: 0;
     width: 100%;
     box-sizing: border-box;
+}
+
+.chat-input-container > .chat-input-field {
+    flex: 1;
+    display: flex;
+    min-width: 0;
 }
 
 .chat-input-field {
@@ -1498,16 +1506,17 @@ header {
 .chat-input-container textarea {
     flex: 1;
     min-width: 0;
-    padding: 12px 16px;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    padding: 10px 14px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
     font-size: 0.9375rem;
     outline: none;
     transition: all 0.2s;
-    background: var(--bg-primary);
+    background: #ffffff;
     color: var(--text-primary);
     resize: none;
-    height: 44px;
+    min-height: 40px;
+    max-height: 120px;
     font-family: inherit;
     line-height: 1.5;
     overflow-y: auto;
@@ -1542,34 +1551,46 @@ header {
 
 .chat-input-container textarea:focus {
     border-color: var(--accent-color);
-    box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+    box-shadow: 0 0 0 2px rgba(0, 102, 255, 0.08);
+    background: #ffffff;
 }
 
 .chat-input-container textarea::placeholder {
     color: var(--text-muted);
 }
 
-.chat-input-container button {
-    padding: 12px 24px;
+.chat-input-container .send-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 18px;
+    height: 40px;
     background: var(--accent-color);
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: 12px;
     cursor: pointer;
     font-size: 0.9375rem;
     font-weight: 500;
     transition: all 0.2s;
     white-space: nowrap;
+    flex-shrink: 0;
+    box-sizing: border-box;
 }
 
-.chat-input-container button:hover {
+.chat-input-container .send-btn:hover {
     background: var(--accent-hover);
     transform: translateY(-1px);
-    box-shadow: var(--shadow-md);
+    box-shadow: 0 2px 8px rgba(0, 102, 255, 0.25);
 }
 
-.chat-input-container button:active {
+.chat-input-container .send-btn:active {
     transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(0, 102, 255, 0.2);
+}
+
+.chat-input-container .send-btn svg {
+    flex-shrink: 0;
 }
 
 .mention-suggestions {
@@ -7637,5 +7658,959 @@ header {
         justify-content: center;
         padding: 7px 14px !important;
         font-size: 0.8125rem !important;
+    }
+}
+
+/* 角色选择器样式 */
+.role-selector-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    height: 40px;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    font-size: 0.875rem;
+    font-weight: 500;
+    white-space: nowrap;
+    box-sizing: border-box;
+}
+
+.role-selector-btn:hover {
+    background: #f8f9fa;
+    border-color: rgba(0, 102, 255, 0.3);
+    box-shadow: 0 0 0 2px rgba(0, 102, 255, 0.08);
+}
+
+.role-selector-btn:active {
+    transform: scale(0.98);
+    background: #f0f2f5;
+}
+
+.role-selector-btn.active {
+    background: #f0f2f5;
+    border-color: rgba(0, 102, 255, 0.4);
+    box-shadow: 0 0 0 2px rgba(0, 102, 255, 0.12);
+}
+
+.role-selector-btn.active .role-selector-arrow {
+    transform: rotate(180deg);
+    color: rgba(0, 102, 255, 0.8);
+}
+
+.role-selector-icon {
+    font-size: 1rem;
+    line-height: 1;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.role-selector-text {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    flex-shrink: 0;
+}
+
+.role-selector-arrow {
+    width: 10px;
+    height: 10px;
+    color: rgba(0, 0, 0, 0.4);
+    flex-shrink: 0;
+    transition: transform 0.2s, color 0.2s;
+}
+
+.role-selector-btn:hover .role-selector-arrow {
+    color: rgba(0, 102, 255, 0.6);
+}
+
+/* 角色选择器包装器 */
+.role-selector-wrapper {
+    position: relative;
+    flex-shrink: 0;
+}
+
+/* 主内容区域角色选择面板样式（下拉菜单形式） */
+.role-selection-panel {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    width: 320px;
+    max-width: calc(100vw - 32px);
+    max-height: 60vh;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+    z-index: 1000;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.role-selection-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    background: var(--bg-primary);
+    z-index: 10;
+}
+
+.role-selection-panel-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.role-selection-panel-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+    padding: 0;
+}
+
+.role-selection-panel-close:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.role-selection-list-main {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    /* 限制显示8个角色：每个角色约70px高度 + gap，8个角色约580px */
+    max-height: 580px;
+    overflow-y: auto;
+    padding-right: 4px;
+    flex: 1;
+}
+
+.role-selection-list-main::-webkit-scrollbar {
+    width: 6px;
+}
+
+.role-selection-list-main::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.role-selection-list-main::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+.role-selection-list-main::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.role-selection-item-main {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.role-selection-item-main:hover {
+    background: var(--bg-secondary);
+    border-color: rgba(138, 43, 226, 0.3);
+}
+
+.role-selection-item-main.selected {
+    background: rgba(138, 43, 226, 0.1);
+    border-color: #8a2be2;
+}
+
+.role-selection-item-icon-main {
+    font-size: 1.125rem;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.role-selection-item-main.selected .role-selection-item-icon-main {
+    background: rgba(138, 43, 226, 0.15);
+}
+
+.role-selection-item-content-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+}
+
+.role-selection-item-name-main {
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 0.8125rem;
+    line-height: 1.3;
+    margin: 0;
+    transition: color 0.2s;
+}
+
+.role-selection-item-main.selected .role-selection-item-name-main {
+    color: #8a2be2;
+    font-weight: 600;
+}
+
+.role-selection-item-description-main {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.role-selection-checkmark-main {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #8a2be2;
+    color: white;
+    border-radius: 50%;
+    font-size: 0.625rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+@keyframes highlight-flash {
+    0%, 100% {
+        background-color: transparent;
+    }
+    50% {
+        background-color: rgba(138, 43, 226, 0.1);
+    }
+}
+
+.role-select-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 18px;
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--bg-primary);
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.role-select-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(138, 43, 226, 0.03) 0%, rgba(138, 43, 226, 0.01) 100%);
+    opacity: 0;
+    transition: opacity 0.25s;
+}
+
+.role-select-item:hover {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-color: rgba(138, 43, 226, 0.3);
+    box-shadow: 0 4px 12px rgba(138, 43, 226, 0.1), 0 2px 4px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+}
+
+.role-select-item:hover::before {
+    opacity: 1;
+}
+
+.role-select-item.selected {
+    background: linear-gradient(135deg, rgba(138, 43, 226, 0.1) 0%, rgba(138, 43, 226, 0.05) 100%);
+    border-color: #8a2be2;
+    box-shadow: 0 4px 16px rgba(138, 43, 226, 0.2), 0 2px 8px rgba(138, 43, 226, 0.15);
+    transform: translateY(-2px);
+}
+
+.role-select-item.selected::before {
+    opacity: 1;
+    background: linear-gradient(135deg, rgba(138, 43, 226, 0.08) 0%, rgba(138, 43, 226, 0.03) 100%);
+}
+
+.role-select-item.selected::after {
+    content: '✓';
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #8a2be2 0%, #6a1bb2 100%);
+    color: white;
+    border-radius: 50%;
+    font-size: 0.75rem;
+    font-weight: 700;
+    box-shadow: 0 2px 6px rgba(138, 43, 226, 0.4);
+}
+
+.role-select-item-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 10px;
+    transition: all 0.25s;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.role-select-item.selected .role-select-item-icon {
+    background: linear-gradient(135deg, rgba(138, 43, 226, 0.15) 0%, rgba(138, 43, 226, 0.08) 100%);
+    border-color: rgba(138, 43, 226, 0.2);
+    transform: scale(1.05);
+}
+
+.role-select-item-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.role-select-item-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 1rem;
+    line-height: 1.4;
+    margin: 0;
+    transition: color 0.2s;
+}
+
+.role-select-item.selected .role-select-item-name {
+    color: #8a2be2;
+}
+
+.role-select-item-description {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 角色管理页面样式 */
+.roles-controls {
+    margin-bottom: 24px;
+}
+
+.roles-stats-bar {
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.role-stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.role-stat-label {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+}
+
+.role-stat-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.roles-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.role-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.role-item:hover {
+    box-shadow: var(--shadow-sm);
+    border-color: var(--accent-color);
+}
+
+.role-item-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.role-item-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.role-item-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.role-item-badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.role-item-badge.enabled {
+    background: rgba(40, 167, 69, 0.12);
+    color: var(--success-color);
+}
+
+.role-item-badge.disabled {
+    background: rgba(220, 53, 69, 0.12);
+    color: var(--error-color);
+}
+
+.role-item-description {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.role-item-details {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.role-item-detail {
+    display: flex;
+    gap: 8px;
+    font-size: 0.8125rem;
+}
+
+.role-item-detail-label {
+    color: var(--text-secondary);
+    font-weight: 500;
+    min-width: 80px;
+}
+
+.role-item-detail-value {
+    color: var(--text-primary);
+    flex: 1;
+    word-break: break-word;
+}
+
+.role-item-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.empty-state {
+    padding: 48px 24px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.9375rem;
+}
+
+/* 角色MCP选择列表样式 */
+.role-mcps-list {
+    margin-top: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    min-height: 120px;
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.role-mcps-checkbox-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.role-mcp-checkbox-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.role-mcp-checkbox-item:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    box-shadow: 0 2px 4px rgba(0, 102, 255, 0.1);
+}
+
+.role-mcp-checkbox-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin-right: 12px;
+    cursor: pointer;
+    accent-color: var(--accent-color);
+}
+
+.role-mcp-checkbox-item:has(input[type="checkbox"]:checked) {
+    background: rgba(0, 102, 255, 0.08);
+    border-color: var(--accent-color);
+}
+
+.role-mcp-checkbox-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.role-mcp-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 0.9375rem;
+}
+
+.role-mcp-status {
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.role-mcp-status.status-connected {
+    background: rgba(40, 167, 69, 0.12);
+    color: var(--success-color);
+}
+
+.role-mcp-status.status-disconnected {
+    background: rgba(108, 117, 125, 0.12);
+    color: var(--text-secondary);
+}
+
+.role-mcp-status.status-connecting {
+    background: rgba(255, 193, 7, 0.12);
+    color: var(--warning-color);
+}
+
+.role-mcp-status.status-error {
+    background: rgba(220, 53, 69, 0.12);
+    color: var(--error-color);
+}
+
+.role-mcp-status.status-disabled {
+    background: rgba(108, 117, 125, 0.12);
+    color: var(--text-muted);
+}
+
+.role-mcp-tool-count {
+    padding: 2px 6px;
+    background: rgba(0, 102, 255, 0.1);
+    color: var(--accent-color);
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.mcp-loading,
+.mcp-empty,
+.mcp-error {
+    padding: 24px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.mcp-error {
+    color: var(--error-color);
+}
+
+/* 角色工具选择列表样式 */
+.role-tools-controls {
+    margin-bottom: 12px;
+}
+
+.role-tools-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.role-tools-search-box {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+    max-width: 400px;
+}
+
+.role-tools-search-box input {
+    width: 100%;
+    padding: 8px 32px 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.875rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    transition: all 0.2s;
+}
+
+.role-tools-search-box input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(0, 102, 255, 0.1);
+}
+
+.role-tools-search-clear {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.role-tools-search-clear:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.role-tools-stats {
+    display: flex;
+    gap: 16px;
+    padding: 8px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+}
+
+.role-tools-stats span {
+    white-space: nowrap;
+}
+
+.role-tools-stats strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.role-tools-list {
+    margin-top: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    min-height: 200px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.role-tools-list-items {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.role-tool-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    transition: all 0.2s ease;
+}
+
+.role-tool-item:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-color);
+    box-shadow: 0 2px 4px rgba(0, 102, 255, 0.1);
+}
+
+.role-tool-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    cursor: pointer;
+    accent-color: var(--accent-color);
+    flex-shrink: 0;
+}
+
+.role-tool-item-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.role-tool-item-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 0.9375rem;
+}
+
+.role-tool-item-desc {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.external-tool-badge {
+    padding: 2px 6px;
+    background: rgba(0, 102, 255, 0.1);
+    color: var(--accent-color);
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.role-tools-pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.role-tools-pagination .pagination-info {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+}
+
+.role-tools-pagination .pagination-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.role-tools-pagination .pagination-page {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    padding: 0 8px;
+}
+
+.tools-loading,
+.tools-empty,
+.tools-error {
+    padding: 24px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.tools-error {
+    color: var(--error-color);
+}
+
+/* 默认角色提示信息样式 */
+.role-tools-default-hint {
+    margin-top: 8px;
+    padding: 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+}
+
+.role-tools-default-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.role-tools-default-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.role-tools-default-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.role-tools-default-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9375rem;
+}
+
+.role-tools-default-desc {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+/* 角色选择面板响应式样式 */
+@media (max-width: 768px) {
+    .role-selection-panel {
+        width: calc(100vw - 16px);
+        max-width: calc(100vw - 16px);
+        left: -8px;
+        padding: 8px;
+        border-radius: 8px;
+        max-height: 60vh;
+    }
+
+    .role-selection-panel-header {
+        margin-bottom: 8px;
+        padding: 6px 4px;
+    }
+
+    .role-selection-panel-title {
+        font-size: 0.8125rem;
+    }
+
+    .role-selection-list-main {
+        /* 在移动设备上限制显示8个角色，每个约60px，总计约480px */
+        max-height: 480px;
+        gap: 4px;
+    }
+
+    .role-selection-item-main {
+        padding: 8px 10px;
+    }
+
+    .role-selection-item-icon-main {
+        width: 24px;
+        height: 24px;
+        font-size: 1rem;
+    }
+
+    .role-selection-item-name-main {
+        font-size: 0.75rem;
+    }
+
+    .role-selection-item-description-main {
+        font-size: 0.6875rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .role-selection-panel {
+        width: calc(100vw - 8px);
+        max-width: calc(100vw - 8px);
+        left: -4px;
+        padding: 6px;
+        max-height: 50vh;
+    }
+
+    .role-selection-list-main {
+        /* 在小屏幕上限制显示8个角色，每个约55px，总计约450px */
+        max-height: 450px;
+    }
+
+    .role-selection-item-main {
+        padding: 6px 8px;
     }
 }

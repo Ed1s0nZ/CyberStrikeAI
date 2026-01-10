@@ -147,6 +147,7 @@ type ToolConfigInfo struct {
 	Enabled     bool   `json:"enabled"`
 	IsExternal  bool   `json:"is_external,omitempty"`  // 是否为外部MCP工具
 	ExternalMCP string `json:"external_mcp,omitempty"` // 外部MCP名称（如果是外部工具）
+	RoleEnabled *bool  `json:"role_enabled,omitempty"` // 该工具在当前角色中是否启用（nil表示未指定角色或使用所有工具）
 }
 
 // GetConfig 获取当前配置
@@ -272,11 +273,12 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 
 // GetToolsResponse 获取工具列表响应（分页）
 type GetToolsResponse struct {
-	Tools      []ToolConfigInfo `json:"tools"`
-	Total      int              `json:"total"`
-	Page       int              `json:"page"`
-	PageSize   int              `json:"page_size"`
-	TotalPages int              `json:"total_pages"`
+	Tools        []ToolConfigInfo `json:"tools"`
+	Total        int              `json:"total"`
+	TotalEnabled int              `json:"total_enabled"` // 已启用的工具总数
+	Page         int              `json:"page"`
+	PageSize     int              `json:"page_size"`
+	TotalPages   int              `json:"total_pages"`
 }
 
 // GetTools 获取工具列表（支持分页和搜索）
@@ -305,6 +307,23 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 		searchTermLower = strings.ToLower(searchTerm)
 	}
 
+	// 解析角色参数，用于过滤工具并标注启用状态
+	roleName := c.Query("role")
+	var roleToolsSet map[string]bool // 角色配置的工具集合
+	var roleUsesAllTools bool = true // 角色是否使用所有工具（默认角色）
+	if roleName != "" && roleName != "默认" && h.config.Roles != nil {
+		if role, exists := h.config.Roles[roleName]; exists && role.Enabled {
+			if len(role.Tools) > 0 {
+				// 角色配置了工具列表，只使用这些工具
+				roleToolsSet = make(map[string]bool)
+				for _, toolKey := range role.Tools {
+					roleToolsSet[toolKey] = true
+				}
+				roleUsesAllTools = false
+			}
+		}
+	}
+
 	// 获取所有内部工具并应用搜索过滤
 	configToolMap := make(map[string]bool)
 	allTools := make([]ToolConfigInfo, 0, len(h.config.Security.Tools))
@@ -323,6 +342,31 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 				desc = desc[:100] + "..."
 			}
 			toolInfo.Description = desc
+		}
+
+		// 根据角色配置标注工具状态
+		if roleName != "" {
+			if roleUsesAllTools {
+				// 角色使用所有工具，标注启用的工具为role_enabled=true
+				if tool.Enabled {
+					roleEnabled := true
+					toolInfo.RoleEnabled = &roleEnabled
+				} else {
+					roleEnabled := false
+					toolInfo.RoleEnabled = &roleEnabled
+				}
+			} else {
+				// 角色配置了工具列表，检查工具是否在列表中
+				// 内部工具使用工具名称作为key
+				if roleToolsSet[tool.Name] {
+					roleEnabled := tool.Enabled // 工具必须在角色列表中且本身启用
+					toolInfo.RoleEnabled = &roleEnabled
+				} else {
+					// 不在角色列表中，标记为false
+					roleEnabled := false
+					toolInfo.RoleEnabled = &roleEnabled
+				}
+			}
 		}
 
 		// 如果有关键词，进行搜索过滤
@@ -359,6 +403,26 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 				Description: description,
 				Enabled:     true, // 直接注册的工具默认启用
 				IsExternal:  false,
+			}
+
+			// 根据角色配置标注工具状态
+			if roleName != "" {
+				if roleUsesAllTools {
+					// 角色使用所有工具，直接注册的工具默认启用
+					roleEnabled := true
+					toolInfo.RoleEnabled = &roleEnabled
+				} else {
+					// 角色配置了工具列表，检查工具是否在列表中
+					// 内部工具使用工具名称作为key
+					if roleToolsSet[mcpTool.Name] {
+						roleEnabled := true // 在角色列表中且工具本身启用
+						toolInfo.RoleEnabled = &roleEnabled
+					} else {
+						// 不在角色列表中，标记为false
+						roleEnabled := false
+						toolInfo.RoleEnabled = &roleEnabled
+					}
+				}
 			}
 
 			// 如果有关键词，进行搜索过滤
@@ -439,18 +503,55 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 					}
 				}
 
-				allTools = append(allTools, ToolConfigInfo{
+				toolInfo := ToolConfigInfo{
 					Name:        actualToolName, // 显示实际工具名称，不带前缀
 					Description: description,
 					Enabled:     enabled,
 					IsExternal:  true,
 					ExternalMCP: mcpName,
-				})
+				}
+
+				// 根据角色配置标注工具状态
+				if roleName != "" {
+					if roleUsesAllTools {
+						// 角色使用所有工具，标注启用的工具为role_enabled=true
+						toolInfo.RoleEnabled = &enabled
+					} else {
+						// 角色配置了工具列表，检查工具是否在列表中
+						// 外部工具使用 "mcpName::toolName" 格式作为key
+						externalToolKey := externalTool.Name // 这是 "mcpName::toolName" 格式
+						if roleToolsSet[externalToolKey] {
+							roleEnabled := enabled // 工具必须在角色列表中且本身启用
+							toolInfo.RoleEnabled = &roleEnabled
+						} else {
+							// 不在角色列表中，标记为false
+							roleEnabled := false
+							toolInfo.RoleEnabled = &roleEnabled
+						}
+					}
+				}
+
+				allTools = append(allTools, toolInfo)
 			}
 		}
 	}
 
+	// 如果角色配置了工具列表，过滤工具（只保留列表中的工具，但保留其他工具并标记为禁用）
+	// 注意：这里我们不直接过滤掉工具，而是保留所有工具，但通过 role_enabled 字段标注状态
+	// 这样前端可以显示所有工具，并标注哪些工具在当前角色中可用
+
 	total := len(allTools)
+	// 统计已启用的工具数（在角色中的启用工具数）
+	totalEnabled := 0
+	for _, tool := range allTools {
+		if tool.RoleEnabled != nil && *tool.RoleEnabled {
+			totalEnabled++
+		} else if tool.RoleEnabled == nil && tool.Enabled {
+			// 如果未指定角色，统计所有启用的工具
+			totalEnabled++
+		}
+	}
+
 	totalPages := (total + pageSize - 1) / pageSize
 	if totalPages == 0 {
 		totalPages = 1
@@ -471,11 +572,12 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, GetToolsResponse{
-		Tools:      tools,
-		Total:      total,
-		Page:       page,
-		PageSize:   pageSize,
-		TotalPages: totalPages,
+		Tools:        tools,
+		Total:        total,
+		TotalEnabled: totalEnabled,
+		Page:         page,
+		PageSize:     pageSize,
+		TotalPages:   totalPages,
 	})
 }
 

@@ -8,7 +8,7 @@ function initRouter() {
     if (hash) {
         const hashParts = hash.split('?');
         const pageId = hashParts[0];
-        if (pageId && ['chat', 'vulnerabilities', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'settings', 'tasks'].includes(pageId)) {
+        if (pageId && ['chat', 'vulnerabilities', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'roles-management', 'settings', 'tasks'].includes(pageId)) {
             switchPage(pageId);
             
             // 如果是chat页面且带有conversation参数，加载对应对话
@@ -92,6 +92,19 @@ function updateNavState(pageId) {
             knowledgeItem.classList.add('active');
             // 展开知识子菜单
             knowledgeItem.classList.add('expanded');
+        }
+        
+        const submenuItem = document.querySelector(`.nav-submenu-item[data-page="${pageId}"]`);
+        if (submenuItem) {
+            submenuItem.classList.add('active');
+        }
+    } else if (pageId === 'roles-management') {
+        // 角色子菜单项
+        const rolesItem = document.querySelector('.nav-item[data-page="roles"]');
+        if (rolesItem) {
+            rolesItem.classList.add('active');
+            // 展开角色子菜单
+            rolesItem.classList.add('expanded');
         }
         
         const submenuItem = document.querySelector(`.nav-submenu-item[data-page="${pageId}"]`);
@@ -237,6 +250,16 @@ function initPage(pageId) {
             // 初始化设置页面（不需要加载工具列表）
             if (typeof loadConfig === 'function') {
                 loadConfig(false);
+            }
+            break;
+        case 'roles-management':
+            // 初始化角色管理页面
+            if (typeof loadRoles === 'function') {
+                loadRoles().then(() => {
+                    if (typeof renderRolesList === 'function') {
+                        renderRolesList();
+                    }
+                });
             }
             break;
     }

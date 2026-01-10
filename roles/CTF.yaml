@@ -1,0 +1,33 @@
+name: CTF
+description: CTF竞赛专家，擅长解题和漏洞利用
+user_prompt: 你是一个CTF竞赛专家。请使用CTF解题思维和方法，快速定位和利用漏洞，解决各类CTF题目。
+icon: "\U0001F3C6"
+tools:
+    - amass
+    - anew
+    - angr
+    - api-fuzzer
+    - api-schema-analyzer
+    - arjun
+    - arp-scan
+    - autorecon
+    - binwalk
+    - bloodhound
+    - burpsuite
+    - cat
+    - checkov
+    - checksec
+    - cloudmapper
+    - create-file
+    - cyberchef
+    - dalfox
+    - delete-file
+    - httpx
+    - http-framework-test
+    - exec
+    - execute-python-script
+    - install-python-package
+    - record_vulnerability
+    - list_knowledge_risk_types
+    - search_knowledge_base
+enabled: true

@@ -12,7 +12,9 @@ import (
 	"unicode/utf8"
 
 	"cyberstrike-ai/internal/agent"
+	"cyberstrike-ai/internal/config"
 	"cyberstrike-ai/internal/database"
+	"cyberstrike-ai/internal/mcp/builtin"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -66,13 +68,14 @@ type AgentHandler struct {
 	logger           *zap.Logger
 	tasks            *AgentTaskManager
 	batchTaskManager *BatchTaskManager
-	knowledgeManager interface { // 知识库管理器接口
+	config           *config.Config // 配置引用，用于获取角色信息
+	knowledgeManager interface {    // 知识库管理器接口
 		LogRetrieval(conversationID, messageID, query, riskType string, retrievedItems []string) error
 	}
 }
 
 // NewAgentHandler 创建新的Agent处理器
-func NewAgentHandler(agent *agent.Agent, db *database.DB, logger *zap.Logger) *AgentHandler {
+func NewAgentHandler(agent *agent.Agent, db *database.DB, cfg *config.Config, logger *zap.Logger) *AgentHandler {
 	batchTaskManager := NewBatchTaskManager()
 	batchTaskManager.SetDB(db)
 
@@ -87,6 +90,7 @@ func NewAgentHandler(agent *agent.Agent, db *database.DB, logger *zap.Logger) *A
 		logger:           logger,
 		tasks:            NewAgentTaskManager(),
 		batchTaskManager: batchTaskManager,
+		config:           cfg,
 	}
 }
 
@@ -101,6 +105,7 @@ func (h *AgentHandler) SetKnowledgeManager(manager interface {
 type ChatRequest struct {
 	Message        string `json:"message" binding:"required"`
 	ConversationID string `json:"conversationId,omitempty"`
+	Role           string `json:"role,omitempty"` // 角色名称
 }
 
 // ChatResponse 聊天响应
@@ -161,14 +166,34 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 		h.logger.Info("从ReAct数据恢复历史上下文", zap.Int("count", len(agentHistoryMessages)))
 	}
 
-	// 保存用户消息
+	// 应用角色用户提示词和工具配置
+	finalMessage := req.Message
+	var roleTools []string // 角色配置的工具列表
+	if req.Role != "" && req.Role != "默认" {
+		if h.config.Roles != nil {
+			if role, exists := h.config.Roles[req.Role]; exists && role.Enabled {
+				// 应用用户提示词
+				if role.UserPrompt != "" {
+					finalMessage = role.UserPrompt + "\n\n" + req.Message
+					h.logger.Info("应用角色用户提示词", zap.String("role", req.Role))
+				}
+				// 获取角色配置的工具列表（优先使用tools字段，向后兼容mcps字段）
+				if len(role.Tools) > 0 {
+					roleTools = role.Tools
+					h.logger.Info("使用角色配置的工具列表", zap.String("role", req.Role), zap.Int("toolCount", len(roleTools)))
+				}
+			}
+		}
+	}
+
+	// 保存用户消息（保存原始消息，不包含角色提示词）
 	_, err = h.db.AddMessage(conversationID, "user", req.Message, nil)
 	if err != nil {
 		h.logger.Error("保存用户消息失败", zap.Error(err))
 	}
 
-	// 执行Agent Loop，传入历史消息和对话ID
-	result, err := h.agent.AgentLoopWithConversationID(c.Request.Context(), req.Message, agentHistoryMessages, conversationID)
+	// 执行Agent Loop，传入历史消息和对话ID（使用包含角色提示词的finalMessage和角色工具列表）
+	result, err := h.agent.AgentLoopWithProgress(c.Request.Context(), finalMessage, agentHistoryMessages, conversationID, nil, roleTools)
 	if err != nil {
 		h.logger.Error("Agent Loop执行失败", zap.Error(err))
 
@@ -231,7 +256,7 @@ func (h *AgentHandler) createProgressCallback(conversationID, assistantMessageID
 		if eventType == "tool_call" {
 			if dataMap, ok := data.(map[string]interface{}); ok {
 				toolName, _ := dataMap["toolName"].(string)
-				if toolName == "search_knowledge_base" {
+				if toolName == builtin.ToolSearchKnowledgeBase {
 					if toolCallId, ok := dataMap["toolCallId"].(string); ok && toolCallId != "" {
 						if argumentsObj, ok := dataMap["argumentsObj"].(map[string]interface{}); ok {
 							toolCallCache[toolCallId] = argumentsObj
@@ -245,7 +270,7 @@ func (h *AgentHandler) createProgressCallback(conversationID, assistantMessageID
 		if eventType == "tool_result" && h.knowledgeManager != nil {
 			if dataMap, ok := data.(map[string]interface{}); ok {
 				toolName, _ := dataMap["toolName"].(string)
-				if toolName == "search_knowledge_base" {
+				if toolName == builtin.ToolSearchKnowledgeBase {
 					// 提取检索信息
 					query := ""
 					riskType := ""
@@ -470,7 +495,32 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 		h.logger.Info("从ReAct数据恢复历史上下文", zap.Int("count", len(agentHistoryMessages)))
 	}
 
-	// 保存用户消息
+	// 应用角色用户提示词和工具配置
+	finalMessage := req.Message
+	var roleTools []string // 角色配置的工具列表
+	if req.Role != "" && req.Role != "默认" {
+		if h.config.Roles != nil {
+			if role, exists := h.config.Roles[req.Role]; exists && role.Enabled {
+				// 应用用户提示词
+				if role.UserPrompt != "" {
+					finalMessage = role.UserPrompt + "\n\n" + req.Message
+					h.logger.Info("应用角色用户提示词", zap.String("role", req.Role))
+				}
+				// 获取角色配置的工具列表（优先使用tools字段，向后兼容mcps字段）
+				if len(role.Tools) > 0 {
+					roleTools = role.Tools
+					h.logger.Info("使用角色配置的工具列表", zap.String("role", req.Role), zap.Int("toolCount", len(roleTools)))
+				} else if len(role.MCPs) > 0 {
+					// 向后兼容：如果只有mcps字段，暂时使用空列表（表示使用所有工具）
+					// 因为mcps是MCP服务器名称，不是工具列表
+					h.logger.Info("角色配置使用旧的mcps字段，将使用所有工具", zap.String("role", req.Role))
+				}
+			}
+		}
+	}
+	// 如果roleTools为空，表示使用所有工具（默认角色或未配置工具的角色）
+
+	// 保存用户消息（保存原始消息，不包含角色提示词）
 	_, err = h.db.AddMessage(conversationID, "user", req.Message, nil)
 	if err != nil {
 		h.logger.Error("保存用户消息失败", zap.Error(err))
@@ -547,9 +597,9 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	taskStatus := "completed"
 	defer h.tasks.FinishTask(conversationID, taskStatus)
 
-	// 执行Agent Loop，传入独立的上下文，确保任务不会因客户端断开而中断
+	// 执行Agent Loop，传入独立的上下文，确保任务不会因客户端断开而中断（使用包含角色提示词的finalMessage和角色工具列表）
 	sendEvent("progress", "正在分析您的请求...", nil)
-	result, err := h.agent.AgentLoopWithProgress(taskCtx, req.Message, agentHistoryMessages, conversationID, progressCallback)
+	result, err := h.agent.AgentLoopWithProgress(taskCtx, finalMessage, agentHistoryMessages, conversationID, progressCallback, roleTools)
 	if err != nil {
 		h.logger.Error("Agent Loop执行失败", zap.Error(err))
 		cause := context.Cause(baseCtx)
@@ -759,7 +809,7 @@ func (h *AgentHandler) ListCompletedTasks(c *gin.Context) {
 
 // BatchTaskRequest 批量任务请求
 type BatchTaskRequest struct {
-	Title string   `json:"title"` // 任务标题（可选）
+	Title string   `json:"title"`                    // 任务标题（可选）
 	Tasks []string `json:"tasks" binding:"required"` // 任务列表，每行一个任务
 }
 
@@ -1072,7 +1122,8 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		// 存储取消函数，以便在取消队列时能够取消当前任务
 		h.batchTaskManager.SetTaskCancel(queueID, cancel)
-		result, err := h.agent.AgentLoopWithProgress(ctx, task.Message, []agent.ChatMessage{}, conversationID, progressCallback)
+		// 批量任务暂时不支持角色工具过滤，使用所有工具（传入nil）
+		result, err := h.agent.AgentLoopWithProgress(ctx, task.Message, []agent.ChatMessage{}, conversationID, progressCallback, nil)
 		// 任务执行完成，清理取消函数
 		h.batchTaskManager.SetTaskCancel(queueID, nil)
 		cancel()

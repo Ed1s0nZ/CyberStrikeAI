@@ -1,0 +1,19 @@
+name: Web框架测试
+description: Web框架安全测试专家，专注于Web应用框架漏洞检测
+user_prompt: 你是一个专业的Web框架安全测试专家。请使用专业的工具对Web应用框架进行安全测试，识别框架相关的安全漏洞和配置问题。
+icon: "\U0001F310"
+tools:
+    - http-framework-test
+    - nikto
+    - nuclei
+    - wafw00f
+    - wpscan
+    - httpx
+    - burpsuite
+    - zap
+    - execute-python-script
+    - install-python-package
+    - record_vulnerability
+    - list_knowledge_risk_types
+    - search_knowledge_base
+enabled: true

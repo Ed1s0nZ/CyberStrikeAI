@@ -145,6 +145,9 @@ async function sendMessage() {
     let mcpExecutionIds = [];
     
     try {
+        // 获取当前选中的角色（从 roles.js 的函数获取）
+        const roleName = typeof getCurrentRole === 'function' ? getCurrentRole() : '';
+
         const response = await apiFetch('/api/agent-loop/stream', {
             method: 'POST',
             headers: {
@@ -152,7 +155,8 @@ async function sendMessage() {
             },
             body: JSON.stringify({ 
                 message: message,
-                conversationId: currentConversationId 
+                conversationId: currentConversationId,
+                role: roleName || undefined
             }),
         });
         
@@ -252,6 +256,13 @@ if (typeof window !== 'undefined') {
 }
 
 function ensureMentionToolsLoaded() {
+    // 检查角色是否改变，如果改变则强制重新加载
+    if (typeof window !== 'undefined' && window._mentionToolsRoleChanged) {
+        mentionToolsLoaded = false;
+        mentionTools = [];
+        delete window._mentionToolsRoleChanged;
+    }
+    
     if (mentionToolsLoaded) {
         return Promise.resolve(mentionTools);
     }
@@ -282,6 +293,9 @@ async function fetchMentionTools() {
     const collected = [];
 
     try {
+        // 获取当前选中的角色（从 roles.js 的函数获取）
+        const roleName = typeof getCurrentRole === 'function' ? getCurrentRole() : '';
+
         // 同时获取外部MCP列表
         try {
             const mcpResponse = await apiFetch('/api/external-mcp');
@@ -300,7 +314,13 @@ async function fetchMentionTools() {
         }
 
         while (page <= totalPages && page <= 20) {
-            const response = await apiFetch(`/api/config/tools?page=${page}&page_size=${pageSize}`);
+            // 构建API URL，如果指定了角色，添加role查询参数
+            let url = `/api/config/tools?page=${page}&page_size=${pageSize}`;
+            if (roleName && roleName !== '默认') {
+                url += `&role=${encodeURIComponent(roleName)}`;
+            }
+
+            const response = await apiFetch(url);
             if (!response.ok) {
                 break;
             }
@@ -316,10 +336,20 @@ async function fetchMentionTools() {
                     return;
                 }
                 seen.add(toolKey);
+
+                // 确定工具在当前角色中的启用状态
+                // 如果有 role_enabled 字段，使用它（表示指定了角色）
+                // 否则使用 enabled 字段（表示未指定角色或使用所有工具）
+                let roleEnabled = tool.enabled !== false;
+                if (tool.role_enabled !== undefined && tool.role_enabled !== null) {
+                    roleEnabled = tool.role_enabled;
+                }
+
                 collected.push({
                     name: tool.name,
                     description: tool.description || '',
-                    enabled: tool.enabled !== false,
+                    enabled: tool.enabled !== false, // 工具本身的启用状态
+                    roleEnabled: roleEnabled, // 在当前角色中的启用状态
                     isExternal: !!tool.is_external,
                     externalMcp: tool.external_mcp || '',
                     toolKey: toolKey, // 保存唯一标识符
@@ -488,6 +518,15 @@ function updateMentionCandidates() {
     }
 
     filtered = filtered.slice().sort((a, b) => {
+        // 如果指定了角色，优先显示在当前角色中启用的工具
+        if (a.roleEnabled !== undefined || b.roleEnabled !== undefined) {
+            const aRoleEnabled = a.roleEnabled !== undefined ? a.roleEnabled : a.enabled;
+            const bRoleEnabled = b.roleEnabled !== undefined ? b.roleEnabled : b.enabled;
+            if (aRoleEnabled !== bRoleEnabled) {
+                return aRoleEnabled ? -1 : 1; // 启用的工具排在前面
+            }
+        }
+
         if (normalizedQuery) {
             // 精确匹配MCP名称的工具优先显示
             const aMcpExact = a.externalMcp && a.externalMcp.toLowerCase() === normalizedQuery;
@@ -502,8 +541,11 @@ function updateMentionCandidates() {
                 return aStarts ? -1 : 1;
             }
         }
-        if (a.enabled !== b.enabled) {
-            return a.enabled ? -1 : 1;
+        // 如果指定了角色，使用 roleEnabled；否则使用 enabled
+        const aEnabled = a.roleEnabled !== undefined ? a.roleEnabled : a.enabled;
+        const bEnabled = b.roleEnabled !== undefined ? b.roleEnabled : b.enabled;
+        if (aEnabled !== bEnabled) {
+            return aEnabled ? -1 : 1;
         }
         return a.name.localeCompare(b.name, 'zh-CN');
     });
@@ -545,13 +587,16 @@ function renderMentionSuggestions({ showLoading = false } = {}) {
 
     const itemsHtml = mentionFilteredTools.map((tool, index) => {
         const activeClass = index === mentionState.selectedIndex ? 'active' : '';
-        const disabledClass = tool.enabled ? '' : 'disabled';
+        // 如果工具有 roleEnabled 字段（指定了角色），使用它；否则使用 enabled
+        const toolEnabled = tool.roleEnabled !== undefined ? tool.roleEnabled : tool.enabled;
+        const disabledClass = toolEnabled ? '' : 'disabled';
         const badge = tool.isExternal ? '<span class="mention-item-badge">外部</span>' : '<span class="mention-item-badge internal">内置</span>';
         const nameHtml = escapeHtml(tool.name);
         const description = tool.description && tool.description.length > 0 ? escapeHtml(tool.description) : '暂无描述';
         const descHtml = `<div class="mention-item-desc">${description}</div>`;
-        const statusLabel = tool.enabled ? '可用' : '已禁用';
-        const statusClass = tool.enabled ? 'enabled' : 'disabled';
+        // 根据工具在当前角色中的启用状态显示状态标签
+        const statusLabel = toolEnabled ? '可用' : (tool.roleEnabled !== undefined ? '已禁用（当前角色）' : '已禁用');
+        const statusClass = toolEnabled ? 'enabled' : 'disabled';
         const originLabel = tool.isExternal
             ? (tool.externalMcp ? `来源：${escapeHtml(tool.externalMcp)}` : '来源：外部MCP')
             : '来源：内置工具';
@@ -1109,7 +1154,7 @@ function renderProcessDetails(messageId, processDetails) {
             itemTitle = `${statusIcon} 工具 ${escapeHtml(toolName)} 执行${success ? '完成' : '失败'}`;
             
             // 如果是知识检索工具，添加特殊标记
-            if (toolName === 'search_knowledge_base' && success) {
+            if (toolName === BuiltinTools.SEARCH_KNOWLEDGE_BASE && success) {
                 itemTitle = `📚 ${itemTitle} - 知识检索`;
             }
         } else if (eventType === 'knowledge_retrieval') {

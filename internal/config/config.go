@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -22,6 +23,8 @@ type Config struct {
 	Auth        AuthConfig        `yaml:"auth"`
 	ExternalMCP ExternalMCPConfig `yaml:"external_mcp,omitempty"`
 	Knowledge   KnowledgeConfig   `yaml:"knowledge,omitempty"`
+	RolesDir    string            `yaml:"roles_dir,omitempty" json:"roles_dir,omitempty"` // 角色配置文件目录（新方式）
+	Roles       map[string]RoleConfig `yaml:"roles,omitempty" json:"roles,omitempty"`     // 向后兼容：支持在主配置文件中定义角色
 }
 
 type ServerConfig struct {
@@ -207,6 +210,29 @@ func Load(path string) (*Config, error) {
 		}
 	}
 
+	// 从角色目录加载角色配置
+	if cfg.RolesDir != "" {
+		configDir := filepath.Dir(path)
+		rolesDir := cfg.RolesDir
+
+		// 如果是相对路径，相对于配置文件所在目录
+		if !filepath.IsAbs(rolesDir) {
+			rolesDir = filepath.Join(configDir, rolesDir)
+		}
+
+		roles, err := LoadRolesFromDir(rolesDir)
+		if err != nil {
+			return nil, fmt.Errorf("从角色目录加载角色配置失败: %w", err)
+		}
+
+		cfg.Roles = roles
+	} else {
+		// 如果未配置 roles_dir，初始化为空 map
+		if cfg.Roles == nil {
+			cfg.Roles = make(map[string]RoleConfig)
+		}
+	}
+
 	return &cfg, nil
 }
 
@@ -375,6 +401,98 @@ func LoadToolFromFile(path string) (*ToolConfig, error) {
 	return &tool, nil
 }
 
+// LoadRolesFromDir 从目录加载所有角色配置文件
+func LoadRolesFromDir(dir string) (map[string]RoleConfig, error) {
+	roles := make(map[string]RoleConfig)
+
+	// 检查目录是否存在
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return roles, nil // 目录不存在时返回空map，不报错
+	}
+
+	// 读取目录中的所有 .yaml 和 .yml 文件
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("读取角色目录失败: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".yaml") && !strings.HasSuffix(name, ".yml") {
+			continue
+		}
+
+		filePath := filepath.Join(dir, name)
+		role, err := LoadRoleFromFile(filePath)
+		if err != nil {
+			// 记录错误但继续加载其他文件
+			fmt.Printf("警告: 加载角色配置文件 %s 失败: %v\n", filePath, err)
+			continue
+		}
+
+		// 使用角色名称作为key
+		roleName := role.Name
+		if roleName == "" {
+			// 如果角色名称为空，使用文件名（去掉扩展名）作为名称
+			roleName = strings.TrimSuffix(strings.TrimSuffix(name, ".yaml"), ".yml")
+			role.Name = roleName
+		}
+
+		roles[roleName] = *role
+	}
+
+	return roles, nil
+}
+
+// LoadRoleFromFile 从单个文件加载角色配置
+func LoadRoleFromFile(path string) (*RoleConfig, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("读取文件失败: %w", err)
+	}
+
+	var role RoleConfig
+	if err := yaml.Unmarshal(data, &role); err != nil {
+		return nil, fmt.Errorf("解析角色配置失败: %w", err)
+	}
+
+	// 处理 icon 字段：如果包含 Unicode 转义格式（\U0001F3C6），转换为实际的 Unicode 字符
+	// Go 的 yaml 库可能不会自动解析 \U 转义序列，需要手动转换
+	if role.Icon != "" {
+		icon := role.Icon
+		// 去除可能的引号
+		icon = strings.Trim(icon, `"`)
+		
+		// 检查是否是 Unicode 转义格式 \U0001F3C6（8位十六进制）或 \uXXXX（4位十六进制）
+		if len(icon) >= 3 && icon[0] == '\\' {
+			if icon[1] == 'U' && len(icon) >= 10 {
+				// \U0001F3C6 格式（8位十六进制）
+				if codePoint, err := strconv.ParseInt(icon[2:10], 16, 32); err == nil {
+					role.Icon = string(rune(codePoint))
+				}
+			} else if icon[1] == 'u' && len(icon) >= 6 {
+				// \uXXXX 格式（4位十六进制）
+				if codePoint, err := strconv.ParseInt(icon[2:6], 16, 32); err == nil {
+					role.Icon = string(rune(codePoint))
+				}
+			}
+		}
+	}
+
+	// 验证必需字段
+	if role.Name == "" {
+		// 如果名称为空，尝试从文件名获取
+		baseName := filepath.Base(path)
+		role.Name = strings.TrimSuffix(strings.TrimSuffix(baseName, ".yaml"), ".yml")
+	}
+
+	return &role, nil
+}
+
 func Default() *Config {
 	return &Config{
 		Server: ServerConfig{
@@ -447,4 +565,21 @@ type RetrievalConfig struct {
 	TopK                int     `yaml:"top_k" json:"top_k"`                               // 检索Top-K
 	SimilarityThreshold float64 `yaml:"similarity_threshold" json:"similarity_threshold"` // 相似度阈值
 	HybridWeight        float64 `yaml:"hybrid_weight" json:"hybrid_weight"`               // 向量检索权重（0-1）
+}
+
+// RolesConfig 角色配置（已废弃，使用 map[string]RoleConfig 替代）
+// 保留此类型以兼容旧代码，但建议直接使用 map[string]RoleConfig
+type RolesConfig struct {
+	Roles map[string]RoleConfig `yaml:"roles,omitempty" json:"roles,omitempty"`
+}
+
+// RoleConfig 单个角色配置
+type RoleConfig struct {
+	Name        string   `yaml:"name" json:"name"`               // 角色名称
+	Description string   `yaml:"description" json:"description"` // 角色描述
+	UserPrompt  string   `yaml:"user_prompt" json:"user_prompt"` // 用户提示词(追加到用户消息前)
+	Icon        string   `yaml:"icon,omitempty" json:"icon,omitempty"` // 角色图标（可选）
+	Tools       []string `yaml:"tools,omitempty" json:"tools,omitempty"` // 关联的工具列表（toolKey格式，如 "toolName" 或 "mcpName::toolName"）
+	MCPs        []string `yaml:"mcps,omitempty" json:"mcps,omitempty"` // 向后兼容：关联的MCP服务器列表（已废弃，使用tools替代）
+	Enabled     bool     `yaml:"enabled" json:"enabled"`         // 是否启用
 }
