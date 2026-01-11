@@ -30,6 +30,9 @@ CyberStrikeAI is an **AI-native security testing platform** built in Go. It inte
 ### Task Management
 <img src="./img/任务.png" alt="Task Management" width="560">
 
+### Role Management
+<img src="./img/角色管理.png" alt="Role Management" width="560">
+
 ## Highlights
 
 - 🤖 AI decision engine with OpenAI-compatible models (GPT, Claude, DeepSeek, etc.)
