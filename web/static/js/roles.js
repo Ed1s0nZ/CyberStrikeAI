@@ -428,8 +428,9 @@ async function loadRoleTools(page = 1, searchKeyword = '') {
                 });
             } else {
                 // 工具已在映射中（可能是预先设置的选中工具或用户手动选择的），保留映射中的状态
-                // 但如果使用所有工具，且工具在MCP管理中已启用，确保标记为选中
+                // 注意：即使使用所有工具，也不要强制覆盖用户已取消的工具选择
                 const state = roleToolStateMap.get(toolKey);
+                // 如果使用所有工具，且工具在MCP管理中已启用，确保标记为选中
                 if (roleUsesAllTools && tool.enabled) {
                     // 使用所有工具时，确保所有已启用的工具都被选中
                     state.enabled = true;
@@ -823,6 +824,11 @@ async function showAddRoleModal() {
     if (clearBtn) {
         clearBtn.style.display = 'none';
     }
+    
+    // 清空工具列表 DOM，避免 loadRoleTools 中的 saveCurrentRolePageToolStates 读取旧状态
+    if (toolsList) {
+        toolsList.innerHTML = '';
+    }
 
     // 加载并渲染工具列表
     await loadRoleTools(1, '');
@@ -831,6 +837,9 @@ async function showAddRoleModal() {
     if (toolsList) {
         toolsList.style.display = 'block';
     }
+    
+    // 确保统计信息正确更新（显示0/108）
+    updateRoleToolsStats();
 
     modal.style.display = 'flex';
 }
@@ -965,11 +974,13 @@ async function editRole(roleName) {
                     if (toolKey) {
                         const state = roleToolStateMap.get(toolKey);
                         // 只选中在MCP管理中已启用的工具
-                        const shouldEnable = state && state.mcpEnabled !== false;
+                        // 如果状态存在，使用状态中的 mcpEnabled；否则假设已启用（因为 loadRoleTools 应该已经初始化了所有工具）
+                        const shouldEnable = state ? (state.mcpEnabled !== false) : true;
                         checkbox.checked = shouldEnable;
                         if (state) {
                             state.enabled = shouldEnable;
                         } else {
+                            // 如果状态不存在，创建新状态（这种情况不应该发生，因为 loadRoleTools 应该已经初始化了）
                             roleToolStateMap.set(toolKey, {
                                 enabled: shouldEnable,
                                 is_external: isExternal,
@@ -981,6 +992,8 @@ async function editRole(roleName) {
                     }
                 }
             });
+            // 更新统计信息，确保显示正确的选中数量
+            updateRoleToolsStats();
         } else if (selectedTools.length > 0) {
             // 加载完成后，再次设置选中状态（确保当前页的工具也被正确设置）
             setSelectedRoleTools(selectedTools);
@@ -1027,6 +1040,68 @@ function getDisabledTools(selectedTools) {
     });
 }
 
+// 加载所有工具到状态映射中（用于从使用全部工具切换到部分工具时）
+async function loadAllToolsToStateMap() {
+    try {
+        const pageSize = 100; // 使用较大的页面大小以减少请求次数
+        let page = 1;
+        let hasMore = true;
+        
+        // 遍历所有页面获取所有工具
+        while (hasMore) {
+            const url = `/api/config/tools?page=${page}&page_size=${pageSize}`;
+            const response = await apiFetch(url);
+            if (!response.ok) {
+                throw new Error('获取工具列表失败');
+            }
+            
+            const result = await response.json();
+            
+            // 将所有工具添加到状态映射中
+            result.tools.forEach(tool => {
+                const toolKey = getToolKey(tool);
+                if (!roleToolStateMap.has(toolKey)) {
+                    // 工具不在映射中，根据当前模式初始化
+                    let enabled = false;
+                    if (roleUsesAllTools) {
+                        // 如果使用所有工具，且工具在MCP管理中已启用，则标记为选中
+                        enabled = tool.enabled ? true : false;
+                    } else {
+                        // 如果不使用所有工具，只有工具在角色配置的工具列表中才标记为选中
+                        enabled = roleConfiguredTools.has(toolKey);
+                    }
+                    roleToolStateMap.set(toolKey, {
+                        enabled: enabled,
+                        is_external: tool.is_external || false,
+                        external_mcp: tool.external_mcp || '',
+                        name: tool.name,
+                        mcpEnabled: tool.enabled // 保存MCP管理中的原始启用状态
+                    });
+                } else {
+                    // 工具已在映射中，更新其他属性但保留enabled状态
+                    const state = roleToolStateMap.get(toolKey);
+                    state.is_external = tool.is_external || false;
+                    state.external_mcp = tool.external_mcp || '';
+                    state.mcpEnabled = tool.enabled; // 更新MCP管理中的原始启用状态
+                    if (!state.name || state.name === toolKey.split('::').pop()) {
+                        state.name = tool.name; // 更新工具名称
+                    }
+                }
+            });
+            
+            // 检查是否还有更多页面
+            if (page >= result.total_pages) {
+                hasMore = false;
+            } else {
+                page++;
+            }
+        }
+    } catch (error) {
+        console.error('加载所有工具到状态映射失败:', error);
+        throw error;
+    }
+}
+
 // 保存角色
 async function saveRole() {
     const name = document.getElementById('role-name').value.trim();
@@ -1049,36 +1124,79 @@ async function saveRole() {
     const userPrompt = document.getElementById('role-user-prompt').value.trim();
     const enabled = document.getElementById('role-enabled').checked;
 
+    const isEdit = document.getElementById('role-name').disabled;
+    
     // 检查是否为默认角色
     const isDefaultRole = name === '默认';
+    
+    // 检查是否是首次添加角色（排除默认角色后，没有任何用户创建的角色）
+    const isFirstUserRole = !isEdit && !isDefaultRole && roles.filter(r => r.name !== '默认').length === 0;
     
     // 默认角色不保存tools字段（使用所有工具）
     // 非默认角色：如果使用所有工具（roleUsesAllTools为true），也不保存tools字段
     let tools = [];
     let disabledTools = []; // 存储未在MCP管理中启用的工具
     
-    if (!isDefaultRole && !roleUsesAllTools) {
+    if (!isDefaultRole) {
         // 保存当前页的状态
         saveCurrentRolePageToolStates();
         
         // 收集所有选中的工具（包括未在MCP管理中启用的）
         const allSelectedTools = getAllSelectedRoleTools();
         
-        // 检查哪些工具未在MCP管理中启用
-        disabledTools = getDisabledTools(allSelectedTools);
-        
-        // 如果有未启用的工具，提示用户
-        if (disabledTools.length > 0) {
-            const toolNames = disabledTools.map(t => t.name).join('、');
-            const message = `以下 ${disabledTools.length} 个工具未在MCP管理中启用，无法在角色中配置：\n\n${toolNames}\n\n请先在"MCP管理"中启用这些工具，然后再在角色中配置。\n\n是否继续保存？（将只保存已启用的工具）`;
+        // 如果是首次添加角色且没有选择工具，默认使用全部工具
+        if (isFirstUserRole && allSelectedTools.length === 0) {
+            roleUsesAllTools = true;
+            showNotification('检测到这是首次添加角色且未选择工具，将默认使用全部工具', 'info');
+        } else if (roleUsesAllTools) {
+            // 如果当前使用所有工具，需要检查用户是否取消了一些工具
+            // 检查状态映射中是否有未选中的已启用工具
+            let hasUnselectedTools = false;
+            roleToolStateMap.forEach((state) => {
+                // 如果工具在MCP管理中已启用但未选中，说明用户取消了该工具
+                if (state.mcpEnabled !== false && !state.enabled) {
+                    hasUnselectedTools = true;
+                }
+            });
             
-            if (!confirm(message)) {
-                return; // 用户取消保存
+            // 如果用户取消了一些已启用的工具，切换到部分工具模式
+            if (hasUnselectedTools) {
+                // 在切换之前，需要加载所有工具到状态映射中
+                // 这样我们可以正确保存所有工具的状态（除了用户取消的那些）
+                await loadAllToolsToStateMap();
+                
+                // 将所有已启用的工具标记为选中（除了用户已取消的那些）
+                // 用户已取消的工具在状态映射中enabled为false，保持不变
+                roleToolStateMap.forEach((state, toolKey) => {
+                    // 如果工具在MCP管理中已启用，且状态映射中没有明确标记为未选中（即enabled不是false）
+                    // 则标记为选中
+                    if (state.mcpEnabled !== false && state.enabled !== false) {
+                        state.enabled = true;
+                    }
+                });
+                
+                roleUsesAllTools = false;
             }
         }
         
-        // 获取选中的工具列表（只包含在MCP管理中已启用的工具）
-        tools = await getSelectedRoleTools();
+        // 如果使用所有工具，不需要获取工具列表
+        if (!roleUsesAllTools) {
+            // 检查哪些工具未在MCP管理中启用
+            disabledTools = getDisabledTools(allSelectedTools);
+            
+            // 如果有未启用的工具，提示用户
+            if (disabledTools.length > 0) {
+                const toolNames = disabledTools.map(t => t.name).join('、');
+                const message = `以下 ${disabledTools.length} 个工具未在MCP管理中启用，无法在角色中配置：\n\n${toolNames}\n\n请先在"MCP管理"中启用这些工具，然后再在角色中配置。\n\n是否继续保存？（将只保存已启用的工具）`;
+                
+                if (!confirm(message)) {
+                    return; // 用户取消保存
+                }
+            }
+            
+            // 获取选中的工具列表（只包含在MCP管理中已启用的工具）
+            tools = await getSelectedRoleTools();
+        }
     }
 
     const roleData = {
@@ -1089,8 +1207,6 @@ async function saveRole() {
         tools: tools, // 默认角色为空数组，表示使用所有工具
         enabled: enabled
     };
-
-    const isEdit = document.getElementById('role-name').disabled;
     const url = isEdit ? `/api/roles/${encodeURIComponent(name)}` : '/api/roles';
     const method = isEdit ? 'PUT' : 'POST';
 
