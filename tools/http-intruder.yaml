@@ -17,20 +17,46 @@ args:
     url = sys.argv[1]
     method = (sys.argv[2] or "GET").upper()
     location = (sys.argv[3] or "query").lower()
-    params_json = sys.argv[4] if len(sys.argv) > 4 else "{}"
+    params_input = sys.argv[4] if len(sys.argv) > 4 else "{}"
     payloads_json = sys.argv[5] if len(sys.argv) > 5 else "[]"
     max_requests = int(sys.argv[6]) if len(sys.argv) > 6 and sys.argv[6] else 0
 
     try:
-        params_template = json.loads(params_json) if params_json else {}
+        # 框架会将 object 类型序列化为 JSON 字符串传递
+        # sys.argv 中的参数都是字符串，需要解析 JSON
+        if params_input and params_input.strip():
+            params_template = json.loads(params_input)
+            if not isinstance(params_template, dict):
+                sys.stderr.write("参数模板必须是字典格式\n")
+                sys.exit(1)
+        else:
+            params_template = {}
     except json.JSONDecodeError as exc:
-        sys.stderr.write(f"参数模板解析失败: {exc}\n")
+        sys.stderr.write(f"参数模板解析失败（需要 JSON 字典格式）: {exc}\n")
         sys.exit(1)
 
     try:
-        payloads = json.loads(payloads_json)
-    except json.JSONDecodeError as exc:
-        sys.stderr.write(f"载荷解析失败: {exc}\n")
+        # 框架会将 array 类型转换为逗号分隔的字符串（见 formatParamValue）
+        # 但为了兼容性，也支持 JSON 数组格式
+        if payloads_json and payloads_json.strip():
+            payloads_str = payloads_json.strip()
+            # 优先尝试解析为 JSON 数组
+            if payloads_str.startswith("["):
+                try:
+                    payloads = json.loads(payloads_str)
+                except json.JSONDecodeError:
+                    # JSON 解析失败，尝试逗号分隔格式
+                    payloads = [item.strip() for item in payloads_str.split(",") if item.strip()]
+            else:
+                # 逗号分隔的字符串（框架的 array 类型默认格式）
+                payloads = [item.strip() for item in payloads_str.split(",") if item.strip()]
+            if not isinstance(payloads, list):
+                sys.stderr.write("载荷必须是数组格式\n")
+                sys.exit(1)
+        else:
+            payloads = []
+    except (json.JSONDecodeError, ValueError) as exc:
+        sys.stderr.write(f"载荷解析失败（需要 JSON 数组或逗号分隔格式）: {exc}\n")
         sys.exit(1)
 
     if not isinstance(payloads, list) or not payloads:
@@ -110,14 +136,14 @@ parameters:
     position: 2
     format: "positional"
   - name: "params"
-    type: "string"
-    description: "参数模板（JSON字典），指定要模糊的键及默认值"
+    type: "object"
+    description: "参数模板（字典格式），指定要模糊的键及默认值，如 {\"id\": \"1\", \"name\": \"test\"}"
     required: true
     position: 3
     format: "positional"
   - name: "payloads"
-    type: "string"
-    description: "载荷列表（JSON数组）"
+    type: "array"
+    description: "载荷列表（数组格式），如 [\"test1\", \"test2\", \"test3\"]"
     required: true
     position: 4
     format: "positional"

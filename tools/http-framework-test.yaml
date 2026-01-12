@@ -445,7 +445,7 @@ args:
         parser.add_argument("--url", required=True)
         parser.add_argument("--method", default="GET")
         parser.add_argument("--data", default="")
-        parser.add_argument("--headers", default="")
+        parser.add_argument("--headers", default="", type=str)
         parser.add_argument("--cookies", default="")
         parser.add_argument("--user-agent", dest="user_agent", default="")
         parser.add_argument("--proxy", default="")
@@ -489,7 +489,30 @@ args:
         prepared_url = smart_encode_url(args.url) if args.auto_encode_url else args.url
         method = (args.method or "GET").upper()
 
-        headers = httpx.Headers(parse_headers(args.headers))
+        # 处理 headers：支持字典（JSON字符串）和字符串格式
+        # 框架会将 object 类型序列化为 JSON 字符串传递
+        headers_list = []
+        if args.headers:
+            headers_str = args.headers.strip()
+            # 优先尝试解析为 JSON（框架传递的字典会被序列化为 JSON）
+            if headers_str.startswith("{") or headers_str.startswith("["):
+                try:
+                    parsed = json.loads(headers_str)
+                    if isinstance(parsed, dict):
+                        # 字典格式：直接转换为 (key, value) 元组列表
+                        headers_list = [(str(k).strip(), str(v).strip()) for k, v in parsed.items()]
+                    elif isinstance(parsed, list):
+                        # 数组格式：使用原有的 parse_headers 函数处理
+                        headers_list = parse_headers(headers_str)
+                    else:
+                        headers_list = parse_headers(headers_str)
+                except (json.JSONDecodeError, ValueError):
+                    # JSON 解析失败，回退到原有的字符串解析逻辑
+                    headers_list = parse_headers(headers_str)
+            else:
+                # 非 JSON 格式，使用原有的字符串解析逻辑（向后兼容）
+                headers_list = parse_headers(headers_str)
+        headers = httpx.Headers(headers_list)
         if args.user_agent:
             headers["User-Agent"] = args.user_agent
 
@@ -724,8 +747,8 @@ parameters:
     required: false
     flag: "--data"
   - name: "headers"
-    type: "string"
-    description: "自定义请求头（JSON字典、行分隔或分号分隔的 Header: Value 格式）"
+    type: "object"
+    description: "自定义请求头（字典格式，如 {\"X-Custom\": \"value\"}）"
     required: false
     flag: "--headers"
   - name: "cookies"
