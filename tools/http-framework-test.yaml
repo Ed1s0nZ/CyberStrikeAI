@@ -732,7 +732,7 @@ description: |
 parameters:
   - name: "url"
     type: "string"
-    description: "目标URL（可自动编码路径/参数，避免特殊字符导致的请求失败）"
+    description: "目标URL（可自动编码路径/参数，避免特殊字符导致的请求失败如：https://www.target.com/s?wd=test）"
     required: true
     flag: "--url"
   - name: "method"
