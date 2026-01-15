@@ -1281,10 +1281,16 @@ version: 1.0.0<br>
                 <span class="modal-close" onclick="closeCreateGroupModal()">&times;</span>
             </div>
             <div class="modal-body create-group-body">
-                <p class="create-group-description">分组功能可将对话集中归类管理,让对话更加井然有序。</p>
+                <p class="create-group-description">分组功能可将对话集中归类管理，让对话更加井然有序。</p>
                 <div class="create-group-input-wrapper">
                     <span class="group-icon-input">😊</span>
                     <input type="text" id="create-group-name-input" placeholder="请输入分组名称" />
+                </div>
+                <div class="create-group-suggestions">
+                    <div class="suggestion-tag" onclick="selectSuggestion('渗透测试')">渗透测试</div>
+                    <div class="suggestion-tag" onclick="selectSuggestion('CTF')">CTF</div>
+                    <div class="suggestion-tag" onclick="selectSuggestion('红队')">红队</div>
+                    <div class="suggestion-tag" onclick="selectSuggestion('漏洞挖掘')">漏洞挖掘</div>
                 </div>
             </div>
             <div class="modal-footer">

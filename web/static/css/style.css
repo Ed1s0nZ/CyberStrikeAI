@@ -3272,166 +3272,181 @@ header {
     flex-direction: column;
     height: 100%;
     position: relative;
+    overflow: hidden;
 }
 
 .skills-list-with-pagination {
     flex: 1;
     overflow-y: auto;
-    padding-bottom: 90px; /* 为固定分页栏留出空间 */
+    overflow-x: hidden;
     min-height: 0;
+    /* 为分页组件预留空间，确保视觉连接自然 */
+    padding-bottom: 0;
 }
 
 .pagination-fixed {
-    position: sticky;
-    bottom: 0;
-    z-index: 10;
     background: var(--bg-primary);
-    border-top: 1px solid var(--border-color);
-    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
     margin-top: 0;
-    padding: 16px 24px;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    padding: 0;
+    /* 确保分页组件宽度与内容区域一致，不包括滚动条 */
+    width: 100%;
+    box-sizing: border-box;
+    /* 确保分页组件不延伸到滚动条区域 */
+    overflow: hidden;
+    /* 当列表有滚动条时，分页组件应该与内容区域对齐 */
+    position: relative;
+    /* 添加四个角的圆角，与上方卡片保持一致 */
+    border-radius: 8px;
 }
 
 .pagination-fixed .pagination {
     margin-top: 0;
-    border-top: none;
-    padding: 0;
-    background: transparent;
-    border-radius: 12px;
+    border-top: 1px solid var(--border-color);
+    padding: 16px 20px;
+    background: var(--bg-primary);
     justify-content: space-between;
     align-items: center;
-    gap: 24px;
+    gap: 20px;
     flex-wrap: wrap;
+    /* 确保分页内容与列表内容对齐 */
+    width: 100%;
+    box-sizing: border-box;
+    /* 柔和的顶部边框，与列表自然分离 */
+    border-top-color: rgba(233, 236, 239, 0.6);
+    /* 添加四个角的圆角，与上方卡片保持一致 */
+    border-radius: 8px;
 }
 
-/* 左侧：信息显示 */
+/* 左侧：信息显示和每页数量选择器 - 更自然的设计 */
 .pagination-fixed .pagination-info {
     font-size: 0.875rem;
     color: var(--text-secondary);
-    font-weight: 500;
-    white-space: nowrap;
     display: flex;
     align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    /* 去掉背景色和边框，更自然 */
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
 }
 
 .pagination-fixed .pagination-info span {
     color: var(--text-primary);
+    white-space: nowrap;
+    font-weight: 400;
 }
 
-/* 中间：每页数量选择器 */
-.pagination-fixed .pagination-page-size {
+.pagination-fixed .pagination-info .pagination-page-size {
     display: flex;
     align-items: center;
     gap: 8px;
     font-size: 0.875rem;
     color: var(--text-secondary);
+    font-weight: 400;
 }
 
-.pagination-fixed .pagination-page-size label {
-    font-weight: 500;
-    white-space: nowrap;
-}
-
-.pagination-fixed .pagination-page-size select {
-    padding: 6px 12px;
+.pagination-fixed .pagination-info .pagination-page-size select {
+    padding: 6px 10px;
+    border-radius: 6px;
     border: 1px solid var(--border-color);
-    border-radius: 8px;
-    background: var(--bg-secondary);
+    background: var(--bg-primary);
     color: var(--text-primary);
     font-size: 0.875rem;
     cursor: pointer;
     transition: all 0.2s ease;
     min-width: 70px;
     font-weight: 500;
+    /* 更柔和的边框 */
+    border-color: rgba(233, 236, 239, 0.8);
 }
 
-.pagination-fixed .pagination-page-size select:hover {
-    border-color: var(--accent-color);
-    background: var(--bg-tertiary);
-}
-
-.pagination-fixed .pagination-page-size select:focus {
+.pagination-fixed .pagination-info .pagination-page-size select:focus {
     outline: none;
     border-color: var(--accent-color);
     box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+    background: var(--bg-primary);
 }
 
-/* 右侧：分页按钮组 */
+.pagination-fixed .pagination-info .pagination-page-size select:hover {
+    border-color: var(--accent-color);
+    background: var(--bg-secondary);
+}
+
+/* 右侧：分页按钮组 - 更统一的设计 */
 .pagination-fixed .pagination-controls {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     flex-wrap: wrap;
 }
 
 .pagination-fixed .pagination-controls .btn-secondary {
-    padding: 8px 16px;
+    padding: 7px 14px;
     font-size: 0.875rem;
-    font-weight: 500;
-    border-radius: 8px;
     min-width: auto;
     transition: all 0.2s ease;
+    font-weight: 500;
+    border-radius: 8px;
+    /* 更柔和的边框 */
+    border-color: rgba(233, 236, 239, 0.8);
 }
 
 .pagination-fixed .pagination-controls .btn-secondary:hover:not(:disabled) {
+    background: var(--bg-tertiary);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 102, 255, 0.15);
+    box-shadow: 0 2px 4px rgba(0, 102, 255, 0.1);
+}
+
+.pagination-fixed .pagination-controls .btn-secondary:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 102, 255, 0.08);
 }
 
 .pagination-fixed .pagination-controls .btn-secondary:disabled {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
+    color: var(--text-muted);
 }
 
 .pagination-fixed .pagination-page {
     font-size: 0.875rem;
     color: var(--text-secondary);
-    font-weight: 500;
     padding: 0 12px;
     white-space: nowrap;
+    font-weight: 400;
 }
 
 /* 响应式优化 */
 @media (max-width: 768px) {
-    .pagination-fixed {
-        padding: 12px 16px;
-    }
-    
     .pagination-fixed .pagination {
         flex-direction: column;
-        gap: 12px;
+        gap: 16px;
         align-items: stretch;
+        padding: 16px;
     }
     
     .pagination-fixed .pagination-info {
         width: 100%;
-        text-align: center;
         justify-content: center;
-    }
-    
-    .pagination-fixed .pagination-page-size {
-        width: 100%;
-        justify-content: center;
+        gap: 16px;
     }
     
     .pagination-fixed .pagination-controls {
         width: 100%;
         justify-content: center;
         flex-wrap: wrap;
+        gap: 6px;
     }
     
     .pagination-fixed .pagination-controls .btn-secondary {
         flex: 1;
         min-width: 60px;
         max-width: 120px;
-    }
-    
-    .skills-list-with-pagination {
-        padding-bottom: 140px; /* 移动端需要更多空间 */
     }
 }
 
@@ -3937,6 +3952,27 @@ header {
     width: 18px;
     height: 18px;
     accent-color: var(--accent-color);
+    margin: 0;
+    vertical-align: middle;
+    display: inline-block;
+}
+
+/* 确保复选框单元格垂直居中 */
+.monitor-table td:first-child,
+.monitor-table th:first-child {
+    text-align: center;
+    vertical-align: middle;
+}
+
+/* 统一表头复选框大小 */
+#monitor-select-all {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--accent-color);
+    margin: 0;
+    vertical-align: middle;
+    display: inline-block;
 }
 
 /* 移除第一列的特殊样式，让表格更灵活 */
@@ -6540,48 +6576,152 @@ header {
 
 /* 创建分组模态框 */
 .create-group-modal-content {
-    max-width: 500px;
-    width: 90vw;
+    max-width: 640px;
+    width: 60vw;
+    margin: 8% auto;
+}
+
+.create-group-modal-content .modal-header {
+    padding: 12px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    background: #ffffff;
+}
+
+.create-group-modal-content .modal-header h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1a1a1a;
+    background: none;
+    -webkit-background-clip: unset;
+    -webkit-text-fill-color: #1a1a1a;
+    background-clip: unset;
+    margin: 0;
+}
+
+.create-group-modal-content .modal-close {
+    width: 28px;
+    height: 28px;
+    font-size: 1.1rem;
+    color: #666;
+}
+
+.create-group-modal-content .modal-close:hover {
+    background: #f5f5f5;
+    color: #333;
+    border-color: transparent;
+    transform: scale(1);
+}
+
+.create-group-modal-content .modal-footer {
+    padding: 10px 20px;
+    border-top: 1px solid #f0f0f0;
+    background: #fafafa;
 }
 
 .create-group-body {
-    padding: 24px;
+    padding: 16px 20px;
 }
 
 .create-group-description {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-    line-height: 1.6;
-    margin-bottom: 24px;
+    font-size: 0.8125rem;
+    color: #666;
+    line-height: 1.3;
+    margin-bottom: 12px;
+    margin-top: 0;
+    padding: 0;
 }
 
 .create-group-input-wrapper {
     position: relative;
     display: flex;
     align-items: center;
+    margin-bottom: 0;
+    width: 100%;
 }
 
 .group-icon-input {
     position: absolute;
-    left: 12px;
-    font-size: 1.2rem;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: auto;
+    height: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border-radius: 0;
+    font-size: 1rem;
     pointer-events: none;
+    z-index: 1;
+    box-shadow: none;
+    line-height: 1;
 }
 
 #create-group-name-input {
     width: 100%;
-    padding: 12px 16px 12px 48px;
-    border: 2px solid var(--accent-color);
+    padding: 8px 12px 8px 40px;
+    border: 1.5px solid #e0e0e0;
     border-radius: 8px;
-    font-size: 0.9375rem;
-    background: var(--bg-primary);
+    font-size: 0.875rem;
+    background: #fafafa;
     color: var(--text-primary);
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    height: 36px;
+    box-sizing: border-box;
+    line-height: 1.2;
+}
+
+#create-group-name-input:hover {
+    border-color: #b0b0b0;
+    background: #ffffff;
 }
 
 #create-group-name-input:focus {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+    border-color: #667eea;
+    background: #ffffff;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1), 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+#create-group-name-input::placeholder {
+    color: #999;
+}
+
+.create-group-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.suggestion-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 12px;
+    background: #f5f5f5;
+    border: 1px solid #e0e0e0;
+    border-radius: 14px;
+    font-size: 0.8125rem;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    height: 26px;
+    box-sizing: border-box;
+}
+
+.suggestion-tag:hover {
+    background: #e8e8e8;
+    border-color: #d0d0d0;
+    color: #333;
+    transform: translateY(-1px);
+}
+
+.suggestion-tag:active {
+    transform: translateY(0);
+    background: #ddd;
 }
 
 /* 上下文菜单 */

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"cyberstrike-ai/internal/config"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+	"gopkg.in/yaml.v3"
 )
 
 // SkillsHandler Skills处理器
@@ -50,7 +52,7 @@ func (h *SkillsHandler) GetSkills(c *gin.Context) {
 
 	// 搜索参数
 	searchKeyword := strings.TrimSpace(c.Query("search"))
-	
+
 	// 先加载所有skills的详细信息用于搜索过滤
 	allSkillsInfo := make([]map[string]interface{}, 0, len(skillList))
 	for _, skillName := range skillList {
@@ -105,7 +107,7 @@ func (h *SkillsHandler) GetSkills(c *gin.Context) {
 			name := strings.ToLower(fmt.Sprintf("%v", skillInfo["name"]))
 			description := strings.ToLower(fmt.Sprintf("%v", skillInfo["description"]))
 			path := strings.ToLower(fmt.Sprintf("%v", skillInfo["path"]))
-			
+
 			if strings.Contains(name, keywordLower) ||
 				strings.Contains(description, keywordLower) ||
 				strings.Contains(path, keywordLower) {
@@ -160,7 +162,6 @@ func (h *SkillsHandler) GetSkills(c *gin.Context) {
 	})
 }
 
-
 // GetSkill 获取单个skill的详细信息
 func (h *SkillsHandler) GetSkill(c *gin.Context) {
 	skillName := c.Param("name")
@@ -211,6 +212,49 @@ func (h *SkillsHandler) GetSkill(c *gin.Context) {
 			"mod_time":    modTime,
 		},
 	})
+}
+
+// GetSkillBoundRoles 获取绑定指定skill的角色列表
+func (h *SkillsHandler) GetSkillBoundRoles(c *gin.Context) {
+	skillName := c.Param("name")
+	if skillName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "skill名称不能为空"})
+		return
+	}
+
+	boundRoles := h.getRolesBoundToSkill(skillName)
+	c.JSON(http.StatusOK, gin.H{
+		"skill":        skillName,
+		"bound_roles":  boundRoles,
+		"bound_count":  len(boundRoles),
+	})
+}
+
+// getRolesBoundToSkill 获取绑定指定skill的角色列表（不修改配置）
+func (h *SkillsHandler) getRolesBoundToSkill(skillName string) []string {
+	if h.config.Roles == nil {
+		return []string{}
+	}
+
+	boundRoles := make([]string, 0)
+	for roleName, role := range h.config.Roles {
+		// 确保角色名称正确设置
+		if role.Name == "" {
+			role.Name = roleName
+		}
+
+		// 检查角色的Skills列表中是否包含该skill
+		if len(role.Skills) > 0 {
+			for _, skill := range role.Skills {
+				if skill == skillName {
+					boundRoles = append(boundRoles, roleName)
+					break
+				}
+			}
+		}
+	}
+
+	return boundRoles
 }
 
 // CreateSkill 创建新skill
@@ -414,6 +458,14 @@ func (h *SkillsHandler) DeleteSkill(c *gin.Context) {
 		return
 	}
 
+	// 检查是否有角色绑定了该skill，如果有则自动移除绑定
+	affectedRoles := h.removeSkillFromRoles(skillName)
+	if len(affectedRoles) > 0 {
+		h.logger.Info("从角色中移除skill绑定", 
+			zap.String("skill", skillName), 
+			zap.Strings("roles", affectedRoles))
+	}
+
 	// 获取skills目录
 	skillsDir := h.config.SkillsDir
 	if skillsDir == "" {
@@ -432,9 +484,16 @@ func (h *SkillsHandler) DeleteSkill(c *gin.Context) {
 		return
 	}
 
+	responseMsg := "skill已删除"
+	if len(affectedRoles) > 0 {
+		responseMsg = fmt.Sprintf("skill已删除，已自动从 %d 个角色中移除绑定: %s", 
+			len(affectedRoles), strings.Join(affectedRoles, ", "))
+	}
+
 	h.logger.Info("删除skill成功", zap.String("skill", skillName))
 	c.JSON(http.StatusOK, gin.H{
-		"message": "skill已删除",
+		"message":        responseMsg,
+		"affected_roles": affectedRoles,
 	})
 }
 
@@ -558,6 +617,150 @@ func (h *SkillsHandler) ClearSkillStatsByName(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": fmt.Sprintf("已清空skill '%s' 的统计信息", skillName),
 	})
+}
+
+// removeSkillFromRoles 从所有角色中移除指定的skill绑定
+// 返回受影响角色名称列表
+func (h *SkillsHandler) removeSkillFromRoles(skillName string) []string {
+	if h.config.Roles == nil {
+		return []string{}
+	}
+
+	affectedRoles := make([]string, 0)
+	rolesToUpdate := make(map[string]config.RoleConfig)
+
+	// 遍历所有角色，查找并移除skill绑定
+	for roleName, role := range h.config.Roles {
+		// 确保角色名称正确设置
+		if role.Name == "" {
+			role.Name = roleName
+		}
+
+		// 检查角色的Skills列表中是否包含要删除的skill
+		if len(role.Skills) > 0 {
+			updated := false
+			newSkills := make([]string, 0, len(role.Skills))
+			for _, skill := range role.Skills {
+				if skill != skillName {
+					newSkills = append(newSkills, skill)
+				} else {
+					updated = true
+				}
+			}
+			if updated {
+				role.Skills = newSkills
+				rolesToUpdate[roleName] = role
+				affectedRoles = append(affectedRoles, roleName)
+			}
+		}
+	}
+
+	// 如果有角色需要更新，保存到文件
+	if len(rolesToUpdate) > 0 {
+		// 更新内存中的配置
+		for roleName, role := range rolesToUpdate {
+			h.config.Roles[roleName] = role
+		}
+		// 保存更新后的角色配置到文件
+		if err := h.saveRolesConfig(); err != nil {
+			h.logger.Error("保存角色配置失败", zap.Error(err))
+		}
+	}
+
+	return affectedRoles
+}
+
+// saveRolesConfig 保存角色配置到文件（从SkillsHandler调用）
+func (h *SkillsHandler) saveRolesConfig() error {
+	configDir := filepath.Dir(h.configPath)
+	rolesDir := h.config.RolesDir
+	if rolesDir == "" {
+		rolesDir = "roles" // 默认目录
+	}
+
+	// 如果是相对路径，相对于配置文件所在目录
+	if !filepath.IsAbs(rolesDir) {
+		rolesDir = filepath.Join(configDir, rolesDir)
+	}
+
+	// 确保目录存在
+	if err := os.MkdirAll(rolesDir, 0755); err != nil {
+		return fmt.Errorf("创建角色目录失败: %w", err)
+	}
+
+	// 保存每个角色到独立的文件
+	if h.config.Roles != nil {
+		for roleName, role := range h.config.Roles {
+			// 确保角色名称正确设置
+			if role.Name == "" {
+				role.Name = roleName
+			}
+
+			// 使用角色名称作为文件名（安全化文件名，避免特殊字符）
+			safeFileName := sanitizeRoleFileName(role.Name)
+			roleFile := filepath.Join(rolesDir, safeFileName+".yaml")
+
+			// 将角色配置序列化为YAML
+			roleData, err := yaml.Marshal(&role)
+			if err != nil {
+				h.logger.Error("序列化角色配置失败", zap.String("role", roleName), zap.Error(err))
+				continue
+			}
+
+			// 处理icon字段：确保包含\U的icon值被引号包围（YAML需要引号才能正确解析Unicode转义）
+			roleDataStr := string(roleData)
+			if role.Icon != "" && strings.HasPrefix(role.Icon, "\\U") {
+				// 匹配 icon: \UXXXXXXXX 格式（没有引号），排除已经有引号的情况
+				re := regexp.MustCompile(`(?m)^(icon:\s+)(\\U[0-9A-F]{8})(\s*)$`)
+				roleDataStr = re.ReplaceAllString(roleDataStr, `${1}"${2}"${3}`)
+				roleData = []byte(roleDataStr)
+			}
+
+			// 写入文件
+			if err := os.WriteFile(roleFile, roleData, 0644); err != nil {
+				h.logger.Error("保存角色配置文件失败", zap.String("role", roleName), zap.String("file", roleFile), zap.Error(err))
+				continue
+			}
+
+			h.logger.Info("角色配置已保存到文件", zap.String("role", roleName), zap.String("file", roleFile))
+		}
+	}
+
+	return nil
+}
+
+// sanitizeRoleFileName 将角色名称转换为安全的文件名
+func sanitizeRoleFileName(name string) string {
+	// 替换可能不安全的字符
+	replacer := map[rune]string{
+		'/':  "_",
+		'\\': "_",
+		':':  "_",
+		'*':  "_",
+		'?':  "_",
+		'"':  "_",
+		'<':  "_",
+		'>':  "_",
+		'|':  "_",
+		' ':  "_",
+	}
+
+	var result []rune
+	for _, r := range name {
+		if replacement, ok := replacer[r]; ok {
+			result = append(result, []rune(replacement)...)
+		} else {
+			result = append(result, r)
+		}
+	}
+
+	fileName := string(result)
+	// 如果文件名为空，使用默认名称
+	if fileName == "" {
+		fileName = "role"
+	}
+
+	return fileName
 }
 
 // isValidSkillName 验证skill名称是否有效

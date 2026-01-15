@@ -5007,6 +5007,15 @@ function closeCreateGroupModal() {
     }
 }
 
+// 选择建议标签
+function selectSuggestion(name) {
+    const input = document.getElementById('create-group-name-input');
+    if (input) {
+        input.value = name;
+        input.focus();
+    }
+}
+
 // 创建分组
 async function createGroup(event) {
     // 阻止事件冒泡

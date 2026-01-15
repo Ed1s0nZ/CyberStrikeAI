@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"go.uber.org/zap"
 )
@@ -14,6 +15,7 @@ type Manager struct {
 	skillsDir string
 	logger    *zap.Logger
 	skills    map[string]*Skill // 缓存已加载的skills
+	mu        sync.RWMutex      // 保护skills map的并发访问
 }
 
 // Skill Skill定义
@@ -35,10 +37,13 @@ func NewManager(skillsDir string, logger *zap.Logger) *Manager {
 
 // LoadSkill 加载单个skill
 func (m *Manager) LoadSkill(skillName string) (*Skill, error) {
-	// 检查缓存
+	// 先尝试读锁检查缓存
+	m.mu.RLock()
 	if skill, exists := m.skills[skillName]; exists {
+		m.mu.RUnlock()
 		return skill, nil
 	}
+	m.mu.RUnlock()
 
 	// 构建skill路径
 	skillPath := filepath.Join(m.skillsDir, skillName)
@@ -79,8 +84,15 @@ func (m *Manager) LoadSkill(skillName string) (*Skill, error) {
 	// 解析skill内容
 	skill := m.parseSkillContent(string(content), skillName, skillPath)
 	
-	// 缓存skill
+	// 使用写锁缓存skill（双重检查，避免重复加载）
+	m.mu.Lock()
+	// 再次检查，可能其他goroutine已经加载了
+	if existing, exists := m.skills[skillName]; exists {
+		m.mu.Unlock()
+		return existing, nil
+	}
 	m.skills[skillName] = skill
+	m.mu.Unlock()
 
 	return skill, nil
 }
