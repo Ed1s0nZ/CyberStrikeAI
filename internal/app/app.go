@@ -700,7 +700,6 @@ func setupRoutes(
 		protected.GET("/skills/stats", skillsHandler.GetSkillStats)
 		protected.DELETE("/skills/stats", skillsHandler.ClearSkillStats)
 		protected.GET("/skills/:name", skillsHandler.GetSkill)
-		protected.GET("/skills/:name/bound-roles", skillsHandler.GetSkillBoundRoles)
 		protected.POST("/skills", skillsHandler.CreateSkill)
 		protected.PUT("/skills/:name", skillsHandler.UpdateSkill)
 		protected.DELETE("/skills/:name", skillsHandler.DeleteSkill)

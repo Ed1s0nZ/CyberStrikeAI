@@ -165,76 +165,45 @@ function renderSkillsPagination() {
     }
     
     // 计算显示范围
-    const start = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-    const end = total === 0 ? 0 : Math.min(currentPage * pageSize, total);
+    const start = (currentPage - 1) * pageSize + 1;
+    const end = Math.min(currentPage * pageSize, total);
     
     let paginationHTML = '<div class="pagination">';
     
-    // 左侧：显示范围信息和每页数量选择器（参考MCP样式）
+    // 左侧：显示范围信息
     paginationHTML += `
         <div class="pagination-info">
             <span>显示 ${start}-${end} / 共 ${total} 条</span>
-            <label class="pagination-page-size">
-                每页显示
-                <select id="skills-page-size-pagination" onchange="changeSkillsPageSize()">
-                    <option value="10" ${pageSize === 10 ? 'selected' : ''}>10</option>
-                    <option value="20" ${pageSize === 20 ? 'selected' : ''}>20</option>
-                    <option value="50" ${pageSize === 50 ? 'selected' : ''}>50</option>
-                    <option value="100" ${pageSize === 100 ? 'selected' : ''}>100</option>
-                </select>
-            </label>
+        </div>
+    `;
+    
+    // 中间：每页数量选择器
+    paginationHTML += `
+        <div class="pagination-page-size">
+            <label for="skills-page-size-pagination">每页:</label>
+            <select id="skills-page-size-pagination" onchange="changeSkillsPageSize()">
+                <option value="10" ${pageSize === 10 ? 'selected' : ''}>10</option>
+                <option value="20" ${pageSize === 20 ? 'selected' : ''}>20</option>
+                <option value="50" ${pageSize === 50 ? 'selected' : ''}>50</option>
+                <option value="100" ${pageSize === 100 ? 'selected' : ''}>100</option>
+            </select>
         </div>
     `;
     
     // 右侧：分页按钮（参考MCP样式：首页、上一页、第X/Y页、下一页、末页）
     paginationHTML += `
         <div class="pagination-controls">
-            <button class="btn-secondary" onclick="loadSkills(1, ${pageSize})" ${currentPage === 1 || total === 0 ? 'disabled' : ''}>首页</button>
-            <button class="btn-secondary" onclick="loadSkills(${currentPage - 1}, ${pageSize})" ${currentPage === 1 || total === 0 ? 'disabled' : ''}>上一页</button>
+            <button class="btn-secondary" onclick="loadSkills(1, ${pageSize})" ${currentPage === 1 ? 'disabled' : ''}>首页</button>
+            <button class="btn-secondary" onclick="loadSkills(${currentPage - 1}, ${pageSize})" ${currentPage === 1 ? 'disabled' : ''}>上一页</button>
             <span class="pagination-page">第 ${currentPage} / ${totalPages || 1} 页</span>
-            <button class="btn-secondary" onclick="loadSkills(${currentPage + 1}, ${pageSize})" ${currentPage >= totalPages || total === 0 ? 'disabled' : ''}>下一页</button>
-            <button class="btn-secondary" onclick="loadSkills(${totalPages || 1}, ${pageSize})" ${currentPage >= totalPages || total === 0 ? 'disabled' : ''}>末页</button>
+            <button class="btn-secondary" onclick="loadSkills(${currentPage + 1}, ${pageSize})" ${currentPage >= totalPages ? 'disabled' : ''}>下一页</button>
+            <button class="btn-secondary" onclick="loadSkills(${totalPages || 1}, ${pageSize})" ${currentPage >= totalPages ? 'disabled' : ''}>末页</button>
         </div>
     `;
     
     paginationHTML += '</div>';
     
     paginationContainer.innerHTML = paginationHTML;
-    
-    // 确保分页组件与列表内容区域对齐（不包括滚动条）
-    function alignPaginationWidth() {
-        const skillsList = document.getElementById('skills-list');
-        if (skillsList && paginationContainer) {
-            // 获取列表的实际内容宽度（不包括滚动条）
-            const listClientWidth = skillsList.clientWidth; // 可视区域宽度（不包括滚动条）
-            const listScrollHeight = skillsList.scrollHeight; // 内容总高度
-            const listClientHeight = skillsList.clientHeight; // 可视区域高度
-            const hasScrollbar = listScrollHeight > listClientHeight;
-            
-            // 如果列表有垂直滚动条，分页组件应该与列表内容区域对齐（clientWidth）
-            // 如果没有滚动条，使用100%宽度
-            if (hasScrollbar) {
-                // 分页组件应该与列表内容区域对齐，不包括滚动条
-                paginationContainer.style.width = `${listClientWidth}px`;
-            } else {
-                // 如果没有滚动条，使用100%宽度
-                paginationContainer.style.width = '100%';
-            }
-        }
-    }
-    
-    // 立即执行一次
-    alignPaginationWidth();
-    
-    // 监听窗口大小变化和列表内容变化
-    const resizeObserver = new ResizeObserver(() => {
-        alignPaginationWidth();
-    });
-    
-    const skillsList = document.getElementById('skills-list');
-    if (skillsList) {
-        resizeObserver.observe(skillsList);
-    }
 }
 
 // 改变每页显示数量
@@ -492,27 +461,7 @@ async function saveSkill() {
 
 // 删除skill
 async function deleteSkill(skillName) {
-    // 先检查是否有角色绑定了该skill
-    let boundRoles = [];
-    try {
-        const checkResponse = await apiFetch(`/api/skills/${encodeURIComponent(skillName)}/bound-roles`);
-        if (checkResponse.ok) {
-            const checkData = await checkResponse.json();
-            boundRoles = checkData.bound_roles || [];
-        }
-    } catch (error) {
-        console.warn('检查skill绑定失败:', error);
-        // 如果检查失败，继续执行删除流程
-    }
-
-    // 构建确认消息
-    let confirmMessage = `确定要删除skill "${skillName}" 吗？此操作不可恢复。`;
-    if (boundRoles.length > 0) {
-        const rolesList = boundRoles.join('、');
-        confirmMessage = `确定要删除skill "${skillName}" 吗？\n\n⚠️ 该skill当前已被以下 ${boundRoles.length} 个角色绑定：\n${rolesList}\n\n删除后，系统将自动从这些角色中移除该skill的绑定。\n\n此操作不可恢复，是否继续？`;
-    }
-
-    if (!confirm(confirmMessage)) {
+    if (!confirm(`确定要删除skill "${skillName}" 吗？此操作不可恢复。`)) {
         return;
     }
 
@@ -526,14 +475,7 @@ async function deleteSkill(skillName) {
             throw new Error(error.error || '删除skill失败');
         }
 
-        const data = await response.json();
-        let successMessage = 'skill已删除';
-        if (data.affected_roles && data.affected_roles.length > 0) {
-            const rolesList = data.affected_roles.join('、');
-            successMessage = `skill已删除，已自动从 ${data.affected_roles.length} 个角色中移除绑定：${rolesList}`;
-        }
-        showNotification(successMessage, 'success');
-        
+        showNotification('skill已删除', 'success');
         // 如果当前页没有数据了，回到上一页
         const currentPage = skillsPagination.currentPage;
         const totalAfterDelete = skillsPagination.total - 1;
@@ -644,7 +586,7 @@ function renderSkillsMonitor() {
         <table class="monitor-table">
             <thead>
                 <tr>
-                    <th style="text-align: left !important;">Skill名称</th>
+                    <th style="text-align: left;">Skill名称</th>
                     <th style="text-align: center;">总调用</th>
                     <th style="text-align: center;">成功</th>
                     <th style="text-align: center;">失败</th>
@@ -662,7 +604,7 @@ function renderSkillsMonitor() {
                     
                     return `
                         <tr>
-                            <td style="text-align: left !important;"><strong>${escapeHtml(stat.skill_name || '')}</strong></td>
+                            <td><strong>${escapeHtml(stat.skill_name || '')}</strong></td>
                             <td style="text-align: center;">${totalCalls}</td>
                             <td style="text-align: center; color: #28a745; font-weight: 500;">${successCalls}</td>
                             <td style="text-align: center; color: #dc3545; font-weight: 500;">${failedCalls}</td>
