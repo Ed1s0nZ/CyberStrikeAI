@@ -12,26 +12,54 @@ CyberStrikeAI is an **AI-native security testing platform** built in Go. It inte
 
 ## Interface & Integration Preview
 
-### Web Console
-<img src="./img/效果.png" alt="Web Console" width="560">
+<div align="center">
 
-### MCP Integration
-- **MCP stdio mode**  
-  <img src="./img/mcp-stdio2.png" alt="MCP stdio mode" width="560">
-- **MCP management**  
-  <img src="./img/MCP管理.png" alt="MCP management" width="560">
+### Core Features Overview
 
-### Attack Chain Visualization
-<img src="./img/攻击链.png" alt="Attack Chain" width="560">
+<table>
+<tr>
+<td width="50%" align="center">
+<strong>Web Console</strong><br/>
+<img src="./img/效果.png" alt="Web Console" width="100%">
+</td>
+<td width="50%" align="center">
+<strong>MCP Integration</strong><br/>
+<img src="./img/MCP管理.png" alt="MCP management" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%" align="center">
+<strong>Attack Chain Visualization</strong><br/>
+<img src="./img/攻击链.png" alt="Attack Chain" width="100%">
+</td>
+<td width="50%" align="center">
+<strong>Vulnerability Management</strong><br/>
+<img src="./img/漏洞管理.png" alt="Vulnerability Management" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%" align="center">
+<strong>Task Management</strong><br/>
+<img src="./img/任务.png" alt="Task Management" width="100%">
+</td>
+<td width="50%" align="center">
+<strong>Role Management</strong><br/>
+<img src="./img/角色管理.png" alt="Role Management" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%" align="center">
+<strong>Skills Management</strong><br/>
+<img src="./img/skills.png" alt="Skills Management" width="100%">
+</td>
+<td width="50%" align="center">
+<strong>MCP stdio Mode</strong><br/>
+<img src="./img/mcp-stdio2.png" alt="MCP stdio mode" width="100%">
+</td>
+</tr>
+</table>
 
-### Vulnerability Management
-<img src="./img/漏洞管理.png" alt="Vulnerability Management" width="560">
-
-### Task Management
-<img src="./img/任务.png" alt="Task Management" width="560">
-
-### Role Management
-<img src="./img/角色管理.png" alt="Role Management" width="560">
+</div>
 
 ## Highlights
 
