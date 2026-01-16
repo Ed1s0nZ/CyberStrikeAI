@@ -1051,106 +1051,90 @@ function renderBatchQueues() {
     renderBatchQueuesPagination();
 }
 
-// 渲染批量任务队列分页控件
+// 渲染批量任务队列分页控件（参考Skills管理页面样式）
 function renderBatchQueuesPagination() {
     const paginationContainer = document.getElementById('batch-queues-pagination');
     if (!paginationContainer) return;
     
     const { currentPage, pageSize, total, totalPages } = batchQueuesState;
     
-    // 如果没有数据，不显示分页控件
+    // 即使只有一页也显示分页信息（参考Skills样式）
     if (total === 0) {
         paginationContainer.innerHTML = '';
-        paginationContainer.style.display = 'none';
         return;
     }
     
-    // 确保分页控件可见
-    paginationContainer.style.display = '';
-    
-    // 即使只有一页，也显示分页信息（总数和每页条数选择器）
-    
-    // 计算显示的页码范围
-    let startPage = Math.max(1, currentPage - 2);
-    let endPage = Math.min(totalPages, currentPage + 2);
-    
-    // 确保显示5个页码（如果可能）
-    if (endPage - startPage < 4) {
-        if (startPage === 1) {
-            endPage = Math.min(totalPages, startPage + 4);
-        } else if (endPage === totalPages) {
-            startPage = Math.max(1, endPage - 4);
-        }
-    }
+    // 计算显示范围
+    const start = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+    const end = total === 0 ? 0 : Math.min(currentPage * pageSize, total);
     
     let paginationHTML = '<div class="pagination">';
     
-    const startItem = (currentPage - 1) * pageSize + 1;
-    const endItem = Math.min(currentPage * pageSize, total);
-    paginationHTML += `<div class="pagination-info">显示 ${startItem}-${endItem} / 共 ${total} 条</div>`;
-    
-    // 每页条数选择器
+    // 左侧：显示范围信息和每页数量选择器（参考Skills样式）
     paginationHTML += `
-        <div class="pagination-page-size">
-            <label for="batch-queues-page-size-pagination">每页:</label>
-            <select id="batch-queues-page-size-pagination" onchange="changeBatchQueuesPageSize()">
-                <option value="10" ${pageSize === 10 ? 'selected' : ''}>10</option>
-                <option value="20" ${pageSize === 20 ? 'selected' : ''}>20</option>
-                <option value="50" ${pageSize === 50 ? 'selected' : ''}>50</option>
-                <option value="100" ${pageSize === 100 ? 'selected' : ''}>100</option>
-            </select>
+        <div class="pagination-info">
+            <span>显示 ${start}-${end} / 共 ${total} 条</span>
+            <label class="pagination-page-size">
+                每页显示
+                <select id="batch-queues-page-size-pagination" onchange="changeBatchQueuesPageSize()">
+                    <option value="10" ${pageSize === 10 ? 'selected' : ''}>10</option>
+                    <option value="20" ${pageSize === 20 ? 'selected' : ''}>20</option>
+                    <option value="50" ${pageSize === 50 ? 'selected' : ''}>50</option>
+                    <option value="100" ${pageSize === 100 ? 'selected' : ''}>100</option>
+                </select>
+            </label>
         </div>
     `;
     
-    // 只有当有多页时才显示页码导航
-    if (totalPages > 1) {
-        paginationHTML += '<div class="pagination-controls">';
-        
-        // 上一页按钮
-        if (currentPage > 1) {
-            paginationHTML += `<button class="pagination-btn" onclick="goBatchQueuesPage(${currentPage - 1})" title="上一页">‹</button>`;
-        } else {
-            paginationHTML += '<button class="pagination-btn disabled" disabled>‹</button>';
-        }
-        
-        // 第一页
-        if (startPage > 1) {
-            paginationHTML += `<button class="pagination-btn" onclick="goBatchQueuesPage(1)">1</button>`;
-            if (startPage > 2) {
-                paginationHTML += '<span class="pagination-ellipsis">...</span>';
-            }
-        }
-        
-        // 页码按钮
-        for (let i = startPage; i <= endPage; i++) {
-            if (i === currentPage) {
-                paginationHTML += `<button class="pagination-btn active">${i}</button>`;
-            } else {
-                paginationHTML += `<button class="pagination-btn" onclick="goBatchQueuesPage(${i})">${i}</button>`;
-            }
-        }
-        
-        // 最后一页
-        if (endPage < totalPages) {
-            if (endPage < totalPages - 1) {
-                paginationHTML += '<span class="pagination-ellipsis">...</span>';
-            }
-            paginationHTML += `<button class="pagination-btn" onclick="goBatchQueuesPage(${totalPages})">${totalPages}</button>`;
-        }
-        
-        // 下一页按钮
-        if (currentPage < totalPages) {
-            paginationHTML += `<button class="pagination-btn" onclick="goBatchQueuesPage(${currentPage + 1})" title="下一页">›</button>`;
-        } else {
-            paginationHTML += '<button class="pagination-btn disabled" disabled>›</button>';
-        }
-        
-        paginationHTML += '</div>';
-    }
+    // 右侧：分页按钮（参考Skills样式：首页、上一页、第X/Y页、下一页、末页）
+    paginationHTML += `
+        <div class="pagination-controls">
+            <button class="btn-secondary" onclick="goBatchQueuesPage(1)" ${currentPage === 1 || total === 0 ? 'disabled' : ''}>首页</button>
+            <button class="btn-secondary" onclick="goBatchQueuesPage(${currentPage - 1})" ${currentPage === 1 || total === 0 ? 'disabled' : ''}>上一页</button>
+            <span class="pagination-page">第 ${currentPage} / ${totalPages || 1} 页</span>
+            <button class="btn-secondary" onclick="goBatchQueuesPage(${currentPage + 1})" ${currentPage >= totalPages || total === 0 ? 'disabled' : ''}>下一页</button>
+            <button class="btn-secondary" onclick="goBatchQueuesPage(${totalPages || 1})" ${currentPage >= totalPages || total === 0 ? 'disabled' : ''}>末页</button>
+        </div>
+    `;
     
     paginationHTML += '</div>';
     
     paginationContainer.innerHTML = paginationHTML;
+    
+    // 确保分页组件与列表内容区域对齐（不包括滚动条）
+    function alignPaginationWidth() {
+        const batchQueuesList = document.getElementById('batch-queues-list');
+        if (batchQueuesList && paginationContainer) {
+            // 获取列表的实际内容宽度（不包括滚动条）
+            const listClientWidth = batchQueuesList.clientWidth; // 可视区域宽度（不包括滚动条）
+            const listScrollHeight = batchQueuesList.scrollHeight; // 内容总高度
+            const listClientHeight = batchQueuesList.clientHeight; // 可视区域高度
+            const hasScrollbar = listScrollHeight > listClientHeight;
+            
+            // 如果列表有垂直滚动条，分页组件应该与列表内容区域对齐（clientWidth）
+            // 如果没有滚动条，使用100%宽度
+            if (hasScrollbar) {
+                // 分页组件应该与列表内容区域对齐，不包括滚动条
+                paginationContainer.style.width = `${listClientWidth}px`;
+            } else {
+                // 如果没有滚动条，使用100%宽度
+                paginationContainer.style.width = '100%';
+            }
+        }
+    }
+    
+    // 立即执行一次
+    alignPaginationWidth();
+    
+    // 监听窗口大小变化和列表内容变化
+    const resizeObserver = new ResizeObserver(() => {
+        alignPaginationWidth();
+    });
+    
+    const batchQueuesList = document.getElementById('batch-queues-list');
+    if (batchQueuesList) {
+        resizeObserver.observe(batchQueuesList);
+    }
 }
 
 // 跳转到指定页面

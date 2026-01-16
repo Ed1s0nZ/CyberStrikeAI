@@ -349,6 +349,18 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	}
 	configHandler.SetVulnerabilityToolRegistrar(vulnerabilityRegistrar)
 
+	// 设置Skills工具注册器（内置工具，必须设置）
+	skillsRegistrar := func() error {
+		// 创建一个适配器，将database.DB适配为SkillStatsStorage接口
+		var skillStatsStorage skills.SkillStatsStorage
+		if db != nil {
+			skillStatsStorage = &skillStatsDBAdapter{db: db}
+		}
+		skills.RegisterSkillsToolWithStorage(mcpServer, skillsManager, skillStatsStorage, log.Logger)
+		return nil
+	}
+	configHandler.SetSkillsToolRegistrar(skillsRegistrar)
+
 	// 设置知识库初始化器（用于动态初始化，需要在 App 创建后设置）
 	configHandler.SetKnowledgeInitializer(func() (*handler.KnowledgeHandler, error) {
 		knowledgeHandler, err := initializeKnowledge(cfg, db, knowledgeDBConn, mcpServer, agentHandler, app, log.Logger)

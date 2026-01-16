@@ -28,6 +28,9 @@ type KnowledgeToolRegistrar func() error
 // VulnerabilityToolRegistrar 漏洞工具注册器接口
 type VulnerabilityToolRegistrar func() error
 
+// SkillsToolRegistrar Skills工具注册器接口
+type SkillsToolRegistrar func() error
+
 // RetrieverUpdater 检索器更新接口
 type RetrieverUpdater interface {
 	UpdateConfig(config *knowledge.RetrievalConfig)
@@ -52,6 +55,7 @@ type ConfigHandler struct {
 	externalMCPMgr             *mcp.ExternalMCPManager    // 外部MCP管理器
 	knowledgeToolRegistrar     KnowledgeToolRegistrar     // 知识库工具注册器（可选）
 	vulnerabilityToolRegistrar VulnerabilityToolRegistrar // 漏洞工具注册器（可选）
+	skillsToolRegistrar        SkillsToolRegistrar        // Skills工具注册器（可选）
 	retrieverUpdater           RetrieverUpdater           // 检索器更新器（可选）
 	knowledgeInitializer       KnowledgeInitializer       // 知识库初始化器（可选）
 	appUpdater                 AppUpdater                 // App更新器（可选）
@@ -108,6 +112,13 @@ func (h *ConfigHandler) SetVulnerabilityToolRegistrar(registrar VulnerabilityToo
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.vulnerabilityToolRegistrar = registrar
+}
+
+// SetSkillsToolRegistrar 设置Skills工具注册器
+func (h *ConfigHandler) SetSkillsToolRegistrar(registrar SkillsToolRegistrar) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.skillsToolRegistrar = registrar
 }
 
 // SetRetrieverUpdater 设置检索器更新器
@@ -866,6 +877,16 @@ func (h *ConfigHandler) ApplyConfig(c *gin.Context) {
 			h.logger.Error("重新注册漏洞记录工具失败", zap.Error(err))
 		} else {
 			h.logger.Info("漏洞记录工具已重新注册")
+		}
+	}
+
+	// 重新注册Skills工具（内置工具，必须注册）
+	if h.skillsToolRegistrar != nil {
+		h.logger.Info("重新注册Skills工具")
+		if err := h.skillsToolRegistrar(); err != nil {
+			h.logger.Error("重新注册Skills工具失败", zap.Error(err))
+		} else {
+			h.logger.Info("Skills工具已重新注册")
 		}
 	}
 

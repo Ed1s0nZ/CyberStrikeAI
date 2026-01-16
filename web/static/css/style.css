@@ -398,7 +398,7 @@ body {
 }
 
 .page-header {
-    padding: 20px 24px;
+    padding: 12px 20px;
     background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
     border-bottom: 1px solid var(--border-color);
     display: flex;
@@ -410,14 +410,14 @@ body {
 
 .page-header h2 {
     margin: 0;
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     font-weight: 600;
     color: var(--text-primary);
 }
 
 .page-header-actions {
     display: flex;
-    gap: 12px;
+    gap: 8px;
     align-items: center;
 }
 
@@ -425,8 +425,16 @@ body {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 24px;
+    padding: 16px 20px;
     min-height: 0;
+}
+
+/* 任务管理页面内容区域底部圆角 */
+#page-tasks .page-content {
+    /* 确保底部左右角都是圆角 */
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+    overflow: hidden;
 }
 
 /* 对话页面布局 */
@@ -3150,18 +3158,20 @@ header {
 }
 
 .btn-search {
-    padding: 8px 16px;
+    padding: 6px 12px;
     border: 1px solid var(--border-color);
     border-radius: 6px;
     background: var(--bg-primary);
     color: var(--text-primary);
-    font-size: 1rem;
+    font-size: 0.875rem;
     cursor: pointer;
     transition: all 0.2s;
     min-width: 40px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
+    box-sizing: border-box;
 }
 
 .btn-search:hover {
@@ -3263,7 +3273,7 @@ header {
 }
 
 .pagination-container {
-    margin-top: 16px;
+    margin-top: 10px;
 }
 
 /* Skills管理页面分页优化 */
@@ -3297,16 +3307,19 @@ header {
     position: relative;
     /* 添加四个角的圆角，与上方卡片保持一致 */
     border-radius: 8px;
+    /* 确保底部左右角都是圆角 */
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
 }
 
 .pagination-fixed .pagination {
     margin-top: 0;
     border-top: 1px solid var(--border-color);
-    padding: 16px 20px;
+    padding: 10px 16px;
     background: var(--bg-primary);
     justify-content: space-between;
     align-items: center;
-    gap: 20px;
+    gap: 12px;
     flex-wrap: wrap;
     /* 确保分页内容与列表内容对齐 */
     width: 100%;
@@ -3315,15 +3328,18 @@ header {
     border-top-color: rgba(233, 236, 239, 0.6);
     /* 添加四个角的圆角，与上方卡片保持一致 */
     border-radius: 8px;
+    /* 确保底部左右角都是圆角 */
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
 }
 
 /* 左侧：信息显示和每页数量选择器 - 更自然的设计 */
 .pagination-fixed .pagination-info {
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     color: var(--text-secondary);
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 12px;
     flex-wrap: wrap;
     /* 去掉背景色和边框，更自然 */
     padding: 0;
@@ -3340,25 +3356,27 @@ header {
 .pagination-fixed .pagination-info .pagination-page-size {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 0.875rem;
+    gap: 6px;
+    font-size: 0.8125rem;
     color: var(--text-secondary);
     font-weight: 400;
 }
 
 .pagination-fixed .pagination-info .pagination-page-size select {
-    padding: 6px 10px;
+    padding: 4px 8px;
     border-radius: 6px;
     border: 1px solid var(--border-color);
     background: var(--bg-primary);
     color: var(--text-primary);
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     cursor: pointer;
     transition: all 0.2s ease;
-    min-width: 70px;
+    min-width: 60px;
     font-weight: 500;
     /* 更柔和的边框 */
     border-color: rgba(233, 236, 239, 0.8);
+    /* 确保四个角都是圆角 */
+    border-radius: 8px !important;
 }
 
 .pagination-fixed .pagination-info .pagination-page-size select:focus {
@@ -3382,14 +3400,16 @@ header {
 }
 
 .pagination-fixed .pagination-controls .btn-secondary {
-    padding: 7px 14px;
-    font-size: 0.875rem;
+    padding: 5px 12px;
+    font-size: 0.8125rem;
     min-width: auto;
     transition: all 0.2s ease;
     font-weight: 500;
-    border-radius: 8px;
+    border-radius: 6px;
     /* 更柔和的边框 */
     border-color: rgba(233, 236, 239, 0.8);
+    /* 确保四个角都是圆角 */
+    border-radius: 8px !important;
 }
 
 .pagination-fixed .pagination-controls .btn-secondary:hover:not(:disabled) {
@@ -3414,11 +3434,18 @@ header {
 }
 
 .pagination-fixed .pagination-page {
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     color: var(--text-secondary);
-    padding: 0 12px;
+    padding: 5px 10px;
     white-space: nowrap;
     font-weight: 400;
+    /* 添加圆角设计，四个角都是圆的 */
+    border-radius: 6px !important;
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border-color) !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
 }
 
 /* 响应式优化 */
@@ -3598,12 +3625,12 @@ header {
 }
 
 .btn-primary {
-    padding: 10px 20px;
+    padding: 7px 16px;
     background: var(--accent-color);
     color: white;
     border: none;
     border-radius: 6px;
-    font-size: 0.9375rem;
+    font-size: 0.875rem;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
@@ -3616,12 +3643,12 @@ header {
 }
 
 .btn-secondary {
-    padding: 10px 20px;
+    padding: 7px 16px;
     background: var(--bg-secondary);
     color: var(--text-primary);
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    font-size: 0.9375rem;
+    font-size: 0.875rem;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
@@ -6865,9 +6892,10 @@ header {
     align-items: flex-end;
     flex-wrap: wrap;
     padding: 16px;
-    background: var(--bg-secondary);
+    background: var(--bg-primary);
     border: 1px solid var(--border-color);
     border-radius: 12px;
+    margin-bottom: 16px;
 }
 
 .tasks-filters label {
@@ -7260,8 +7288,12 @@ header {
 
 /* 批量任务相关样式 */
 .batch-queues-section {
-    margin-top: 16px;
-    padding-top: 8px;
+    margin-top: 0;
+    padding-top: 0;
+    /* 确保底部左右角都是圆角 */
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+    overflow: hidden;
 }
 
 .batch-queues-header {
@@ -7283,6 +7315,7 @@ header {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    margin-bottom: 16px;
 }
 
 .batch-queue-item {
@@ -9218,17 +9251,17 @@ header {
 
 /* Skills管理页面样式 */
 .skills-controls {
-    margin-bottom: 24px;
+    margin-bottom: 16px;
 }
 
 .skills-stats-bar {
     display: flex;
-    gap: 16px;
-    padding: 16px;
+    gap: 12px;
+    padding: 10px 12px;
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
-    margin-bottom: 16px;
+    border-radius: 6px;
+    margin-bottom: 10px;
 }
 
 .skill-stat-item {
@@ -9238,41 +9271,45 @@ header {
 }
 
 .skill-stat-label {
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     color: var(--text-secondary);
 }
 
 .skill-stat-value {
-    font-size: 1.25rem;
+    font-size: 1.125rem;
     font-weight: 600;
     color: var(--text-primary);
 }
 
 .skills-filters {
     display: flex;
-    gap: 12px;
+    gap: 8px;
     align-items: center;
 }
 
 .skills-filters input {
     flex: 1;
-    padding: 8px 12px;
+    padding: 6px 10px;
     border: 1px solid var(--border-color);
     border-radius: 6px;
     font-size: 0.875rem;
+    box-sizing: border-box;
+    height: 32px;
+    line-height: 1.4;
 }
 
 .skills-list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 16px;
+    margin-bottom: 16px;
 }
 
 .skill-item {
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 16px;
+    border-radius: 6px;
+    padding: 10px 12px;
     transition: all 0.2s;
 }
 
@@ -9285,7 +9322,7 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 12px;
+    margin-bottom: 6px;
 }
 
 .skill-item-info {
@@ -9293,28 +9330,30 @@ header {
 }
 
 .skill-item-name {
-    font-size: 1.125rem;
+    font-size: 1rem;
     font-weight: 600;
     color: var(--text-primary);
-    margin: 0 0 8px 0;
+    margin: 0 0 4px 0;
+    line-height: 1.3;
 }
 
 .skill-item-desc {
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     color: var(--text-secondary);
     margin: 0;
+    line-height: 1.4;
 }
 
 .skill-item-actions {
     display: flex;
-    gap: 8px;
+    gap: 6px;
 }
 
 .btn-icon {
     background: none;
     border: 1px solid var(--border-color);
     border-radius: 4px;
-    padding: 6px;
+    padding: 4px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -9337,10 +9376,11 @@ header {
 
 .skill-item-meta {
     display: flex;
-    gap: 16px;
+    gap: 12px;
     flex-wrap: wrap;
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     color: var(--text-secondary);
+    line-height: 1.4;
 }
 
 .skill-meta-item {
