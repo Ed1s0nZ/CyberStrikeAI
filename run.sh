@@ -11,6 +11,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # 打印带颜色的消息
@@ -18,12 +19,66 @@ info() { echo -e "${BLUE}ℹ️  $1${NC}"; }
 success() { echo -e "${GREEN}✅ $1${NC}"; }
 warning() { echo -e "${YELLOW}⚠️  $1${NC}"; }
 error() { echo -e "${RED}❌ $1${NC}"; }
+note() { echo -e "${CYAN}ℹ️  $1${NC}"; }
+
+# 临时源配置（仅在此脚本中生效）
+PIP_INDEX_URL="${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
+GOPROXY="${GOPROXY:-https://goproxy.cn,direct}"
+
+# 保存原始环境变量（用于恢复）
+ORIGINAL_PIP_INDEX_URL="${PIP_INDEX_URL:-}"
+ORIGINAL_GOPROXY="${GOPROXY:-}"
+
+# 进度显示函数
+show_progress() {
+    local pid=$1
+    local message=$2
+    local i=0
+    local dots=""
+    
+    # 检查进程是否存在
+    if ! kill -0 "$pid" 2>/dev/null; then
+        # 进程已经结束，立即返回
+        return 0
+    fi
+    
+    while kill -0 "$pid" 2>/dev/null; do
+        i=$((i + 1))
+        case $((i % 4)) in
+            0) dots="." ;;
+            1) dots=".." ;;
+            2) dots="..." ;;
+            3) dots="...." ;;
+        esac
+        printf "\r${BLUE}⏳ %s%s${NC}" "$message" "$dots"
+        sleep 0.5
+        
+        # 再次检查进程是否还存在
+        if ! kill -0 "$pid" 2>/dev/null; then
+            break
+        fi
+    done
+    printf "\r"
+}
 
 echo ""
 echo "=========================================="
 echo "  CyberStrikeAI 一键部署启动脚本"
 echo "=========================================="
 echo ""
+
+# 显示临时源配置信息
+echo ""
+warning "⚠️  注意：此脚本将使用临时镜像源加速下载"
+echo ""
+info "Python pip 临时镜像源:"
+echo "  ${PIP_INDEX_URL}"
+info "Go Proxy 临时镜像源:"
+echo "  ${GOPROXY}"
+echo ""
+note "这些设置仅在脚本运行期间生效，不会修改系统配置"
+echo ""
+sleep 1
 
 CONFIG_FILE="$ROOT_DIR/config.yaml"
 VENV_DIR="$ROOT_DIR/venv"
@@ -101,12 +156,55 @@ setup_python_env() {
     source "$VENV_DIR/bin/activate"
     
     if [ -f "$REQUIREMENTS_FILE" ]; then
-        info "安装/更新 Python 依赖..."
-        pip install --quiet --upgrade pip >/dev/null 2>&1 || true
+        echo ""
+        note "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        note "⚠️  使用临时 pip 镜像源（仅本次脚本运行有效）"
+        note "   镜像地址: ${PIP_INDEX_URL}"
+        note "   如需永久配置，请设置环境变量 PIP_INDEX_URL"
+        note "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
         
-        # 尝试安装依赖，捕获错误输出
+        info "升级 pip..."
+        pip install --index-url "$PIP_INDEX_URL" --upgrade pip >/dev/null 2>&1 || true
+        
+        info "安装 Python 依赖包..."
+        echo ""
+        
+        # 尝试安装依赖，捕获错误输出并显示进度
         PIP_LOG=$(mktemp)
-        if pip install -r "$REQUIREMENTS_FILE" >"$PIP_LOG" 2>&1; then
+        (
+            set +e  # 在子shell中禁用错误退出
+            pip install --index-url "$PIP_INDEX_URL" -r "$REQUIREMENTS_FILE" >"$PIP_LOG" 2>&1
+            echo $? > "${PIP_LOG}.exit"
+        ) &
+        PIP_PID=$!
+        
+        # 等待一小段时间，确保进程启动
+        sleep 0.1
+        
+        # 显示进度（如果进程还在运行）
+        if kill -0 "$PIP_PID" 2>/dev/null; then
+            show_progress "$PIP_PID" "正在安装依赖包"
+        else
+            # 进程已经结束，等待一下确保退出码文件已写入
+            sleep 0.2
+        fi
+        
+        # 等待进程完成，忽略 wait 的退出码
+        wait "$PIP_PID" 2>/dev/null || true
+        
+        PIP_EXIT_CODE=0
+        if [ -f "${PIP_LOG}.exit" ]; then
+            PIP_EXIT_CODE=$(cat "${PIP_LOG}.exit" 2>/dev/null || echo "1")
+            rm -f "${PIP_LOG}.exit" 2>/dev/null || true
+        else
+            # 如果没有退出码文件，检查日志中是否有错误
+            if [ -f "$PIP_LOG" ] && grep -q -i "error\|failed\|exception" "$PIP_LOG" 2>/dev/null; then
+                PIP_EXIT_CODE=1
+            fi
+        fi
+        
+        if [ $PIP_EXIT_CODE -eq 0 ]; then
             success "Python 依赖安装完成"
         else
             # 检查是否是 angr 安装失败（需要 Rust）
@@ -138,17 +236,102 @@ setup_python_env() {
 
 # 构建 Go 项目
 build_go_project() {
+    echo ""
+    note "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    note "⚠️  使用临时 Go Proxy（仅本次脚本运行有效）"
+    note "   Proxy 地址: ${GOPROXY}"
+    note "   如需永久配置，请设置环境变量 GOPROXY"
+    note "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    
     info "下载 Go 依赖..."
-    go mod download >/dev/null 2>&1 || {
+    GO_DOWNLOAD_LOG=$(mktemp)
+    (
+        set +e  # 在子shell中禁用错误退出
+        export GOPROXY="$GOPROXY"
+        go mod download >"$GO_DOWNLOAD_LOG" 2>&1
+        echo $? > "${GO_DOWNLOAD_LOG}.exit"
+    ) &
+    GO_DOWNLOAD_PID=$!
+    
+    # 等待一小段时间，确保进程启动
+    sleep 0.1
+    
+    # 显示进度（如果进程还在运行）
+    if kill -0 "$GO_DOWNLOAD_PID" 2>/dev/null; then
+        show_progress "$GO_DOWNLOAD_PID" "正在下载 Go 依赖"
+    else
+        # 进程已经结束，等待一下确保退出码文件已写入
+        sleep 0.2
+    fi
+    
+    # 等待进程完成，忽略 wait 的退出码
+    wait "$GO_DOWNLOAD_PID" 2>/dev/null || true
+    
+    GO_DOWNLOAD_EXIT_CODE=0
+    if [ -f "${GO_DOWNLOAD_LOG}.exit" ]; then
+        GO_DOWNLOAD_EXIT_CODE=$(cat "${GO_DOWNLOAD_LOG}.exit" 2>/dev/null || echo "1")
+        rm -f "${GO_DOWNLOAD_LOG}.exit" 2>/dev/null || true
+    else
+        # 如果没有退出码文件，检查日志中是否有错误
+        if [ -f "$GO_DOWNLOAD_LOG" ] && grep -q -i "error\|failed" "$GO_DOWNLOAD_LOG" 2>/dev/null; then
+            GO_DOWNLOAD_EXIT_CODE=1
+        fi
+    fi
+    rm -f "$GO_DOWNLOAD_LOG" 2>/dev/null || true
+    
+    if [ $GO_DOWNLOAD_EXIT_CODE -ne 0 ]; then
         error "Go 依赖下载失败"
         exit 1
-    }
+    fi
+    success "Go 依赖下载完成"
     
     info "构建项目..."
-    if go build -o "$BINARY_NAME" cmd/server/main.go 2>&1; then
+    GO_BUILD_LOG=$(mktemp)
+    (
+        set +e  # 在子shell中禁用错误退出
+        export GOPROXY="$GOPROXY"
+        go build -o "$BINARY_NAME" cmd/server/main.go >"$GO_BUILD_LOG" 2>&1
+        echo $? > "${GO_BUILD_LOG}.exit"
+    ) &
+    GO_BUILD_PID=$!
+    
+    # 等待一小段时间，确保进程启动
+    sleep 0.1
+    
+    # 显示进度（如果进程还在运行）
+    if kill -0 "$GO_BUILD_PID" 2>/dev/null; then
+        show_progress "$GO_BUILD_PID" "正在构建项目"
+    else
+        # 进程已经结束，等待一下确保退出码文件已写入
+        sleep 0.2
+    fi
+    
+    # 等待进程完成，忽略 wait 的退出码
+    wait "$GO_BUILD_PID" 2>/dev/null || true
+    
+    GO_BUILD_EXIT_CODE=0
+    if [ -f "${GO_BUILD_LOG}.exit" ]; then
+        GO_BUILD_EXIT_CODE=$(cat "${GO_BUILD_LOG}.exit" 2>/dev/null || echo "1")
+        rm -f "${GO_BUILD_LOG}.exit" 2>/dev/null || true
+    else
+        # 如果没有退出码文件，检查日志中是否有错误
+        if [ -f "$GO_BUILD_LOG" ] && grep -q -i "error\|failed" "$GO_BUILD_LOG" 2>/dev/null; then
+            GO_BUILD_EXIT_CODE=1
+        fi
+    fi
+    
+    if [ $GO_BUILD_EXIT_CODE -eq 0 ]; then
         success "项目构建完成: $BINARY_NAME"
+        rm -f "$GO_BUILD_LOG"
     else
         error "项目构建失败"
+        # 显示构建错误
+        echo ""
+        info "构建错误详情："
+        cat "$GO_BUILD_LOG" | sed 's/^/  /'
+        echo ""
+        rm -f "$GO_BUILD_LOG"
         exit 1
     fi
 }
