@@ -491,8 +491,6 @@ Build an attack chain for the latest engagement and export the node list with se
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for detailed version history and all changes.
-
 ### Recent Highlights
 
 - **2026-01-27** – OpenAPI documentation with interactive testing interface, supporting conversation management, message interaction, and result querying
