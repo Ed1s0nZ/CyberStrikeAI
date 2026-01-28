@@ -9713,41 +9713,33 @@ header {
     color: var(--text-primary);
 }
 
-/* 技能卡片网格布局 */
+/* 技能列表布局 */
 .skills-grid {
-    display: grid;
-    /* 优化网格布局：使用 auto-fit 让卡片更好地分布，减少最小宽度以容纳更多列 */
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
     padding: 0;
     /* 确保列表可以滚动，不会把分页栏推出视口 */
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
     min-height: 0;
-    /* 统一同一行卡片的高度 */
-    align-items: stretch;
-    /* 让卡片在容器中更好地分布，避免都聚集在左侧 */
-    justify-items: stretch;
 }
 
-/* 技能卡片样式 */
+/* 技能列表项样式 */
 .skill-card {
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 16px;
     display: flex;
-    flex-direction: column;
-    gap: 10px;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
     transition: all 0.2s;
     cursor: default;
-    /* 统一卡片高度：让卡片填满网格单元格高度 */
-    align-items: stretch;
-    height: 100%;
-    /* 确保卡片宽度填满网格单元格 */
-    width: 100%;
     box-sizing: border-box;
+    width: 100%;
 }
 
 .skill-card:hover {
@@ -9758,9 +9750,10 @@ header {
 
 .skill-card-header {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 12px;
+    flex-direction: column;
+    flex: 1;
+    gap: 8px;
+    min-width: 0;
 }
 
 .skill-card-title {
@@ -9768,75 +9761,42 @@ header {
     font-weight: 600;
     color: var(--text-primary);
     margin: 0;
-    /* 移除 flex: 1，让标题只占据实际需要的高度 */
     line-height: 1.4;
     word-break: break-word;
     overflow-wrap: break-word;
-    /* 限制标题最多显示2行 */
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
 }
 
 .skill-card-description {
     font-size: 0.875rem;
     color: var(--text-secondary);
     line-height: 1.6;
-    /* 让描述区域占据剩余空间，统一卡片高度 */
-    flex: 1;
-    min-height: 48px;
-    /* 优化文字排版 */
     word-break: break-word;
     overflow-wrap: break-word;
-    /* 限制描述的最大行数，保持卡片整洁 */
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    margin: 0;
 }
 
 .skill-card-actions {
     display: flex;
     gap: 8px;
-    margin-top: auto;
-    /* 使用 margin-top: auto 将按钮推到底部，统一卡片布局 */
     flex-shrink: 0;
 }
 
-/* 技能卡片响应式布局优化 */
-@media (min-width: 1400px) {
-    .skills-grid {
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-        gap: 20px;
-    }
-}
-
-@media (max-width: 1200px) {
-    .skills-grid {
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 16px;
-    }
-}
-
+/* 技能列表响应式布局优化 */
 @media (max-width: 768px) {
-    .skills-grid {
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 12px;
-    }
-    
     .skill-card {
         padding: 14px;
-        gap: 8px;
-    }
-}
-
-@media (max-width: 480px) {
-    .skills-grid {
-        grid-template-columns: 1fr;
         gap: 12px;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .skill-card-header {
+        width: 100%;
+    }
+    
+    .skill-card-actions {
+        width: 100%;
+        justify-content: flex-start;
     }
 }
 

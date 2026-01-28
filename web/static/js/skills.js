@@ -24,7 +24,7 @@ function getSkillsPageSize() {
         const saved = localStorage.getItem('skillsPageSize');
         if (saved) {
             const size = parseInt(saved);
-            if ([20, 50, 100].includes(size)) {
+            if ([10, 20, 50, 100].includes(size)) {
                 return size;
             }
         }
@@ -109,8 +109,8 @@ function renderSkillsList() {
             <div class="skill-card">
                 <div class="skill-card-header">
                     <h3 class="skill-card-title">${escapeHtml(skill.name || '')}</h3>
+                    <div class="skill-card-description">${escapeHtml(skill.description || '无描述')}</div>
                 </div>
-                <div class="skill-card-description">${escapeHtml(skill.description || '无描述')}</div>
                 <div class="skill-card-actions">
                     <button class="btn-secondary btn-small" onclick="viewSkill('${escapeHtml(skill.name)}')">查看</button>
                     <button class="btn-secondary btn-small" onclick="editSkill('${escapeHtml(skill.name)}')">编辑</button>
@@ -161,6 +161,7 @@ function renderSkillsPagination() {
             <label class="pagination-page-size">
                 每页显示
                 <select id="skills-page-size-pagination" onchange="changeSkillsPageSize()">
+                    <option value="10" ${pageSize === 10 ? 'selected' : ''}>10</option>
                     <option value="20" ${pageSize === 20 ? 'selected' : ''}>20</option>
                     <option value="50" ${pageSize === 50 ? 'selected' : ''}>50</option>
                     <option value="100" ${pageSize === 100 ? 'selected' : ''}>100</option>
