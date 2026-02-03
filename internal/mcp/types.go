@@ -1,10 +1,21 @@
 package mcp
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
 )
+
+// ExternalMCPClient 外部 MCP 客户端接口（由 client_sdk.go 基于官方 SDK 实现）
+type ExternalMCPClient interface {
+	Initialize(ctx context.Context) error
+	ListTools(ctx context.Context) ([]Tool, error)
+	CallTool(ctx context.Context, name string, args map[string]interface{}) (*ToolResult, error)
+	Close() error
+	IsConnected() bool
+	GetStatus() string
+}
 
 // MCP消息类型
 const (
@@ -29,21 +40,21 @@ func (m *MessageID) UnmarshalJSON(data []byte) error {
 		m.value = nil
 		return nil
 	}
-	
+
 	// 尝试解析为字符串
 	var str string
 	if err := json.Unmarshal(data, &str); err == nil {
 		m.value = str
 		return nil
 	}
-	
+
 	// 尝试解析为数字
 	var num json.Number
 	if err := json.Unmarshal(data, &num); err == nil {
 		m.value = num
 		return nil
 	}
-	
+
 	return fmt.Errorf("invalid id type")
 }
 
@@ -81,15 +92,15 @@ type Message struct {
 
 // Error 表示MCP错误
 type Error struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
+	Code    int         `json:"code"`
+	Message string      `json:"message"`
 	Data    interface{} `json:"data,omitempty"`
 }
 
 // Tool 表示MCP工具定义
 type Tool struct {
 	Name             string                 `json:"name"`
-	Description      string                 `json:"description"`      // 详细描述
+	Description      string                 `json:"description"`                // 详细描述
 	ShortDescription string                 `json:"shortDescription,omitempty"` // 简短描述（用于工具列表，减少token消耗）
 	InputSchema      map[string]interface{} `json:"inputSchema"`
 }
@@ -127,9 +138,9 @@ type ClientInfo struct {
 
 // InitializeResponse 初始化响应
 type InitializeResponse struct {
-	ProtocolVersion string                 `json:"protocolVersion"`
-	Capabilities    ServerCapabilities     `json:"capabilities"`
-	ServerInfo      ServerInfo             `json:"serverInfo"`
+	ProtocolVersion string             `json:"protocolVersion"`
+	Capabilities    ServerCapabilities `json:"capabilities"`
+	ServerInfo      ServerInfo         `json:"serverInfo"`
 }
 
 // ServerCapabilities 服务器能力
@@ -178,31 +189,31 @@ type CallToolResponse struct {
 
 // ToolExecution 工具执行记录
 type ToolExecution struct {
-	ID          string                 `json:"id"`
-	ToolName    string                 `json:"toolName"`
-	Arguments   map[string]interface{} `json:"arguments"`
-	Status      string                 `json:"status"` // pending, running, completed, failed
-	Result      *ToolResult            `json:"result,omitempty"`
-	Error       string                 `json:"error,omitempty"`
-	StartTime   time.Time              `json:"startTime"`
-	EndTime     *time.Time             `json:"endTime,omitempty"`
-	Duration    time.Duration          `json:"duration,omitempty"`
+	ID        string                 `json:"id"`
+	ToolName  string                 `json:"toolName"`
+	Arguments map[string]interface{} `json:"arguments"`
+	Status    string                 `json:"status"` // pending, running, completed, failed
+	Result    *ToolResult            `json:"result,omitempty"`
+	Error     string                 `json:"error,omitempty"`
+	StartTime time.Time              `json:"startTime"`
+	EndTime   *time.Time             `json:"endTime,omitempty"`
+	Duration  time.Duration          `json:"duration,omitempty"`
 }
 
 // ToolStats 工具统计信息
 type ToolStats struct {
-	ToolName     string `json:"toolName"`
-	TotalCalls   int    `json:"totalCalls"`
-	SuccessCalls int    `json:"successCalls"`
-	FailedCalls  int    `json:"failedCalls"`
+	ToolName     string     `json:"toolName"`
+	TotalCalls   int        `json:"totalCalls"`
+	SuccessCalls int        `json:"successCalls"`
+	FailedCalls  int        `json:"failedCalls"`
 	LastCallTime *time.Time `json:"lastCallTime,omitempty"`
 }
 
 // Prompt 提示词模板
 type Prompt struct {
-	Name        string                 `json:"name"`
-	Description string                 `json:"description,omitempty"`
-	Arguments   []PromptArgument       `json:"arguments,omitempty"`
+	Name        string           `json:"name"`
+	Description string           `json:"description,omitempty"`
+	Arguments   []PromptArgument `json:"arguments,omitempty"`
 }
 
 // PromptArgument 提示词参数
@@ -257,11 +268,11 @@ type ResourceContent struct {
 
 // SamplingRequest 采样请求
 type SamplingRequest struct {
-	Messages []SamplingMessage `json:"messages"`
-	Model    string            `json:"model,omitempty"`
-	MaxTokens int              `json:"maxTokens,omitempty"`
-	Temperature float64        `json:"temperature,omitempty"`
-	TopP       float64         `json:"topP,omitempty"`
+	Messages    []SamplingMessage `json:"messages"`
+	Model       string            `json:"model,omitempty"`
+	MaxTokens   int               `json:"maxTokens,omitempty"`
+	Temperature float64           `json:"temperature,omitempty"`
+	TopP        float64           `json:"topP,omitempty"`
 }
 
 // SamplingMessage 采样消息
@@ -272,9 +283,9 @@ type SamplingMessage struct {
 
 // SamplingResponse 采样响应
 type SamplingResponse struct {
-	Content []SamplingContent `json:"content"`
-	Model   string            `json:"model,omitempty"`
-	StopReason string         `json:"stopReason,omitempty"`
+	Content    []SamplingContent `json:"content"`
+	Model      string            `json:"model,omitempty"`
+	StopReason string            `json:"stopReason,omitempty"`
 }
 
 // SamplingContent 采样内容
@@ -282,4 +293,3 @@ type SamplingContent struct {
 	Type string `json:"type"`
 	Text string `json:"text,omitempty"`
 }
-

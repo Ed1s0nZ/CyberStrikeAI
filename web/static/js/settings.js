@@ -994,6 +994,20 @@ async function loadExternalMCPs() {
     }
 }
 
+// 延迟刷新外部MCP列表（用于在保存/连接后拉取后端异步更新的工具数量）
+// 可选传入单次延迟毫秒数；不传则执行两次：2.5s 与 5s（覆盖启动后后端异步更新较慢的情况）
+function scheduleExternalMCPToolCountRefresh(delayMs) {
+    const delays = delayMs != null ? [delayMs] : [2500, 5000];
+    delays.forEach((d) => {
+        setTimeout(async () => {
+            await loadExternalMCPs();
+            if (typeof window !== 'undefined' && typeof window.refreshMentionTools === 'function') {
+                window.refreshMentionTools();
+            }
+        }, d);
+    });
+}
+
 // 渲染外部MCP列表
 function renderExternalMCPList(servers) {
     const list = document.getElementById('external-mcp-list');
@@ -1354,6 +1368,8 @@ async function saveExternalMCP() {
         if (typeof window !== 'undefined' && typeof window.refreshMentionTools === 'function') {
             window.refreshMentionTools();
         }
+        // 后端在连接成功约 2 秒后才更新工具数量，延迟再拉取一次以显示正确工具数
+        scheduleExternalMCPToolCountRefresh();
         alert('保存成功');
     } catch (error) {
         console.error('保存外部MCP失败:', error);
@@ -1433,6 +1449,8 @@ async function toggleExternalMCP(name, currentStatus) {
                         if (typeof window !== 'undefined' && typeof window.refreshMentionTools === 'function') {
                             window.refreshMentionTools();
                         }
+                        // 后端约 2 秒后才更新工具数量，延迟再拉取一次以显示正确工具数
+                        scheduleExternalMCPToolCountRefresh();
                         return;
                     }
                 }
@@ -1496,6 +1514,8 @@ async function pollExternalMCPStatus(name, maxAttempts = 30) {
                     if (typeof window !== 'undefined' && typeof window.refreshMentionTools === 'function') {
                         window.refreshMentionTools();
                     }
+                    // 后端约 2 秒后才更新工具数量，延迟再拉取一次以显示正确工具数
+                    scheduleExternalMCPToolCountRefresh();
                     return;
                 } else if (status === 'error' || status === 'disconnected') {
                     // 连接失败，刷新列表并显示错误

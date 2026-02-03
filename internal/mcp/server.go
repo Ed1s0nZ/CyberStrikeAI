@@ -125,6 +125,13 @@ func (s *Server) HandleHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 官方 MCP SSE 规范：带 sessionid 的 POST 表示消息发往该 SSE 会话，响应通过 SSE 流返回
+	if sessionID := r.URL.Query().Get("sessionid"); sessionID != "" {
+		s.serveSSESessionMessage(w, r, sessionID)
+		return
+	}
+
+	// 简单 POST：请求体为 JSON-RPC，响应在 body 中返回
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		s.sendError(w, nil, -32700, "Parse error", err.Error())
@@ -137,14 +144,56 @@ func (s *Server) HandleHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 处理消息
 	response := s.handleMessage(&msg)
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
-// handleSSE 处理SSE连接（用于MCP HTTP传输的事件通道）
+// serveSSESessionMessage 处理发往 SSE 会话的 POST：读取 JSON-RPC 请求，处理后将响应通过该会话的 SSE 流推送
+func (s *Server) serveSSESessionMessage(w http.ResponseWriter, r *http.Request, sessionID string) {
+	s.mu.RLock()
+	client, exists := s.sseClients[sessionID]
+	s.mu.RUnlock()
+	if !exists || client == nil {
+		http.Error(w, "session not found", http.StatusNotFound)
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "failed to read body", http.StatusBadRequest)
+		return
+	}
+
+	var msg Message
+	if err := json.Unmarshal(body, &msg); err != nil {
+		http.Error(w, "failed to parse body", http.StatusBadRequest)
+		return
+	}
+
+	response := s.handleMessage(&msg)
+	if response == nil {
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+
+	respBytes, err := json.Marshal(response)
+	if err != nil {
+		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+		return
+	}
+
+	select {
+	case client.send <- respBytes:
+		w.WriteHeader(http.StatusAccepted)
+	default:
+		http.Error(w, "session send buffer full", http.StatusServiceUnavailable)
+	}
+}
+
+// handleSSE 处理 SSE 连接，兼容官方 MCP 2024-11-05 SSE 规范：
+// 1. 首个事件必须为 event: endpoint，data 为客户端 POST 消息的 URL（含 sessionid）
+// 2. 后续事件为 event: message，data 为 JSON-RPC 响应
 func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -157,16 +206,25 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 
+	sessionID := uuid.New().String()
 	client := &sseClient{
-		id:   uuid.New().String(),
-		send: make(chan []byte, 8),
+		id:   sessionID,
+		send: make(chan []byte, 32),
 	}
 
 	s.addSSEClient(client)
 	defer s.removeSSEClient(client.id)
 
-	// 发送初始ready事件，告知客户端连接成功
-	fmt.Fprintf(w, "event: message\ndata: {\"type\":\"ready\",\"status\":\"ok\"}\n\n")
+	// 官方规范：首个事件为 endpoint，data 为消息端点 URL（客户端将向该 URL POST 请求）
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if r.URL.Scheme != "" {
+		scheme = r.URL.Scheme
+	}
+	endpointURL := fmt.Sprintf("%s://%s%s?sessionid=%s", scheme, r.Host, r.URL.Path, sessionID)
+	fmt.Fprintf(w, "event: endpoint\ndata: %s\n\n", endpointURL)
 	flusher.Flush()
 
 	ticker := time.NewTicker(15 * time.Second)
@@ -183,7 +241,6 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "event: message\ndata: %s\n\n", msg)
 			flusher.Flush()
 		case <-ticker.C:
-			// 心跳保持连接
 			fmt.Fprintf(w, ": ping\n\n")
 			flusher.Flush()
 		}

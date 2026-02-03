@@ -8,6 +8,7 @@ import (
 
 	"cyberstrike-ai/internal/config"
 	"cyberstrike-ai/internal/mcp"
+
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
@@ -36,12 +37,12 @@ func NewExternalMCPHandler(manager *mcp.ExternalMCPManager, cfg *config.Config, 
 func (h *ExternalMCPHandler) GetExternalMCPs(c *gin.Context) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	
+
 	configs := h.manager.GetConfigs()
-	
+
 	// 获取所有外部MCP的工具数量
 	toolCounts := h.manager.GetToolCounts()
-	
+
 	// 转换为响应格式
 	result := make(map[string]ExternalMCPResponse)
 	for name, cfg := range configs {
@@ -54,13 +55,13 @@ func (h *ExternalMCPHandler) GetExternalMCPs(c *gin.Context) {
 		} else {
 			status = "disabled"
 		}
-		
+
 		toolCount := toolCounts[name]
 		errorMsg := ""
 		if status == "error" {
 			errorMsg = h.manager.GetError(name)
 		}
-		
+
 		result[name] = ExternalMCPResponse{
 			Config:    cfg,
 			Status:    status,
@@ -68,7 +69,7 @@ func (h *ExternalMCPHandler) GetExternalMCPs(c *gin.Context) {
 			Error:     errorMsg,
 		}
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"servers": result,
 		"stats":   h.manager.GetStats(),
@@ -78,17 +79,17 @@ func (h *ExternalMCPHandler) GetExternalMCPs(c *gin.Context) {
 // GetExternalMCP 获取单个外部MCP配置
 func (h *ExternalMCPHandler) GetExternalMCP(c *gin.Context) {
 	name := c.Param("name")
-	
+
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	
+
 	configs := h.manager.GetConfigs()
 	cfg, exists := configs[name]
 	if !exists {
 		c.JSON(http.StatusNotFound, gin.H{"error": "外部MCP配置不存在"})
 		return
 	}
-	
+
 	client, clientExists := h.manager.GetClient(name)
 	status := "disconnected"
 	if clientExists {
@@ -98,7 +99,7 @@ func (h *ExternalMCPHandler) GetExternalMCP(c *gin.Context) {
 	} else {
 		status = "disabled"
 	}
-	
+
 	// 获取工具数量
 	toolCount := 0
 	if clientExists && client.IsConnected() {
@@ -106,13 +107,13 @@ func (h *ExternalMCPHandler) GetExternalMCP(c *gin.Context) {
 			toolCount = count
 		}
 	}
-	
+
 	// 获取错误信息
 	errorMsg := ""
 	if status == "error" {
 		errorMsg = h.manager.GetError(name)
 	}
-	
+
 	c.JSON(http.StatusOK, ExternalMCPResponse{
 		Config:    cfg,
 		Status:    status,
@@ -128,38 +129,38 @@ func (h *ExternalMCPHandler) AddOrUpdateExternalMCP(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的请求参数: " + err.Error()})
 		return
 	}
-	
+
 	name := c.Param("name")
 	if name == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "名称不能为空"})
 		return
 	}
-	
+
 	// 验证配置
 	if err := h.validateConfig(req.Config); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	
+
 	// 添加或更新配置
 	if err := h.manager.AddOrUpdateConfig(name, req.Config); err != nil {
 		h.logger.Error("添加或更新外部MCP配置失败", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "添加或更新配置失败: " + err.Error()})
 		return
 	}
-	
+
 	// 更新内存中的配置
 	if h.config.ExternalMCP.Servers == nil {
 		h.config.ExternalMCP.Servers = make(map[string]config.ExternalMCPServerConfig)
 	}
-	
+
 	// 如果用户提供了 disabled 或 enabled 字段，保留它们以保持向后兼容
 	// 同时将值迁移到 external_mcp_enable
 	cfg := req.Config
-	
+
 	if req.Config.Disabled {
 		// 用户设置了 disabled: true
 		cfg.ExternalMCPEnable = false
@@ -185,16 +186,16 @@ func (h *ExternalMCPHandler) AddOrUpdateExternalMCP(c *gin.Context) {
 		cfg.Enabled = true
 		cfg.Disabled = false
 	}
-	
+
 	h.config.ExternalMCP.Servers[name] = cfg
-	
+
 	// 保存到配置文件
 	if err := h.saveConfig(); err != nil {
 		h.logger.Error("保存配置失败", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存配置失败: " + err.Error()})
 		return
 	}
-	
+
 	h.logger.Info("外部MCP配置已更新", zap.String("name", name))
 	c.JSON(http.StatusOK, gin.H{"message": "配置已更新"})
 }
@@ -202,28 +203,28 @@ func (h *ExternalMCPHandler) AddOrUpdateExternalMCP(c *gin.Context) {
 // DeleteExternalMCP 删除外部MCP配置
 func (h *ExternalMCPHandler) DeleteExternalMCP(c *gin.Context) {
 	name := c.Param("name")
-	
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	
+
 	// 移除配置
 	if err := h.manager.RemoveConfig(name); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "配置不存在"})
 		return
 	}
-	
+
 	// 从内存配置中删除
 	if h.config.ExternalMCP.Servers != nil {
 		delete(h.config.ExternalMCP.Servers, name)
 	}
-	
+
 	// 保存到配置文件
 	if err := h.saveConfig(); err != nil {
 		h.logger.Error("保存配置失败", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存配置失败: " + err.Error()})
 		return
 	}
-	
+
 	h.logger.Info("外部MCP配置已删除", zap.String("name", name))
 	c.JSON(http.StatusOK, gin.H{"message": "配置已删除"})
 }
@@ -231,10 +232,10 @@ func (h *ExternalMCPHandler) DeleteExternalMCP(c *gin.Context) {
 // StartExternalMCP 启动外部MCP
 func (h *ExternalMCPHandler) StartExternalMCP(c *gin.Context) {
 	name := c.Param("name")
-	
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	
+
 	// 更新配置为启用
 	if h.config.ExternalMCP.Servers == nil {
 		h.config.ExternalMCP.Servers = make(map[string]config.ExternalMCPServerConfig)
@@ -242,32 +243,32 @@ func (h *ExternalMCPHandler) StartExternalMCP(c *gin.Context) {
 	cfg := h.config.ExternalMCP.Servers[name]
 	cfg.ExternalMCPEnable = true
 	h.config.ExternalMCP.Servers[name] = cfg
-	
+
 	// 保存到配置文件
 	if err := h.saveConfig(); err != nil {
 		h.logger.Error("保存配置失败", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存配置失败: " + err.Error()})
 		return
 	}
-	
+
 	// 启动客户端（立即创建客户端并设置状态为connecting，实际连接在后台进行）
 	h.logger.Info("开始启动外部MCP", zap.String("name", name))
 	if err := h.manager.StartClient(name); err != nil {
 		h.logger.Error("启动外部MCP失败", zap.String("name", name), zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
+			"error":  err.Error(),
 			"status": "error",
 		})
 		return
 	}
-	
+
 	// 获取客户端状态（应该是connecting）
 	client, exists := h.manager.GetClient(name)
 	status := "connecting"
 	if exists {
 		status = client.GetStatus()
 	}
-	
+
 	// 立即返回，不等待连接完成
 	// 客户端会在后台异步连接，用户可以通过状态查询接口查看连接状态
 	c.JSON(http.StatusOK, gin.H{
@@ -279,16 +280,16 @@ func (h *ExternalMCPHandler) StartExternalMCP(c *gin.Context) {
 // StopExternalMCP 停止外部MCP
 func (h *ExternalMCPHandler) StopExternalMCP(c *gin.Context) {
 	name := c.Param("name")
-	
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	
+
 	// 停止客户端
 	if err := h.manager.StopClient(name); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	// 更新配置
 	if h.config.ExternalMCP.Servers == nil {
 		h.config.ExternalMCP.Servers = make(map[string]config.ExternalMCPServerConfig)
@@ -296,14 +297,14 @@ func (h *ExternalMCPHandler) StopExternalMCP(c *gin.Context) {
 	cfg := h.config.ExternalMCP.Servers[name]
 	cfg.ExternalMCPEnable = false
 	h.config.ExternalMCP.Servers[name] = cfg
-	
+
 	// 保存到配置文件
 	if err := h.saveConfig(); err != nil {
 		h.logger.Error("保存配置失败", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存配置失败: " + err.Error()})
 		return
 	}
-	
+
 	h.logger.Info("外部MCP已停止", zap.String("name", name))
 	c.JSON(http.StatusOK, gin.H{"message": "外部MCP已停止"})
 }
@@ -327,7 +328,7 @@ func (h *ExternalMCPHandler) validateConfig(cfg config.ExternalMCPServerConfig) 
 			return fmt.Errorf("需要指定command（stdio模式）或url（http/sse模式）")
 		}
 	}
-	
+
 	switch transport {
 	case "http":
 		if cfg.URL == "" {
@@ -344,7 +345,7 @@ func (h *ExternalMCPHandler) validateConfig(cfg config.ExternalMCPServerConfig) 
 	default:
 		return fmt.Errorf("不支持的传输模式: %s，支持的模式: http, stdio, sse", transport)
 	}
-	
+
 	return nil
 }
 
@@ -428,17 +429,17 @@ func updateExternalMCPConfig(doc *yaml.Node, cfg config.ExternalMCPConfig, origi
 	root := doc.Content[0]
 	externalMCPNode := ensureMap(root, "external_mcp")
 	serversNode := ensureMap(externalMCPNode, "servers")
-	
+
 	// 清空现有服务器配置
 	serversNode.Content = nil
-	
+
 	// 添加新的服务器配置
 	for name, serverCfg := range cfg.Servers {
 		// 添加服务器名称键
 		nameNode := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: name}
 		serverNode := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
 		serversNode.Content = append(serversNode.Content, nameNode, serverNode)
-		
+
 		// 设置服务器配置字段
 		if serverCfg.Command != "" {
 			setStringInMap(serverNode, "command", serverCfg.Command)
@@ -459,6 +460,13 @@ func updateExternalMCPConfig(doc *yaml.Node, cfg config.ExternalMCPConfig, origi
 		if serverCfg.URL != "" {
 			setStringInMap(serverNode, "url", serverCfg.URL)
 		}
+		// 保存 headers 字段（HTTP/SSE 请求头）
+		if serverCfg.Headers != nil && len(serverCfg.Headers) > 0 {
+			headersNode := ensureMap(serverNode, "headers")
+			for k, v := range serverCfg.Headers {
+				setStringInMap(headersNode, k, v)
+			}
+		}
 		if serverCfg.Description != "" {
 			setStringInMap(serverNode, "description", serverCfg.Description)
 		}
@@ -476,7 +484,7 @@ func updateExternalMCPConfig(doc *yaml.Node, cfg config.ExternalMCPConfig, origi
 		}
 		// 保留旧的 enabled/disabled 字段以保持向后兼容
 		originalFields, hasOriginal := originalConfigs[name]
-		
+
 		// 如果原始配置中有 enabled 字段，保留它
 		if hasOriginal {
 			if enabledVal, hasEnabled := originalFields["enabled"]; hasEnabled {
@@ -494,7 +502,7 @@ func updateExternalMCPConfig(doc *yaml.Node, cfg config.ExternalMCPConfig, origi
 				}
 			}
 		}
-		
+
 		// 如果用户在当前请求中明确设置了这些字段，也保存它们
 		if serverCfg.Enabled {
 			setBoolInMap(serverNode, "enabled", serverCfg.Enabled)
@@ -528,8 +536,7 @@ type AddOrUpdateExternalMCPRequest struct {
 // ExternalMCPResponse 外部MCP响应
 type ExternalMCPResponse struct {
 	Config    config.ExternalMCPServerConfig `json:"config"`
-	Status    string                         `json:"status"` // "connected", "disconnected", "disabled", "error", "connecting"
-	ToolCount int                            `json:"tool_count"` // 工具数量
+	Status    string                         `json:"status"`          // "connected", "disconnected", "disabled", "error", "connecting"
+	ToolCount int                            `json:"tool_count"`      // 工具数量
 	Error     string                         `json:"error,omitempty"` // 错误信息（仅在status为error时存在）
 }
-

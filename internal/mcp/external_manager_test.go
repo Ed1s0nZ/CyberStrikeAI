@@ -151,48 +151,26 @@ func TestExternalMCPManager_LoadConfigs(t *testing.T) {
 	}
 }
 
-func TestHTTPMCPClient_Initialize(t *testing.T) {
-	// 注意：这个测试需要一个真实的HTTP MCP服务器
-	// 如果没有服务器，这个测试会失败
-	// 在实际测试中，可以使用mock服务器
+// TestLazySDKClient_InitializeFails 验证无效配置时 SDK 客户端 Initialize 失败并设置 error 状态
+func TestLazySDKClient_InitializeFails(t *testing.T) {
 	logger := zap.NewNop()
-	client := NewHTTPMCPClient("http://127.0.0.1:8081/mcp", 5*time.Second, logger)
-
+	// 使用不存在的 HTTP 地址，Initialize 应失败
+	cfg := config.ExternalMCPServerConfig{
+		Transport: "http",
+		URL:       "http://127.0.0.1:19999/nonexistent",
+		Timeout:   2,
+	}
+	c := newLazySDKClient(cfg, logger)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
-	// 这个测试可能会失败，如果没有真实的服务器
-	// 在实际环境中，应该使用mock服务器
-	err := client.Initialize(ctx)
-	if err != nil {
-		t.Logf("初始化失败（可能是没有服务器）: %v", err)
+	err := c.Initialize(ctx)
+	if err == nil {
+		t.Fatal("expected error when connecting to invalid server")
 	}
-
-	status := client.GetStatus()
-	if status == "" {
-		t.Error("状态不应该为空")
+	if c.GetStatus() != "error" {
+		t.Errorf("expected status error, got %s", c.GetStatus())
 	}
-
-	client.Close()
-}
-
-func TestStdioMCPClient_Initialize(t *testing.T) {
-	// 注意：这个测试需要一个真实的stdio MCP服务器
-	// 如果没有服务器，这个测试会失败
-	logger := zap.NewNop()
-	client := NewStdioMCPClient("echo", []string{"test"}, nil, 5*time.Second, logger)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// 这个测试可能会失败，因为echo不是MCP服务器
-	// 在实际环境中，应该使用真实的MCP服务器或mock
-	err := client.Initialize(ctx)
-	if err != nil {
-		t.Logf("初始化失败（echo不是MCP服务器）: %v", err)
-	}
-
-	client.Close()
+	c.Close()
 }
 
 func TestExternalMCPManager_StartStopClient(t *testing.T) {

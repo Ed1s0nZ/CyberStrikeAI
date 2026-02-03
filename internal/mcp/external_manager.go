@@ -196,7 +196,8 @@ func (m *ExternalMCPManager) StartClient(name string) error {
 			m.mu.Lock()
 			delete(m.errors, name)
 			m.mu.Unlock()
-			// 连接成功，立即刷新工具数量
+			// 延迟再刷新工具数量，避免 SSE/Streamable 连接尚未就绪时立即请求导致 EOF（如值得买等远端）
+			time.Sleep(2 * time.Second)
 			m.triggerToolCountRefresh()
 		}
 	}()
@@ -630,11 +631,20 @@ func (m *ExternalMCPManager) refreshToolCounts() {
 			cancel()
 
 			if err != nil {
-				m.logger.Debug("获取外部MCP工具数量失败",
-					zap.String("name", n),
-					zap.Error(err),
-				)
-				// 如果获取失败，保留旧值（在更新时处理）
+				errStr := err.Error()
+				// SSE 连接 EOF：远端可能关闭了流或未按规范在流上推送响应，仅首次用 Warn 提示
+				if strings.Contains(errStr, "EOF") || strings.Contains(errStr, "client is closing") {
+					m.logger.Warn("获取外部MCP工具数量失败（SSE 流已关闭或服务端未在流上返回 tools/list 响应）",
+						zap.String("name", n),
+						zap.String("hint", "若为 SSE 连接，请确认服务端保持 GET 流打开并按 MCP 规范以 event: message 推送 JSON-RPC 响应"),
+						zap.Error(err),
+					)
+				} else {
+					m.logger.Warn("获取外部MCP工具数量失败，请检查连接或服务端 tools/list",
+						zap.String("name", n),
+						zap.Error(err),
+					)
+				}
 				resultChan <- countResult{name: n, count: -1} // -1 表示使用旧值
 				return
 			}
@@ -707,21 +717,13 @@ func (m *ExternalMCPManager) triggerToolCountRefresh() {
 	go m.refreshToolCounts()
 }
 
-// createClient 创建客户端（不连接）
+// createClient 创建客户端（不连接）。统一使用官方 MCP Go SDK 的 lazy 客户端，连接在 Initialize 时完成。
 func (m *ExternalMCPManager) createClient(serverCfg config.ExternalMCPServerConfig) ExternalMCPClient {
-	timeout := time.Duration(serverCfg.Timeout) * time.Second
-	if timeout <= 0 {
-		timeout = 30 * time.Second
-	}
-
-	// 根据传输模式创建客户端
 	transport := serverCfg.Transport
 	if transport == "" {
-		// 如果没有指定transport，根据是否有command或url判断
 		if serverCfg.Command != "" {
 			transport = "stdio"
 		} else if serverCfg.URL != "" {
-			// 默认使用http，但可以通过transport字段指定sse
 			transport = "http"
 		} else {
 			return nil
@@ -733,17 +735,23 @@ func (m *ExternalMCPManager) createClient(serverCfg config.ExternalMCPServerConf
 		if serverCfg.URL == "" {
 			return nil
 		}
-		return NewHTTPMCPClient(serverCfg.URL, timeout, m.logger)
+		return newLazySDKClient(serverCfg, m.logger)
+	case "simple_http":
+		// 简单 HTTP（一次 POST 一次响应），用于自建 MCP 等
+		if serverCfg.URL == "" {
+			return nil
+		}
+		return newLazySDKClient(serverCfg, m.logger)
 	case "stdio":
 		if serverCfg.Command == "" {
 			return nil
 		}
-		return NewStdioMCPClient(serverCfg.Command, serverCfg.Args, serverCfg.Env, timeout, m.logger)
+		return newLazySDKClient(serverCfg, m.logger)
 	case "sse":
 		if serverCfg.URL == "" {
 			return nil
 		}
-		return NewSSEMCPClient(serverCfg.URL, timeout, m.logger)
+		return newLazySDKClient(serverCfg, m.logger)
 	default:
 		return nil
 	}
@@ -773,12 +781,7 @@ func (m *ExternalMCPManager) doConnect(name string, serverCfg config.ExternalMCP
 
 // setClientStatus 设置客户端状态（通过类型断言）
 func (m *ExternalMCPManager) setClientStatus(client ExternalMCPClient, status string) {
-	switch c := client.(type) {
-	case *HTTPMCPClient:
-		c.setStatus(status)
-	case *StdioMCPClient:
-		c.setStatus(status)
-	case *SSEMCPClient:
+	if c, ok := client.(*lazySDKClient); ok {
 		c.setStatus(status)
 	}
 }

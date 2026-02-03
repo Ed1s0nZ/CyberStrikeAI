@@ -13,19 +13,19 @@ import (
 )
 
 type Config struct {
-	Server      ServerConfig      `yaml:"server"`
-	Log         LogConfig         `yaml:"log"`
-	MCP         MCPConfig         `yaml:"mcp"`
-	OpenAI      OpenAIConfig      `yaml:"openai"`
-	Agent       AgentConfig       `yaml:"agent"`
-	Security    SecurityConfig    `yaml:"security"`
-	Database    DatabaseConfig    `yaml:"database"`
-	Auth        AuthConfig        `yaml:"auth"`
-	ExternalMCP ExternalMCPConfig `yaml:"external_mcp,omitempty"`
-	Knowledge   KnowledgeConfig   `yaml:"knowledge,omitempty"`
-	RolesDir    string            `yaml:"roles_dir,omitempty" json:"roles_dir,omitempty"` // 角色配置文件目录（新方式）
-	Roles       map[string]RoleConfig `yaml:"roles,omitempty" json:"roles,omitempty"`     // 向后兼容：支持在主配置文件中定义角色
-	SkillsDir   string            `yaml:"skills_dir,omitempty" json:"skills_dir,omitempty"` // Skills配置文件目录
+	Server      ServerConfig          `yaml:"server"`
+	Log         LogConfig             `yaml:"log"`
+	MCP         MCPConfig             `yaml:"mcp"`
+	OpenAI      OpenAIConfig          `yaml:"openai"`
+	Agent       AgentConfig           `yaml:"agent"`
+	Security    SecurityConfig        `yaml:"security"`
+	Database    DatabaseConfig        `yaml:"database"`
+	Auth        AuthConfig            `yaml:"auth"`
+	ExternalMCP ExternalMCPConfig     `yaml:"external_mcp,omitempty"`
+	Knowledge   KnowledgeConfig       `yaml:"knowledge,omitempty"`
+	RolesDir    string                `yaml:"roles_dir,omitempty" json:"roles_dir,omitempty"`   // 角色配置文件目录（新方式）
+	Roles       map[string]RoleConfig `yaml:"roles,omitempty" json:"roles,omitempty"`           // 向后兼容：支持在主配置文件中定义角色
+	SkillsDir   string                `yaml:"skills_dir,omitempty" json:"skills_dir,omitempty"` // Skills配置文件目录
 }
 
 type ServerConfig struct {
@@ -83,13 +83,14 @@ type ExternalMCPConfig struct {
 // ExternalMCPServerConfig 外部MCP服务器配置
 type ExternalMCPServerConfig struct {
 	// stdio模式配置
-	Command string   `yaml:"command,omitempty" json:"command,omitempty"`
-	Args    []string `yaml:"args,omitempty" json:"args,omitempty"`
+	Command string            `yaml:"command,omitempty" json:"command,omitempty"`
+	Args    []string          `yaml:"args,omitempty" json:"args,omitempty"`
 	Env     map[string]string `yaml:"env,omitempty" json:"env,omitempty"` // 环境变量（用于stdio模式）
 
 	// HTTP模式配置
-	Transport string `yaml:"transport,omitempty" json:"transport,omitempty"` // "http" 或 "stdio"
-	URL       string `yaml:"url,omitempty" json:"url,omitempty"`
+	Transport string            `yaml:"transport,omitempty" json:"transport,omitempty"` // "stdio" | "sse" | "http"(Streamable) | "simple_http"(自建/简单POST端点，如本机 http://127.0.0.1:8081/mcp)
+	URL       string            `yaml:"url,omitempty" json:"url,omitempty"`
+	Headers   map[string]string `yaml:"headers,omitempty" json:"headers,omitempty"` // HTTP/SSE 请求头（如 x-api-key）
 
 	// 通用配置
 	Description       string          `yaml:"description,omitempty" json:"description,omitempty"`
@@ -108,8 +109,8 @@ type ToolConfig struct {
 	ShortDescription string            `yaml:"short_description,omitempty"` // 简短描述（用于工具列表，减少token消耗）
 	Description      string            `yaml:"description"`                 // 详细描述（用于工具文档）
 	Enabled          bool              `yaml:"enabled"`
-	Parameters       []ParameterConfig `yaml:"parameters,omitempty"`  // 参数定义（可选）
-	ArgMapping       string            `yaml:"arg_mapping,omitempty"` // 参数映射方式: "auto", "manual", "template"（可选）
+	Parameters       []ParameterConfig `yaml:"parameters,omitempty"`         // 参数定义（可选）
+	ArgMapping       string            `yaml:"arg_mapping,omitempty"`        // 参数映射方式: "auto", "manual", "template"（可选）
 	AllowedExitCodes []int             `yaml:"allowed_exit_codes,omitempty"` // 允许的退出码列表（某些工具在成功时也返回非零退出码）
 }
 
@@ -467,7 +468,7 @@ func LoadRoleFromFile(path string) (*RoleConfig, error) {
 		icon := role.Icon
 		// 去除可能的引号
 		icon = strings.Trim(icon, `"`)
-		
+
 		// 检查是否是 Unicode 转义格式 \U0001F3C6（8位十六进制）或 \uXXXX（4位十六进制）
 		if len(icon) >= 3 && icon[0] == '\\' {
 			if icon[1] == 'U' && len(icon) >= 10 {
@@ -576,12 +577,12 @@ type RolesConfig struct {
 
 // RoleConfig 单个角色配置
 type RoleConfig struct {
-	Name        string   `yaml:"name" json:"name"`               // 角色名称
-	Description string   `yaml:"description" json:"description"` // 角色描述
-	UserPrompt  string   `yaml:"user_prompt" json:"user_prompt"` // 用户提示词(追加到用户消息前)
-	Icon        string   `yaml:"icon,omitempty" json:"icon,omitempty"` // 角色图标（可选）
-	Tools       []string `yaml:"tools,omitempty" json:"tools,omitempty"` // 关联的工具列表（toolKey格式，如 "toolName" 或 "mcpName::toolName"）
-	MCPs        []string `yaml:"mcps,omitempty" json:"mcps,omitempty"` // 向后兼容：关联的MCP服务器列表（已废弃，使用tools替代）
+	Name        string   `yaml:"name" json:"name"`                         // 角色名称
+	Description string   `yaml:"description" json:"description"`           // 角色描述
+	UserPrompt  string   `yaml:"user_prompt" json:"user_prompt"`           // 用户提示词(追加到用户消息前)
+	Icon        string   `yaml:"icon,omitempty" json:"icon,omitempty"`     // 角色图标（可选）
+	Tools       []string `yaml:"tools,omitempty" json:"tools,omitempty"`   // 关联的工具列表（toolKey格式，如 "toolName" 或 "mcpName::toolName"）
+	MCPs        []string `yaml:"mcps,omitempty" json:"mcps,omitempty"`     // 向后兼容：关联的MCP服务器列表（已废弃，使用tools替代）
 	Skills      []string `yaml:"skills,omitempty" json:"skills,omitempty"` // 关联的skills列表（skill名称列表，在执行任务前会读取这些skills的内容）
-	Enabled     bool     `yaml:"enabled" json:"enabled"`         // 是否启用
+	Enabled     bool     `yaml:"enabled" json:"enabled"`                   // 是否启用
 }
