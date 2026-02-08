@@ -8409,7 +8409,9 @@ header {
     position: relative;
     margin-top: 24px;
     padding: 24px 28px;
-    background: linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(241,245,249,0.95) 50%, rgba(226,232,240,0.4) 100%);
+    background:
+        linear-gradient(90deg, rgba(14, 165, 233, 0.12) 0%, rgba(14, 165, 233, 0.04) 22%, transparent 38%),
+        linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(241,245,249,0.95) 50%, rgba(226,232,240,0.4) 100%);
     border: 1px solid rgba(2, 132, 199, 0.12);
     border-radius: 16px;
     display: flex;
@@ -8419,16 +8421,6 @@ header {
     flex-wrap: wrap;
     box-shadow: 0 4px 20px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.8);
     overflow: hidden;
-}
-
-.dashboard-cta-accent {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 4px;
-    background: linear-gradient(180deg, #0ea5e9 0%, #0284c7 50%, #0369a1 100%);
-    border-radius: 16px 0 0 16px;
 }
 
 .dashboard-cta-content {
