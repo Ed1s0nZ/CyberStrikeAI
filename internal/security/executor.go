@@ -1213,7 +1213,15 @@ func (e *Executor) buildInputSchema(toolConfig *config.ToolConfig) map[string]in
 		required := []string{}
 
 		for _, param := range toolConfig.Parameters {
-			// 转换类型为OpenAI/JSON Schema标准类型
+			// 跳过 name 为空的参数（避免 YAML 中 name: null 或空导致非法 schema）
+			if strings.TrimSpace(param.Name) == "" {
+				e.logger.Debug("跳过无名称的参数",
+					zap.String("tool", toolConfig.Name),
+					zap.String("type", param.Type),
+				)
+				continue
+			}
+			// 转换类型为OpenAI/JSON Schema标准类型（空类型默认为 string）
 			openAIType := e.convertToOpenAIType(param.Type)
 
 			prop := map[string]interface{}{
@@ -1255,6 +1263,10 @@ func (e *Executor) buildInputSchema(toolConfig *config.ToolConfig) map[string]in
 
 // convertToOpenAIType 将配置中的类型转换为OpenAI/JSON Schema标准类型
 func (e *Executor) convertToOpenAIType(configType string) string {
+	// 空或 null 类型统一视为 string，避免非法 schema 导致工具调用失败
+	if strings.TrimSpace(configType) == "" {
+		return "string"
+	}
 	switch configType {
 	case "bool":
 		return "boolean"
