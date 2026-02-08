@@ -67,6 +67,10 @@ database:
 # 推荐方式：在 tools/ 目录下为每个工具创建独立的配置文件
 security:
   tools_dir: tools # 工具配置文件目录（相对于配置文件所在目录）
+  # 工具描述模式：加载 tools 下工具时，暴露给 AI/API 使用的描述来源
+  #   short - 优先使用 short_description（简短描述，省 token），为空时用 description
+  #   full  - 使用 description（详细描述）
+  tool_description_mode: full
 
 # ============================================
 # MCP 相关配置
