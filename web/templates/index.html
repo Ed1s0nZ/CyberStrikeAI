@@ -29,7 +29,7 @@
     <div class="container">
         <header>
             <div class="header-content">
-                <div class="logo">
+                <div class="logo header-logo-link" onclick="switchPage('dashboard')" role="button" title="返回仪表盘">
                     <img src="/static/logo.png" alt="CyberStrikeAI Logo" style="width: 32px; height: 32px; margin-right: 8px;">
                     <h1>CyberStrikeAI</h1>
                 </div>
@@ -71,6 +71,17 @@
                     </svg>
                 </div>
                 <nav class="main-sidebar-nav">
+                    <div class="nav-item" data-page="dashboard">
+                        <div class="nav-item-content" data-title="仪表盘" onclick="switchPage('dashboard')">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="7" height="9"></rect>
+                                <rect x="14" y="3" width="7" height="5"></rect>
+                                <rect x="14" y="12" width="7" height="9"></rect>
+                                <rect x="3" y="16" width="7" height="5"></rect>
+                            </svg>
+                            <span>仪表盘</span>
+                        </div>
+                    </div>
                     <div class="nav-item" data-page="chat">
                         <div class="nav-item-content" data-title="对话" onclick="switchPage('chat')">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -192,6 +203,105 @@
 
             <!-- 内容区域 -->
             <div class="content-area">
+                <!-- 仪表盘页面 -->
+                <div id="page-dashboard" class="page">
+                    <div class="dashboard-page">
+                        <div class="page-header">
+                            <h2>仪表盘</h2>
+                            <div class="page-header-actions">
+                                <button class="btn-secondary" onclick="refreshDashboard()" title="刷新数据">刷新</button>
+                            </div>
+                        </div>
+                        <div class="dashboard-content">
+                            <div class="dashboard-cards" id="dashboard-cards">
+                                <div class="dashboard-card dashboard-card-tasks" onclick="switchPage('tasks')">
+                                    <div class="dashboard-card-glow"></div>
+                                    <div class="dashboard-card-icon">
+                                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                                    </div>
+                                    <div class="dashboard-card-body">
+                                        <div class="dashboard-card-value" id="dashboard-running-tasks">-</div>
+                                        <div class="dashboard-card-label">运行中任务</div>
+                                        <div class="dashboard-card-hint">点击查看任务管理</div>
+                                    </div>
+                                </div>
+                                <div class="dashboard-card dashboard-card-vulns" onclick="switchPage('vulnerabilities')">
+                                    <div class="dashboard-card-glow"></div>
+                                    <div class="dashboard-card-icon">
+                                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                                    </div>
+                                    <div class="dashboard-card-body">
+                                        <div class="dashboard-card-value" id="dashboard-vuln-total">-</div>
+                                        <div class="dashboard-card-label">漏洞总数</div>
+                                        <div class="dashboard-card-hint">点击查看漏洞管理</div>
+                                    </div>
+                                </div>
+                                <div class="dashboard-card dashboard-card-chat" onclick="switchPage('chat')">
+                                    <div class="dashboard-card-glow"></div>
+                                    <div class="dashboard-card-icon">
+                                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                                    </div>
+                                    <div class="dashboard-card-body">
+                                        <div class="dashboard-card-cta">开始对话</div>
+                                        <div class="dashboard-card-desc">与 AI 进行安全测试</div>
+                                        <div class="dashboard-card-hint">立即开始</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="dashboard-section dashboard-section-chart">
+                                <h3 class="dashboard-section-title"><span class="dashboard-section-dot"></span>漏洞严重程度分布</h3>
+                                <div class="dashboard-chart-wrap">
+                                    <div class="dashboard-stacked-bar" id="dashboard-stacked-bar">
+                                        <span class="dashboard-bar-seg seg-critical" id="dashboard-bar-critical" style="width: 0%"></span>
+                                        <span class="dashboard-bar-seg seg-high" id="dashboard-bar-high" style="width: 0%"></span>
+                                        <span class="dashboard-bar-seg seg-medium" id="dashboard-bar-medium" style="width: 0%"></span>
+                                        <span class="dashboard-bar-seg seg-low" id="dashboard-bar-low" style="width: 0%"></span>
+                                        <span class="dashboard-bar-seg seg-info" id="dashboard-bar-info" style="width: 0%"></span>
+                                    </div>
+                                    <div class="dashboard-legend" id="dashboard-vuln-bars">
+                                        <div class="dashboard-legend-item"><span class="dashboard-legend-dot critical"></span><span class="dashboard-legend-label">严重</span><span class="dashboard-legend-value" id="dashboard-severity-critical">0</span></div>
+                                        <div class="dashboard-legend-item"><span class="dashboard-legend-dot high"></span><span class="dashboard-legend-label">高危</span><span class="dashboard-legend-value" id="dashboard-severity-high">0</span></div>
+                                        <div class="dashboard-legend-item"><span class="dashboard-legend-dot medium"></span><span class="dashboard-legend-label">中危</span><span class="dashboard-legend-value" id="dashboard-severity-medium">0</span></div>
+                                        <div class="dashboard-legend-item"><span class="dashboard-legend-dot low"></span><span class="dashboard-legend-label">低危</span><span class="dashboard-legend-value" id="dashboard-severity-low">0</span></div>
+                                        <div class="dashboard-legend-item"><span class="dashboard-legend-dot info"></span><span class="dashboard-legend-label">信息</span><span class="dashboard-legend-value" id="dashboard-severity-info">0</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="dashboard-section">
+                                <h3 class="dashboard-section-title"><span class="dashboard-section-dot"></span>快捷入口</h3>
+                                <div class="dashboard-quick-links">
+                                    <a class="dashboard-quick-link" onclick="switchPage('tasks')">
+                                        <span class="dashboard-quick-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg></span>
+                                        <span>任务管理</span>
+                                    </a>
+                                    <a class="dashboard-quick-link" onclick="switchPage('vulnerabilities')">
+                                        <span class="dashboard-quick-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg></span>
+                                        <span>漏洞管理</span>
+                                    </a>
+                                    <a class="dashboard-quick-link" onclick="switchPage('chat')">
+                                        <span class="dashboard-quick-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></span>
+                                        <span>对话</span>
+                                    </a>
+                                    <a class="dashboard-quick-link" onclick="switchPage('mcp-monitor')">
+                                        <span class="dashboard-quick-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg></span>
+                                        <span>MCP 监控</span>
+                                    </a>
+                                    <a class="dashboard-quick-link" onclick="switchPage('skills-monitor')">
+                                        <span class="dashboard-quick-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg></span>
+                                        <span>Skills 监控</span>
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="dashboard-cta-block">
+                                <div class="dashboard-cta-inner">
+                                    <p class="dashboard-cta-text">准备好开始安全测试？</p>
+                                    <button class="dashboard-cta-btn" onclick="switchPage('chat')">前往对话 →</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 对话页面 -->
                 <div id="page-chat" class="page active">
                     <div class="chat-page-layout">
@@ -1701,6 +1811,7 @@ version: 1.0.0<br>
     <script src="/static/js/builtin-tools.js"></script>
     <script src="/static/js/auth.js"></script>
     <script src="/static/js/router.js"></script>
+    <script src="/static/js/dashboard.js"></script>
     <script src="/static/js/monitor.js"></script>
     <script src="/static/js/chat.js"></script>
     <script src="/static/js/settings.js"></script>

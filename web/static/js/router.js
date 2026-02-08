@@ -8,7 +8,7 @@ function initRouter() {
     if (hash) {
         const hashParts = hash.split('?');
         const pageId = hashParts[0];
-        if (pageId && ['chat', 'vulnerabilities', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'roles-management', 'skills-monitor', 'skills-management', 'settings', 'tasks'].includes(pageId)) {
+        if (pageId && ['dashboard', 'chat', 'vulnerabilities', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'roles-management', 'skills-monitor', 'skills-management', 'settings', 'tasks'].includes(pageId)) {
             switchPage(pageId);
             
             // 如果是chat页面且带有conversation参数，加载对应对话
@@ -237,6 +237,11 @@ function showSubmenuPopup(navItem, menuId) {
 // 初始化页面
 function initPage(pageId) {
     switch(pageId) {
+        case 'dashboard':
+            if (typeof refreshDashboard === 'function') {
+                refreshDashboard();
+            }
+            break;
         case 'chat':
             // 对话页面已由chat.js初始化
             break;
