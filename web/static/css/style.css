@@ -8072,6 +8072,47 @@ header {
     border: 1px solid rgba(0,0,0,0.05);
 }
 
+.dashboard-section-overview {
+    background: var(--bg-primary);
+    border-radius: 16px;
+    padding: 22px 24px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    border: 1px solid rgba(0,0,0,0.05);
+}
+
+.dashboard-overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+}
+
+.dashboard-overview-item {
+    padding: 14px 18px;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.dashboard-overview-item:hover {
+    border-color: var(--accent-color);
+    background: rgba(0, 102, 255, 0.04);
+}
+
+.dashboard-overview-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.dashboard-overview-value {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
 .dashboard-section-title {
     display: flex;
     align-items: center;

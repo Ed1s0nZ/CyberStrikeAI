@@ -267,6 +267,23 @@
                                     </div>
                                 </div>
                             </div>
+                            <div class="dashboard-section dashboard-section-overview">
+                                <h3 class="dashboard-section-title"><span class="dashboard-section-dot"></span>运行概览</h3>
+                                <div class="dashboard-overview-grid">
+                                    <div class="dashboard-overview-item" onclick="switchPage('tasks')">
+                                        <span class="dashboard-overview-label">批量任务队列</span>
+                                        <span class="dashboard-overview-value"><span id="dashboard-batch-pending">-</span> 待执行 / <span id="dashboard-batch-running">-</span> 执行中 / <span id="dashboard-batch-done">-</span> 已完成</span>
+                                    </div>
+                                    <div class="dashboard-overview-item" onclick="switchPage('mcp-monitor')">
+                                        <span class="dashboard-overview-label">工具调用</span>
+                                        <span class="dashboard-overview-value"><span id="dashboard-tools-count">-</span> 个工具，共 <span id="dashboard-tools-calls">-</span> 次调用</span>
+                                    </div>
+                                    <div class="dashboard-overview-item" onclick="switchPage('skills-monitor')">
+                                        <span class="dashboard-overview-label">Skills</span>
+                                        <span class="dashboard-overview-value"><span id="dashboard-skills-count">-</span> 个 Skill，共 <span id="dashboard-skills-calls">-</span> 次调用</span>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="dashboard-section">
                                 <h3 class="dashboard-section-title"><span class="dashboard-section-dot"></span>快捷入口</h3>
                                 <div class="dashboard-quick-links">
