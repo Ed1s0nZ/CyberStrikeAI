@@ -694,6 +694,18 @@ func setupRoutes(
 				}
 				app.knowledgeHandler.Search(c)
 			})
+			knowledgeRoutes.GET("/stats", func(c *gin.Context) {
+				if app.knowledgeHandler == nil {
+					c.JSON(http.StatusOK, gin.H{
+						"enabled":          false,
+						"total_categories": 0,
+						"total_items":      0,
+						"message":          "知识库功能未启用，请前往系统设置启用知识检索功能",
+					})
+					return
+				}
+				app.knowledgeHandler.GetStats(c)
+			})
 		}
 
 		// 漏洞管理

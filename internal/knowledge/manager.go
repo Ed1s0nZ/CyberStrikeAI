@@ -153,6 +153,25 @@ func (m *Manager) GetCategories() ([]string, error) {
 	return categories, nil
 }
 
+// GetStats 获取知识库统计信息
+func (m *Manager) GetStats() (int, int, error) {
+	// 获取分类总数
+	categories, err := m.GetCategories()
+	if err != nil {
+		return 0, 0, fmt.Errorf("获取分类失败: %w", err)
+	}
+	totalCategories := len(categories)
+
+	// 获取知识项总数
+	var totalItems int
+	err = m.db.QueryRow("SELECT COUNT(*) FROM knowledge_base_items").Scan(&totalItems)
+	if err != nil {
+		return totalCategories, 0, fmt.Errorf("获取知识项总数失败: %w", err)
+	}
+
+	return totalCategories, totalItems, nil
+}
+
 // GetCategoriesWithItems 按分类分页获取知识项（每个分类包含其下的所有知识项）
 // limit: 每页分类数量（0表示不限制）
 // offset: 偏移量（按分类偏移）
@@ -359,7 +378,7 @@ func (m *Manager) SearchItemsByKeyword(keyword string, category string) ([]*Know
 	// SQLite的LIKE不区分大小写，使用COLLATE NOCASE或LOWER()函数
 	// 使用%keyword%进行模糊匹配
 	searchPattern := "%" + keyword + "%"
-	
+
 	query = `
 		SELECT id, category, title, file_path, created_at, updated_at 
 		FROM knowledge_base_items 

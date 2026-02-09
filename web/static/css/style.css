@@ -8405,6 +8405,24 @@ header {
     font-variant-numeric: tabular-nums;
 }
 
+.dashboard-tools-bar-tooltip {
+    display: none;
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 10000;
+    max-width: 320px;
+    padding: 6px 10px;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: #fff;
+    background: rgba(15, 23, 42, 0.95);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    pointer-events: none;
+    word-break: break-all;
+}
+
 .dashboard-cta-block {
     position: relative;
     margin-top: 24px;

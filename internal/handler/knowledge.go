@@ -15,11 +15,11 @@ import (
 
 // KnowledgeHandler 知识库处理器
 type KnowledgeHandler struct {
-	manager  *knowledge.Manager
+	manager   *knowledge.Manager
 	retriever *knowledge.Retriever
-	indexer  *knowledge.Indexer
-	db       *database.DB
-	logger   *zap.Logger
+	indexer   *knowledge.Indexer
+	db        *database.DB
+	logger    *zap.Logger
 }
 
 // NewKnowledgeHandler 创建新的知识库处理器
@@ -55,7 +55,7 @@ func (h *KnowledgeHandler) GetCategories(c *gin.Context) {
 func (h *KnowledgeHandler) GetItems(c *gin.Context) {
 	category := c.Query("category")
 	searchKeyword := c.Query("search") // 搜索关键字
-	
+
 	// 如果提供了搜索关键字，执行关键字搜索（在所有数据中搜索）
 	if searchKeyword != "" {
 		items, err := h.manager.SearchItemsByKeyword(searchKeyword, category)
@@ -102,10 +102,10 @@ func (h *KnowledgeHandler) GetItems(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// 分页模式：categoryPage=true 表示按分类分页，否则按项分页（向后兼容）
 	categoryPageMode := c.Query("categoryPage") != "false" // 默认使用分类分页
-	
+
 	// 分页参数
 	limit := 50 // 默认每页50条（分类分页时为分类数，项分页时为项数）
 	offset := 0
@@ -192,9 +192,9 @@ func (h *KnowledgeHandler) GetItems(c *gin.Context) {
 		}
 
 		c.JSON(http.StatusOK, gin.H{
-			"items": items,
-			"total": total,
-			"limit": limit,
+			"items":  items,
+			"total":  total,
+			"limit":  limit,
 			"offset": offset,
 		})
 	} else {
@@ -207,9 +207,9 @@ func (h *KnowledgeHandler) GetItems(c *gin.Context) {
 		}
 
 		c.JSON(http.StatusOK, gin.H{
-			"items": items,
-			"total": total,
-			"limit": limit,
+			"items":  items,
+			"total":  total,
+			"limit":  limit,
 			"offset": offset,
 		})
 	}
@@ -341,12 +341,12 @@ func (h *KnowledgeHandler) ScanKnowledgeBase(c *gin.Context) {
 		consecutiveFailures := 0
 		var firstFailureItemID string
 		var firstFailureError error
-		
+
 		for i, itemID := range itemsToIndex {
 			if err := h.indexer.IndexItem(ctx, itemID); err != nil {
 				failedCount++
 				consecutiveFailures++
-				
+
 				// 只在第一个失败时记录详细日志
 				if consecutiveFailures == 1 {
 					firstFailureItemID = itemID
@@ -357,7 +357,7 @@ func (h *KnowledgeHandler) ScanKnowledgeBase(c *gin.Context) {
 						zap.Error(err),
 					)
 				}
-				
+
 				// 如果连续失败2次，立即停止增量索引
 				if consecutiveFailures >= 2 {
 					h.logger.Error("连续索引失败次数过多，立即停止增量索引",
@@ -371,14 +371,14 @@ func (h *KnowledgeHandler) ScanKnowledgeBase(c *gin.Context) {
 				}
 				continue
 			}
-			
+
 			// 成功时重置连续失败计数
 			if consecutiveFailures > 0 {
 				consecutiveFailures = 0
 				firstFailureItemID = ""
 				firstFailureError = nil
 			}
-			
+
 			// 减少进度日志频率
 			if (i+1)%10 == 0 || i+1 == len(itemsToIndex) {
 				h.logger.Info("索引进度", zap.Int("current", i+1), zap.Int("total", len(itemsToIndex)), zap.Int("failed", failedCount))
@@ -388,7 +388,7 @@ func (h *KnowledgeHandler) ScanKnowledgeBase(c *gin.Context) {
 	}()
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":      fmt.Sprintf("扫描完成，开始索引 %d 个新添加或更新的知识项", len(itemsToIndex)),
+		"message":        fmt.Sprintf("扫描完成，开始索引 %d 个新添加或更新的知识项", len(itemsToIndex)),
 		"items_to_index": len(itemsToIndex),
 	})
 }
@@ -470,10 +470,25 @@ func (h *KnowledgeHandler) Search(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"results": results})
 }
 
+// GetStats 获取知识库统计信息
+func (h *KnowledgeHandler) GetStats(c *gin.Context) {
+	totalCategories, totalItems, err := h.manager.GetStats()
+	if err != nil {
+		h.logger.Error("获取知识库统计信息失败", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"enabled":          true,
+		"total_categories": totalCategories,
+		"total_items":      totalItems,
+	})
+}
+
 // 辅助函数：解析整数
 func parseInt(s string) (int, error) {
 	var result int
 	_, err := fmt.Sscanf(s, "%d", &result)
 	return result, err
 }
-

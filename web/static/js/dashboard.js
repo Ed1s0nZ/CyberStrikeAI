@@ -29,11 +29,12 @@ async function refreshDashboard() {
     }
 
     try {
-        const [tasksRes, vulnRes, batchRes, monitorRes, skillsRes] = await Promise.all([
+        const [tasksRes, vulnRes, batchRes, monitorRes, knowledgeRes, skillsRes] = await Promise.all([
             apiFetch('/api/agent-loop/tasks').then(r => r.ok ? r.json() : null).catch(() => null),
             apiFetch('/api/vulnerabilities/stats').then(r => r.ok ? r.json() : null).catch(() => null),
             apiFetch('/api/batch-tasks?limit=500&page=1').then(r => r.ok ? r.json() : null).catch(() => null),
             apiFetch('/api/monitor/stats').then(r => r.ok ? r.json() : null).catch(() => null),
+            apiFetch('/api/knowledge/stats').then(r => r.ok ? r.json() : null).catch(() => null),
             apiFetch('/api/skills/stats').then(r => r.ok ? r.json() : null).catch(() => null)
         ]);
 
@@ -108,6 +109,20 @@ async function refreshDashboard() {
             renderDashboardToolsBar(null);
         }
 
+        // 知识：{ enabled, total_categories, total_items, ... }
+        const knowledgeValueEl = document.getElementById('dashboard-knowledge-value');
+        if (knowledgeRes && typeof knowledgeRes === 'object') {
+            if (knowledgeRes.enabled === false) {
+                if (knowledgeValueEl) knowledgeValueEl.textContent = '知识功能暂未启用';
+            } else {
+                const categories = knowledgeRes.total_categories ?? 0;
+                const items = knowledgeRes.total_items ?? 0;
+                if (knowledgeValueEl) knowledgeValueEl.textContent = `${categories} 个分类，共 ${items} 项`;
+            }
+        } else {
+            if (knowledgeValueEl) knowledgeValueEl.textContent = '-';
+        }
+
         // Skills：{ total_skills, total_calls, ... }
         if (skillsRes && typeof skillsRes === 'object') {
             setEl('dashboard-skills-count', String(skillsRes.total_skills ?? '-'));
@@ -137,6 +152,8 @@ function setEl(id, text) {
 function setDashboardOverviewPlaceholder(t) {
     ['dashboard-batch-pending', 'dashboard-batch-running', 'dashboard-batch-done',
      'dashboard-tools-count', 'dashboard-tools-calls', 'dashboard-skills-count', 'dashboard-skills-calls'].forEach(id => setEl(id, t));
+    const knowledgeValueEl = document.getElementById('dashboard-knowledge-value');
+    if (knowledgeValueEl) knowledgeValueEl.textContent = t;
 }
 
 // Top 30 工具执行次数柱状图颜色（30 色不重复，柔和、易区分）
@@ -190,11 +207,63 @@ function renderDashboardToolsBar(monitorRes) {
         var pct = maxCalls > 0 ? (e.totalCalls / maxCalls) * 100 : 0;
         var label = e.name.length > 12 ? e.name.slice(0, 10) + '…' : e.name;
         var color = DASHBOARD_BAR_COLORS[i % DASHBOARD_BAR_COLORS.length];
-        html += '<div class="dashboard-tools-bar-item">';
-        html += '<span class="dashboard-tools-bar-label" title="' + esc(e.name) + '">' + esc(label) + '</span>';
+        var fullName = esc(e.name);
+        html += '<div class="dashboard-tools-bar-item" data-tooltip="' + fullName + '">';
+        html += '<span class="dashboard-tools-bar-label">' + esc(label) + '</span>';
         html += '<div class="dashboard-tools-bar-track"><div class="dashboard-tools-bar-fill" style="width:' + pct + '%;background:' + color + '"></div></div>';
         html += '<span class="dashboard-tools-bar-value">' + e.totalCalls + '</span>';
         html += '</div>';
     });
     barChartEl.innerHTML = html;
+    attachDashboardBarTooltips(barChartEl);
+}
+
+var dashboardBarTooltipEl = null;
+var dashboardBarTooltipTimer = null;
+
+function attachDashboardBarTooltips(barChartEl) {
+    if (!barChartEl) return;
+    if (!dashboardBarTooltipEl) {
+        dashboardBarTooltipEl = document.createElement('div');
+        dashboardBarTooltipEl.className = 'dashboard-tools-bar-tooltip';
+        dashboardBarTooltipEl.setAttribute('role', 'tooltip');
+        document.body.appendChild(dashboardBarTooltipEl);
+    }
+    barChartEl.removeEventListener('mouseover', dashboardBarTooltipOnOver);
+    barChartEl.removeEventListener('mouseout', dashboardBarTooltipOnOut);
+    barChartEl.addEventListener('mouseover', dashboardBarTooltipOnOver);
+    barChartEl.addEventListener('mouseout', dashboardBarTooltipOnOut);
+}
+
+function dashboardBarTooltipOnOver(ev) {
+    var item = ev.target && ev.target.closest && ev.target.closest('.dashboard-tools-bar-item');
+    if (!item || !dashboardBarTooltipEl) return;
+    var text = item.getAttribute('data-tooltip');
+    if (!text) return;
+    clearTimeout(dashboardBarTooltipTimer);
+    dashboardBarTooltipTimer = setTimeout(function () {
+        dashboardBarTooltipEl.textContent = text;
+        dashboardBarTooltipEl.style.display = 'block';
+        requestAnimationFrame(function () {
+            var rect = item.getBoundingClientRect();
+            var ttRect = dashboardBarTooltipEl.getBoundingClientRect();
+            var x = rect.left + (rect.width / 2) - (ttRect.width / 2);
+            var y = rect.top - ttRect.height - 6;
+            if (y < 8) y = rect.bottom + 6;
+            var pad = 8;
+            if (x < pad) x = pad;
+            if (x + ttRect.width > window.innerWidth - pad) x = window.innerWidth - ttRect.width - pad;
+            dashboardBarTooltipEl.style.left = x + 'px';
+            dashboardBarTooltipEl.style.top = y + 'px';
+        });
+    }, 180);
+}
+
+function dashboardBarTooltipOnOut(ev) {
+    var item = ev.target && ev.target.closest && ev.target.closest('.dashboard-tools-bar-item');
+    var related = ev.relatedTarget && ev.relatedTarget.closest && ev.relatedTarget.closest('.dashboard-tools-bar-item');
+    if (item && item === related) return;
+    clearTimeout(dashboardBarTooltipTimer);
+    dashboardBarTooltipTimer = null;
+    if (dashboardBarTooltipEl) dashboardBarTooltipEl.style.display = 'none';
 }
