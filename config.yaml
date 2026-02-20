@@ -44,6 +44,16 @@ openai:
   model: deepseek-chat                   # 模型名称（必填）
   max_total_tokens: 120000              # LLM 相关上下文的最大 Token 数限制（内存压缩和攻击链构建会共用此配置）
 
+# ============================================
+# 信息收集（FOFA）配置（可选）
+# ============================================
+# 用于「信息收集」页面调用 FOFA API（后端代理，避免前端暴露 key）
+# 也可通过环境变量配置：FOFA_EMAIL / FOFA_API_KEY（优先级更高）
+fofa:
+  base_url: "https://fofa.info/api/v1/search/all" # 可选，留空则使用默认
+  email: ""   # FOFA 账号邮箱（可选，建议在系统设置中填写）
+  api_key: "" # FOFA API Key（可选，建议在系统设置中填写）
+
 # Agent 配置
 # 达到最大迭代次数时，AI 会自动总结测试结果
 agent:
