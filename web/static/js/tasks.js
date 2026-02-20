@@ -1197,7 +1197,8 @@ async function showBatchQueueDetail(queueId) {
         batchQueuesState.currentQueueId = queueId;
         
         if (title) {
-            title.textContent = queue.title ? `批量任务队列 - ${escapeHtml(queue.title)}` : '批量任务队列';
+            // textContent 本身会做转义；这里不要再 escapeHtml，否则会把 && 显示成 &amp;...（看起来像“变形/乱码”）
+            title.textContent = queue.title ? `批量任务队列 - ${String(queue.title)}` : '批量任务队列';
         }
         
         // 更新按钮显示

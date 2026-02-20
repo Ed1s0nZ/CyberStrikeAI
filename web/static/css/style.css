@@ -2142,6 +2142,10 @@ header {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    /* 允许标题在 flex 中收缩/换行，避免把右侧按钮挤压变形 */
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .modal-close {
@@ -7838,6 +7842,27 @@ header {
     color: var(--accent-color);
 }
 
+/* 批量队列详情弹窗：标题很长时避免挤压右侧按钮 */
+#batch-queue-detail-modal .modal-header {
+    align-items: flex-start;
+    gap: 12px;
+}
+
+#batch-queue-detail-modal .modal-header > div {
+    flex-shrink: 0;
+}
+
+#batch-queue-detail-modal .modal-header-actions {
+    flex-direction: row;
+    width: auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+#batch-queue-detail-modal .modal-header-actions button {
+    white-space: nowrap;
+}
+
 .batch-queue-tasks-list {
     max-height: 500px;
     overflow-y: auto;
@@ -7877,12 +7902,13 @@ header {
 }
 
 .batch-task-header .btn-small {
-    margin-left: auto;
+    margin-left: 0;
     flex-shrink: 0;
 }
 
 .batch-task-header .batch-task-edit-btn {
-    margin-left: 8px;
+    /* 仅把“编辑”(首个操作按钮)推到最右，避免多个按钮都 margin-left:auto 导致挤压/错位 */
+    margin-left: auto;
 }
 
 .batch-task-header .batch-task-delete-btn {
@@ -9332,6 +9358,13 @@ header {
         flex-direction: column;
         width: 100%;
         gap: 6px;
+    }
+
+    /* 批量队列详情弹窗：即使在窄屏也保持按钮不“变形” */
+    #batch-queue-detail-modal .modal-header-actions {
+        flex-direction: row;
+        width: auto;
+        gap: 8px;
     }
     
     .attack-chain-action-btn {
