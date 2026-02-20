@@ -318,6 +318,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	roleHandler := handler.NewRoleHandler(cfg, configPath, log.Logger)
 	roleHandler.SetSkillsManager(skillsManager) // 设置Skills管理器到RoleHandler
 	skillsHandler := handler.NewSkillsHandler(skillsManager, cfg, configPath, log.Logger)
+	fofaHandler := handler.NewFofaHandler(cfg, log.Logger)
 	if db != nil {
 		skillsHandler.SetDB(db) // 设置数据库连接以便获取调用统计
 	}
@@ -415,6 +416,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 		vulnerabilityHandler,
 		roleHandler,
 		skillsHandler,
+		fofaHandler,
 		mcpServer,
 		authManager,
 		openAPIHandler,
@@ -478,6 +480,7 @@ func setupRoutes(
 	vulnerabilityHandler *handler.VulnerabilityHandler,
 	roleHandler *handler.RoleHandler,
 	skillsHandler *handler.SkillsHandler,
+	fofaHandler *handler.FofaHandler,
 	mcpServer *mcp.Server,
 	authManager *security.AuthManager,
 	openAPIHandler *handler.OpenAPIHandler,
@@ -505,6 +508,9 @@ func setupRoutes(
 		protected.POST("/agent-loop/cancel", agentHandler.CancelAgentLoop)
 		protected.GET("/agent-loop/tasks", agentHandler.ListAgentTasks)
 		protected.GET("/agent-loop/tasks/completed", agentHandler.ListCompletedTasks)
+
+		// 信息收集 - FOFA 查询（后端代理）
+		protected.POST("/fofa/search", fofaHandler.Search)
 
 		// 批量任务管理
 		protected.POST("/batch-tasks", agentHandler.CreateBatchQueue)

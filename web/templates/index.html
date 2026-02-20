@@ -92,6 +92,15 @@
                             <span>对话</span>
                         </div>
                     </div>
+                    <div class="nav-item" data-page="info-collect">
+                        <div class="nav-item-content" data-title="信息收集" onclick="switchPage('info-collect')">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                            <span>信息收集</span>
+                        </div>
+                    </div>
                     <div class="nav-item" data-page="tasks">
                         <div class="nav-item-content" data-title="任务管理" onclick="switchPage('tasks')">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -724,6 +733,96 @@
                     </div>
                 </div>
 
+                <!-- 信息收集页面 -->
+                <div id="page-info-collect" class="page">
+                    <div class="page-header">
+                        <h2>信息收集</h2>
+                        <div class="page-header-actions">
+                            <button class="btn-secondary" onclick="resetFofaForm()">重置</button>
+                            <button class="btn-primary" onclick="submitFofaSearch()">确定</button>
+                        </div>
+                    </div>
+                    <div class="page-content">
+                        <div class="info-collect-panel">
+                            <div class="info-collect-form">
+                                <div class="form-group">
+                                    <label for="fofa-query">FOFA 查询语法</label>
+                                    <textarea id="fofa-query" class="info-collect-query-input" rows="1" placeholder='例如：app="Apache" && country="CN"'></textarea>
+                                    <small class="form-hint">查询语法参考 FOFA 文档，支持 && / || / () 等。</small>
+                                    <div class="info-collect-presets" aria-label="FOFA 查询示例">
+                                        <button class="preset-chip" type="button" onclick="applyFofaQueryPreset('app=&quot;Apache&quot; &amp;&amp; country=&quot;CN&quot;')" title="填入示例">Apache + 中国</button>
+                                        <button class="preset-chip" type="button" onclick="applyFofaQueryPreset('title=&quot;登录&quot; &amp;&amp; country=&quot;CN&quot;')" title="填入示例">登录页 + 中国</button>
+                                        <button class="preset-chip" type="button" onclick="applyFofaQueryPreset('domain=&quot;example.com&quot;')" title="填入示例">指定域名</button>
+                                        <button class="preset-chip" type="button" onclick="applyFofaQueryPreset('ip=&quot;1.1.1.1&quot;')" title="填入示例">指定 IP</button>
+                                    </div>
+                                </div>
+                                <div class="info-collect-form-row">
+                                    <div class="form-group">
+                                        <label for="fofa-size">返回数量</label>
+                                        <input type="number" id="fofa-size" min="1" max="10000" value="100" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="fofa-page">页码</label>
+                                        <input type="number" id="fofa-page" min="1" value="1" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="checkbox-label" style="margin-top: 24px;">
+                                            <input type="checkbox" id="fofa-full" class="modern-checkbox" />
+                                            <span class="checkbox-custom"></span>
+                                            <span class="checkbox-text">full</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="fofa-fields">返回字段名（逗号分隔）</label>
+                                    <input type="text" id="fofa-fields" value="host,ip,port,domain,title,protocol,country,province,city,server" />
+                                    <div class="info-collect-presets" aria-label="FOFA 字段模板">
+                                        <button class="preset-chip" type="button" onclick="applyFofaFieldsPreset('host,ip,port,domain')" title="适合快速导出目标">最小字段</button>
+                                        <button class="preset-chip" type="button" onclick="applyFofaFieldsPreset('host,title,ip,port,domain,protocol,server,icp,country,province,city')" title="适合浏览和筛选">Web 常用</button>
+                                        <button class="preset-chip" type="button" onclick="applyFofaFieldsPreset('host,ip,port,domain,title,protocol,country,province,city,server,as_number,as_organization,icp,header,banner')" title="更偏指纹/情报">情报增强</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="info-collect-results">
+                            <div class="info-collect-results-header">
+                                <div class="info-collect-results-header-left">
+                                    <div class="info-collect-results-title">查询结果</div>
+                                    <div class="info-collect-results-meta" id="fofa-results-meta">-</div>
+                                </div>
+                                <div class="info-collect-results-toolbar" aria-label="结果工具条">
+                                    <div class="info-collect-selected" id="fofa-selected-meta">已选择 0 条</div>
+                                    <button class="btn-secondary btn-small" type="button" onclick="toggleFofaColumnsPanel()" title="显示/隐藏字段">列</button>
+                                    <button class="btn-secondary btn-small" type="button" onclick="exportFofaResults('csv')" title="导出当前结果为 CSV">导出 CSV</button>
+                                    <button class="btn-secondary btn-small" type="button" onclick="exportFofaResults('json')" title="导出当前结果为 JSON">导出 JSON</button>
+                                    <button class="btn-primary btn-small" type="button" onclick="batchScanSelectedFofaRows()" title="将所选行创建为批量任务队列">批量扫描</button>
+                                </div>
+                            </div>
+                            <div class="info-collect-results-table-wrap">
+                                <!-- 字段显示/隐藏面板 -->
+                                <div id="fofa-columns-panel" class="info-collect-columns-panel" style="display: none;">
+                                    <div class="info-collect-columns-panel-header">
+                                        <div class="info-collect-columns-title">显示字段</div>
+                                        <div class="info-collect-columns-actions">
+                                            <button class="btn-secondary btn-small" type="button" onclick="showAllFofaColumns()">全选</button>
+                                            <button class="btn-secondary btn-small" type="button" onclick="hideAllFofaColumns()">全不选</button>
+                                            <button class="btn-secondary btn-small" type="button" onclick="closeFofaColumnsPanel()">关闭</button>
+                                        </div>
+                                    </div>
+                                    <div id="fofa-columns-list" class="info-collect-columns-list"></div>
+                                </div>
+                                <table class="info-collect-table">
+                                    <thead id="fofa-results-thead"></thead>
+                                    <tbody id="fofa-results-tbody">
+                                        <tr><td class="muted" style="padding: 16px;">暂无数据</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 漏洞管理页面 -->
                 <div id="page-vulnerabilities" class="page">
                     <div class="page-header">
@@ -982,6 +1081,27 @@
                                         <div class="form-group">
                                             <label for="openai-model">模型 <span style="color: red;">*</span></label>
                                             <input type="text" id="openai-model" placeholder="gpt-4" required />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- FOFA配置 -->
+                                <div class="settings-subsection">
+                                    <h4>FOFA 配置</h4>
+                                    <div class="settings-form">
+                                        <div class="form-group">
+                                            <label for="fofa-base-url">Base URL</label>
+                                            <input type="text" id="fofa-base-url" placeholder="https://fofa.info/api/v1/search/all（可选）" />
+                                            <small class="form-hint">留空则使用默认地址。</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="fofa-email">Email</label>
+                                            <input type="text" id="fofa-email" placeholder="输入 FOFA 账号邮箱" autocomplete="off" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="fofa-api-key">API Key</label>
+                                            <input type="password" id="fofa-api-key" placeholder="输入 FOFA API Key" autocomplete="off" />
+                                            <small class="form-hint">仅保存在服务器配置中（`config.yaml`）。</small>
                                         </div>
                                     </div>
                                 </div>
@@ -1880,6 +2000,7 @@ version: 1.0.0<br>
 
     <script src="/static/js/builtin-tools.js"></script>
     <script src="/static/js/auth.js"></script>
+    <script src="/static/js/info-collect.js"></script>
     <script src="/static/js/router.js"></script>
     <script src="/static/js/dashboard.js"></script>
     <script src="/static/js/monitor.js"></script>

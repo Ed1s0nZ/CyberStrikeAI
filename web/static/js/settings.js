@@ -102,6 +102,15 @@ async function loadConfig(loadTools = true) {
         document.getElementById('openai-api-key').value = currentConfig.openai.api_key || '';
         document.getElementById('openai-base-url').value = currentConfig.openai.base_url || '';
         document.getElementById('openai-model').value = currentConfig.openai.model || '';
+
+        // 填充FOFA配置
+        const fofa = currentConfig.fofa || {};
+        const fofaEmailEl = document.getElementById('fofa-email');
+        const fofaKeyEl = document.getElementById('fofa-api-key');
+        const fofaBaseUrlEl = document.getElementById('fofa-base-url');
+        if (fofaEmailEl) fofaEmailEl.value = fofa.email || '';
+        if (fofaKeyEl) fofaKeyEl.value = fofa.api_key || '';
+        if (fofaBaseUrlEl) fofaBaseUrlEl.value = fofa.base_url || '';
         
         // 填充Agent配置
         document.getElementById('agent-max-iterations').value = currentConfig.agent.max_iterations || 30;
@@ -692,6 +701,11 @@ async function applySettings() {
                 api_key: apiKey,
                 base_url: baseUrl,
                 model: model
+            },
+            fofa: {
+                email: document.getElementById('fofa-email')?.value.trim() || '',
+                api_key: document.getElementById('fofa-api-key')?.value.trim() || '',
+                base_url: document.getElementById('fofa-base-url')?.value.trim() || ''
             },
             agent: {
                 max_iterations: parseInt(document.getElementById('agent-max-iterations').value) || 30

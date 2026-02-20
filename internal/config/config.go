@@ -18,6 +18,7 @@ type Config struct {
 	Log         LogConfig             `yaml:"log"`
 	MCP         MCPConfig             `yaml:"mcp"`
 	OpenAI      OpenAIConfig          `yaml:"openai"`
+	FOFA        FofaConfig            `yaml:"fofa,omitempty" json:"fofa,omitempty"`
 	Agent       AgentConfig           `yaml:"agent"`
 	Security    SecurityConfig        `yaml:"security"`
 	Database    DatabaseConfig        `yaml:"database"`
@@ -50,6 +51,13 @@ type OpenAIConfig struct {
 	BaseURL        string `yaml:"base_url" json:"base_url"`
 	Model          string `yaml:"model" json:"model"`
 	MaxTotalTokens int    `yaml:"max_total_tokens,omitempty" json:"max_total_tokens,omitempty"`
+}
+
+type FofaConfig struct {
+	// Email 为 FOFA 账号邮箱；APIKey 为 FOFA API Key（建议使用只读权限的 Key）
+	Email   string `yaml:"email,omitempty" json:"email,omitempty"`
+	APIKey  string `yaml:"api_key,omitempty" json:"api_key,omitempty"`
+	BaseURL string `yaml:"base_url,omitempty" json:"base_url,omitempty"` // 默认 https://fofa.info/api/v1/search/all
 }
 
 type SecurityConfig struct {

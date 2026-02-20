@@ -145,6 +145,7 @@ func (h *ConfigHandler) SetAppUpdater(updater AppUpdater) {
 // GetConfigResponse 获取配置响应
 type GetConfigResponse struct {
 	OpenAI    config.OpenAIConfig    `json:"openai"`
+	FOFA      config.FofaConfig      `json:"fofa"`
 	MCP       config.MCPConfig       `json:"mcp"`
 	Tools     []ToolConfigInfo       `json:"tools"`
 	Agent     config.AgentConfig     `json:"agent"`
@@ -216,6 +217,7 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 
 	c.JSON(http.StatusOK, GetConfigResponse{
 		OpenAI:    h.config.OpenAI,
+		FOFA:      h.config.FOFA,
 		MCP:       h.config.MCP,
 		Tools:     tools,
 		Agent:     h.config.Agent,
@@ -472,6 +474,7 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 // UpdateConfigRequest 更新配置请求
 type UpdateConfigRequest struct {
 	OpenAI    *config.OpenAIConfig    `json:"openai,omitempty"`
+	FOFA      *config.FofaConfig      `json:"fofa,omitempty"`
 	MCP       *config.MCPConfig       `json:"mcp,omitempty"`
 	Tools     []ToolEnableStatus      `json:"tools,omitempty"`
 	Agent     *config.AgentConfig     `json:"agent,omitempty"`
@@ -504,6 +507,12 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 			zap.String("base_url", h.config.OpenAI.BaseURL),
 			zap.String("model", h.config.OpenAI.Model),
 		)
+	}
+
+	// 更新FOFA配置
+	if req.FOFA != nil {
+		h.config.FOFA = *req.FOFA
+		h.logger.Info("更新FOFA配置", zap.String("email", h.config.FOFA.Email))
 	}
 
 	// 更新MCP配置
