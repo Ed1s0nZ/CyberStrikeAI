@@ -83,6 +83,7 @@ CyberStrikeAI is an **AI-native security testing platform** built in Go. It inte
 - 📋 Batch task management: create task queues, add multiple tasks, and execute them sequentially
 - 🎭 Role-based testing: predefined security testing roles (Penetration Testing, CTF, Web App Scanning, etc.) with custom prompts and tool restrictions
 - 🎯 Skills system: 20+ predefined security testing skills (SQL injection, XSS, API security, etc.) that can be attached to roles or called on-demand by AI agents
+- 📱 **Chatbot**: DingTalk and Lark (Feishu) long-lived connections so you can talk to CyberStrikeAI from mobile (see [Robot / Chatbot guide](docs/robot_en.md) for setup and commands)
 
 ## Tool Overview
 
@@ -460,6 +461,10 @@ tools:
 enabled: true
 ```
 
+## Related documentation
+
+- [Robot / Chatbot guide (DingTalk & Lark)](docs/robot_en.md): Full setup, commands, and troubleshooting for using CyberStrikeAI from DingTalk or Lark on your phone. **Follow this doc to avoid common pitfalls.**
+
 ## Project Layout
 
 ```
@@ -470,6 +475,7 @@ CyberStrikeAI/
 ├── tools/               # YAML tool recipes (100+ examples provided)
 ├── roles/               # Role configurations (12+ predefined security testing roles)
 ├── skills/              # Skills directory (20+ predefined security testing skills)
+├── docs/                # Documentation (e.g. robot/chbot guide)
 ├── images/              # Docs screenshots & diagrams
 ├── config.yaml          # Runtime configuration
 ├── run.sh               # Convenience launcher
