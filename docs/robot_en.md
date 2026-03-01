@@ -188,6 +188,9 @@ API: `POST /api/robot/test` (requires login). Body: `{"platform":"optional","use
 
 Check in this order:
 
+0. **After laptop sleep or network drop**  
+   DingTalk and Lark both use long-lived connections; they break when the machine sleeps or the network drops. The app **auto-reconnects** (retries within about 5–60 seconds). After wake or network recovery, wait a moment before sending; if there is still no response, restart the CyberStrikeAI process.
+
 1. **Client ID / Client Secret match the open platform exactly**  
    Copy from “Credentials and basic info”; avoid typing. Watch **0** vs **o** and **1** vs **l** (e.g. `ding9gf9tiozuc504aer` has **504**, not 5o4).
 

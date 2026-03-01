@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"cyberstrike-ai/internal/config"
 
@@ -15,30 +16,54 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	dingReconnectInitial = 5 * time.Second  // 首次重连间隔
+	dingReconnectMax     = 60 * time.Second // 最大重连间隔
+)
+
 // StartDing 启动钉钉 Stream 长连接（无需公网），收到消息后调用 handler 并通过 SessionWebhook 回复。
-// ctx 被取消时长连接会退出，便于配置变更时重启。
+// 断线（如笔记本睡眠、网络中断）后会自动重连；ctx 被取消时退出，便于配置变更时重启。
 func StartDing(ctx context.Context, cfg config.RobotDingtalkConfig, h MessageHandler, logger *zap.Logger) {
 	if !cfg.Enabled || cfg.ClientID == "" || cfg.ClientSecret == "" {
 		return
 	}
-	streamClient := client.NewStreamClient(
-		client.WithAppCredential(client.NewAppCredentialConfig(cfg.ClientID, cfg.ClientSecret)),
-		client.WithSubscription(dingutils.SubscriptionTypeKCallback, "/v1.0/im/bot/messages/get",
-			chatbot.NewDefaultChatBotFrameHandler(func(ctx context.Context, msg *chatbot.BotCallbackDataModel) ([]byte, error) {
-				go handleDingMessage(ctx, msg, h, logger)
-				return nil, nil
-			}).OnEventReceived),
-	)
-	logger.Info("钉钉 Stream 正在连接…", zap.String("client_id", cfg.ClientID))
-	go func() {
+	go runDingLoop(ctx, cfg, h, logger)
+}
+
+// runDingLoop 循环维持钉钉长连接：断开且 ctx 未取消时按退避间隔重连。
+func runDingLoop(ctx context.Context, cfg config.RobotDingtalkConfig, h MessageHandler, logger *zap.Logger) {
+	backoff := dingReconnectInitial
+	for {
+		streamClient := client.NewStreamClient(
+			client.WithAppCredential(client.NewAppCredentialConfig(cfg.ClientID, cfg.ClientSecret)),
+			client.WithSubscription(dingutils.SubscriptionTypeKCallback, "/v1.0/im/bot/messages/get",
+				chatbot.NewDefaultChatBotFrameHandler(func(ctx context.Context, msg *chatbot.BotCallbackDataModel) ([]byte, error) {
+					go handleDingMessage(ctx, msg, h, logger)
+					return nil, nil
+				}).OnEventReceived),
+		)
+		logger.Info("钉钉 Stream 正在连接…", zap.String("client_id", cfg.ClientID))
 		err := streamClient.Start(ctx)
-		if err != nil && ctx.Err() == nil {
-			logger.Error("钉钉 Stream 长连接退出", zap.Error(err))
-		} else if ctx.Err() != nil {
+		if ctx.Err() != nil {
 			logger.Info("钉钉 Stream 已按配置重启关闭")
+			return
 		}
-	}()
-	logger.Info("钉钉 Stream 已启动（无需公网），等待收消息", zap.String("client_id", cfg.ClientID))
+		if err != nil {
+			logger.Warn("钉钉 Stream 长连接断开（如睡眠/断网），将自动重连", zap.Error(err), zap.Duration("retry_after", backoff))
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(backoff):
+			// 下次重连间隔递增，上限 60 秒，避免频繁重试
+			if backoff < dingReconnectMax {
+				backoff *= 2
+				if backoff > dingReconnectMax {
+					backoff = dingReconnectMax
+				}
+			}
+		}
+	}
 }
 
 func handleDingMessage(ctx context.Context, msg *chatbot.BotCallbackDataModel, h MessageHandler, logger *zap.Logger) {
