@@ -133,8 +133,9 @@ const (
 	chatUploadsDirName    = "chat_uploads"  // 对话附件保存的根目录（相对当前工作目录）
 )
 
-// saveAttachmentsToDateDir 将附件保存到当前目录下的 chat_uploads/YYYY-MM-DD/，返回每个文件的保存路径（与 attachments 顺序一致）
-func saveAttachmentsToDateDir(attachments []ChatAttachment, logger *zap.Logger) (savedPaths []string, err error) {
+// saveAttachmentsToDateAndConversationDir 将附件保存到 chat_uploads/YYYY-MM-DD/{conversationID}/，返回每个文件的保存路径（与 attachments 顺序一致）
+// conversationID 为空时使用 "_new" 作为目录名（新对话尚未有 ID）
+func saveAttachmentsToDateAndConversationDir(attachments []ChatAttachment, conversationID string, logger *zap.Logger) (savedPaths []string, err error) {
 	if len(attachments) == 0 {
 		return nil, nil
 	}
@@ -143,7 +144,14 @@ func saveAttachmentsToDateDir(attachments []ChatAttachment, logger *zap.Logger) 
 		return nil, fmt.Errorf("获取当前工作目录失败: %w", err)
 	}
 	dateDir := filepath.Join(cwd, chatUploadsDirName, time.Now().Format("2006-01-02"))
-	if err = os.MkdirAll(dateDir, 0755); err != nil {
+	convDirName := strings.TrimSpace(conversationID)
+	if convDirName == "" {
+		convDirName = "_new"
+	} else {
+		convDirName = strings.ReplaceAll(convDirName, string(filepath.Separator), "_")
+	}
+	targetDir := filepath.Join(dateDir, convDirName)
+	if err = os.MkdirAll(targetDir, 0755); err != nil {
 		return nil, fmt.Errorf("创建上传目录失败: %w", err)
 	}
 	savedPaths = make([]string, 0, len(attachments))
@@ -166,7 +174,7 @@ func saveAttachmentsToDateDir(attachments []ChatAttachment, logger *zap.Logger) 
 		} else {
 			unique = baseName + suffix
 		}
-		fullPath := filepath.Join(dateDir, unique)
+		fullPath := filepath.Join(targetDir, unique)
 		if err = os.WriteFile(fullPath, raw, 0644); err != nil {
 			return nil, fmt.Errorf("写入文件 %s 失败: %w", a.FileName, err)
 		}
@@ -195,6 +203,24 @@ func attachmentContentToBytes(a ChatAttachment) ([]byte, error) {
 		return decoded, nil
 	}
 	return []byte(content), nil
+}
+
+// userMessageContentForStorage 返回要存入数据库的用户消息内容：有附件时在正文后追加附件名（及路径），刷新后仍能显示，继续对话时大模型也能从历史中拿到路径
+func userMessageContentForStorage(message string, attachments []ChatAttachment, savedPaths []string) string {
+	if len(attachments) == 0 {
+		return message
+	}
+	var b strings.Builder
+	b.WriteString(message)
+	for i, a := range attachments {
+		b.WriteString("\n📎 ")
+		b.WriteString(a.FileName)
+		if i < len(savedPaths) && savedPaths[i] != "" {
+			b.WriteString(": ")
+			b.WriteString(savedPaths[i])
+		}
+	}
+	return b.String()
 }
 
 // appendAttachmentsToMessage 将附件内容拼接到用户消息末尾；若 savedPaths 与 attachments 一一对应，会先写入“已保存到”路径供大模型按路径读取
@@ -340,7 +366,7 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 	}
 	var savedPaths []string
 	if len(req.Attachments) > 0 {
-		savedPaths, err = saveAttachmentsToDateDir(req.Attachments, h.logger)
+		savedPaths, err = saveAttachmentsToDateAndConversationDir(req.Attachments, conversationID, h.logger)
 		if err != nil {
 			h.logger.Error("保存对话附件失败", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "保存上传文件失败: " + err.Error()})
@@ -349,8 +375,9 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 	}
 	finalMessage = appendAttachmentsToMessage(finalMessage, req.Attachments, savedPaths, h.logger)
 
-	// 保存用户消息（保存原始消息，不包含角色提示词）
-	_, err = h.db.AddMessage(conversationID, "user", req.Message, nil)
+	// 保存用户消息：有附件时一并保存附件名与路径，刷新后显示、继续对话时大模型也能从历史中拿到路径
+	userContent := userMessageContentForStorage(req.Message, req.Attachments, savedPaths)
+	_, err = h.db.AddMessage(conversationID, "user", userContent, nil)
 	if err != nil {
 		h.logger.Error("保存用户消息失败", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存用户消息失败: " + err.Error()})
@@ -795,7 +822,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	}
 	var savedPaths []string
 	if len(req.Attachments) > 0 {
-		savedPaths, err = saveAttachmentsToDateDir(req.Attachments, h.logger)
+		savedPaths, err = saveAttachmentsToDateAndConversationDir(req.Attachments, conversationID, h.logger)
 		if err != nil {
 			h.logger.Error("保存对话附件失败", zap.Error(err))
 			sendEvent("error", "保存上传文件失败: "+err.Error(), nil)
@@ -806,8 +833,9 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	finalMessage = appendAttachmentsToMessage(finalMessage, req.Attachments, savedPaths, h.logger)
 	// 如果roleTools为空，表示使用所有工具（默认角色或未配置工具的角色）
 
-	// 保存用户消息（保存原始消息，不包含角色提示词）
-	_, err = h.db.AddMessage(conversationID, "user", req.Message, nil)
+	// 保存用户消息：有附件时一并保存附件名与路径，刷新后显示、继续对话时大模型也能从历史中拿到路径
+	userContent := userMessageContentForStorage(req.Message, req.Attachments, savedPaths)
+	_, err = h.db.AddMessage(conversationID, "user", userContent, nil)
 	if err != nil {
 		h.logger.Error("保存用户消息失败", zap.Error(err))
 	}
