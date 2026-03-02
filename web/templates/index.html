@@ -499,7 +499,7 @@
                             </div>
                             <div id="active-tasks-bar" class="active-tasks-bar"></div>
                             <div id="chat-messages" class="chat-messages"></div>
-                            <div class="chat-input-container">
+                            <div id="chat-input-container" class="chat-input-container">
                                 <div class="role-selector-wrapper">
                                     <button id="role-selector-btn" class="role-selector-btn" onclick="toggleRoleSelectionPanel()" title="选择角色">
                                         <span id="role-selector-icon" class="role-selector-icon">🔵</span>
@@ -521,10 +521,19 @@
                                         <div id="role-selection-list" class="role-selection-list-main"></div>
                                     </div>
                                 </div>
-                                <div class="chat-input-field">
-                                    <textarea id="chat-input" placeholder="输入测试目标或命令... (输入 @ 选择工具 | Shift+Enter 换行，Enter 发送)" rows="1"></textarea>
-                                    <div id="mention-suggestions" class="mention-suggestions" role="listbox" aria-label="工具提及候选"></div>
+                                <div class="chat-input-with-files">
+                                    <div id="chat-file-list" class="chat-file-list" aria-label="已选文件列表"></div>
+                                    <div class="chat-input-field">
+                                        <textarea id="chat-input" placeholder="输入测试目标或命令... (输入 @ 选择工具 | Shift+Enter 换行，Enter 发送)" rows="1"></textarea>
+                                        <div id="mention-suggestions" class="mention-suggestions" role="listbox" aria-label="工具提及候选"></div>
+                                    </div>
                                 </div>
+                                <input type="file" id="chat-file-input" class="chat-file-input-hidden" multiple accept="*" title="选择文件">
+                                <button type="button" class="chat-upload-btn" onclick="document.getElementById('chat-file-input').click()" title="上传文件（可多选或拖拽到此处）">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </button>
                                 <button class="send-btn" onclick="sendMessage()">
                                     <span>发送</span>
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

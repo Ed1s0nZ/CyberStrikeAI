@@ -2,10 +2,14 @@ package handler
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -108,11 +112,133 @@ func (h *AgentHandler) SetSkillsManager(manager *skills.Manager) {
 	h.skillsManager = manager
 }
 
+// ChatAttachment 聊天附件（用户上传的文件）
+type ChatAttachment struct {
+	FileName string `json:"fileName"` // 文件名
+	Content  string `json:"content"`  // 文本内容或 base64（由 MimeType 决定是否解码）
+	MimeType string `json:"mimeType,omitempty"`
+}
+
 // ChatRequest 聊天请求
 type ChatRequest struct {
-	Message        string `json:"message" binding:"required"`
-	ConversationID string `json:"conversationId,omitempty"`
-	Role           string `json:"role,omitempty"` // 角色名称
+	Message        string            `json:"message" binding:"required"`
+	ConversationID string            `json:"conversationId,omitempty"`
+	Role           string            `json:"role,omitempty"` // 角色名称
+	Attachments    []ChatAttachment  `json:"attachments,omitempty"`
+}
+
+const (
+	maxAttachments        = 10
+	maxAttachmentBytes    = 2 * 1024 * 1024 // 单文件约 2MB（仅用于是否内联展示内容，不限制上传）
+	chatUploadsDirName    = "chat_uploads"  // 对话附件保存的根目录（相对当前工作目录）
+)
+
+// saveAttachmentsToDateDir 将附件保存到当前目录下的 chat_uploads/YYYY-MM-DD/，返回每个文件的保存路径（与 attachments 顺序一致）
+func saveAttachmentsToDateDir(attachments []ChatAttachment, logger *zap.Logger) (savedPaths []string, err error) {
+	if len(attachments) == 0 {
+		return nil, nil
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("获取当前工作目录失败: %w", err)
+	}
+	dateDir := filepath.Join(cwd, chatUploadsDirName, time.Now().Format("2006-01-02"))
+	if err = os.MkdirAll(dateDir, 0755); err != nil {
+		return nil, fmt.Errorf("创建上传目录失败: %w", err)
+	}
+	savedPaths = make([]string, 0, len(attachments))
+	for i, a := range attachments {
+		raw, decErr := attachmentContentToBytes(a)
+		if decErr != nil {
+			return nil, fmt.Errorf("附件 %s 解码失败: %w", a.FileName, decErr)
+		}
+		baseName := filepath.Base(a.FileName)
+		if baseName == "" || baseName == "." {
+			baseName = "file"
+		}
+		baseName = strings.ReplaceAll(baseName, string(filepath.Separator), "_")
+		ext := filepath.Ext(baseName)
+		nameNoExt := strings.TrimSuffix(baseName, ext)
+		suffix := fmt.Sprintf("_%s_%s", time.Now().Format("150405"), shortRand(6))
+		var unique string
+		if ext != "" {
+			unique = nameNoExt + suffix + ext
+		} else {
+			unique = baseName + suffix
+		}
+		fullPath := filepath.Join(dateDir, unique)
+		if err = os.WriteFile(fullPath, raw, 0644); err != nil {
+			return nil, fmt.Errorf("写入文件 %s 失败: %w", a.FileName, err)
+		}
+		absPath, _ := filepath.Abs(fullPath)
+		savedPaths = append(savedPaths, absPath)
+		if logger != nil {
+			logger.Debug("对话附件已保存", zap.Int("index", i+1), zap.String("fileName", a.FileName), zap.String("path", absPath))
+		}
+	}
+	return savedPaths, nil
+}
+
+func shortRand(n int) string {
+	const letters = "0123456789abcdef"
+	b := make([]byte, n)
+	_, _ = rand.Read(b)
+	for i := range b {
+		b[i] = letters[int(b[i])%len(letters)]
+	}
+	return string(b)
+}
+
+func attachmentContentToBytes(a ChatAttachment) ([]byte, error) {
+	content := a.Content
+	if decoded, err := base64.StdEncoding.DecodeString(content); err == nil && len(decoded) > 0 {
+		return decoded, nil
+	}
+	return []byte(content), nil
+}
+
+// appendAttachmentsToMessage 将附件内容拼接到用户消息末尾；若 savedPaths 与 attachments 一一对应，会先写入“已保存到”路径供大模型按路径读取
+func appendAttachmentsToMessage(msg string, attachments []ChatAttachment, savedPaths []string, logger *zap.Logger) string {
+	if len(attachments) == 0 {
+		return msg
+	}
+	var b strings.Builder
+	b.WriteString(msg)
+	if len(savedPaths) == len(attachments) {
+		b.WriteString("\n\n[用户上传的文件已保存到以下路径（可使用 cat/exec 等工具按路径读取）]\n")
+		for i, a := range attachments {
+			b.WriteString(fmt.Sprintf("- %s: %s\n", a.FileName, savedPaths[i]))
+		}
+		b.WriteString("\n[以下为附件内容（便于直接参考）]\n")
+	}
+	for i, a := range attachments {
+		b.WriteString(fmt.Sprintf("\n--- 附件 %d: %s ---\n", i+1, a.FileName))
+		content := a.Content
+		mime := strings.ToLower(strings.TrimSpace(a.MimeType))
+		isText := strings.HasPrefix(mime, "text/") || mime == "" ||
+			strings.Contains(mime, "json") || strings.Contains(mime, "xml") ||
+			strings.Contains(mime, "javascript") || strings.Contains(mime, "shell")
+		if isText && len(content) > 0 {
+			if decoded, err := base64.StdEncoding.DecodeString(content); err == nil && len(decoded) > 0 {
+				content = string(decoded)
+			}
+			b.WriteString("```\n")
+			b.WriteString(content)
+			b.WriteString("\n```\n")
+		} else {
+			if decoded, err := base64.StdEncoding.DecodeString(content); err == nil {
+				content = string(decoded)
+			}
+			if utf8.ValidString(content) && len(content) < maxAttachmentBytes {
+				b.WriteString("```\n")
+				b.WriteString(content)
+				b.WriteString("\n```\n")
+			} else {
+				b.WriteString(fmt.Sprintf("(二进制文件，约 %d 字节，已保存到上述路径，可按路径读取)\n", len(content)))
+			}
+		}
+	}
+	return b.String()
 }
 
 // ChatResponse 聊天响应
@@ -181,6 +307,12 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 		h.logger.Info("从ReAct数据恢复历史上下文", zap.Int("count", len(agentHistoryMessages)))
 	}
 
+	// 校验附件数量（非流式）
+	if len(req.Attachments) > maxAttachments {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("附件最多 %d 个", maxAttachments)})
+		return
+	}
+
 	// 应用角色用户提示词和工具配置
 	finalMessage := req.Message
 	var roleTools []string // 角色配置的工具列表
@@ -206,6 +338,16 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 			}
 		}
 	}
+	var savedPaths []string
+	if len(req.Attachments) > 0 {
+		savedPaths, err = saveAttachmentsToDateDir(req.Attachments, h.logger)
+		if err != nil {
+			h.logger.Error("保存对话附件失败", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "保存上传文件失败: " + err.Error()})
+			return
+		}
+	}
+	finalMessage = appendAttachmentsToMessage(finalMessage, req.Attachments, savedPaths, h.logger)
 
 	// 保存用户消息（保存原始消息，不包含角色提示词）
 	_, err = h.db.AddMessage(conversationID, "user", req.Message, nil)
@@ -618,6 +760,12 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 		h.logger.Info("从ReAct数据恢复历史上下文", zap.Int("count", len(agentHistoryMessages)))
 	}
 
+	// 校验附件数量
+	if len(req.Attachments) > maxAttachments {
+		sendEvent("error", fmt.Sprintf("附件最多 %d 个", maxAttachments), nil)
+		return
+	}
+
 	// 应用角色用户提示词和工具配置
 	finalMessage := req.Message
 	var roleTools []string // 角色配置的工具列表
@@ -645,6 +793,17 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 			}
 		}
 	}
+	var savedPaths []string
+	if len(req.Attachments) > 0 {
+		savedPaths, err = saveAttachmentsToDateDir(req.Attachments, h.logger)
+		if err != nil {
+			h.logger.Error("保存对话附件失败", zap.Error(err))
+			sendEvent("error", "保存上传文件失败: "+err.Error(), nil)
+			return
+		}
+	}
+	// 将附件内容拼接到 finalMessage，便于大模型识别上传了哪些文件及内容
+	finalMessage = appendAttachmentsToMessage(finalMessage, req.Attachments, savedPaths, h.logger)
 	// 如果roleTools为空，表示使用所有工具（默认角色或未配置工具的角色）
 
 	// 保存用户消息（保存原始消息，不包含角色提示词）

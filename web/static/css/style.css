@@ -1582,10 +1582,104 @@ header {
     box-sizing: border-box;
 }
 
+.chat-input-container > .chat-input-with-files {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 6px;
+}
+
 .chat-input-container > .chat-input-field {
     flex: 1;
     display: flex;
     min-width: 0;
+}
+
+.chat-file-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    min-height: 0;
+}
+
+.chat-file-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: rgba(0, 102, 255, 0.08);
+    border: 1px solid rgba(0, 102, 255, 0.2);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--text-primary);
+    max-width: 200px;
+}
+
+.chat-file-chip-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-file-chip-remove {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: none;
+    background: rgba(0, 0, 0, 0.08);
+    border-radius: 50%;
+    cursor: pointer;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, color 0.2s;
+}
+
+.chat-file-chip-remove:hover {
+    background: rgba(0, 0, 0, 0.12);
+    color: var(--text-primary);
+}
+
+.chat-file-input-hidden {
+    position: absolute;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.chat-upload-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    background: #ffffff;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s, background 0.2s;
+    flex-shrink: 0;
+}
+
+.chat-upload-btn:hover {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+    background: rgba(0, 102, 255, 0.04);
+}
+
+.chat-input-container.drag-over {
+    background: rgba(0, 102, 255, 0.06);
+    border-radius: 12px;
+    outline: 2px dashed rgba(0, 102, 255, 0.35);
+    outline-offset: -2px;
 }
 
 .chat-input-field {

@@ -22,6 +22,12 @@ const DRAFT_STORAGE_KEY = 'cyberstrike-chat-draft';
 let draftSaveTimer = null;
 const DRAFT_SAVE_DELAY = 500; // 500ms防抖延迟
 
+// 对话文件上传相关（后端会拼接路径与内容发给大模型，前端不再重复发文件列表）
+const MAX_CHAT_FILES = 10;
+const CHAT_FILE_DEFAULT_PROMPT = '请根据上传的文件内容进行分析。';
+/** @type {{ fileName: string, content: string, mimeType: string }[]} */
+let chatAttachments = [];
+
 // 保存输入框草稿到localStorage（防抖版本）
 function saveChatDraftDebounced(content) {
     // 清除之前的定时器
@@ -107,14 +113,22 @@ function adjustTextareaHeight(textarea) {
 // 发送消息
 async function sendMessage() {
     const input = document.getElementById('chat-input');
-    const message = input.value.trim();
-    
-    if (!message) {
+    let message = input.value.trim();
+    const hasAttachments = chatAttachments && chatAttachments.length > 0;
+
+    if (!message && !hasAttachments) {
         return;
     }
-    
-    // 显示用户消息
-    addMessage('user', message);
+    // 有附件且用户未输入时，发一句简短默认提示即可（后端会拼接路径和文件内容给大模型）
+    if (hasAttachments && !message) {
+        message = CHAT_FILE_DEFAULT_PROMPT;
+    }
+
+    // 显示用户消息（含附件名，便于用户确认）
+    const displayMessage = hasAttachments
+        ? message + '\n' + chatAttachments.map(a => '📎 ' + a.fileName).join('\n')
+        : message;
+    addMessage('user', displayMessage);
     
     // 清除防抖定时器，防止在清空输入框后重新保存草稿
     if (draftSaveTimer) {
@@ -135,7 +149,24 @@ async function sendMessage() {
     input.value = '';
     // 强制重置输入框高度为初始高度（40px）
     input.style.height = '40px';
-    
+
+    // 构建请求体（含附件）
+    const body = {
+        message: message,
+        conversationId: currentConversationId,
+        role: typeof getCurrentRole === 'function' ? getCurrentRole() : ''
+    };
+    if (hasAttachments) {
+        body.attachments = chatAttachments.map(a => ({
+            fileName: a.fileName,
+            content: a.content,
+            mimeType: a.mimeType || ''
+        }));
+    }
+    // 发送后清空附件列表
+    chatAttachments = [];
+    renderChatFileChips();
+
     // 创建进度消息容器（使用详细的进度展示）
     const progressId = addProgressMessage();
     const progressElement = document.getElementById(progressId);
@@ -145,19 +176,12 @@ async function sendMessage() {
     let mcpExecutionIds = [];
     
     try {
-        // 获取当前选中的角色（从 roles.js 的函数获取）
-        const roleName = typeof getCurrentRole === 'function' ? getCurrentRole() : '';
-
         const response = await apiFetch('/api/agent-loop/stream', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ 
-                message: message,
-                conversationId: currentConversationId,
-                role: roleName || undefined
-            }),
+            body: JSON.stringify(body),
         });
         
         if (!response.ok) {
@@ -220,6 +244,130 @@ async function sendMessage() {
         addMessage('system', '错误: ' + error.message);
         // 发送失败时，不恢复草稿，因为消息已经显示在对话框中了
     }
+}
+
+// ---------- 对话文件上传 ----------
+function renderChatFileChips() {
+    const list = document.getElementById('chat-file-list');
+    if (!list) return;
+    list.innerHTML = '';
+    if (!chatAttachments.length) return;
+    chatAttachments.forEach((a, i) => {
+        const chip = document.createElement('div');
+        chip.className = 'chat-file-chip';
+        chip.setAttribute('role', 'listitem');
+        const name = document.createElement('span');
+        name.className = 'chat-file-chip-name';
+        name.title = a.fileName;
+        name.textContent = a.fileName;
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'chat-file-chip-remove';
+        remove.title = '移除';
+        remove.innerHTML = '×';
+        remove.setAttribute('aria-label', '移除 ' + a.fileName);
+        remove.addEventListener('click', () => removeChatAttachment(i));
+        chip.appendChild(name);
+        chip.appendChild(remove);
+        list.appendChild(chip);
+    });
+}
+
+function removeChatAttachment(index) {
+    chatAttachments.splice(index, 1);
+    renderChatFileChips();
+}
+
+// 有附件且输入框为空时，填入一句默认提示（可编辑）；后端会单独拼接路径与内容给大模型
+function appendChatFilePrompt() {
+    const input = document.getElementById('chat-input');
+    if (!input || !chatAttachments.length) return;
+    if (!input.value.trim()) {
+        input.value = CHAT_FILE_DEFAULT_PROMPT;
+        adjustTextareaHeight(input);
+    }
+}
+
+function readFileAsAttachment(file) {
+    return new Promise((resolve, reject) => {
+        const mimeType = file.type || '';
+        const isTextLike = /^text\//i.test(mimeType) || /^(application\/(json|xml|javascript)|image\/svg\+xml)/i.test(mimeType);
+        const reader = new FileReader();
+        reader.onload = () => {
+            let content = reader.result;
+            if (typeof content === 'string' && content.startsWith('data:')) {
+                content = content.replace(/^data:[^;]+;base64,/, '');
+            }
+            resolve({ fileName: file.name, content: content, mimeType: mimeType });
+        };
+        reader.onerror = () => reject(reader.error);
+        if (isTextLike) {
+            reader.readAsText(file, 'UTF-8');
+        } else {
+            reader.readAsDataURL(file);
+        }
+    });
+}
+
+function addFilesToChat(files) {
+    if (!files || !files.length) return;
+    const next = Array.from(files);
+    if (chatAttachments.length + next.length > MAX_CHAT_FILES) {
+        alert('最多同时上传 ' + MAX_CHAT_FILES + ' 个文件，当前已选 ' + chatAttachments.length + ' 个。');
+        return;
+    }
+    const addOne = (file) => {
+        return readFileAsAttachment(file).then((a) => {
+            chatAttachments.push(a);
+            renderChatFileChips();
+            appendChatFilePrompt();
+        }).catch(() => {
+            alert('读取文件失败：' + file.name);
+        });
+    };
+    let p = Promise.resolve();
+    next.forEach((file) => { p = p.then(() => addOne(file)); });
+    p.then(() => {});
+}
+
+function setupChatFileUpload() {
+    const inputEl = document.getElementById('chat-file-input');
+    const container = document.getElementById('chat-input-container') || document.querySelector('.chat-input-container');
+    if (!inputEl || !container) return;
+
+    inputEl.addEventListener('change', function () {
+        const files = this.files;
+        if (files && files.length) {
+            addFilesToChat(files);
+        }
+        this.value = '';
+    });
+
+    container.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.classList.add('drag-over');
+    });
+    container.addEventListener('dragleave', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!this.contains(e.relatedTarget)) {
+            this.classList.remove('drag-over');
+        }
+    });
+    container.addEventListener('drop', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.classList.remove('drag-over');
+        const files = e.dataTransfer && e.dataTransfer.files;
+        if (files && files.length) addFilesToChat(files);
+    });
+}
+
+// 确保 chat-input-container 有 id（若模板未写）
+function ensureChatInputContainerId() {
+    const c = document.querySelector('.chat-input-container');
+    if (c && !c.id) c.id = 'chat-input-container';
 }
 
 function setupMentionSupport() {
@@ -799,6 +947,8 @@ function initializeChatUI() {
     }
     activeTaskInterval = setInterval(() => loadActiveTasks(), ACTIVE_TASK_REFRESH_INTERVAL);
     setupMentionSupport();
+    ensureChatInputContainerId();
+    setupChatFileUpload();
 }
 
 // 消息计数器，确保ID唯一
