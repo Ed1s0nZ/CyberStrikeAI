@@ -57,9 +57,12 @@ fofa:
 # Agent configuration
 # When the maximum iteration count is reached, the AI will automatically summarize the test results.
 agent:
-  max_iterations: 120           # Maximum iteration count; maximum number of tool-call rounds for the AI agent
+  max_iterations: 120            # Maximum iteration count; maximum number of tool-call rounds for the AI agent
   large_result_threshold: 102400 # Large-result threshold (bytes); default 50 KB — results exceeding this size are automatically saved to storage
   result_storage_dir: tmp        # Result storage directory; large results will be saved here
+  parallel_tool_execution: true  # Execute multiple tool calls concurrently (true by default; set false to revert to sequential)
+  max_parallel_tools: 0          # Max concurrent tool goroutines per iteration (0 = unlimited)
+  tool_retry_count: 0            # Number of retries on transient tool errors (0 = no retries)
 
 # Database configuration
 database:

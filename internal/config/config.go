@@ -105,9 +105,12 @@ type DatabaseConfig struct {
 }
 
 type AgentConfig struct {
-	MaxIterations        int    `yaml:"max_iterations" json:"max_iterations"`
-	LargeResultThreshold int    `yaml:"large_result_threshold" json:"large_result_threshold"` // Large-result threshold (bytes), default 50 KB
-	ResultStorageDir     string `yaml:"result_storage_dir" json:"result_storage_dir"`         // Result storage directory, default tmp
+	MaxIterations          int    `yaml:"max_iterations" json:"max_iterations"`
+	LargeResultThreshold   int    `yaml:"large_result_threshold" json:"large_result_threshold"`     // Large-result threshold (bytes), default 50 KB
+	ResultStorageDir       string `yaml:"result_storage_dir" json:"result_storage_dir"`             // Result storage directory, default tmp
+	ParallelToolExecution  bool   `yaml:"parallel_tool_execution" json:"parallel_tool_execution"`   // Execute multiple tool calls concurrently (default true)
+	MaxParallelTools       int    `yaml:"max_parallel_tools" json:"max_parallel_tools"`             // Maximum concurrent tool calls (0 = unlimited)
+	ToolRetryCount         int    `yaml:"tool_retry_count" json:"tool_retry_count"`                 // Number of retries on transient tool errors (default 0)
 }
 
 type AuthConfig struct {

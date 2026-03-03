@@ -34,6 +34,9 @@ type Agent struct {
 	mu                    sync.RWMutex      // mutex to support concurrent updates
 	toolNameMapping       map[string]string // tool name mapping: OpenAI format -> original format (for external MCP tools)
 	currentConversationID string            // current conversation ID (for automatic passing to tools)
+	parallelToolExecution bool              // execute multiple tool calls concurrently
+	maxParallelTools      int               // max concurrent tool goroutines (0 = unlimited)
+	toolRetryCount        int               // number of retries on transient tool errors
 }
 
 // ResultStorage is the result storage interface (uses types from the storage package directly)
@@ -65,6 +68,23 @@ func NewAgent(cfg *config.OpenAIConfig, agentCfg *config.AgentConfig, mcpServer 
 	resultStorageDir := "tmp"
 	if agentCfg != nil && agentCfg.ResultStorageDir != "" {
 		resultStorageDir = agentCfg.ResultStorageDir
+	}
+
+	// Parallel tool execution: enabled by default
+	parallelToolExecution := true
+	if agentCfg != nil && !agentCfg.ParallelToolExecution {
+		// Only disable when explicitly set to false
+		parallelToolExecution = false
+	}
+
+	maxParallelTools := 0 // unlimited by default
+	if agentCfg != nil && agentCfg.MaxParallelTools > 0 {
+		maxParallelTools = agentCfg.MaxParallelTools
+	}
+
+	toolRetryCount := 0
+	if agentCfg != nil && agentCfg.ToolRetryCount > 0 {
+		toolRetryCount = agentCfg.ToolRetryCount
 	}
 
 	// Initialize result storage
@@ -115,17 +135,20 @@ func NewAgent(cfg *config.OpenAIConfig, agentCfg *config.AgentConfig, mcpServer 
 	}
 
 	return &Agent{
-		openAIClient:         llmClient,
-		config:               cfg,
-		agentConfig:          agentCfg,
-		memoryCompressor:     memoryCompressor,
-		mcpServer:            mcpServer,
-		externalMCPMgr:       externalMCPMgr,
-		logger:               logger,
-		maxIterations:        maxIterations,
-		resultStorage:        resultStorage,
-		largeResultThreshold: largeResultThreshold,
-		toolNameMapping:      make(map[string]string), // Initialize tool name mapping
+		openAIClient:          llmClient,
+		config:                cfg,
+		agentConfig:           agentCfg,
+		memoryCompressor:      memoryCompressor,
+		mcpServer:             mcpServer,
+		externalMCPMgr:        externalMCPMgr,
+		logger:                logger,
+		maxIterations:         maxIterations,
+		resultStorage:         resultStorage,
+		largeResultThreshold:  largeResultThreshold,
+		toolNameMapping:       make(map[string]string), // Initialize tool name mapping
+		parallelToolExecution: parallelToolExecution,
+		maxParallelTools:      maxParallelTools,
+		toolRetryCount:        toolRetryCount,
 	}
 }
 
@@ -702,9 +725,13 @@ Skills Library:
 				"iteration": i + 1,
 			})
 
-			// Execute all tool calls
+			// Execute all tool calls — parallel when enabled and more than one tool is pending.
+			totalTools := len(choice.Message.ToolCalls)
+			useParallel := a.parallelToolExecution && totalTools > 1
+
+			// Announce every pending tool call before execution so the frontend can
+			// display them immediately regardless of execution order.
 			for idx, toolCall := range choice.Message.ToolCalls {
-				// Send tool call start event
 				toolArgsJSON, _ := json.Marshal(toolCall.Function.Arguments)
 				sendProgress("tool_call", fmt.Sprintf("Calling tool: %s", toolCall.Function.Name), map[string]interface{}{
 					"toolName":     toolCall.Function.Name,
@@ -712,73 +739,149 @@ Skills Library:
 					"argumentsObj": toolCall.Function.Arguments,
 					"toolCallId":   toolCall.ID,
 					"index":        idx + 1,
-					"total":        len(choice.Message.ToolCalls),
+					"total":        totalTools,
 					"iteration":    i + 1,
+					"parallel":     useParallel,
 				})
+			}
 
-				// Execute tool
-				execResult, err := a.executeToolViaMCP(ctx, toolCall.Function.Name, toolCall.Function.Arguments)
-				if err != nil {
-					// Build detailed error message to help AI understand the problem and make decisions
-					errorMsg := a.formatToolError(toolCall.Function.Name, toolCall.Function.Arguments, err)
-					messages = append(messages, ChatMessage{
-						Role:       "tool",
-						ToolCallID: toolCall.ID,
-						Content:    errorMsg,
-					})
+			if useParallel {
+				// ── Parallel path ────────────────────────────────────────────────────
+				a.logger.Info("Executing tool calls in parallel",
+					zap.Int("count", totalTools),
+				)
+				parallelResults := a.executeToolCallsInParallel(ctx, choice.Message.ToolCalls)
 
-					// Send tool execution failure event
-					sendProgress("tool_result", fmt.Sprintf("Tool %s execution failed", toolCall.Function.Name), map[string]interface{}{
-						"toolName":   toolCall.Function.Name,
-						"success":    false,
-						"isError":    true,
-						"error":      err.Error(),
-						"toolCallId": toolCall.ID,
-						"index":      idx + 1,
-						"total":      len(choice.Message.ToolCalls),
-						"iteration":  i + 1,
-					})
+				// Process results in original order so tool messages match tool_call IDs.
+				for _, pr := range parallelResults {
+					idx := pr.index
+					toolCall := choice.Message.ToolCalls[idx]
 
-					a.logger.Warn("Tool execution failed, detailed error message returned",
-						zap.String("tool", toolCall.Function.Name),
-						zap.Error(err),
-					)
-				} else {
-					// Even if the tool returned an error result (IsError=true), continue processing and let AI decide the next step
-					messages = append(messages, ChatMessage{
-						Role:       "tool",
-						ToolCallID: toolCall.ID,
-						Content:    execResult.Result,
-					})
-					// Collect execution ID
-					if execResult.ExecutionID != "" {
-						result.MCPExecutionIDs = append(result.MCPExecutionIDs, execResult.ExecutionID)
-					}
-
-					// Send tool execution success event
-					resultPreview := execResult.Result
-					if len(resultPreview) > 200 {
-						resultPreview = resultPreview[:200] + "..."
-					}
-					sendProgress("tool_result", fmt.Sprintf("Tool %s execution completed", toolCall.Function.Name), map[string]interface{}{
-						"toolName":      toolCall.Function.Name,
-						"success":       !execResult.IsError,
-						"isError":       execResult.IsError,
-						"result":        execResult.Result, // full result
-						"resultPreview": resultPreview,     // preview result
-						"executionId":   execResult.ExecutionID,
-						"toolCallId":    toolCall.ID,
-						"index":         idx + 1,
-						"total":         len(choice.Message.ToolCalls),
-						"iteration":     i + 1,
-					})
-
-					// If the tool returned an error, log it but do not interrupt the flow
-					if execResult.IsError {
-						a.logger.Warn("Tool returned error result, but continuing processing",
-							zap.String("tool", toolCall.Function.Name),
-							zap.String("result", execResult.Result),
+					if pr.execErr != nil {
+						errorMsg := a.formatToolError(pr.toolName, pr.arguments, pr.execErr)
+						messages = append(messages, ChatMessage{
+							Role:       "tool",
+							ToolCallID: pr.toolCallID,
+							Content:    errorMsg,
+						})
+						sendProgress("tool_result", fmt.Sprintf("Tool %s execution failed", pr.toolName), map[string]interface{}{
+							"toolName":   pr.toolName,
+							"success":    false,
+							"isError":    true,
+							"error":      pr.execErr.Error(),
+							"toolCallId": pr.toolCallID,
+							"index":      idx + 1,
+							"total":      totalTools,
+							"iteration":  i + 1,
+							"parallel":   true,
+						})
+						a.logger.Warn("Parallel tool execution failed, detailed error message returned",
+							zap.String("tool", pr.toolName),
+							zap.Error(pr.execErr),
 						)
+					} else {
+						execResult := pr.execResult
+						messages = append(messages, ChatMessage{
+							Role:       "tool",
+							ToolCallID: pr.toolCallID,
+							Content:    execResult.Result,
+						})
+						if execResult.ExecutionID != "" {
+							result.MCPExecutionIDs = append(result.MCPExecutionIDs, execResult.ExecutionID)
+						}
+						resultPreview := execResult.Result
+						if len(resultPreview) > 200 {
+							resultPreview = resultPreview[:200] + "..."
+						}
+						sendProgress("tool_result", fmt.Sprintf("Tool %s execution completed", pr.toolName), map[string]interface{}{
+							"toolName":      pr.toolName,
+							"success":       !execResult.IsError,
+							"isError":       execResult.IsError,
+							"result":        execResult.Result,
+							"resultPreview": resultPreview,
+							"executionId":   execResult.ExecutionID,
+							"toolCallId":    pr.toolCallID,
+							"index":         idx + 1,
+							"total":         totalTools,
+							"iteration":     i + 1,
+							"parallel":      true,
+						})
+						if execResult.IsError {
+							a.logger.Warn("Parallel tool returned error result, continuing processing",
+								zap.String("tool", pr.toolName),
+								zap.String("result", execResult.Result),
+							)
+						}
+					}
+					_ = toolCall // referenced above via choice.Message.ToolCalls[idx]
+				}
+			} else {
+				// ── Sequential path (single tool call or parallelism disabled) ───────
+				for idx, toolCall := range choice.Message.ToolCalls {
+					// Execute tool
+					execResult, err := a.executeToolViaMCP(ctx, toolCall.Function.Name, toolCall.Function.Arguments)
+					if err != nil {
+						// Build detailed error message to help AI understand the problem and make decisions
+						errorMsg := a.formatToolError(toolCall.Function.Name, toolCall.Function.Arguments, err)
+						messages = append(messages, ChatMessage{
+							Role:       "tool",
+							ToolCallID: toolCall.ID,
+							Content:    errorMsg,
+						})
+
+						// Send tool execution failure event
+						sendProgress("tool_result", fmt.Sprintf("Tool %s execution failed", toolCall.Function.Name), map[string]interface{}{
+							"toolName":   toolCall.Function.Name,
+							"success":    false,
+							"isError":    true,
+							"error":      err.Error(),
+							"toolCallId": toolCall.ID,
+							"index":      idx + 1,
+							"total":      totalTools,
+							"iteration":  i + 1,
+						})
+
+						a.logger.Warn("Tool execution failed, detailed error message returned",
+							zap.String("tool", toolCall.Function.Name),
+							zap.Error(err),
+						)
+					} else {
+						// Even if the tool returned an error result (IsError=true), continue processing and let AI decide the next step
+						messages = append(messages, ChatMessage{
+							Role:       "tool",
+							ToolCallID: toolCall.ID,
+							Content:    execResult.Result,
+						})
+						// Collect execution ID
+						if execResult.ExecutionID != "" {
+							result.MCPExecutionIDs = append(result.MCPExecutionIDs, execResult.ExecutionID)
+						}
+
+						// Send tool execution success event
+						resultPreview := execResult.Result
+						if len(resultPreview) > 200 {
+							resultPreview = resultPreview[:200] + "..."
+						}
+						sendProgress("tool_result", fmt.Sprintf("Tool %s execution completed", toolCall.Function.Name), map[string]interface{}{
+							"toolName":      toolCall.Function.Name,
+							"success":       !execResult.IsError,
+							"isError":       execResult.IsError,
+							"result":        execResult.Result, // full result
+							"resultPreview": resultPreview,     // preview result
+							"executionId":   execResult.ExecutionID,
+							"toolCallId":    toolCall.ID,
+							"index":         idx + 1,
+							"total":         totalTools,
+							"iteration":     i + 1,
+						})
+
+						// If the tool returned an error, log it but do not interrupt the flow
+						if execResult.IsError {
+							a.logger.Warn("Tool returned error result, but continuing processing",
+								zap.String("tool", toolCall.Function.Name),
+								zap.String("result", execResult.Result),
+							)
+						}
 					}
 				}
 			}
@@ -1205,6 +1308,98 @@ type ToolExecutionResult struct {
 	Result      string
 	ExecutionID string
 	IsError     bool // Marks whether this is an error result
+}
+
+// parallelToolCallResult holds the result of a single parallel tool call.
+type parallelToolCallResult struct {
+	index       int
+	toolCallID  string
+	toolName    string
+	arguments   map[string]interface{}
+	execResult  *ToolExecutionResult
+	execErr     error
+}
+
+// executeToolCallsInParallel runs all tool calls concurrently and returns the results in original order.
+// A semaphore limits concurrency when maxParallelTools > 0.
+// Each goroutine has panic recovery to prevent one failing tool from crashing the agent.
+func (a *Agent) executeToolCallsInParallel(ctx context.Context, toolCalls []ToolCall) []parallelToolCallResult {
+	n := len(toolCalls)
+	results := make([]parallelToolCallResult, n)
+
+	// Build semaphore channel (nil when unlimited)
+	var sem chan struct{}
+	if a.maxParallelTools > 0 && a.maxParallelTools < n {
+		sem = make(chan struct{}, a.maxParallelTools)
+	}
+
+	var wg sync.WaitGroup
+	for idx, tc := range toolCalls {
+		wg.Add(1)
+		go func(idx int, tc ToolCall) {
+			defer wg.Done()
+
+			// Panic recovery: store a descriptive error result so the agent loop can continue.
+			defer func() {
+				if r := recover(); r != nil {
+					a.logger.Error("Panic in parallel tool goroutine",
+						zap.Int("index", idx),
+						zap.String("tool", tc.Function.Name),
+						zap.Any("panic", r),
+					)
+					panicMsg := fmt.Sprintf("Internal panic executing tool %s: %v", tc.Function.Name, r)
+					results[idx] = parallelToolCallResult{
+						index:      idx,
+						toolCallID: tc.ID,
+						toolName:   tc.Function.Name,
+						arguments:  tc.Function.Arguments,
+						execResult: &ToolExecutionResult{
+							Result:  panicMsg,
+							IsError: true,
+						},
+					}
+				}
+			}()
+
+			// Acquire semaphore slot when concurrency is limited.
+			if sem != nil {
+				sem <- struct{}{}
+				defer func() { <-sem }()
+			}
+
+			// Execute with optional retry on transient errors.
+			var execResult *ToolExecutionResult
+			var execErr error
+			attempts := 1 + a.toolRetryCount
+			for attempt := 0; attempt < attempts; attempt++ {
+				execResult, execErr = a.executeToolViaMCP(ctx, tc.Function.Name, tc.Function.Arguments)
+				// Retry only on hard errors (execErr != nil); tool-level errors (IsError) are final.
+				if execErr == nil {
+					break
+				}
+				if attempt < attempts-1 {
+					a.logger.Warn("Transient tool error, retrying",
+						zap.String("tool", tc.Function.Name),
+						zap.Int("attempt", attempt+1),
+						zap.Int("maxAttempts", attempts),
+						zap.Error(execErr),
+					)
+				}
+			}
+
+			results[idx] = parallelToolCallResult{
+				index:      idx,
+				toolCallID: tc.ID,
+				toolName:   tc.Function.Name,
+				arguments:  tc.Function.Arguments,
+				execResult: execResult,
+				execErr:    execErr,
+			}
+		}(idx, tc)
+	}
+
+	wg.Wait()
+	return results
 }
 
 // executeToolViaMCP executes a tool via MCP
