@@ -251,7 +251,7 @@ func (b *Builder) buildReActInput(messages []database.Message) string {
 
 // extractUserInputFromReActInput extracts the last user message from the saved ReAct input (JSON array of messages).
 // func (b *Builder) extractUserInputFromReActInput(reactInputJSON string) string {
-// 	// reactInputJSON是JSON格式的ChatMessage数组，需要解析
+// 	// reactInputJSON is a JSON-formatted ChatMessage array that needs to be parsed
 // 	var messages []map[string]interface{}
 // 	if err := json.Unmarshal([]byte(reactInputJSON), &messages); err != nil {
 // 		b.logger.Warn("failed to parse ReAct input JSON", zap.Error(err))
@@ -678,7 +678,7 @@ func (b *Builder) callAIForChainGeneration(ctx context.Context, prompt string) (
 		"messages": []map[string]interface{}{
 			{
 				"role":    "system",
-				"content": "你是一个专业的安全测试分析师，擅长构建攻击链图。请严格按照JSON格式返回攻击链数据。",
+				"content": "You are a professional security testing analyst skilled at building attack chain graphs. Return attack chain data strictly in JSON format.",
 			},
 			{
 				"role":    "user",

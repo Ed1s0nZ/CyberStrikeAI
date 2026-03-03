@@ -1,116 +1,116 @@
 ---
 name: api-security-testing
-description: API安全测试的专业技能和方法论
+description: Professional skills and methodology for API security testing
 version: 1.0.0
 ---
 
-# API安全测试
+# API Security Testing
 
-## 概述
+## Overview
 
-API安全测试是确保API接口安全性的重要环节。本技能提供API安全测试的方法、工具和最佳实践。
+API security testing is an essential part of ensuring the security of API interfaces. This skill provides methods, tools, and best practices for API security testing.
 
-## 测试范围
+## Testing Scope
 
-### 1. 认证和授权
+### 1. Authentication and Authorization
 
-**测试项目：**
-- Token有效性验证
-- Token过期处理
-- 权限控制
-- 角色权限验证
+**Test items:**
+- Token validity verification
+- Token expiration handling
+- Permission control
+- Role permission verification
 
-### 2. 输入验证
+### 2. Input Validation
 
-**测试项目：**
-- 参数类型验证
-- 数据长度限制
-- 特殊字符处理
-- SQL注入防护
-- XSS防护
+**Test items:**
+- Parameter type validation
+- Data length limits
+- Special character handling
+- SQL injection protection
+- XSS protection
 
-### 3. 业务逻辑
+### 3. Business Logic
 
-**测试项目：**
-- 工作流验证
-- 状态转换
-- 并发控制
-- 业务规则
+**Test items:**
+- Workflow validation
+- State transitions
+- Concurrency control
+- Business rules
 
-### 4. 错误处理
+### 4. Error Handling
 
-**测试项目：**
-- 错误信息泄露
-- 堆栈跟踪
-- 敏感信息暴露
+**Test items:**
+- Error message leakage
+- Stack traces
+- Sensitive information exposure
 
-## 测试方法
+## Testing Methods
 
-### 1. API发现
+### 1. API Discovery
 
-**识别API端点：**
+**Identify API endpoints:**
 ```bash
-# 使用目录扫描
+# Use directory scanning
 gobuster dir -u https://target.com -w api-wordlist.txt
 
-# 使用Burp Suite被动扫描
-# 浏览应用，观察API调用
+# Use Burp Suite passive scanning
+# Browse application, observe API calls
 
-# 分析JavaScript文件
-# 查找API端点定义
+# Analyze JavaScript files
+# Find API endpoint definitions
 ```
 
-### 2. 认证测试
+### 2. Authentication Testing
 
-**Token测试：**
+**Token testing:**
 ```http
-# 测试无效Token
+# Test invalid Token
 GET /api/user
 Authorization: Bearer invalid_token
 
-# 测试过期Token
+# Test expired Token
 GET /api/user
 Authorization: Bearer expired_token
 
-# 测试无Token
+# Test without Token
 GET /api/user
 ```
 
-**JWT测试：**
+**JWT testing:**
 ```bash
-# 使用jwt_tool
+# Use jwt_tool
 python jwt_tool.py <JWT_TOKEN>
 
-# 测试算法混淆
+# Test algorithm confusion
 python jwt_tool.py <JWT_TOKEN> -X a
 
-# 测试密钥暴力破解
+# Test key brute force
 python jwt_tool.py <JWT_TOKEN> -C -d wordlist.txt
 ```
 
-### 3. 授权测试
+### 3. Authorization Testing
 
-**水平权限：**
+**Horizontal privileges:**
 ```http
-# 用户A访问用户B的资源
+# User A accessing User B's resources
 GET /api/user/123
 Authorization: Bearer user_a_token
 
-# 应该返回403
+# Should return 403
 ```
 
-**垂直权限：**
+**Vertical privileges:**
 ```http
-# 普通用户访问管理员接口
+# Regular user accessing admin interface
 GET /api/admin/users
 Authorization: Bearer user_token
 
-# 应该返回403
+# Should return 403
 ```
 
-### 4. 输入验证测试
+### 4. Input Validation Testing
 
-**SQL注入：**
+**SQL injection:**
 ```http
 POST /api/search
 {
@@ -118,7 +118,7 @@ POST /api/search
 }
 ```
 
-**命令注入：**
+**Command injection:**
 ```http
 POST /api/execute
 {
@@ -126,7 +126,7 @@ POST /api/execute
 }
 ```
 
-**XXE：**
+**XXE:**
 ```http
 POST /api/parse
 Content-Type: application/xml
@@ -136,9 +136,9 @@ Content-Type: application/xml
 <foo>&xxe;</foo>
 ```
 
-### 5. 速率限制测试
+### 5. Rate Limit Testing
 
-**测试速率限制：**
+**Test rate limits:**
 ```python
 import requests
 
@@ -147,28 +147,28 @@ for i in range(1000):
     print(f"Request {i}: {response.status_code}")
 ```
 
-## 工具使用
+## Tool Usage
 
 ### Postman
 
-**创建测试集合：**
-1. 导入API文档
-2. 设置认证
-3. 创建测试用例
-4. 运行自动化测试
+**Create test collection:**
+1. Import API documentation
+2. Set authentication
+3. Create test cases
+4. Run automated tests
 
 ### Burp Suite
 
-**API扫描：**
-1. 配置API端点
-2. 设置认证
-3. 运行主动扫描
-4. 分析结果
+**API scanning:**
+1. Configure API endpoints
+2. Set authentication
+3. Run active scanning
+4. Analyze results
 
 ### OWASP ZAP
 
 ```bash
-# API扫描
+# API scan
 zap-cli quick-scan --self-contained \
   --start-options '-config api.disablekey=true' \
   http://target.com/api
@@ -177,111 +177,111 @@ zap-cli quick-scan --self-contained \
 ### REST-Attacker
 
 ```bash
-# 扫描OpenAPI规范
+# Scan OpenAPI specification
 rest-attacker scan openapi.yaml
 ```
 
-## 常见漏洞
+## Common Vulnerabilities
 
-### 1. 认证绕过
+### 1. Authentication Bypass
 
-**Token验证缺陷：**
-- 弱Token生成
-- Token可预测
-- Token不验证签名
+**Token validation flaws:**
+- Weak Token generation
+- Predictable Token
+- Token signature not verified
 
-### 2. 权限提升
+### 2. Privilege Escalation
 
-**IDOR：**
-- 直接对象引用
-- 未验证资源所有权
+**IDOR:**
+- Direct object references
+- Resource ownership not verified
 
-### 3. 信息泄露
+### 3. Information Disclosure
 
-**错误信息：**
-- 详细错误信息
-- 堆栈跟踪
-- 敏感数据
+**Error messages:**
+- Detailed error messages
+- Stack traces
+- Sensitive data
 
-### 4. 注入漏洞
+### 4. Injection Vulnerabilities
 
-**常见注入：**
-- SQL注入
-- NoSQL注入
-- 命令注入
+**Common injections:**
+- SQL injection
+- NoSQL injection
+- Command injection
 - XXE
 
-### 5. 业务逻辑
+### 5. Business Logic
 
-**逻辑缺陷：**
-- 价格操作
-- 数量限制绕过
-- 状态修改
+**Logic flaws:**
+- Price manipulation
+- Quantity limit bypass
+- State modification
 
-## 测试清单
+## Testing Checklist
 
-### 认证测试
-- [ ] Token有效性验证
-- [ ] Token过期处理
-- [ ] 弱Token检测
-- [ ] Token重放攻击
+### Authentication Testing
+- [ ] Token validity verification
+- [ ] Token expiration handling
+- [ ] Weak Token detection
+- [ ] Token replay attack
 
-### 授权测试
-- [ ] 水平权限测试
-- [ ] 垂直权限测试
-- [ ] 角色权限验证
-- [ ] 资源访问控制
+### Authorization Testing
+- [ ] Horizontal privilege testing
+- [ ] Vertical privilege testing
+- [ ] Role permission verification
+- [ ] Resource access control
 
-### 输入验证
-- [ ] SQL注入测试
-- [ ] XSS测试
-- [ ] 命令注入测试
-- [ ] XXE测试
-- [ ] 参数污染
+### Input Validation
+- [ ] SQL injection testing
+- [ ] XSS testing
+- [ ] Command injection testing
+- [ ] XXE testing
+- [ ] Parameter pollution
 
-### 业务逻辑
-- [ ] 工作流验证
-- [ ] 状态转换
-- [ ] 并发控制
-- [ ] 业务规则
+### Business Logic
+- [ ] Workflow validation
+- [ ] State transitions
+- [ ] Concurrency control
+- [ ] Business rules
 
-### 错误处理
-- [ ] 错误信息泄露
-- [ ] 堆栈跟踪
-- [ ] 敏感信息暴露
+### Error Handling
+- [ ] Error message leakage
+- [ ] Stack traces
+- [ ] Sensitive information exposure
 
-## 防护措施
+## Protective Measures
 
-### 推荐方案
+### Recommended Solutions
 
-1. **认证**
-   - 使用强Token
-   - 实现Token刷新
-   - 验证Token签名
+1. **Authentication**
+   - Use strong Tokens
+   - Implement Token refresh
+   - Verify Token signature
 
-2. **授权**
-   - 基于角色的访问控制
-   - 资源所有权验证
-   - 最小权限原则
+2. **Authorization**
+   - Role-based access control
+   - Resource ownership verification
+   - Principle of least privilege
 
-3. **输入验证**
-   - 参数类型验证
-   - 数据长度限制
-   - 白名单验证
+3. **Input Validation**
+   - Parameter type validation
+   - Data length limits
+   - Whitelist validation
 
-4. **错误处理**
-   - 统一错误响应
-   - 不泄露详细信息
-   - 记录错误日志
+4. **Error Handling**
+   - Unified error responses
+   - Do not expose detailed information
+   - Record error logs
 
-5. **速率限制**
-   - 实现API限流
-   - 防止暴力破解
-   - 监控异常请求
+5. **Rate Limiting**
+   - Implement API rate limiting
+   - Prevent brute force attacks
+   - Monitor abnormal requests
 
-## 注意事项
+## Notes
 
-- 仅在授权测试环境中进行
-- 避免对API造成影响
-- 注意不同API版本的差异
-- 测试时注意请求频率
+- Only perform testing in authorized test environments
+- Avoid impacting APIs
+- Note differences across API versions
+- Pay attention to request frequency during testing

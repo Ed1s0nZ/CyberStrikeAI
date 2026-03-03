@@ -1,84 +1,84 @@
 ---
 name: incident-response
-description: 安全事件响应的专业技能和方法论
+description: Professional skills and methodology for security incident response
 version: 1.0.0
 ---
 
-# 安全事件响应
+# Security Incident Response
 
-## 概述
+## Overview
 
-安全事件响应是处理安全事件的关键流程。本技能提供安全事件响应的方法、工具和最佳实践。
+Security incident response is a critical process for handling security incidents. This skill provides methods, tools, and best practices for security incident response.
 
-## 响应流程
+## Response Process
 
-### 1. 准备阶段
+### 1. Preparation Phase
 
-**准备工作：**
-- 建立响应团队
-- 制定响应计划
-- 准备工具和资源
-- 建立通信渠道
+**Preparation work:**
+- Establish response team
+- Develop response plan
+- Prepare tools and resources
+- Establish communication channels
 
-### 2. 识别阶段
+### 2. Identification Phase
 
-**识别事件：**
-- 监控告警
-- 异常检测
-- 日志分析
-- 用户报告
+**Identify incidents:**
+- Monitoring alerts
+- Anomaly detection
+- Log analysis
+- User reports
 
-### 3. 遏制阶段
+### 3. Containment Phase
 
-**遏制措施：**
-- 隔离受影响系统
-- 禁用账户
-- 阻断网络连接
-- 备份证据
+**Containment measures:**
+- Isolate affected systems
+- Disable accounts
+- Block network connections
+- Preserve evidence
 
-### 4. 清除阶段
+### 4. Eradication Phase
 
-**清除威胁：**
-- 移除恶意软件
-- 修复漏洞
-- 重置凭证
-- 清理后门
+**Eliminate threats:**
+- Remove malware
+- Patch vulnerabilities
+- Reset credentials
+- Remove backdoors
 
-### 5. 恢复阶段
+### 5. Recovery Phase
 
-**恢复系统：**
-- 恢复备份
-- 验证系统完整性
-- 监控系统
-- 逐步恢复服务
+**Restore systems:**
+- Restore from backups
+- Verify system integrity
+- Monitor systems
+- Gradually restore services
 
-### 6. 总结阶段
+### 6. Post-Incident Phase
 
-**总结经验：**
-- 事件报告
-- 经验教训
-- 改进措施
-- 更新流程
+**Lessons learned:**
+- Incident report
+- Lessons learned
+- Improvement measures
+- Update processes
 
-## 工具使用
+## Tool Usage
 
-### 日志分析
+### Log Analysis
 
-**使用Splunk：**
+**Using Splunk:**
 ```bash
-# 搜索日志
+# Search logs
 index=security event_type="failed_login"
 
-# 统计分析
+# Statistical analysis
 index=security | stats count by src_ip
 
-# 时间序列分析
+# Time series analysis
 index=security | timechart count by event_type
 ```
 
-**使用ELK：**
+**Using ELK:**
 ```bash
-# Elasticsearch查询
+# Elasticsearch query
 GET /logs/_search
 {
   "query": {
@@ -89,184 +89,184 @@ GET /logs/_search
 }
 ```
 
-### 取证工具
+### Forensics Tools
 
-**使用Volatility：**
+**Using Volatility:**
 ```bash
-# 分析内存镜像
+# Analyze memory image
 volatility -f memory.dump imageinfo
 
-# 列出进程
+# List processes
 volatility -f memory.dump --profile=Win7SP1x64 pslist
 
-# 提取进程内存
+# Extract process memory
 volatility -f memory.dump --profile=Win7SP1x64 memdump -p 1234 -D output/
 ```
 
-**使用Autopsy：**
+**Using Autopsy:**
 ```bash
-# 启动Autopsy
-# 创建案例
-# 添加证据
-# 分析数据
+# Start Autopsy
+# Create case
+# Add evidence
+# Analyze data
 ```
 
-### 网络分析
+### Network Analysis
 
-**使用Wireshark：**
+**Using Wireshark:**
 ```bash
-# 捕获流量
+# Capture traffic
 wireshark -i eth0
 
-# 分析PCAP文件
+# Analyze PCAP file
 wireshark -r capture.pcap
 
-# 过滤流量
-# 显示过滤器: ip.addr == 192.168.1.100
-# 捕获过滤器: host 192.168.1.100
+# Filter traffic
+# Display filter: ip.addr == 192.168.1.100
+# Capture filter: host 192.168.1.100
 ```
 
-**使用tcpdump：**
+**Using tcpdump:**
 ```bash
-# 捕获流量
+# Capture traffic
 tcpdump -i eth0 -w capture.pcap
 
-# 分析流量
+# Analyze traffic
 tcpdump -r capture.pcap -A
 ```
 
-## 事件类型
+## Incident Types
 
-### 恶意软件
+### Malware
 
-**响应步骤：**
-1. 隔离受影响系统
-2. 收集样本
-3. 分析恶意软件
-4. 清除威胁
-5. 修复漏洞
+**Response steps:**
+1. Isolate affected systems
+2. Collect samples
+3. Analyze malware
+4. Eliminate threats
+5. Patch vulnerabilities
 
-**工具：**
+**Tools:**
 - VirusTotal
 - Cuckoo Sandbox
-- YARA规则
+- YARA rules
 
-### 数据泄露
+### Data Breach
 
-**响应步骤：**
-1. 确认泄露范围
-2. 遏制泄露
-3. 评估影响
-4. 通知相关方
-5. 修复漏洞
+**Response steps:**
+1. Confirm breach scope
+2. Contain the breach
+3. Assess impact
+4. Notify relevant parties
+5. Patch vulnerabilities
 
-**检查项目：**
-- 泄露数据量
-- 受影响用户
-- 泄露渠道
-- 数据敏感性
+**Checklist:**
+- Volume of data leaked
+- Affected users
+- Breach channel
+- Data sensitivity
 
-### 拒绝服务
+### Denial of Service
 
-**响应步骤：**
-1. 确认攻击类型
-2. 启用防护措施
-3. 过滤恶意流量
-4. 监控系统状态
-5. 恢复正常服务
+**Response steps:**
+1. Confirm attack type
+2. Enable protective measures
+3. Filter malicious traffic
+4. Monitor system status
+5. Restore normal services
 
-**防护措施：**
-- DDoS防护服务
-- 流量清洗
-- 限流措施
-- CDN防护
+**Protective measures:**
+- DDoS protection service
+- Traffic scrubbing
+- Rate limiting
+- CDN protection
 
-### 未授权访问
+### Unauthorized Access
 
-**响应步骤：**
-1. 禁用受影响账户
-2. 重置凭证
-3. 检查访问日志
-4. 评估数据访问
-5. 修复漏洞
+**Response steps:**
+1. Disable affected accounts
+2. Reset credentials
+3. Review access logs
+4. Assess data access
+5. Patch vulnerabilities
 
-**检查项目：**
-- 访问时间
-- 访问内容
-- 访问来源
-- 数据修改
+**Checklist:**
+- Access time
+- Accessed content
+- Access source
+- Data modifications
 
-## 响应清单
+## Response Checklist
 
-### 准备阶段
-- [ ] 建立响应团队
-- [ ] 制定响应计划
-- [ ] 准备工具
-- [ ] 建立通信渠道
+### Preparation Phase
+- [ ] Establish response team
+- [ ] Develop response plan
+- [ ] Prepare tools
+- [ ] Establish communication channels
 
-### 识别阶段
-- [ ] 确认事件
-- [ ] 收集信息
-- [ ] 评估影响
-- [ ] 记录时间线
+### Identification Phase
+- [ ] Confirm incident
+- [ ] Collect information
+- [ ] Assess impact
+- [ ] Record timeline
 
-### 遏制阶段
-- [ ] 隔离系统
-- [ ] 禁用账户
-- [ ] 阻断连接
-- [ ] 备份证据
+### Containment Phase
+- [ ] Isolate systems
+- [ ] Disable accounts
+- [ ] Block connections
+- [ ] Preserve evidence
 
-### 清除阶段
-- [ ] 移除威胁
-- [ ] 修复漏洞
-- [ ] 重置凭证
-- [ ] 验证清除
+### Eradication Phase
+- [ ] Remove threats
+- [ ] Patch vulnerabilities
+- [ ] Reset credentials
+- [ ] Verify eradication
 
-### 恢复阶段
-- [ ] 恢复系统
-- [ ] 验证完整性
-- [ ] 监控系统
-- [ ] 恢复服务
+### Recovery Phase
+- [ ] Restore systems
+- [ ] Verify integrity
+- [ ] Monitor systems
+- [ ] Restore services
 
-### 总结阶段
-- [ ] 编写报告
-- [ ] 总结经验
-- [ ] 改进措施
-- [ ] 更新流程
+### Post-Incident Phase
+- [ ] Write report
+- [ ] Summarize lessons learned
+- [ ] Implement improvements
+- [ ] Update processes
 
-## 最佳实践
+## Best Practices
 
-### 1. 准备
+### 1. Preparation
 
-- 建立响应团队
-- 制定响应计划
-- 定期演练
-- 准备工具
+- Establish response team
+- Develop response plan
+- Regular drills
+- Prepare tools
 
-### 2. 响应
+### 2. Response
 
-- 快速响应
-- 系统化处理
-- 记录所有操作
-- 保护证据
+- Respond quickly
+- Systematic handling
+- Document all operations
+- Protect evidence
 
-### 3. 沟通
+### 3. Communication
 
-- 内部沟通
-- 外部通知
-- 状态更新
-- 事后报告
+- Internal communication
+- External notification
+- Status updates
+- Post-incident reports
 
-### 4. 改进
+### 4. Improvement
 
-- 事件分析
-- 流程改进
-- 工具更新
-- 培训提升
+- Incident analysis
+- Process improvement
+- Tool updates
+- Training enhancement
 
-## 注意事项
+## Notes
 
-- 快速响应
-- 保护证据
-- 记录操作
-- 遵守法律法规
+- Respond quickly
+- Protect evidence
+- Document operations
+- Comply with laws and regulations

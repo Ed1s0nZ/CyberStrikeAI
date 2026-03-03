@@ -13,18 +13,18 @@ import (
 	"go.uber.org/zap"
 )
 
-// RegisterKnowledgeTool registers knowledge retrieval tools with the MCP server
+// RegisterKnowledgeTool registers the knowledge retrieval tool with the MCP server
 func RegisterKnowledgeTool(
 	mcpServer *mcp.Server,
 	retriever *Retriever,
 	manager *Manager,
 	logger *zap.Logger,
 ) {
-	// register first tool: get the list of all available risk types
+	// register first tool: get all available risk type lists
 	listRiskTypesTool := mcp.Tool{
 		Name:             builtin.ToolListKnowledgeRiskTypes,
-		Description:      "Get the list of all available risk types (risk_type) in the knowledge base. Before searching the knowledge base, you can call this tool to retrieve the available risk types, then use the correct risk type for a precise search. This can greatly reduce retrieval time and improve retrieval accuracy.",
-		ShortDescription: "Get the list of all available risk types in the knowledge base",
+		Description:      "Get a list of all available risk types (risk_type) in the knowledge base. Before searching the knowledge base, you can call this tool first to get the available risk types, then use the correct risk type for a precise search, which can greatly reduce retrieval time and improve retrieval accuracy.",
+		ShortDescription: "Get a list of all available risk types in the knowledge base",
 		InputSchema: map[string]interface{}{
 			"type":       "object",
 			"properties": map[string]interface{}{},
@@ -52,7 +52,7 @@ func RegisterKnowledgeTool(
 				Content: []mcp.Content{
 					{
 						Type: "text",
-						Text: "No risk types are currently available in the knowledge base.",
+						Text: "No risk types currently in the knowledge base.",
 					},
 				},
 			}, nil
@@ -78,21 +78,21 @@ func RegisterKnowledgeTool(
 	mcpServer.RegisterTool(listRiskTypesTool, listRiskTypesHandler)
 	logger.Info("risk type list tool registered", zap.String("toolName", listRiskTypesTool.Name))
 
-	// register second tool: search the knowledge base (preserves original functionality)
+	// register second tool: search knowledge base (preserves original functionality)
 	searchTool := mcp.Tool{
 		Name:             builtin.ToolSearchKnowledgeBase,
-		Description:      "Search the knowledge base for relevant security knowledge. Use this tool when you need to learn about specific vulnerability types, attack techniques, detection methods, or other security topics. The tool uses vector retrieval and hybrid search technology to automatically find the most relevant knowledge fragments based on semantic similarity and keyword matching. Tip: before searching, you can call the " + builtin.ToolListKnowledgeRiskTypes + " tool to get the available risk types, then use the correct risk_type parameter for a precise search to greatly reduce retrieval time.",
-		ShortDescription: "Search the knowledge base for security knowledge (supports vector retrieval and hybrid search)",
+		Description:      "Search for relevant security knowledge in the knowledge base. When you need to learn about a specific vulnerability type, attack technique, detection method, or other security knowledge, you can use this tool to retrieve it. The tool uses vector retrieval and hybrid search techniques to automatically find the most relevant knowledge snippets based on semantic similarity and keyword matching. Tip: Before searching, you can first call the " + builtin.ToolListKnowledgeRiskTypes + " tool to get available risk types, then use the correct risk_type parameter for a precise search, which can greatly reduce retrieval time.",
+		ShortDescription: "Search security knowledge in the knowledge base (supports vector retrieval and hybrid search)",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"query": map[string]interface{}{
 					"type":        "string",
-					"description": "The search query describing the security knowledge topic you want to learn about",
+					"description": "Search query content, describing the security knowledge topic you want to learn about",
 				},
 				"risk_type": map[string]interface{}{
 					"type":        "string",
-					"description": "Optional: specify a risk type (e.g. SQL Injection, XSS, File Upload, etc.). It is recommended to first call the " + builtin.ToolListKnowledgeRiskTypes + " tool to get the list of available risk types, then use the correct risk type for a precise search to greatly reduce retrieval time. If not specified, all types will be searched.",
+					"description": "Optional: specify a risk type (e.g. SQL injection, XSS, file upload, etc.). It is recommended to first call the " + builtin.ToolListKnowledgeRiskTypes + " tool to get the available risk type list, then use the correct risk type for a precise search, which can greatly reduce retrieval time. If not specified, all types are searched.",
 				},
 			},
 			"required": []string{"query"},
@@ -149,7 +149,7 @@ func RegisterKnowledgeTool(
 				Content: []mcp.Content{
 					{
 						Type: "text",
-						Text: fmt.Sprintf("no knowledge found related to query '%s'. Suggestions:\n1. Try different keywords\n2. Check that the risk type is correct\n3. Confirm the knowledge base contains relevant content", query),
+						Text: fmt.Sprintf("No knowledge related to query '%s' was found. Suggestions:\n1. Try different keywords\n2. Check if the risk type is correct\n3. Confirm that the knowledge base contains relevant content", query),
 					},
 				},
 			}, nil
@@ -199,12 +199,12 @@ func RegisterKnowledgeTool(
 		// collect retrieved knowledge item IDs (for logging)
 		retrievedItemIDs := make([]string, 0, len(itemGroups))
 
-		resultText.WriteString(fmt.Sprintf("Found %d relevant knowledge entries (with context expansion):\n\n", len(results)))
+		resultText.WriteString(fmt.Sprintf("Found %d related knowledge item(s) (with context expansion):\n\n", len(results)))
 
 		resultIndex := 1
 		for _, group := range itemGroups {
 			itemResults := group.results
-			// find the one with the highest hybrid score as the main result (using hybrid score, not similarity)
+			// find the one with the highest hybrid score as the main result (use hybrid score, not similarity)
 			mainResult := itemResults[0]
 			maxScore := mainResult.Score
 			for _, result := range itemResults {
@@ -219,7 +219,7 @@ func RegisterKnowledgeTool(
 				return itemResults[i].Chunk.ChunkIndex < itemResults[j].Chunk.ChunkIndex
 			})
 
-			// display main result (highest hybrid score, showing both similarity and hybrid score)
+			// display main result (highest hybrid score, show both similarity and hybrid score)
 			resultText.WriteString(fmt.Sprintf("--- Result %d (similarity: %.2f%%, hybrid score: %.2f%%) ---\n",
 				resultIndex, mainResult.Similarity*100, mainResult.Score*100))
 			resultText.WriteString(fmt.Sprintf("Source: [%s] %s (ID: %s)\n", mainResult.Item.Category, mainResult.Item.Title, mainResult.Item.ID))
@@ -227,17 +227,17 @@ func RegisterKnowledgeTool(
 			// display all chunks in logical order (including main result and expanded chunks)
 			if len(itemResults) == 1 {
 				// only one chunk, display directly
-				resultText.WriteString(fmt.Sprintf("Content fragment:\n%s\n", mainResult.Chunk.ChunkText))
+				resultText.WriteString(fmt.Sprintf("Content snippet:\n%s\n", mainResult.Chunk.ChunkText))
 			} else {
 				// multiple chunks, display in logical order
-				resultText.WriteString("Content fragments (in document order):\n")
+				resultText.WriteString("Content snippets (in document order):\n")
 				for i, result := range itemResults {
-					// mark the main result
+					// mark main result
 					marker := ""
 					if result.Chunk.ID == mainResult.Chunk.ID {
 						marker = " [primary match]"
 					}
-					resultText.WriteString(fmt.Sprintf("  [Fragment %d%s]\n%s\n", i+1, marker, result.Chunk.ChunkText))
+					resultText.WriteString(fmt.Sprintf("  [Snippet %d%s]\n%s\n", i+1, marker, result.Chunk.ChunkText))
 				}
 			}
 			resultText.WriteString("\n")
@@ -248,8 +248,8 @@ func RegisterKnowledgeTool(
 			resultIndex++
 		}
 
-		// append metadata at the end of results (JSON format, for extracting knowledge item IDs)
-		// use a special marker to avoid interfering with AI reading results
+		// append metadata at the end of results (JSON format, used to extract knowledge item IDs)
+		// use special markers to avoid interfering with AI reading of results
 		if len(retrievedItemIDs) > 0 {
 			metadataJSON, _ := json.Marshal(map[string]interface{}{
 				"_metadata": map[string]interface{}{
@@ -260,8 +260,8 @@ func RegisterKnowledgeTool(
 		}
 
 		// log retrieval (async, non-blocking)
-		// note: conversationID and messageID are not available here; they should be logged at the Agent level
-		// actual logging should be done in the Agent's progressCallback
+		// note: conversationID and messageID are not available here; should be logged at the Agent layer
+		// actual log recording should be done in the Agent's progressCallback
 
 		return &mcp.ToolResult{
 			Content: []mcp.Content{
@@ -287,7 +287,7 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
-// GetRetrievalMetadata extracts retrieval metadata from a tool call (for logging)
+// GetRetrievalMetadata extracts retrieval metadata from tool call arguments (used for logging)
 func GetRetrievalMetadata(args map[string]interface{}) (query string, riskType string) {
 	if q, ok := args["query"].(string); ok {
 		query = q
@@ -298,7 +298,7 @@ func GetRetrievalMetadata(args map[string]interface{}) (query string, riskType s
 	return
 }
 
-// FormatRetrievalResults formats retrieval results as a string (for logging)
+// FormatRetrievalResults formats retrieval results as a string (used for logging)
 func FormatRetrievalResults(results []*RetrievalResult) string {
 	if len(results) == 0 {
 		return "no relevant results found"

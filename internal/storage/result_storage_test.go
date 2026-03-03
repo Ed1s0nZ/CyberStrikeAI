@@ -145,10 +145,10 @@ func TestFileResultStorage_GetResultMetadata(t *testing.T) {
 		t.Errorf("total lines mismatch. expected: %d, actual: %d", expectedLines, metadata.TotalLines)
 	}
 
-	// verify creation time is within a reasonable range
+	// verify created time is within a reasonable range
 	now := time.Now()
 	if metadata.CreatedAt.After(now) || metadata.CreatedAt.Before(now.Add(-time.Second)) {
-		t.Errorf("creation time is out of expected range: %v", metadata.CreatedAt)
+		t.Errorf("created time is not within a reasonable range: %v", metadata.CreatedAt)
 	}
 }
 
@@ -182,7 +182,7 @@ func TestFileResultStorage_GetResultPage(t *testing.T) {
 	}
 
 	if page.Limit != 3 {
-		t.Errorf("page limit mismatch. expected: 3, actual: %d", page.Limit)
+		t.Errorf("lines per page mismatch. expected: 3, actual: %d", page.Limit)
 	}
 
 	if page.TotalLines != 10 {
@@ -212,10 +212,10 @@ func TestFileResultStorage_GetResultPage(t *testing.T) {
 	}
 
 	if page2.Lines[0] != "Line 4" {
-		t.Errorf("second page first line mismatch. expected: Line 4, actual: %s", page2.Lines[0])
+		t.Errorf("first line of second page mismatch. expected: Line 4, actual: %s", page2.Lines[0])
 	}
 
-	// test last page (may be incomplete)
+	// test last page (may not be full)
 	page4, err := storage.GetResultPage(executionID, 4, 3)
 	if err != nil {
 		t.Fatalf("failed to get fourth page: %v", err)
@@ -231,9 +231,9 @@ func TestFileResultStorage_GetResultPage(t *testing.T) {
 		t.Fatalf("failed to get fifth page: %v", err)
 	}
 
-	// out-of-range page number should be corrected to the last page
+	// out-of-range page number should be corrected to last page, so should return last page content
 	if page5.Page != 4 {
-		t.Errorf("out-of-range page number should be corrected to the last page. expected: 4, actual: %d", page5.Page)
+		t.Errorf("out-of-range page number should be corrected to last page. expected: 4, actual: %d", page5.Page)
 	}
 
 	// last page should have only 1 line
@@ -256,7 +256,7 @@ func TestFileResultStorage_SearchResult(t *testing.T) {
 		t.Fatalf("failed to save result: %v", err)
 	}
 
-	// search for lines containing "error" (simple string match)
+	// search for lines containing "error" (simple string matching)
 	matchedLines, err := storage.SearchResult(executionID, "error", false)
 	if err != nil {
 		t.Fatalf("search failed: %v", err)
@@ -266,7 +266,7 @@ func TestFileResultStorage_SearchResult(t *testing.T) {
 		t.Errorf("search result count mismatch. expected: 2, actual: %d", len(matchedLines))
 	}
 
-	// verify search result contents
+	// verify search result content
 	for i, line := range matchedLines {
 		if !strings.Contains(line, "error") {
 			t.Errorf("search result line %d does not contain keyword: %s", i+1, line)
@@ -280,7 +280,7 @@ func TestFileResultStorage_SearchResult(t *testing.T) {
 	}
 
 	if len(noMatch) != 0 {
-		t.Errorf("searching for a non-existent keyword should return empty results. actual: %d lines", len(noMatch))
+		t.Errorf("searching for non-existent keyword should return empty result. actual: %d lines", len(noMatch))
 	}
 
 	// test regex search
@@ -308,7 +308,7 @@ func TestFileResultStorage_FilterResult(t *testing.T) {
 		t.Fatalf("failed to save result: %v", err)
 	}
 
-	// filter lines containing "warning" (simple string match)
+	// filter lines containing "warning" (simple string matching)
 	filteredLines, err := storage.FilterResult(executionID, "warning", false)
 	if err != nil {
 		t.Fatalf("filter failed: %v", err)
@@ -318,7 +318,7 @@ func TestFileResultStorage_FilterResult(t *testing.T) {
 		t.Errorf("filter result count mismatch. expected: 2, actual: %d", len(filteredLines))
 	}
 
-	// verify filter result contents
+	// verify filter result content
 	for i, line := range filteredLines {
 		if !strings.Contains(line, "warning") {
 			t.Errorf("filter result line %d does not contain keyword: %s", i+1, line)
@@ -358,7 +358,7 @@ func TestFileResultStorage_DeleteResult(t *testing.T) {
 		t.Fatalf("failed to delete result: %v", err)
 	}
 
-	// verify files have been deleted
+	// verify files were deleted
 	if _, err := os.Stat(resultPath); !os.IsNotExist(err) {
 		t.Fatal("result file was not deleted")
 	}
@@ -367,10 +367,10 @@ func TestFileResultStorage_DeleteResult(t *testing.T) {
 		t.Fatal("metadata file was not deleted")
 	}
 
-	// test deleting a non-existent execution ID (should not error)
+	// test deleting a non-existent execution ID (should not return an error)
 	err = storage.DeleteResult("nonexistent_id")
 	if err != nil {
-		t.Errorf("deleting a non-existent execution ID should not error: %v", err)
+		t.Errorf("deleting a non-existent execution ID should not return an error: %v", err)
 	}
 }
 
