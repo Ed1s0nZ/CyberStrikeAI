@@ -497,6 +497,132 @@ func (h *AgentHandler) ProcessMessageForRobot(ctx context.Context, conversationI
 	return result.Response, conversationID, nil
 }
 
+// ProcessMessageForRobotStream is like ProcessMessageForRobot but calls notifyFn on significant
+// agent progress events (tool calls, tool results), enabling platforms like Telegram to show
+// live progress updates before the final reply is returned.
+// notifyFn receives a short human-readable description of the current step.
+func (h *AgentHandler) ProcessMessageForRobotStream(
+	ctx context.Context,
+	conversationID, message, role string,
+	notifyFn func(step string),
+) (response string, convID string, err error) {
+	if conversationID == "" {
+		title := safeTruncateString(message, 50)
+		conv, createErr := h.db.CreateConversation(title)
+		if createErr != nil {
+			return "", "", fmt.Errorf("failed to create conversation: %w", createErr)
+		}
+		conversationID = conv.ID
+	} else {
+		if _, getErr := h.db.GetConversation(conversationID); getErr != nil {
+			return "", "", fmt.Errorf("conversation does not exist")
+		}
+	}
+
+	agentHistoryMessages, err := h.loadHistoryFromReActData(conversationID)
+	if err != nil {
+		historyMessages, getErr := h.db.GetMessages(conversationID)
+		if getErr != nil {
+			agentHistoryMessages = []agent.ChatMessage{}
+		} else {
+			agentHistoryMessages = make([]agent.ChatMessage, 0, len(historyMessages))
+			for _, msg := range historyMessages {
+				agentHistoryMessages = append(agentHistoryMessages, agent.ChatMessage{Role: msg.Role, Content: msg.Content})
+			}
+		}
+	}
+
+	finalMessage := message
+	var roleTools, roleSkills []string
+	if role != "" && role != "Default" && h.config.Roles != nil {
+		if r, exists := h.config.Roles[role]; exists && r.Enabled {
+			if r.UserPrompt != "" {
+				finalMessage = r.UserPrompt + "\n\n" + message
+			}
+			roleTools = r.Tools
+			roleSkills = r.Skills
+		}
+	}
+
+	if _, err = h.db.AddMessage(conversationID, "user", message, nil); err != nil {
+		return "", "", fmt.Errorf("failed to save user message: %w", err)
+	}
+
+	assistantMsg, err := h.db.AddMessage(conversationID, "assistant", "Processing...", nil)
+	if err != nil {
+		h.logger.Warn("Robot stream: failed to create assistant message placeholder", zap.Error(err))
+	}
+	var assistantMessageID string
+	if assistantMsg != nil {
+		assistantMessageID = assistantMsg.ID
+	}
+
+	// Build a sendEventFunc that forwards relevant events to notifyFn
+	var sendEventFunc func(eventType, message string, data interface{})
+	if notifyFn != nil {
+		sendEventFunc = func(eventType, evtMessage string, data interface{}) {
+			switch eventType {
+			case "tool_call":
+				if dataMap, ok := data.(map[string]interface{}); ok {
+					if toolName, ok := dataMap["toolName"].(string); ok && toolName != "" {
+						notifyFn("calling tool: " + toolName)
+						return
+					}
+				}
+				if evtMessage != "" {
+					notifyFn(evtMessage)
+				}
+			case "tool_result":
+				if dataMap, ok := data.(map[string]interface{}); ok {
+					if toolName, ok := dataMap["toolName"].(string); ok && toolName != "" {
+						notifyFn("tool result: " + toolName)
+						return
+					}
+				}
+			case "progress":
+				if evtMessage != "" {
+					notifyFn(evtMessage)
+				}
+			}
+		}
+	}
+
+	progressCallback := h.createProgressCallback(conversationID, assistantMessageID, sendEventFunc)
+
+	result, err := h.agent.AgentLoopWithProgress(ctx, finalMessage, agentHistoryMessages, conversationID, progressCallback, roleTools, roleSkills)
+	if err != nil {
+		errMsg := "Execution failed: " + err.Error()
+		if assistantMessageID != "" {
+			_, _ = h.db.Exec("UPDATE messages SET content = ? WHERE id = ?", errMsg, assistantMessageID)
+			_ = h.db.AddProcessDetail(assistantMessageID, conversationID, "error", errMsg, nil)
+		}
+		return "", conversationID, err
+	}
+
+	if assistantMessageID != "" {
+		mcpIDsJSON := ""
+		if len(result.MCPExecutionIDs) > 0 {
+			jsonData, _ := json.Marshal(result.MCPExecutionIDs)
+			mcpIDsJSON = string(jsonData)
+		}
+		_, err = h.db.Exec(
+			"UPDATE messages SET content = ?, mcp_execution_ids = ? WHERE id = ?",
+			result.Response, mcpIDsJSON, assistantMessageID,
+		)
+		if err != nil {
+			h.logger.Warn("Robot stream: failed to update assistant message", zap.Error(err))
+		}
+	} else {
+		if _, err = h.db.AddMessage(conversationID, "assistant", result.Response, result.MCPExecutionIDs); err != nil {
+			h.logger.Warn("Robot stream: failed to save assistant message", zap.Error(err))
+		}
+	}
+	if result.LastReActInput != "" || result.LastReActOutput != "" {
+		_ = h.db.SaveReActData(conversationID, result.LastReActInput, result.LastReActOutput)
+	}
+	return result.Response, conversationID, nil
+}
+
 // StreamEvent streaming event
 type StreamEvent struct {
 	Type    string      `json:"type"`    // conversation, progress, tool_call, tool_result, response, error, cancelled, done

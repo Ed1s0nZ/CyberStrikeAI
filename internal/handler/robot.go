@@ -134,6 +134,105 @@ func (h *RobotHandler) clearConversation(platform, userID string) (newConvID str
 	return conv.ID
 }
 
+// HandleMessageStream processes user input with streaming progress support.
+// progressFn is called during agent execution with short step descriptions (e.g. "calling tool: nmap").
+// For instant commands (help, list, etc.) it behaves identically to HandleMessage.
+// This method satisfies the robot.StreamingMessageHandler interface.
+func (h *RobotHandler) HandleMessageStream(platform, userID, text string, progressFn func(step string)) (reply string) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return "Please enter a message, or send \"help\" to view available commands."
+	}
+
+	// Dispatch commands immediately (no streaming needed)
+	switch {
+	case text == robotCmdHelp || text == "？" || text == "?":
+		return h.cmdHelp()
+	case text == robotCmdList || text == robotCmdListAlt || text == "list":
+		return h.cmdList()
+	case strings.HasPrefix(text, robotCmdSwitch+" ") || strings.HasPrefix(text, robotCmdContinue+" ") || strings.HasPrefix(text, "switch ") || strings.HasPrefix(text, "continue "):
+		var id string
+		switch {
+		case strings.HasPrefix(text, robotCmdSwitch+" "):
+			id = strings.TrimSpace(text[len(robotCmdSwitch)+1:])
+		case strings.HasPrefix(text, robotCmdContinue+" "):
+			id = strings.TrimSpace(text[len(robotCmdContinue)+1:])
+		case strings.HasPrefix(text, "switch "):
+			id = strings.TrimSpace(text[7:])
+		default:
+			id = strings.TrimSpace(text[9:])
+		}
+		return h.cmdSwitch(platform, userID, id)
+	case text == robotCmdNew || text == "new":
+		return h.cmdNew(platform, userID)
+	case text == robotCmdClear || text == "clear":
+		return h.cmdClear(platform, userID)
+	case text == robotCmdCurrent || text == "current":
+		return h.cmdCurrent(platform, userID)
+	case text == robotCmdStop || text == "stop":
+		return h.cmdStop(platform, userID)
+	case text == robotCmdRoles || text == robotCmdRolesList || text == "roles":
+		return h.cmdRoles()
+	case strings.HasPrefix(text, robotCmdRoles+" ") || strings.HasPrefix(text, robotCmdSwitchRole+" ") || strings.HasPrefix(text, "role "):
+		var roleName string
+		switch {
+		case strings.HasPrefix(text, robotCmdRoles+" "):
+			roleName = strings.TrimSpace(text[len(robotCmdRoles)+1:])
+		case strings.HasPrefix(text, robotCmdSwitchRole+" "):
+			roleName = strings.TrimSpace(text[len(robotCmdSwitchRole)+1:])
+		default:
+			roleName = strings.TrimSpace(text[5:])
+		}
+		return h.cmdSwitchRole(platform, userID, roleName)
+	case strings.HasPrefix(text, robotCmdDelete+" ") || strings.HasPrefix(text, "delete "):
+		var convID string
+		if strings.HasPrefix(text, robotCmdDelete+" ") {
+			convID = strings.TrimSpace(text[len(robotCmdDelete)+1:])
+		} else {
+			convID = strings.TrimSpace(text[7:])
+		}
+		return h.cmdDelete(platform, userID, convID)
+	case text == robotCmdVersion || text == "version":
+		return h.cmdVersion()
+	}
+
+	// Regular message: send to Agent with streaming progress
+	convID, _ := h.getOrCreateConversation(platform, userID, text)
+	if convID == "" {
+		return "Unable to create or retrieve conversation. Please try again later."
+	}
+	if conv, err := h.db.GetConversation(convID); err == nil && strings.HasPrefix(conv.Title, "New Conversation ") {
+		newTitle := safeTruncateString(text, 50)
+		if newTitle != "" {
+			_ = h.db.UpdateConversationTitle(convID, newTitle)
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	sk := h.sessionKey(platform, userID)
+	h.cancelMu.Lock()
+	h.runningCancels[sk] = cancel
+	h.cancelMu.Unlock()
+	defer func() {
+		cancel()
+		h.cancelMu.Lock()
+		delete(h.runningCancels, sk)
+		h.cancelMu.Unlock()
+	}()
+	role := h.getRole(platform, userID)
+	resp, newConvID, err := h.agentHandler.ProcessMessageForRobotStream(ctx, convID, text, role, progressFn)
+	if err != nil {
+		h.logger.Warn("bot agent streaming execution failed", zap.String("platform", platform), zap.String("userID", userID), zap.Error(err))
+		if errors.Is(err, context.Canceled) {
+			return "Task cancelled."
+		}
+		return "Processing failed: " + err.Error()
+	}
+	if newConvID != convID {
+		h.setConversation(platform, userID, newConvID)
+	}
+	return resp
+}
+
 // HandleMessage processes user input and returns a reply string (called by each platform webhook).
 func (h *RobotHandler) HandleMessage(platform, userID, text string) (reply string) {
 	text = strings.TrimSpace(text)

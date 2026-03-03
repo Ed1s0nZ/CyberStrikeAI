@@ -45,10 +45,11 @@ type App struct {
 	knowledgeIndexer   *knowledge.Indexer        // knowledge base indexer (for dynamic initialization)
 	knowledgeHandler   *handler.KnowledgeHandler // knowledge base handler (for dynamic initialization)
 	agentHandler       *handler.AgentHandler     // Agent handler (for updating knowledge base manager)
-	robotHandler       *handler.RobotHandler     // robot handler (DingTalk/Lark/WeCom)
-	robotMu            sync.Mutex                 // protects DingTalk/Lark long connection cancel
+	robotHandler       *handler.RobotHandler     // robot handler (DingTalk/Lark/WeCom/Telegram)
+	robotMu            sync.Mutex                 // protects DingTalk/Lark/Telegram long connection cancel
 	dingCancel         context.CancelFunc        // DingTalk Stream cancel function, used to restart on config change
 	larkCancel         context.CancelFunc        // Lark long connection cancel function, used to restart on config change
+	telegramCancel     context.CancelFunc        // Telegram polling cancel function, used to restart on config change
 }
 
 // New creates a new application
@@ -468,7 +469,7 @@ func (a *App) Run() error {
 
 // Shutdown shuts down the application
 func (a *App) Shutdown() {
-	// stop DingTalk/Lark long connections
+	// stop DingTalk/Lark/Telegram long connections
 	a.robotMu.Lock()
 	if a.dingCancel != nil {
 		a.dingCancel()
@@ -477,6 +478,10 @@ func (a *App) Shutdown() {
 	if a.larkCancel != nil {
 		a.larkCancel()
 		a.larkCancel = nil
+	}
+	if a.telegramCancel != nil {
+		a.telegramCancel()
+		a.telegramCancel = nil
 	}
 	a.robotMu.Unlock()
 
@@ -493,7 +498,7 @@ func (a *App) Shutdown() {
 	}
 }
 
-// startRobotConnections starts DingTalk/Lark long connections based on current config (does not close existing connections, for initial startup only)
+// startRobotConnections starts DingTalk/Lark/Telegram long connections based on current config (does not close existing connections, for initial startup only)
 func (a *App) startRobotConnections() {
 	a.robotMu.Lock()
 	defer a.robotMu.Unlock()
@@ -508,9 +513,14 @@ func (a *App) startRobotConnections() {
 		a.dingCancel = cancel
 		go robot.StartDing(ctx, cfg.Robots.Dingtalk, a.robotHandler, a.logger.Logger)
 	}
+	if cfg.Robots.Telegram.Enabled && cfg.Robots.Telegram.BotToken != "" {
+		ctx, cancel := context.WithCancel(context.Background())
+		a.telegramCancel = cancel
+		go robot.StartTelegram(ctx, cfg.Robots.Telegram, a.robotHandler, a.logger.Logger)
+	}
 }
 
-// RestartRobotConnections restarts DingTalk/Lark long connections so frontend config changes take effect immediately (implements handler.RobotRestarter)
+// RestartRobotConnections restarts DingTalk/Lark/Telegram long connections so frontend config changes take effect immediately (implements handler.RobotRestarter)
 func (a *App) RestartRobotConnections() {
 	a.robotMu.Lock()
 	if a.dingCancel != nil {
@@ -520,6 +530,10 @@ func (a *App) RestartRobotConnections() {
 	if a.larkCancel != nil {
 		a.larkCancel()
 		a.larkCancel = nil
+	}
+	if a.telegramCancel != nil {
+		a.telegramCancel()
+		a.telegramCancel = nil
 	}
 	a.robotMu.Unlock()
 	// give old goroutines a moment to exit

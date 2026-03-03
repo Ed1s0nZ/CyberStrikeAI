@@ -179,6 +179,7 @@ async function loadConfig(loadTools = true) {
         const wecom = robots.wecom || {};
         const dingtalk = robots.dingtalk || {};
         const lark = robots.lark || {};
+        const telegram = robots.telegram || {};
         const wecomEnabled = document.getElementById('robot-wecom-enabled');
         if (wecomEnabled) wecomEnabled.checked = wecom.enabled === true;
         const wecomToken = document.getElementById('robot-wecom-token');
@@ -205,7 +206,13 @@ async function loadConfig(loadTools = true) {
         if (larkAppSecret) larkAppSecret.value = lark.app_secret || '';
         const larkVerify = document.getElementById('robot-lark-verify-token');
         if (larkVerify) larkVerify.value = lark.verify_token || '';
-        
+        const telegramEnabled = document.getElementById('robot-telegram-enabled');
+        if (telegramEnabled) telegramEnabled.checked = telegram.enabled === true;
+        const telegramBotToken = document.getElementById('robot-telegram-bot-token');
+        if (telegramBotToken) telegramBotToken.value = telegram.bot_token || '';
+        const telegramAllowedIds = document.getElementById('robot-telegram-allowed-user-ids');
+        if (telegramAllowedIds) telegramAllowedIds.value = (telegram.allowed_user_ids || []).join(',');
+
         // Only load tool list when needed (MCP management page needs it, system settings does not)
         if (loadTools) {
             // Set per-page count (will be set when pagination controls render)
@@ -766,6 +773,15 @@ async function applySettings() {
                     app_id: document.getElementById('robot-lark-app-id')?.value.trim() || '',
                     app_secret: document.getElementById('robot-lark-app-secret')?.value.trim() || '',
                     verify_token: document.getElementById('robot-lark-verify-token')?.value.trim() || ''
+                },
+                telegram: {
+                    enabled: document.getElementById('robot-telegram-enabled')?.checked === true,
+                    bot_token: document.getElementById('robot-telegram-bot-token')?.value.trim() || '',
+                    allowed_user_ids: (() => {
+                        const raw = document.getElementById('robot-telegram-allowed-user-ids')?.value.trim() || '';
+                        if (!raw) return [];
+                        return raw.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+                    })()
                 }
             },
             tools: []

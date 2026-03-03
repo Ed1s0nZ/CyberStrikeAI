@@ -40,6 +40,7 @@ This roadmap outlines the planned development trajectory for CyberStrikeAI. Item
 
 ### Integrations & UX
 - ✅ DingTalk and Lark (Feishu) chatbot via persistent long-lived connections
+- ✅ Telegram bot via long-polling — multi-user, progress streaming, MCP tool control, role and conversation management; configurable via Web UI
 - ✅ Web console with terminal, task monitor, conversation groups, and role selector
 - ✅ Conversation grouping — pinning, renaming, batch management
 - ✅ MCP stdio mode for Cursor / IDE integration
@@ -66,6 +67,8 @@ This roadmap outlines the planned development trajectory for CyberStrikeAI. Item
 - 📋 **Slack / Teams bot** — extend the chatbot system to Slack and Microsoft Teams
 - 📋 **Webhook notifications** — send task completion, vulnerability discovery, or attack-chain events to external systems (Slack, PagerDuty, etc.)
 - 📋 **JIRA / GitHub Issues integration** — automatically create issues from discovered vulnerabilities
+- 📋 **Telegram inline keyboard** — add interactive buttons (confirm/cancel actions, quick role switching) to Telegram bot responses
+- 📋 **Telegram file transfer** — send large tool output as downloadable files when the result exceeds the message size limit
 
 ---
 
@@ -132,3 +135,22 @@ See [README.md](README.md) for development setup instructions.
 ---
 
 *Last updated: 2026-03-03. This roadmap is subject to change. Follow the repository to stay updated.*
+
+---
+
+## Telegram Bot — Detailed Roadmap
+
+The Telegram integration (shipped in v1.3.17) provides a foundation for deeper mobile-first control. The following items extend it further:
+
+| Item | Status | Description |
+|------|--------|-------------|
+| Long-polling bot with multi-user support | ✅ | Independent sessions per Telegram user ID |
+| Live progress streaming | ✅ | Placeholder message edited with tool-call steps during execution |
+| Role switching via bot commands | ✅ | `role <name>` command supported in Telegram |
+| MCP tool configuration via Web UI | ✅ | Tools added/toggled in settings are immediately available to the bot |
+| User whitelist (allowed_user_ids) | ✅ | Restrict bot access to specific Telegram user IDs |
+| Group chat support (@ mentions) | ✅ | Bot responds to @mention in groups |
+| Inline keyboard for confirmations | 📋 | Buttons for dangerous actions (delete, stop) |
+| File upload for large results | 📋 | Send results >4096 chars as a `.txt` file |
+| Telegram webhook mode (optional) | 📋 | Alternative to polling for low-latency deployments with public IP |
+| `/start` onboarding message | 📋 | Automatic welcome message with quick-start tips on first contact |

@@ -142,6 +142,10 @@ robots:
     app_id: ""
     app_secret: ""
     verify_token: ""
+  telegram: # Telegram
+    enabled: false
+    bot_token: ""           # Bot token from @BotFather (/newbot)
+    allowed_user_ids: []    # Whitelist of Telegram user IDs; leave empty to allow all users
 
 # ============================================
 # Skills Configuration

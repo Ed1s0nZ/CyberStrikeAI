@@ -1298,6 +1298,30 @@
                                     </div>
                                 </div>
 
+                                <!-- Telegram -->
+                                <div class="settings-subsection">
+                                    <h4>Telegram</h4>
+                                    <div class="settings-form">
+                                        <div class="form-group">
+                                            <label class="checkbox-label">
+                                                <input type="checkbox" id="robot-telegram-enabled" class="modern-checkbox" />
+                                                <span class="checkbox-custom"></span>
+                                                <span class="checkbox-text">Enable Telegram bot</span>
+                                            </label>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="robot-telegram-bot-token">Bot Token</label>
+                                            <input type="password" id="robot-telegram-bot-token" placeholder="Token from @BotFather (e.g. 123456:ABC-DEF...)" autocomplete="off" />
+                                            <small class="form-hint">Get a token by messaging @BotFather on Telegram and creating a new bot with /newbot</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="robot-telegram-allowed-user-ids">Allowed User IDs (optional)</label>
+                                            <input type="text" id="robot-telegram-allowed-user-ids" placeholder="e.g. 123456789,987654321 (comma-separated; leave empty to allow all users)" autocomplete="off" />
+                                            <small class="form-hint">Comma-separated Telegram user IDs allowed to use the bot. Leave empty to allow all users. Find your ID via @userinfobot</small>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div class="settings-subsection">
                                     <h4>Bot Command Reference</h4>
                                     <p class="settings-description">The following commands can be sent in a conversation:</p>

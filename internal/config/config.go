@@ -31,11 +31,12 @@ type Config struct {
 	SkillsDir   string                `yaml:"skills_dir,omitempty" json:"skills_dir,omitempty"` // Skills configuration file directory
 }
 
-// RobotsConfig holds bot configuration for DingTalk, Lark/Feishu, etc.
+// RobotsConfig holds bot configuration for DingTalk, Lark/Feishu, Telegram, etc.
 type RobotsConfig struct {
-	Wecom   RobotWecomConfig   `yaml:"wecom,omitempty" json:"wecom,omitempty"`     // WeCom (Enterprise WeChat)
+	Wecom    RobotWecomConfig    `yaml:"wecom,omitempty" json:"wecom,omitempty"`       // WeCom (Enterprise WeChat)
 	Dingtalk RobotDingtalkConfig `yaml:"dingtalk,omitempty" json:"dingtalk,omitempty"` // DingTalk
-	Lark    RobotLarkConfig    `yaml:"lark,omitempty" json:"lark,omitempty"`     // Lark (Feishu)
+	Lark     RobotLarkConfig     `yaml:"lark,omitempty" json:"lark,omitempty"`         // Lark (Feishu)
+	Telegram RobotTelegramConfig `yaml:"telegram,omitempty" json:"telegram,omitempty"` // Telegram
 }
 
 // RobotWecomConfig holds the WeCom (Enterprise WeChat) bot configuration.
@@ -57,10 +58,17 @@ type RobotDingtalkConfig struct {
 
 // RobotLarkConfig holds the Lark (Feishu) bot configuration.
 type RobotLarkConfig struct {
-	Enabled   bool   `yaml:"enabled" json:"enabled"`
-	AppID     string `yaml:"app_id" json:"app_id"`         // Application App ID
-	AppSecret string `yaml:"app_secret" json:"app_secret"` // Application App Secret
+	Enabled     bool   `yaml:"enabled" json:"enabled"`
+	AppID       string `yaml:"app_id" json:"app_id"`             // Application App ID
+	AppSecret   string `yaml:"app_secret" json:"app_secret"`     // Application App Secret
 	VerifyToken string `yaml:"verify_token" json:"verify_token"` // Event subscription Verification Token (optional)
+}
+
+// RobotTelegramConfig holds the Telegram bot configuration.
+type RobotTelegramConfig struct {
+	Enabled        bool    `yaml:"enabled" json:"enabled"`
+	BotToken       string  `yaml:"bot_token" json:"bot_token"`                               // Bot token from @BotFather
+	AllowedUserIDs []int64 `yaml:"allowed_user_ids,omitempty" json:"allowed_user_ids,omitempty"` // Whitelist of Telegram user IDs; empty = allow all
 }
 
 type ServerConfig struct {
