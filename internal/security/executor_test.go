@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// setupTestExecutor creates an Executor instance for testing
+// setupTestExecutor creates an executor for testing
 func setupTestExecutor(t *testing.T) (*Executor, *mcp.Server) {
 	logger := zap.NewNop()
 	mcpServer := mcp.NewServer(logger)
@@ -72,7 +72,7 @@ func TestExecutor_ExecuteInternalTool_QueryExecutionResult(t *testing.T) {
 	}
 
 	if toolResult.IsError {
-		t.Fatalf("query should succeed but returned error: %s", toolResult.Content[0].Text)
+		t.Fatalf("query should succeed but returned an error: %s", toolResult.Content[0].Text)
 	}
 
 	// verify result contains expected content
@@ -81,8 +81,8 @@ func TestExecutor_ExecuteInternalTool_QueryExecutionResult(t *testing.T) {
 		t.Errorf("result should contain execution ID: %s", executionID)
 	}
 
-	if !strings.Contains(resultText, "page 1/") {
-		t.Errorf("result should contain pagination information")
+	if !strings.Contains(resultText, "Page 1/") {
+		t.Errorf("result should contain pagination info")
 	}
 
 	// test 2: search functionality
@@ -99,7 +99,7 @@ func TestExecutor_ExecuteInternalTool_QueryExecutionResult(t *testing.T) {
 	}
 
 	if toolResult2.IsError {
-		t.Fatalf("search should succeed but returned error: %s", toolResult2.Content[0].Text)
+		t.Fatalf("search should succeed but returned an error: %s", toolResult2.Content[0].Text)
 	}
 
 	resultText2 := toolResult2.Content[0].Text
@@ -121,7 +121,7 @@ func TestExecutor_ExecuteInternalTool_QueryExecutionResult(t *testing.T) {
 	}
 
 	if toolResult3.IsError {
-		t.Fatalf("filter should succeed but returned error: %s", toolResult3.Content[0].Text)
+		t.Fatalf("filter should succeed but returned an error: %s", toolResult3.Content[0].Text)
 	}
 
 	resultText3 := toolResult3.Content[0].Text
@@ -184,7 +184,7 @@ func TestExecutor_ExecuteInternalTool_UnknownTool(t *testing.T) {
 
 func TestExecutor_ExecuteInternalTool_NoStorage(t *testing.T) {
 	executor, _ := setupTestExecutor(t)
-	// do not set storage, testing uninitialized case
+	// do not set storage, test uninitialized case
 
 	ctx := context.Background()
 	args := map[string]interface{}{
@@ -200,8 +200,8 @@ func TestExecutor_ExecuteInternalTool_NoStorage(t *testing.T) {
 		t.Fatal("uninitialized storage should return an error")
 	}
 
-	if !strings.Contains(toolResult.Content[0].Text, "result storage is not initialized") {
-		t.Errorf("error message should contain 'result storage is not initialized'")
+	if !strings.Contains(toolResult.Content[0].Text, "result storage not initialized") {
+		t.Errorf("error message should contain 'result storage not initialized'")
 	}
 }
 
@@ -259,7 +259,7 @@ func TestPaginateLines(t *testing.T) {
 	// test empty list
 	emptyPage := paginateLines([]string{}, 1, 10)
 	if emptyPage.TotalLines != 0 {
-		t.Errorf("empty list total lines should be 0. actual: %d", emptyPage.TotalLines)
+		t.Errorf("total lines for empty list should be 0. actual: %d", emptyPage.TotalLines)
 	}
 	if len(emptyPage.Lines) != 0 {
 		t.Errorf("empty list should return empty result. actual: %d lines", len(emptyPage.Lines))
