@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"html"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -51,6 +52,7 @@ type App struct {
 	dingCancel         context.CancelFunc        // DingTalk Stream cancel function, used to restart on config change
 	larkCancel         context.CancelFunc        // Lark long connection cancel function, used to restart on config change
 	telegramCancel     context.CancelFunc        // Telegram polling cancel function, used to restart on config change
+	indexHTML          string                    // cached index.html content
 }
 
 // New creates a new application
@@ -391,6 +393,13 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 		agentHandler:       agentHandler,
 		robotHandler:       robotHandler,
 	}
+	// cache index.html at startup to avoid per-request disk reads
+	indexHTMLBytes, err := os.ReadFile("web/templates/index.html")
+	if err != nil {
+		log.Logger.Fatal("failed to load index.html", zap.Error(err))
+	}
+	app.indexHTML = string(indexHTMLBytes)
+
 	// Lark/DingTalk long connections (no public network needed), start in background when enabled; will be restarted via RestartRobotConnections when frontend applies config
 	app.startRobotConnections()
 
@@ -898,7 +907,9 @@ func setupRoutes(
 		if version == "" {
 			version = "v1.0.0"
 		}
-		c.HTML(http.StatusOK, "index.html", gin.H{"Version": version})
+		safeVersion := html.EscapeString(version)
+		body := strings.Replace(app.indexHTML, "{{.Version}}", safeVersion, 1)
+		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(body))
 	})
 }
 
