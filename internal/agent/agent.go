@@ -27,6 +27,7 @@ type Agent struct {
 	memoryCompressor      *MemoryCompressor
 	persistentMemory      *PersistentMemory  // long-lived key-value memory that survives compression
 	timeAwareness         *TimeAwareness     // temporal context injector
+	ragInjector           *RAGContextInjector // proactive RAG knowledge injection
 	mcpServer             *mcp.Server
 	externalMCPMgr        *mcp.ExternalMCPManager // external MCP manager
 	logger                *zap.Logger
@@ -176,6 +177,16 @@ func (a *Agent) SetTimeAwareness(ta *TimeAwareness) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.timeAwareness = ta
+}
+
+// SetRAGInjector attaches a RAGContextInjector to the agent.
+// When set, relevant knowledge-base content is proactively retrieved at the
+// start of every AgentLoop run and injected into the system prompt so the
+// LLM can immediately leverage it for tool selection and exploit guidance.
+func (a *Agent) SetRAGInjector(ri *RAGContextInjector) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.ragInjector = ri
 }
 
 // ChatMessage represents a chat message
@@ -521,6 +532,7 @@ Skills Library:
 	a.mu.RLock()
 	ta := a.timeAwareness
 	pm := a.persistentMemory
+	ri := a.ragInjector
 	a.mu.RUnlock()
 	if ta != nil {
 		if block := ta.BuildContextBlock(); block != "" {
@@ -531,6 +543,14 @@ Skills Library:
 	if pm != nil {
 		if block := pm.BuildContextBlock(); block != "" {
 			systemPrompt = block + "\n" + systemPrompt
+		}
+	}
+	// Proactive RAG injection: retrieve knowledge relevant to the user's
+	// current request and embed it in the system prompt so the agent can
+	// immediately apply the correct techniques and tool recommendations.
+	if ri != nil {
+		if block := ri.BuildContextBlock(ctx, userInput); block != "" {
+			systemPrompt = systemPrompt + "\n" + block
 		}
 	}
 

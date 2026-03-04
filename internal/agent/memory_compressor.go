@@ -36,6 +36,8 @@ Key information that MUST be preserved:
 - Current assessment progress
 - Failed attempts and dead ends (to avoid repeated work)
 - All decision records regarding testing strategy
+- Knowledge base citations and retrieved exploitation techniques (record which knowledge items were consulted and their key findings)
+- Tool selection rationale derived from retrieved knowledge (retain the "why" behind tool choices)
 
 Compression guidelines:
 - Retain precise technical details (URLs, paths, parameters, payloads, etc.)
@@ -43,8 +45,9 @@ Compression guidelines:
 - Record version numbers and identified technologies/components
 - Retain original error messages that may indicate vulnerabilities
 - Consolidate duplicate or similar findings into a single conclusion with a common description
+- When summarising knowledge-base lookups, preserve the category name, knowledge item title, and key technique or payload referenced
 
-Remember: another security agent will rely on this summary to continue testing and must be able to take over seamlessly without losing any operational context.
+Remember: another security agent will rely on this summary to continue testing and must be able to take over seamlessly without losing any operational context, including knowledge that was previously retrieved from the knowledge base.
 
 Conversation segments to compress:
 %s

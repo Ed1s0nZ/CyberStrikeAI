@@ -246,6 +246,17 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 		knowledgeHandler = handler.NewKnowledgeHandler(knowledgeManager, knowledgeRetriever, knowledgeIndexer, db, log.Logger)
 		log.Logger.Info("knowledge base module initialization complete", zap.Bool("handler_created", knowledgeHandler != nil))
 
+		// attach proactive RAG context injector to the agent so that relevant
+		// knowledge is automatically embedded in the system prompt at the start
+		// of every agent loop run.
+		ragInjector := agent.NewRAGContextInjector(
+			knowledgeRetriever,
+			log.Logger,
+			agent.RAGContextConfig{}, // use library defaults
+		)
+		agentInstance.SetRAGInjector(ragInjector)
+		log.Logger.Info("RAG context injector attached to agent")
+
 		// scan knowledge base and build index (async)
 		go func() {
 			itemsToIndex, err := knowledgeManager.ScanKnowledgeBase()
@@ -441,6 +452,15 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 			// set retriever updater so ApplyConfig can update retriever config
 			configHandler.SetRetrieverUpdater(app.knowledgeRetriever)
 			log.Logger.Info("knowledge base tool registrar and retriever updater set after dynamic initialization")
+
+			// attach RAG context injector to the agent when knowledge is dynamically enabled
+			ragInjector := agent.NewRAGContextInjector(
+				app.knowledgeRetriever,
+				log.Logger,
+				agent.RAGContextConfig{},
+			)
+			agentInstance.SetRAGInjector(ragInjector)
+			log.Logger.Info("RAG context injector attached to agent (dynamic init)")
 		}
 
 		return knowledgeHandler, nil

@@ -4,6 +4,7 @@ import (
 	"math"
 	"strings"
 	"sync"
+	"unicode"
 )
 
 // BM25Params holds tunable BM25 Okapi parameters.
@@ -225,9 +226,101 @@ func (idx *BM25Index) fallbackScore(queryTerms []string, docTF map[string]int, d
 	return score / float64(len(queryTerms))
 }
 
-// tokenise lower-cases and splits text into tokens.
+// bm25StopWords is a set of common English stop words that carry little
+// discriminating power in BM25 scoring.  Security-domain terms are NOT
+// included here because short technical abbreviations like "rce", "xss",
+// "sqli", "lfi", "ssrf", etc. are intentionally meaningful.
+var bm25StopWords = map[string]struct{}{
+	"a": {}, "an": {}, "and": {}, "are": {}, "as": {}, "at": {},
+	"be": {}, "been": {}, "being": {}, "by": {},
+	"do": {}, "does": {}, "did": {},
+	"for": {}, "from": {},
+	"has": {}, "have": {}, "he": {}, "her": {}, "him": {}, "his": {},
+	"how": {},
+	"i": {}, "if": {}, "in": {}, "into": {}, "is": {}, "it": {}, "its": {},
+	"me": {},
+	"no": {}, "not": {},
+	"of": {}, "on": {}, "or": {},
+	"our": {},
+	"s": {}, "she": {}, "so": {},
+	"that": {}, "the": {}, "their": {}, "them": {}, "then": {}, "there": {},
+	"these": {}, "they": {}, "this": {}, "those": {}, "through": {}, "to": {},
+	"too": {},
+	"up": {}, "use": {}, "used": {}, "uses": {}, "using": {},
+	"was": {}, "we": {}, "were": {}, "what": {}, "when": {}, "where": {},
+	"which": {}, "while": {}, "who": {}, "will": {}, "with": {},
+	"you": {}, "your": {},
+}
+
+// securityAliases maps common security abbreviations / misspellings to a
+// canonical normalised form so that, for example, "sqli" and "sql injection"
+// both produce the token "sqlinj" in the index and in queries.
+var securityAliases = map[string]string{
+	"sqli":          "sqlinj",
+	"sql-injection": "sqlinj",
+	"sqlinjection":  "sqlinj",
+	"xss":           "xss",
+	"cross-site":    "xss",
+	"crosssite":     "xss",
+	"lfi":           "lfi",
+	"rfi":           "rfi",
+	"rce":           "rce",
+	"ssrf":          "ssrf",
+	"ssti":          "ssti",
+	"idor":          "idor",
+	"csrf":          "csrf",
+	"xxe":           "xxe",
+	"oob":           "ooob",  // out-of-band
+	"ooob":          "ooob",
+	"open-redirect": "openredirect",
+	"openredirect":  "openredirect",
+	"path-traversal": "pathtraversal",
+	"pathtraversal": "pathtraversal",
+	"dir-traversal": "pathtraversal",
+	"deserializ":    "deserial",
+	"deserialization": "deserial",
+	"cmd-injection": "cmdinj",
+	"cmdinjection":  "cmdinj",
+	"command-injection": "cmdinj",
+}
+
+// tokenise lower-cases, normalises punctuation, removes stop words, applies
+// security-domain aliases, and splits text into tokens suitable for BM25
+// indexing and scoring.
 func tokenise(text string) []string {
-	return strings.Fields(strings.ToLower(text))
+	// Replace common punctuation with spaces to split on them.
+	var buf strings.Builder
+	for _, r := range strings.ToLower(text) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' || r == '_' {
+			buf.WriteRune(r)
+		} else {
+			buf.WriteRune(' ')
+		}
+	}
+	raw := strings.Fields(buf.String())
+
+	tokens := make([]string, 0, len(raw))
+	for _, tok := range raw {
+		// Remove leading/trailing hyphens and underscores (artifact of splitting).
+		tok = strings.Trim(tok, "-_")
+		if len(tok) < 2 {
+			// Drop single-character tokens; they are almost always noise.
+			continue
+		}
+
+		// Apply stop-word filter.
+		if _, isStop := bm25StopWords[tok]; isStop {
+			continue
+		}
+
+		// Apply security alias normalisation.
+		if alias, ok := securityAliases[tok]; ok {
+			tok = alias
+		}
+
+		tokens = append(tokens, tok)
+	}
+	return tokens
 }
 
 // BM25CorpusIndexer is a convenience wrapper that keeps a live BM25Index in
