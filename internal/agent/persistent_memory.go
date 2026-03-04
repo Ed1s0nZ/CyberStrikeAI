@@ -226,6 +226,49 @@ func (pm *PersistentMemory) List(category MemoryCategory, limit int) ([]*MemoryE
 	return pm.scanRows(rows)
 }
 
+// UpdateByID updates the key, value, and category of an existing memory entry
+// identified by its UUID. Returns an error if the entry is not found.
+func (pm *PersistentMemory) UpdateByID(id, key, value string, category MemoryCategory) (*MemoryEntry, error) {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	now := time.Now().UTC()
+
+	res, err := pm.db.Exec(
+		"UPDATE agent_memories SET key = ?, value = ?, category = ?, updated_at = ? WHERE id = ?",
+		key, value, string(category), now, id,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("update memory by id: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return nil, fmt.Errorf("memory entry not found: %s", id)
+	}
+
+	pm.logger.Debug("updated persistent memory by id", zap.String("id", id), zap.String("key", key))
+
+	var e MemoryEntry
+	var convID sql.NullString
+	var createdAtStr, updatedAtStr string
+	err = pm.db.QueryRow(
+		"SELECT id, key, value, category, conversation_id, created_at, updated_at FROM agent_memories WHERE id = ?", id,
+	).Scan(&e.ID, &e.Key, &e.Value, &e.Category, &convID, &createdAtStr, &updatedAtStr)
+	if err != nil {
+		return nil, fmt.Errorf("fetch updated memory: %w", err)
+	}
+	if convID.Valid {
+		e.ConversationID = convID.String
+	}
+	if t, parseErr := time.Parse(time.RFC3339Nano, createdAtStr); parseErr == nil {
+		e.CreatedAt = t
+	}
+	if t, parseErr := time.Parse(time.RFC3339Nano, updatedAtStr); parseErr == nil {
+		e.UpdatedAt = t
+	}
+	return &e, nil
+}
+
 // Delete removes a memory entry by ID. Returns nil if the entry did not exist.
 func (pm *PersistentMemory) Delete(id string) error {
 	pm.mu.Lock()

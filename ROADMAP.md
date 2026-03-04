@@ -58,7 +58,7 @@ This roadmap outlines the planned development trajectory for CyberStrikeAI. Item
 ### Agent & Orchestration
 - ✅ **Parallel tool execution** — agent fans out independent tool calls concurrently to reduce total time on multi-step engagements
 - ✅ **Agent memory improvements** — persistent cross-session memory store with category tagging; BM25 corpus index for smarter knowledge retrieval
-- 📋 **Memory UI panel** — web interface to view, search, edit, and delete persistent memory entries
+- ✅ **Memory UI panel** — web interface to view, search, edit, and delete persistent memory entries; category filters; stats strip; bulk delete
 - 📋 **Memory expiry / TTL** — optional time-to-live on memory entries so stale facts are automatically purged
 - 📋 **Structured task templates** — YAML-defined recon/pentest playbooks that the agent can load and execute end-to-end
 - 📋 **Tool chaining macros** — define multi-step pipelines (e.g., subfinder → httpx → nuclei) as a single named operation
@@ -84,7 +84,7 @@ This roadmap outlines the planned development trajectory for CyberStrikeAI. Item
 ### AI & Automation
 - 📋 **Multi-model routing** — automatically select the best model (reasoning model for complex planning, faster model for tool execution) to optimize cost and latency
 - 📋 **Autonomous recon-to-report pipeline** — fully automated end-to-end pentest workflow from target scoping to final report generation
-- 📋 **RAG-enhanced agent** — deeper integration of the knowledge base into agent decision-making for better tool selection and exploit guidance
+- ✅ **RAG-enhanced agent** — deeper integration of the knowledge base into agent decision-making for better tool selection and exploit guidance; proactive context injection based on task semantics
 - 📋 **Custom agent personas** — allow organizations to define their own agent behavior, escalation rules, and toolset restrictions
 - 📋 **Fine-tuned security model support** — tested integration with security-focused fine-tuned models
 
@@ -142,7 +142,7 @@ See [README.md](README.md) for development setup instructions.
 
 ---
 
-*Last updated: 2026-03-04. This roadmap is subject to change. Follow the repository to stay updated.*
+*Last updated: 2026-03-04 — Memory UI panel shipped; RAG-enhanced agent graduated from planned to released. This roadmap is subject to change. Follow the repository to stay updated.*
 
 ---
 

@@ -201,6 +201,16 @@
                             </div>
                         </div>
                     </div>
+                    <div class="nav-item" data-page="memory">
+                        <div class="nav-item-content" data-title="Memory" onclick="switchPage('memory')">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                            </svg>
+                            <span>Memory</span>
+                        </div>
+                    </div>
                     <div class="nav-item" data-page="settings">
                         <div class="nav-item-content" data-title="System Settings" onclick="switchPage('settings')">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1055,6 +1065,104 @@
                             <div class="loading-spinner">Loading...</div>
                         </div>
                         <div id="skills-pagination" class="pagination-container pagination-fixed"></div>
+                    </div>
+                </div>
+
+                <!-- Memory management page -->
+                <div id="page-memory" class="page">
+                    <div class="page-header">
+                        <h2>Memory</h2>
+                        <div class="page-header-actions">
+                            <button class="btn-primary" onclick="openCreateMemoryModal()">+ Add Entry</button>
+                            <button class="btn-secondary" onclick="loadMemoryEntries(); loadMemoryStats();" title="Refresh">Refresh</button>
+                        </div>
+                    </div>
+
+                    <!-- Notification bar -->
+                    <div id="memory-notification" class="memory-notification" style="display:none;"></div>
+
+                    <!-- Stats strip -->
+                    <div id="memory-stats" class="memory-stats-strip"></div>
+
+                    <!-- Toolbar: search + category filters + bulk actions -->
+                    <div class="memory-toolbar">
+                        <div class="memory-search-box">
+                            <svg class="memory-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                            <input
+                                id="memory-search-input"
+                                type="text"
+                                placeholder="Search by key or value…"
+                                oninput="onMemorySearchInput(this.value)"
+                                onkeydown="if(event.key==='Escape') clearMemorySearch()"
+                            />
+                            <button id="memory-search-clear" class="memory-search-clear" onclick="clearMemorySearch()" style="display:none;" title="Clear search">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                                    <path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="memory-filter-strip">
+                            <button class="memory-filter-btn" data-cat="" onclick="filterMemoryByCategory('')">All</button>
+                            <button class="memory-filter-btn memory-cat-credential" data-cat="credential" onclick="filterMemoryByCategory('credential')">Credential</button>
+                            <button class="memory-filter-btn memory-cat-target" data-cat="target" onclick="filterMemoryByCategory('target')">Target</button>
+                            <button class="memory-filter-btn memory-cat-vulnerability" data-cat="vulnerability" onclick="filterMemoryByCategory('vulnerability')">Vulnerability</button>
+                            <button class="memory-filter-btn memory-cat-fact" data-cat="fact" onclick="filterMemoryByCategory('fact')">Fact</button>
+                            <button class="memory-filter-btn memory-cat-note" data-cat="note" onclick="filterMemoryByCategory('note')">Note</button>
+                        </div>
+                        <div class="memory-toolbar-right">
+                            <span id="memory-count" class="memory-count"></span>
+                            <button class="btn-danger-outline" onclick="deleteAllMemories()" title="Delete all visible entries">Delete All</button>
+                        </div>
+                    </div>
+
+                    <!-- Entry list -->
+                    <div id="memory-list" class="memory-list"></div>
+                </div>
+
+                <!-- Memory create/edit modal -->
+                <div id="memory-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this) closeMemoryModal()">
+                    <div class="modal-container modal-medium">
+                        <div class="modal-header">
+                            <h3 id="memory-modal-title">Add Memory Entry</h3>
+                            <button class="modal-close" onclick="closeMemoryModal()">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label for="memory-modal-key">Key <span class="required">*</span></label>
+                                <input type="text" id="memory-modal-key" placeholder="e.g. admin_password" autocomplete="off" />
+                            </div>
+                            <div class="form-group">
+                                <label for="memory-modal-value">Value <span class="required">*</span></label>
+                                <textarea id="memory-modal-value" rows="4" placeholder="The fact or value to remember…"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="memory-modal-category">Category</label>
+                                <select id="memory-modal-category">
+                                    <option value="fact">Fact</option>
+                                    <option value="credential">Credential</option>
+                                    <option value="target">Target</option>
+                                    <option value="vulnerability">Vulnerability</option>
+                                    <option value="note">Note</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="memory-modal-conv-id">Conversation ID <span class="optional">(optional)</span></label>
+                                <input type="text" id="memory-modal-conv-id" placeholder="Leave blank for session-independent memory" autocomplete="off" />
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn-secondary" onclick="closeMemoryModal()">Cancel</button>
+                            <button class="btn-primary" id="memory-modal-save" onclick="saveMemoryEntry()">Save</button>
+                        </div>
                     </div>
                 </div>
 
@@ -2197,6 +2305,7 @@ Skill content goes here...</small>
     <script src="/static/js/vulnerability.js?v=4"></script>
     <script src="/static/js/tasks.js"></script>
     <script src="/static/js/roles.js"></script>
+    <script src="/static/js/memory.js"></script>
 </body>
 </html>
 

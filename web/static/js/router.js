@@ -8,7 +8,7 @@ function initRouter() {
     if (hash) {
         const hashParts = hash.split('?');
         const pageId = hashParts[0];
-        if (pageId && ['dashboard', 'chat', 'info-collect', 'vulnerabilities', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'roles-management', 'skills-monitor', 'skills-management', 'settings', 'tasks'].includes(pageId)) {
+        if (pageId && ['dashboard', 'chat', 'info-collect', 'vulnerabilities', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'roles-management', 'skills-monitor', 'skills-management', 'settings', 'tasks', 'memory'].includes(pageId)) {
             switchPage(pageId);
             
             // If this is the chat page with a conversation param, load that conversation
@@ -341,8 +341,14 @@ function initPage(pageId) {
                 loadSkills();
             }
             break;
+        case 'memory':
+            // Initialize persistent memory panel
+            if (typeof initMemoryPage === 'function') {
+                initMemoryPage();
+            }
+            break;
     }
-    
+
     // Clean up timers for other pages
     if (pageId !== 'tasks' && typeof cleanupTasksPage === 'function') {
         cleanupTasksPage();
@@ -361,7 +367,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const hashParts = hash.split('?');
         const pageId = hashParts[0];
         
-        if (pageId && ['chat', 'info-collect', 'tasks', 'vulnerabilities', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'roles-management', 'skills-monitor', 'skills-management', 'settings'].includes(pageId)) {
+        if (pageId && ['chat', 'info-collect', 'tasks', 'vulnerabilities', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'roles-management', 'skills-monitor', 'skills-management', 'settings', 'memory'].includes(pageId)) {
             switchPage(pageId);
             
             // If this is the chat page with a conversation param, load that conversation

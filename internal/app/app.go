@@ -46,6 +46,7 @@ type App struct {
 	knowledgeRetriever *knowledge.Retriever      // knowledge base retriever (for dynamic initialization)
 	knowledgeIndexer   *knowledge.Indexer        // knowledge base indexer (for dynamic initialization)
 	knowledgeHandler   *handler.KnowledgeHandler // knowledge base handler (for dynamic initialization)
+	memoryHandler      *handler.MemoryHandler    // memory handler (nil when persistent memory is disabled)
 	agentHandler       *handler.AgentHandler     // Agent handler (for updating knowledge base manager)
 	robotHandler       *handler.RobotHandler     // robot handler (DingTalk/Lark/WeCom/Telegram)
 	robotMu            sync.Mutex                 // protects DingTalk/Lark/Telegram long connection cancel
@@ -172,9 +173,11 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	// attach time awareness and memory to agent
 	agentInstance.SetTimeAwareness(timeAwareness)
 	registerTimeTools(mcpServer, timeAwareness, log.Logger)
+	var memHandler *handler.MemoryHandler
 	if persistentMem != nil {
 		agentInstance.SetPersistentMemory(persistentMem)
 		registerMemoryTools(mcpServer, persistentMem, log.Logger)
+		memHandler = handler.NewMemoryHandler(persistentMem, log.Logger)
 	}
 
 	// initialize knowledge base module (if enabled)
@@ -401,6 +404,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 		knowledgeRetriever: knowledgeRetriever,
 		knowledgeIndexer:   knowledgeIndexer,
 		knowledgeHandler:   knowledgeHandler,
+		memoryHandler:      memHandler,
 		agentHandler:       agentHandler,
 		robotHandler:       robotHandler,
 	}
@@ -870,6 +874,62 @@ func setupRoutes(
 					return
 				}
 				app.knowledgeHandler.GetStats(c)
+			})
+		}
+
+		// persistent memory management
+		memoryRoutes := protected.Group("/memories")
+		{
+			memoryRoutes.GET("", func(c *gin.Context) {
+				if app.memoryHandler == nil {
+					c.JSON(http.StatusOK, gin.H{
+						"entries": []interface{}{},
+						"total":   0,
+						"enabled": false,
+						"message": "Persistent memory is not enabled. Set agent.memory.enabled: true in config.yaml.",
+					})
+					return
+				}
+				app.memoryHandler.ListMemories(c)
+			})
+			memoryRoutes.GET("/stats", func(c *gin.Context) {
+				if app.memoryHandler == nil {
+					c.JSON(http.StatusOK, gin.H{
+						"total":   0,
+						"enabled": false,
+						"message": "Persistent memory is not enabled.",
+					})
+					return
+				}
+				app.memoryHandler.GetMemoryStats(c)
+			})
+			memoryRoutes.POST("", func(c *gin.Context) {
+				if app.memoryHandler == nil {
+					c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Persistent memory is not enabled."})
+					return
+				}
+				app.memoryHandler.CreateMemory(c)
+			})
+			memoryRoutes.PUT("/:id", func(c *gin.Context) {
+				if app.memoryHandler == nil {
+					c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Persistent memory is not enabled."})
+					return
+				}
+				app.memoryHandler.UpdateMemory(c)
+			})
+			memoryRoutes.DELETE("", func(c *gin.Context) {
+				if app.memoryHandler == nil {
+					c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Persistent memory is not enabled."})
+					return
+				}
+				app.memoryHandler.DeleteAllMemories(c)
+			})
+			memoryRoutes.DELETE("/:id", func(c *gin.Context) {
+				if app.memoryHandler == nil {
+					c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Persistent memory is not enabled."})
+					return
+				}
+				app.memoryHandler.DeleteMemory(c)
 			})
 		}
 
