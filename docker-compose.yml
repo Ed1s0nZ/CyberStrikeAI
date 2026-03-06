@@ -6,8 +6,15 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "0.0.0.0:8080:8080"
-      - "0.0.0.0:8081:8081"
+      - "0.0.0.0:${DOCKER_HTTP_PORT:-18080}:8080"
+      - "0.0.0.0:${DOCKER_MCP_PORT:-18081}:8081"
+    environment:
+      - CYBERSTRIKE_DOCKER=true
+      - ALL_PROXY=${DOCKER_ALL_PROXY:-}
+      - HTTP_PROXY=${DOCKER_HTTP_PROXY:-}
+      - HTTPS_PROXY=${DOCKER_HTTPS_PROXY:-}
+      - NO_PROXY=${DOCKER_NO_PROXY:-localhost,127.0.0.1,::1}
     volumes:
       - ./data:/app/data
       - ./tmp:/app/tmp
+      - ./logs:/app/logs

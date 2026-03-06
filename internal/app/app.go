@@ -379,6 +379,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	skillsHandler := handler.NewSkillsHandler(skillsManager, cfg, configPath, log.Logger)
 	fofaHandler := handler.NewFofaHandler(cfg, log.Logger)
 	terminalHandler := handler.NewTerminalHandler(log.Logger)
+	dockerHandler := handler.NewDockerHandler(filepath.Dir(configPath), log.Logger)
 	if db != nil {
 		skillsHandler.SetDB(db) // set database connection for fetching call statistics
 	}
@@ -503,6 +504,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 		skillsHandler,
 		fofaHandler,
 		terminalHandler,
+		dockerHandler,
 		mcpServer,
 		authManager,
 		openAPIHandler,
@@ -628,6 +630,7 @@ func setupRoutes(
 	skillsHandler *handler.SkillsHandler,
 	fofaHandler *handler.FofaHandler,
 	terminalHandler *handler.TerminalHandler,
+	dockerHandler *handler.DockerHandler,
 	mcpServer *mcp.Server,
 	authManager *security.AuthManager,
 	openAPIHandler *handler.OpenAPIHandler,
@@ -718,6 +721,9 @@ func setupRoutes(
 		protected.POST("/terminal/run", terminalHandler.RunCommand)
 		protected.POST("/terminal/run/stream", terminalHandler.RunCommandStream)
 		protected.GET("/terminal/ws", terminalHandler.RunCommandWS)
+		protected.GET("/docker/status", dockerHandler.GetStatus)
+		protected.GET("/docker/logs", dockerHandler.GetLogs)
+		protected.POST("/docker/action", dockerHandler.RunAction)
 
 		// external MCP management
 		protected.GET("/external-mcp", externalMCPHandler.GetExternalMCPs)

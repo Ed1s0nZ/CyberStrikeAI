@@ -20,7 +20,7 @@ FROM debian:bookworm-slim
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates tzdata \
+    && apt-get install -y --no-install-recommends ca-certificates tzdata bash \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /out/cyberstrike-ai /app/cyberstrike-ai
@@ -29,11 +29,21 @@ COPY tools /app/tools
 COPY skills /app/skills
 COPY roles /app/roles
 COPY knowledge_base /app/knowledge_base
+COPY scripts /app/scripts
+COPY requirements.txt /app/requirements.txt
+COPY run_docker.sh /app/run_docker.sh
 COPY config.docker.yaml /app/config.docker.yaml
+
+RUN chmod +x /app/scripts/install-enabled-tools-container.sh \
+    && chmod +x /app/run_docker.sh \
+    && /app/scripts/install-enabled-tools-container.sh \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /app/data /app/tmp \
     && chmod +x /app/cyberstrike-ai
 
 EXPOSE 8080 8081
+
+ENV CYBERSTRIKE_DOCKER=true
 
 ENTRYPOINT ["/app/cyberstrike-ai", "--config", "/app/config.docker.yaml"]

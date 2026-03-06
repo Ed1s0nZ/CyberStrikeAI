@@ -13,6 +13,10 @@ tmp/
 logs/
 *.log
 *.pid
+reports/
+.docker/docker.env
+.docker/docker-compose.override.yml
+*_ips.txt
 
 # Local build outputs
 cyberstrike-ai

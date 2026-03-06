@@ -1,6 +1,8 @@
 // Settings-related functionality
 let currentConfig = null;
 let allTools = [];
+let dockerLogStreamTimer = null;
+let dockerLogStreaming = false;
 // Global tool status map, used to save user changes across all pages
 // key: unique tool identifier (toolKey), value: { enabled: boolean, is_external: boolean, external_mcp: string }
 let toolStateMap = new Map();
@@ -49,6 +51,11 @@ function switchSettingsSection(section) {
     if (section === 'terminal' && typeof initTerminal === 'function') {
         setTimeout(initTerminal, 0);
     }
+    if (section === 'docker') {
+        refreshDockerStatus();
+    } else {
+        stopDockerLogStream();
+    }
 }
 
 // Open settings
@@ -79,6 +86,128 @@ function closeSettings() {
     // If needed, can switch back to conversations page
     if (typeof switchPage === 'function') {
         switchPage('chat');
+    }
+}
+
+async function refreshDockerStatus() {
+    await Promise.all([loadDockerStatus(), loadDockerLogs()]);
+}
+
+async function loadDockerStatus() {
+    const statusGrid = document.getElementById('docker-status-grid');
+    if (!statusGrid) return;
+    try {
+        const res = await apiFetch('/api/docker/status');
+        if (!res.ok) throw new Error('Failed to load docker status');
+        const data = await res.json();
+        renderDockerStatus(data);
+    } catch (error) {
+        statusGrid.innerHTML = `<div class="docker-status-card"><span class="label">Error</span><span class="value">${escapeHtml(error.message)}</span></div>`;
+    }
+}
+
+function renderDockerStatus(data) {
+    const statusGrid = document.getElementById('docker-status-grid');
+    if (!statusGrid) return;
+    const cards = [
+        { label: 'Running in Docker', value: data.in_docker ? 'Yes' : 'No' },
+        { label: 'Docker Installed', value: data.docker_installed ? 'Yes' : 'No' },
+        { label: 'Compose Installed', value: data.compose_installed ? 'Yes' : 'No' },
+        { label: 'Container Name', value: data.container_name || '-' },
+        { label: 'Container Status', value: data.container_status || '-' },
+        { label: 'Container Image', value: data.container_image || '-' },
+        { label: 'Compose Version', value: data.compose_version || '-' },
+        { label: 'App :18080', value: data.http?.app_18080?.ok ? `OK (${data.http.app_18080.status_code || ''})` : (data.http?.app_18080?.error || 'DOWN') },
+        { label: 'App :8080', value: data.http?.app_8080?.ok ? `OK (${data.http.app_8080.status_code || ''})` : (data.http?.app_8080?.error || 'DOWN') },
+        { label: 'run_docker.sh', value: data.script_exists ? data.script_path : 'Missing' },
+        { label: 'Checked At', value: data.checked_at || '-' }
+    ];
+
+    statusGrid.innerHTML = cards.map(item => `
+        <div class="docker-status-card">
+            <span class="label">${escapeHtml(item.label)}</span>
+            <span class="value">${escapeHtml(String(item.value || '-'))}</span>
+        </div>
+    `).join('');
+}
+
+async function loadDockerLogs() {
+    const linesInput = document.getElementById('docker-log-lines');
+    const lines = parseInt(linesInput?.value || '300', 10) || 300;
+    const output = document.getElementById('docker-log-output');
+    if (!output) return;
+    try {
+        const res = await apiFetch(`/api/docker/logs?lines=${encodeURIComponent(lines)}`);
+        if (!res.ok) throw new Error('Failed to load docker logs');
+        const data = await res.json();
+        output.textContent = data.log || '';
+        output.scrollTop = output.scrollHeight;
+    } catch (error) {
+        output.textContent = `Failed to load logs: ${error.message}`;
+    }
+}
+
+function toggleDockerLogStream() {
+    if (dockerLogStreaming) {
+        stopDockerLogStream();
+    } else {
+        startDockerLogStream();
+    }
+}
+
+function startDockerLogStream() {
+    if (dockerLogStreaming) return;
+    dockerLogStreaming = true;
+    const btn = document.getElementById('docker-log-stream-btn');
+    if (btn) btn.textContent = 'Stop Stream';
+    dockerLogStreamTimer = setInterval(() => {
+        loadDockerLogs();
+        loadDockerStatus();
+    }, 2500);
+}
+
+function stopDockerLogStream() {
+    dockerLogStreaming = false;
+    if (dockerLogStreamTimer) {
+        clearInterval(dockerLogStreamTimer);
+        dockerLogStreamTimer = null;
+    }
+    const btn = document.getElementById('docker-log-stream-btn');
+    if (btn) btn.textContent = 'Start Stream';
+}
+
+async function runDockerAction(action) {
+    const output = document.getElementById('docker-action-output');
+    const payload = {
+        action,
+        proxy_mode: document.getElementById('docker-proxy-mode')?.value || 'direct',
+        proxy_url: document.getElementById('docker-proxy-url')?.value?.trim() || '',
+        vpn_container: document.getElementById('docker-vpn-container')?.value?.trim() || '',
+        git_ref: document.getElementById('docker-git-ref')?.value?.trim() || 'main'
+    };
+
+    if (action === 'remove') {
+        if (!confirm('Remove docker stack (containers + volumes)?')) return;
+    }
+
+    if (output) output.textContent = `Running action: ${action}...\n`;
+    try {
+        const res = await apiFetch('/api/docker/action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.error || data.output || 'Action failed');
+        }
+        if (output) {
+            output.textContent = `Action: ${action}\nSuccess: ${data.success}\nExit Code: ${data.exitCode}\n\n${data.output || ''}`;
+            output.scrollTop = output.scrollHeight;
+        }
+        await refreshDockerStatus();
+    } catch (error) {
+        if (output) output.textContent += `\nError: ${error.message}`;
     }
 }
 

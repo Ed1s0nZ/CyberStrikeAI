@@ -1210,6 +1210,9 @@
                                 <div class="settings-nav-item" data-section="terminal" onclick="switchSettingsSection('terminal')">
                                     <span>Terminal</span>
                                 </div>
+                                <div class="settings-nav-item" data-section="docker" onclick="switchSettingsSection('docker')">
+                                    <span>Docker</span>
+                                </div>
                                 <div class="settings-nav-item" data-section="security" onclick="switchSettingsSection('security')">
                                     <span>Security Settings</span>
                                 </div>
@@ -1496,6 +1499,70 @@
                                             <div id="terminal-container-1" class="terminal-container"></div>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+
+                            <!-- Docker settings -->
+                            <div id="settings-section-docker" class="settings-section-content">
+                                <div class="settings-section-header">
+                                    <h3>Docker Control</h3>
+                                    <p class="settings-description">Manage containerized deployment, networking mode, runtime health, and live logs.</p>
+                                </div>
+                                <div class="settings-subsection">
+                                    <h4>Network Profile</h4>
+                                    <div class="settings-form docker-settings-grid">
+                                        <div class="form-group">
+                                            <label for="docker-proxy-mode">Proxy Mode</label>
+                                            <select id="docker-proxy-mode">
+                                                <option value="direct">Direct</option>
+                                                <option value="socks">SOCKS</option>
+                                                <option value="http">HTTP/HTTPS Proxy</option>
+                                                <option value="tor">Tor (socks5h://host.docker.internal:9050)</option>
+                                                <option value="vpn">VPN Container Mode</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="docker-proxy-url">Proxy URL</label>
+                                            <input type="text" id="docker-proxy-url" placeholder="socks5h://127.0.0.1:1080" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="docker-vpn-container">VPN Container Name</label>
+                                            <input type="text" id="docker-vpn-container" placeholder="gluetun" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="docker-git-ref">Git Ref (update action)</label>
+                                            <input type="text" id="docker-git-ref" placeholder="main" value="main" />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="settings-subsection">
+                                    <h4>Lifecycle Actions</h4>
+                                    <div class="docker-actions">
+                                        <button class="btn-secondary" onclick="runDockerAction('install')">Install Docker</button>
+                                        <button class="btn-primary" onclick="runDockerAction('deploy')">Deploy</button>
+                                        <button class="btn-secondary" onclick="runDockerAction('update')">Update via Git</button>
+                                        <button class="btn-secondary" onclick="runDockerAction('restart')">Restart</button>
+                                        <button class="btn-secondary" onclick="runDockerAction('test')">Run Container Tests</button>
+                                        <button class="btn-danger-outline" onclick="runDockerAction('remove')">Remove Stack</button>
+                                    </div>
+                                </div>
+                                <div class="settings-subsection">
+                                    <h4>Runtime Status</h4>
+                                    <div id="docker-status-grid" class="docker-status-grid"></div>
+                                </div>
+                                <div class="settings-subsection">
+                                    <h4>Live Logs</h4>
+                                    <div class="docker-log-toolbar">
+                                        <button class="btn-secondary" onclick="refreshDockerStatus()">Refresh</button>
+                                        <button class="btn-secondary" id="docker-log-stream-btn" onclick="toggleDockerLogStream()">Start Stream</button>
+                                        <label for="docker-log-lines">Tail lines</label>
+                                        <input type="number" id="docker-log-lines" min="50" max="5000" value="300" />
+                                    </div>
+                                    <pre id="docker-log-output" class="docker-log-output">Loading...</pre>
+                                </div>
+                                <div class="settings-subsection">
+                                    <h4>Action Output</h4>
+                                    <pre id="docker-action-output" class="docker-log-output"></pre>
                                 </div>
                             </div>
 

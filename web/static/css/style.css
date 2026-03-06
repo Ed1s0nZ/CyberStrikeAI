@@ -3290,6 +3290,69 @@ header {
     font-size: 0.875rem;
 }
 
+.docker-settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+}
+
+.docker-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.docker-status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.docker-status-card {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    padding: 10px 12px;
+}
+
+.docker-status-card .label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.docker-status-card .value {
+    font-size: 0.92rem;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+.docker-log-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.docker-log-toolbar input {
+    width: 110px;
+}
+
+.docker-log-output {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: #0d1117;
+    color: #d0e2ff;
+    padding: 12px;
+    max-height: 360px;
+    overflow: auto;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+    line-height: 1.35;
+}
+
 .settings-section {
     margin-bottom: 32px;
 }

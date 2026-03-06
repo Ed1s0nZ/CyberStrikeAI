@@ -163,7 +163,9 @@ apt-get install -y --no-install-recommends \
   default-jre-headless
 
 # docker.io conflicts with containerd.io on some hosts.
-if dpkg -s containerd.io >/dev/null 2>&1; then
+if [[ "${SKIP_DOCKER_INSTALL:-0}" == "1" ]]; then
+  warn "SKIP_DOCKER_INSTALL=1; skipping docker engine package install"
+elif dpkg -s containerd.io >/dev/null 2>&1; then
   warn "containerd.io is installed; skipping docker.io install to avoid conflicts"
 else
   apt-get install -y --no-install-recommends docker.io || warn "unable to install docker.io"
