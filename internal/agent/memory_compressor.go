@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -26,6 +28,10 @@ const (
 	defaultMaxImages = 3
 	// defaultSummaryTimeout is the timeout duration for generating a message summary
 	defaultSummaryTimeout = 10 * time.Minute
+	// Max output size of a single chunk summary to prevent summary bloat.
+	defaultMaxSummaryChars = 3500
+	// Max number of preserved key findings appended to chunk summary.
+	defaultMaxPreservedFindings = 12
 
 	summaryPromptTemplate = `You are an assistant responsible for performing context compression for a security agent. Your task is to compress scan data while keeping all critical penetration testing information intact.
 
@@ -53,7 +59,16 @@ Remember: another security agent will rely on this summary to continue testing a
 Conversation segments to compress:
 %s
 
-Please provide a technically precise and concise summary covering all context relevant to the security assessment.`
+Output format requirements (strict):
+1) [TASK_STATUS] — objective progress and current state in 2-4 bullets.
+2) [KEY_TECHNICAL_FINDINGS] — critical findings only (vulns, credentials, exploitable paths, decisive errors).
+3) [NEXT_BEST_ACTIONS] — concrete next actions (max 5 bullets), aligned to current objective.
+
+Rules:
+- Keep it compact and actionable; remove duplicate details.
+- Preserve exact indicators when available (host/IP/URL/port/CVE/payload/parameter/path).
+- Do not include narrative filler.
+- If no findings exist, explicitly state "No confirmed findings yet".`
 )
 
 // MemoryCompressor is responsible for compressing historical context before calling the LLM to avoid token explosion.
@@ -69,6 +84,10 @@ type MemoryCompressor struct {
 	completionClient CompletionClient
 	logger           *zap.Logger
 }
+
+var (
+	contextSummaryTagRe = regexp.MustCompile(`(?is)</?context_summary[^>]*>`)
+)
 
 // MemoryCompressorConfig is used to initialize a MemoryCompressor.
 type MemoryCompressorConfig struct {
@@ -328,6 +347,7 @@ func (mc *MemoryCompressor) summarizeChunk(ctx context.Context, chunk []ChatMess
 	}
 	conversation := strings.Join(formatted, "\n")
 	prompt := fmt.Sprintf(summaryPromptTemplate, conversation)
+	preservedFindings := mc.extractCriticalFindings(chunk, defaultMaxPreservedFindings)
 
 	// Use dynamically obtained model name, not the saved summaryModel
 	modelName := mc.getModelName()
@@ -347,6 +367,20 @@ func (mc *MemoryCompressor) summarizeChunk(ctx context.Context, chunk []ChatMess
 			Content: fmt.Sprintf("<context_summary message_count='%d'>[Summary unavailable]\n%s</context_summary>", len(chunk), sb.String()),
 		}, nil
 	}
+	summary = mc.compactSummary(summary)
+	if len(preservedFindings) > 0 {
+		var preserved strings.Builder
+		preserved.WriteString("\n[PRESERVED_KEY_FINDINGS]\n")
+		for _, finding := range preservedFindings {
+			preserved.WriteString("- ")
+			preserved.WriteString(finding)
+			preserved.WriteString("\n")
+		}
+		summary += preserved.String()
+	}
+	if len(summary) > defaultMaxSummaryChars {
+		summary = summary[:defaultMaxSummaryChars] + "...[truncated]"
+	}
 
 	return ChatMessage{
 		Role:    "assistant",
@@ -355,7 +389,126 @@ func (mc *MemoryCompressor) summarizeChunk(ctx context.Context, chunk []ChatMess
 }
 
 func (mc *MemoryCompressor) extractMessageText(msg ChatMessage) string {
-	return msg.Content
+	content := strings.TrimSpace(msg.Content)
+	if content == "" {
+		return ""
+	}
+	// Avoid recursive expansion when previous chunk summaries are summarized again.
+	// Keep them compact by stripping wrapper tags and normalizing whitespace.
+	content = contextSummaryTagRe.ReplaceAllString(content, "")
+	content = strings.ReplaceAll(content, "\r\n", "\n")
+	content = strings.TrimSpace(content)
+	if len(content) > 1600 {
+		content = content[:1600] + "...[truncated]"
+	}
+	return content
+}
+
+func (mc *MemoryCompressor) compactSummary(summary string) string {
+	s := strings.TrimSpace(summary)
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	lines := strings.Split(s, "\n")
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		out = append(out, trimmed)
+	}
+	return strings.Join(out, "\n")
+}
+
+func (mc *MemoryCompressor) extractCriticalFindings(chunk []ChatMessage, maxItems int) []string {
+	if maxItems <= 0 {
+		return nil
+	}
+	type scored struct {
+		text  string
+		score int
+	}
+	candidates := make([]scored, 0, 32)
+	seen := make(map[string]struct{})
+
+	scoreLine := func(lowerLine string, role string) int {
+		score := 0
+		if strings.Contains(lowerLine, "cve-") || strings.Contains(lowerLine, "critical") {
+			score += 6
+		}
+		if strings.Contains(lowerLine, "vulnerab") || strings.Contains(lowerLine, "rce") ||
+			strings.Contains(lowerLine, "sqli") || strings.Contains(lowerLine, "xss") ||
+			strings.Contains(lowerLine, "lfi") || strings.Contains(lowerLine, "auth bypass") {
+			score += 5
+		}
+		if strings.Contains(lowerLine, "password") || strings.Contains(lowerLine, "token") ||
+			strings.Contains(lowerLine, "apikey") || strings.Contains(lowerLine, "api_key") ||
+			strings.Contains(lowerLine, "secret") || strings.Contains(lowerLine, "credential") {
+			score += 5
+		}
+		if strings.Contains(lowerLine, "http://") || strings.Contains(lowerLine, "https://") ||
+			strings.Contains(lowerLine, "/api/") || strings.Contains(lowerLine, "/bitrix/") {
+			score += 3
+		}
+		if strings.Contains(lowerLine, "port ") || strings.Contains(lowerLine, "open ") ||
+			strings.Contains(lowerLine, "service") || strings.Contains(lowerLine, "execution id") {
+			score += 2
+		}
+		if strings.Contains(lowerLine, "error") || strings.Contains(lowerLine, "failed") ||
+			strings.Contains(lowerLine, "timeout") || strings.Contains(lowerLine, "unauthorized") ||
+			strings.Contains(lowerLine, "forbidden") {
+			score += 3
+		}
+		if role == "user" {
+			// Keep explicit user objective/progress direction visible.
+			score += 1
+		}
+		return score
+	}
+
+	for _, msg := range chunk {
+		text := mc.extractMessageText(msg)
+		if text == "" {
+			continue
+		}
+		role := strings.ToLower(strings.TrimSpace(msg.Role))
+		lines := strings.Split(text, "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			lower := strings.ToLower(line)
+			score := scoreLine(lower, role)
+			if score < 4 {
+				continue
+			}
+			if len(line) > 220 {
+				line = line[:220] + "...[truncated]"
+			}
+			key := strings.ToLower(line)
+			if _, exists := seen[key]; exists {
+				continue
+			}
+			seen[key] = struct{}{}
+			candidates = append(candidates, scored{text: line, score: score})
+		}
+	}
+
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].score == candidates[j].score {
+			return len(candidates[i].text) < len(candidates[j].text)
+		}
+		return candidates[i].score > candidates[j].score
+	})
+
+	if len(candidates) > maxItems {
+		candidates = candidates[:maxItems]
+	}
+	result := make([]string, 0, len(candidates))
+	for _, c := range candidates {
+		result = append(result, c.text)
+	}
+	return result
 }
 
 func (mc *MemoryCompressor) adjustRecentStartForToolCalls(msgs []ChatMessage, recentStart int) int {
