@@ -78,13 +78,15 @@ CyberStrikeAI is an **AI-native security testing platform** built in Go. It inte
 - 🔗 Attack-chain graph, risk scoring, and step-by-step replay
 - 🔒 Password-protected web UI, audit logs, and SQLite persistence
 - 📚 Knowledge base with vector search and **corpus-level BM25 hybrid retrieval** for security expertise
-- 🧠 **Persistent memory**: key-value store that survives conversation compression and server restarts — agents remember credentials, targets, and findings across sessions
+- 🧠 **Persistent memory**: key-value store that survives conversation compression and server restarts — agents remember credentials, targets, and findings across sessions; tool results are automatically stored as memory entries
+- 🔍 **Agent introspection**: before every major action the agent automatically retrieves similar memory entries and pre-fetches relevant knowledge-base guidance to avoid duplicate work and improve tool selection
 - ⏰ **Time awareness**: current date/time is automatically injected into every agent system prompt; configurable timezone support
 - 📁 Conversation grouping with pinning, rename, and batch management
 - 🛡️ Vulnerability management with CRUD operations, severity tracking, status workflow, and statistics
 - 📋 Batch task management: create task queues, add multiple tasks, and execute them sequentially
-- 🎭 Role-based testing: predefined security testing roles (Penetration Testing, CTF, Web App Scanning, etc.) with custom prompts and tool restrictions
-- 🎯 Skills system: 20+ predefined security testing skills (SQL injection, XSS, API security, etc.) that can be attached to roles or called on-demand by AI agents
+- 🎭 Role-based testing: 13 predefined security testing roles (Penetration Testing, CTF, Web App Scanning, etc.) with custom prompts and tool restrictions
+- 🎯 Skills system: 22 predefined security testing skills (SQL injection, XSS, API security, etc.) that can be attached to roles or called on-demand by AI agents
+- 🐳 **Docker lifecycle management**: deploy, update, start, stop, restart, and monitor the Docker stack directly from the System Settings UI or via REST API
 - 📱 **Chatbot**: DingTalk and Lark (Feishu) long-lived connections so you can talk to CyberStrikeAI from mobile (see [Robot / Chatbot guide](docs/robot_en.md) for setup and commands)
 
 ## Tool Overview
@@ -182,7 +184,7 @@ go build -o cyberstrike-ai cmd/server/main.go
 ## Advanced Usage
 
 ### Role-Based Testing
-- **Predefined roles** – System includes 12+ predefined security testing roles (Penetration Testing, CTF, Web App Scanning, API Security Testing, Binary Analysis, Cloud Security Audit, etc.) in the `roles/` directory.
+- **Predefined roles** – System includes 13 predefined security testing roles (Penetration Testing, CTF, Web App Scanning, API Security Testing, Binary Analysis, Cloud Security Audit, etc.) in the `roles/` directory.
 - **Custom prompts** – Each role can define a `user_prompt` that prepends to user messages, guiding the AI to adopt specialized testing methodologies and focus areas.
 - **Tool restrictions** – Roles can specify a `tools` list to limit available tools, ensuring focused testing workflows (e.g., CTF role restricts to CTF-specific utilities).
 - **Skills integration** – Roles can attach security testing skills. Skill names are added to system prompts as hints, and AI agents can access skill content on-demand using the `read_skill` tool.
@@ -208,7 +210,7 @@ go build -o cyberstrike-ai cmd/server/main.go
 2. Restart the server or reload configuration; the role appears in the role selector dropdown.
 
 ### Skills System
-- **Predefined skills** – System includes 20+ predefined security testing skills (SQL injection, XSS, API security, cloud security, container security, etc.) in the `skills/` directory.
+- **Predefined skills** – System includes 22 predefined security testing skills (SQL injection, XSS, API security, cloud security, container security, etc.) in the `skills/` directory.
 - **Skill hints in prompts** – When a role is selected, skill names attached to that role are added to the system prompt as recommendations. Skill content is not automatically injected; AI agents must use the `read_skill` tool to access skill details when needed.
 - **On-demand access** – AI agents can also access skills on-demand using built-in tools (`list_skills`, `read_skill`), allowing dynamic skill retrieval during task execution.
 - **Structured format** – Each skill is a directory containing a `SKILL.md` file with detailed testing methods, tool usage, best practices, and examples. Skills support YAML front matter for metadata.
@@ -451,11 +453,69 @@ The injected block looks like:
 
 ---
 
+### Docker Lifecycle Management
+
+CyberStrikeAI includes a full Docker management layer accessible from both the web UI and REST API.
+
+**System Settings → Docker panel** lets you:
+- View container status, image version, and compose version at a glance
+- Stream live container logs with a configurable line count
+- Run lifecycle actions (deploy, update, start, stop, restart, remove) with optional proxy or VPN configuration
+- Monitor HTTP health probes for the app on ports 8080 and 18080
+
+**CLI via `run_docker.sh`:**
+```bash
+./run_docker.sh deploy            # Build and start the stack
+./run_docker.sh update            # git pull + redeploy
+./run_docker.sh start|stop|restart
+./run_docker.sh status            # Show container + app status
+./run_docker.sh logs              # Print last N container log lines
+./run_docker.sh test              # Run container runtime tests
+./run_docker.sh remove            # Remove containers, network, and volumes
+
+# Proxy options (passed through to the container environment):
+./run_docker.sh deploy --proxy-mode socks --proxy-url socks5h://127.0.0.1:1080
+./run_docker.sh deploy --proxy-mode vpn --vpn-container my-vpn
+./run_docker.sh update --git-ref v1.5.0
+```
+
+**Docker API endpoints:**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET`  | `/api/docker/status` | Container status, compose version, and HTTP health probes |
+| `GET`  | `/api/docker/logs?lines=200` | Last N lines from container logs (or local `logs/suite.log`) |
+| `POST` | `/api/docker/action` | Run a lifecycle action (`deploy`, `update`, `start`, `stop`, `restart`, `remove`, `test`) |
+
+**Docker action request body:**
+```json
+{
+  "action": "update",
+  "proxy_mode": "direct",
+  "proxy_url": "",
+  "vpn_container": "",
+  "git_ref": "main"
+}
+```
+
+See [Docker Guide](docs/docker_en.md) for a full walkthrough.
+
+### Agent Introspection
+
+Before every major new action the agent now performs a mandatory introspection pass:
+
+1. **Memory similarity check** – retrieves memory entries that are semantically similar to the current user request, plus entity-based matches (IP addresses, domain names). This surfaces relevant credentials, prior tool results, and known vulnerabilities without requiring the user to repeat context.
+2. **Knowledge-base preflight** – runs a focused knowledge-base query combining the user input with penetration-testing terminology to surface relevant exploitation techniques and tool guidance.
+3. **Contextual decision** – the agent uses this retrieved context to choose tools and parameters, avoiding duplicate scans and leveraging prior findings automatically.
+
+The introspection context is injected into the system prompt as a `<memory_similarity_context>` block before each agent turn, ensuring the agent never starts a scan it already completed.
+
 ### Automation Hooks
 - **REST APIs** – everything the UI uses (auth, conversations, tool runs, monitor, vulnerabilities, roles) is available over JSON.
 - **Role APIs** – manage security testing roles via `/api/roles` endpoints: `GET /api/roles` (list all roles), `GET /api/roles/:name` (get role), `POST /api/roles` (create role), `PUT /api/roles/:name` (update role), `DELETE /api/roles/:name` (delete role). Roles are stored as YAML files in the `roles/` directory and support hot-reload.
 - **Vulnerability APIs** – manage vulnerabilities via `/api/vulnerabilities` endpoints: `GET /api/vulnerabilities` (list with filters), `POST /api/vulnerabilities` (create), `GET /api/vulnerabilities/:id` (get), `PUT /api/vulnerabilities/:id` (update), `DELETE /api/vulnerabilities/:id` (delete), `GET /api/vulnerabilities/stats` (statistics).
 - **Batch Task APIs** – manage batch task queues via `/api/batch-tasks` endpoints: `POST /api/batch-tasks` (create queue), `GET /api/batch-tasks` (list queues), `GET /api/batch-tasks/:queueId` (get queue), `POST /api/batch-tasks/:queueId/start` (start execution), `POST /api/batch-tasks/:queueId/cancel` (cancel), `DELETE /api/batch-tasks/:queueId` (delete), `POST /api/batch-tasks/:queueId/tasks` (add task), `PUT /api/batch-tasks/:queueId/tasks/:taskId` (update task), `DELETE /api/batch-tasks/:queueId/tasks/:taskId` (delete task). Tasks execute sequentially, each creating a separate conversation with full status tracking.
+- **Docker APIs** – manage the Docker stack via `/api/docker/status`, `/api/docker/logs`, and `/api/docker/action` (see Docker Lifecycle Management section above).
 - **Task control** – pause/resume/stop long scans, re-run steps with new params, or stream transcripts.
 - **Audit & security** – rotate passwords via `/api/auth/change-password`, enforce short-lived sessions, and restrict MCP ports at the network layer when exposing the service.
 
@@ -562,6 +622,8 @@ enabled: true
 | Document | Description |
 |----------|-------------|
 | [Robot / Chatbot guide](docs/robot_en.md) | Full setup, commands, and troubleshooting for DingTalk & Lark integration. **Follow this to avoid common pitfalls.** |
+| [Docker Guide](docs/docker_en.md) | Docker deployment, lifecycle management, proxy/VPN configuration, and System Settings UI reference. |
+| [Memory Guide](docs/memory_en.md) | Persistent memory system: categories, agent tools, UI panel, and API reference. |
 | [Tool Configuration Guide](tools/README.md) | How to write, configure, and extend YAML tool recipes. |
 | [Role Configuration Guide](roles/README.md) | How to create and manage security testing roles. |
 | [Skills System Guide](skills/README.md) | How to create and attach skills to roles. |
@@ -575,13 +637,16 @@ CyberStrikeAI/
 ├── internal/            # Agent engine, MCP core, handlers, security executor
 ├── web/                 # Single-page application (templates + static assets)
 ├── tools/               # YAML tool recipes (100+ provided)
-├── roles/               # Role configurations (12+ predefined security testing roles)
-├── skills/              # Skills library (20+ predefined security testing skills)
+├── roles/               # Role configurations (13 predefined security testing roles)
+├── skills/              # Skills library (22 predefined security testing skills)
 ├── knowledge_base/      # Markdown files for the vector knowledge base
-├── docs/                # Additional documentation (chatbot guide, etc.)
+├── scripts/             # Installation and utility scripts
+├── docs/                # Additional documentation (chatbot, Docker, memory guides)
 ├── images/              # Screenshots and diagrams for documentation
 ├── config.yaml          # Runtime configuration
 ├── run.sh               # One-command launcher script
+├── run_docker.sh        # Docker lifecycle management script
+├── docker-compose.yml   # Docker Compose configuration
 ├── ROADMAP.md           # Development roadmap
 └── README.md
 ```

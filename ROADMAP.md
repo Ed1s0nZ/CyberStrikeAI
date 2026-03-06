@@ -27,9 +27,10 @@ This roadmap outlines the planned development trajectory for CyberStrikeAI. Item
 - ✅ SQLite persistence for conversations, vulnerabilities, and audit logs
 - ✅ Password-protected Web UI with Bearer-token auth and session management
 - ✅ Streaming SSE output for real-time task progress
+- ✅ **Docker lifecycle management** — deploy, update, start, stop, restart, remove via `run_docker.sh` or System Settings UI; REST API (`/api/docker/status`, `/api/docker/logs`, `/api/docker/action`); proxy (SOCKS/HTTP/Tor) and VPN-container modes
 
 ### Security Testing Features
-- ✅ Role-based testing system (12+ predefined roles: Penetration Testing, CTF, Web App Scanning, API Security, Binary Analysis, Cloud Security Audit, etc.)
+- ✅ Role-based testing system (13 predefined roles: Penetration Testing, CTF, Web App Scanning, API Security, Binary Analysis, Cloud Security Audit, etc.)
 - ✅ Skills system (20+ predefined skills: SQL injection, XSS, API security, container security, etc.)
 - ✅ Attack-chain graph with severity scoring and step-by-step replay
 - ✅ Vulnerability management — CRUD, severity/status tracking, statistics
@@ -40,7 +41,8 @@ This roadmap outlines the planned development trajectory for CyberStrikeAI. Item
 - ✅ FOFA / ZoomEye search engine integration
 
 ### Agent Intelligence
-- ✅ **Persistent memory** — cross-session key-value store (SQLite-backed) with categories (credential, target, vulnerability, fact, note); survives conversation compression; exposed as four agent tools (`store_memory`, `retrieve_memory`, `list_memories`, `delete_memory`)
+- ✅ **Persistent memory** — cross-session key-value store (SQLite-backed) with categories (credential, target, vulnerability, fact, note); survives conversation compression; exposed as four agent tools (`store_memory`, `retrieve_memory`, `list_memories`, `delete_memory`); tool results automatically persisted as `tool_run` memory entries
+- ✅ **Agent introspection** — before every major action the agent runs a mandatory memory-similarity check and knowledge-base preflight; entity-based memory lookup for IP/domain targets; `<memory_similarity_context>` injected into system prompt to prevent duplicate scans
 - ✅ **Time awareness** — current date/time, timezone, and session age automatically injected into every system prompt; configurable via `agent.time_awareness`; `get_current_time` tool for on-demand queries
 
 ### Integrations & UX
@@ -57,8 +59,8 @@ This roadmap outlines the planned development trajectory for CyberStrikeAI. Item
 
 ### Agent & Orchestration
 - ✅ **Parallel tool execution** — agent fans out independent tool calls concurrently to reduce total time on multi-step engagements
-- ✅ **Agent memory improvements** — persistent cross-session memory store with category tagging; BM25 corpus index for smarter knowledge retrieval
-- ✅ **Memory UI panel** — web interface to view, search, edit, and delete persistent memory entries; category filters; stats strip; bulk delete
+- ✅ **Agent memory improvements** — persistent cross-session memory store with category tagging; BM25 corpus index for smarter knowledge retrieval; paginated Memory UI with scrolling and category filters
+- ✅ **Memory UI panel** — web interface to view, search, edit, and delete persistent memory entries; category filters; stats strip; bulk delete; paginated loading
 - 📋 **Memory expiry / TTL** — optional time-to-live on memory entries so stale facts are automatically purged
 - 📋 **Structured task templates** — YAML-defined recon/pentest playbooks that the agent can load and execute end-to-end
 - 📋 **Tool chaining macros** — define multi-step pipelines (e.g., subfinder → httpx → nuclei) as a single named operation
@@ -142,7 +144,7 @@ See [README.md](README.md) for development setup instructions.
 
 ---
 
-*Last updated: 2026-03-04 — Memory UI panel shipped; RAG-enhanced agent graduated from planned to released. This roadmap is subject to change. Follow the repository to stay updated.*
+*Last updated: 2026-03-06 — Docker lifecycle management shipped; agent introspection (memory similarity + KB preflight) shipped; tool-result memory auto-persistence shipped; Memory UI paginated loading and filters shipped. This roadmap is subject to change. Follow the repository to stay updated.*
 
 ---
 

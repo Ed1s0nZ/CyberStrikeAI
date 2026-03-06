@@ -6,7 +6,31 @@ CyberStrikeAI can remember facts, credentials, targets, and notes **across conve
 
 ## How It Works
 
-Every time the agent completes a tool call it can call `store_memory` to save a fact to a small SQLite-backed store (`agent_memories` table in the main database). On every subsequent request all stored entries are injected into the system prompt inside a `<persistent_memory>` block, grouped by category. This means the agent never forgets credentials, targets, or key findings even when conversation history is compressed.
+Every time the agent completes a tool call it can call `store_memory` to save a fact to a small SQLite-backed store (`agent_memories` table in the main database). In addition, **tool results are automatically persisted** as `tool_run` category memory entries without any explicit agent action — so completed scans, output summaries, and execution metadata are always available for future sessions.
+
+On every subsequent request all stored entries are injected into the system prompt inside a `<persistent_memory>` block, grouped by category. This means the agent never forgets credentials, targets, or key findings even when conversation history is compressed.
+
+### Agent Introspection (Memory Similarity)
+
+Before every major new action the agent runs a mandatory introspection pass:
+
+1. **Memory similarity check** — queries memories semantically similar to the current user input (`retrieve_memory` with the raw query), surfacing relevant prior findings.
+2. **Entity-based lookup** — extracts IP addresses and domain names from the user input and fetches all memories tagged with those entities (`list_memories` with entity filter).
+3. **Knowledge-base preflight** — runs a focused KB query combining the user input with penetration-testing terminology to retrieve relevant exploitation techniques and tool guidance.
+
+The results are injected into the system prompt as a `<memory_similarity_context>` block:
+
+```
+<memory_similarity_context>
+Similar memory entries related to the current task. Reuse this context before launching new scans:
+- Query matches:
+  • [active][tool_run] nmap_192.168.1.1 => open ports: 22/tcp ssh, 80/tcp http, 443/tcp https
+- Entity matches:
+  • [entity:192.168.1.1][vulnerability] sqli_login => /login.php?id= is injectable (union-based)
+</memory_similarity_context>
+```
+
+This prevents duplicate scans and ensures the agent builds on prior findings rather than restarting from scratch.
 
 ### Memory Categories
 
@@ -17,6 +41,7 @@ Every time the agent completes a tool call it can call `store_memory` to save a 
 | `vulnerability` | CVEs, exploit notes, proof-of-concept details |
 | `fact` | General observations and context |
 | `note` | Operational reminders and planning notes |
+| `tool_run` | Automatically stored tool execution results (scan output summaries, execution metadata) |
 
 ---
 
