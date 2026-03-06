@@ -11671,6 +11671,12 @@ header {
 
 
 /* ── Memory panel ─────────────────────────────────────────────────────────── */
+.memory-page-content {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    gap: 8px;
+}
 
 .memory-stats-strip {
     display: flex;
@@ -11728,6 +11734,33 @@ header {
     gap: 10px;
     padding: 10px 0;
     margin-bottom: 8px;
+}
+
+.memory-input,
+.memory-select {
+    height: 32px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 0.82rem;
+    padding: 0 10px;
+}
+
+.memory-input-entity {
+    min-width: 160px;
+}
+
+.memory-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+}
+
+.memory-toggle input {
+    accent-color: var(--accent-color);
 }
 
 .memory-search-box {
@@ -11844,7 +11877,18 @@ header {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding-bottom: 40px;
+    padding-bottom: 12px;
+    overflow-y: auto;
+    min-height: 240px;
+    flex: 1 1 auto;
+}
+
+.memory-list-footer {
+    min-height: 24px;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    text-align: center;
+    padding-bottom: 4px;
 }
 
 .memory-entry {

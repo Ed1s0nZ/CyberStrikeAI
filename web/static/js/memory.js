@@ -3,12 +3,21 @@
 (function () {
     'use strict';
 
-    // ── State ────────────────────────────────────────────────────────────────
+    let allEntries = [];
+    let memorySearchQuery = '';
+    let memoryFilterCategory = '';
+    let memoryFilterStatus = '';
+    let memoryFilterConfidence = '';
+    let memoryFilterEntity = '';
+    let memoryIncludeDismissed = true;
+    let memoryEnabled = true;
 
-    let allEntries = [];          // local cache of fetched entries
-    let memorySearchQuery = '';   // current search string
-    let memoryFilterCategory = ''; // current category filter
-    let memoryEnabled = true;     // whether the feature is available
+    let memoryOffset = 0;
+    let memoryLimit = 100;
+    let memoryHasMore = true;
+    let memoryLoading = false;
+    let memoryScrollBound = false;
+    let memorySearchTimer = null;
 
     const CATEGORIES = ['credential', 'target', 'vulnerability', 'fact', 'note', 'tool_run', 'discovery', 'plan'];
     const STATUS_LABELS = {
@@ -18,14 +27,12 @@
         disproven: 'Disproven'
     };
 
-    // ── Init ─────────────────────────────────────────────────────────────────
-
     function initMemoryPage() {
+        bindMemoryScroll();
+        syncFilterUI();
         loadMemoryStats();
-        loadMemoryEntries();
+        loadMemoryEntries(true);
     }
-
-    // ── API helpers ──────────────────────────────────────────────────────────
 
     async function apiFetch(url, options = {}) {
         const reqOptions = { ...options, credentials: 'include' };
@@ -37,10 +44,8 @@
 
         let res;
         if (typeof window.apiFetch === 'function') {
-            // Reuse shared auth-aware fetch so Authorization is injected consistently.
             res = await window.apiFetch(url, reqOptions);
         } else {
-            // Fallback: attach token from localStorage if available.
             try {
                 const raw = localStorage.getItem('cyberstrike-auth');
                 if (raw) {
@@ -49,9 +54,7 @@
                         headers.set('Authorization', `Bearer ${parsed.token}`);
                     }
                 }
-            } catch (_) {
-                // ignore localStorage parse failures
-            }
+            } catch (_) {}
             res = await fetch(url, reqOptions);
         }
 
@@ -59,12 +62,9 @@
             const body = await res.json().catch(() => ({}));
             throw new Error(body.error || `HTTP ${res.status}`);
         }
-
         if (res.status === 204) return {};
         return res.json().catch(() => ({}));
     }
-
-    // ── Stats ────────────────────────────────────────────────────────────────
 
     async function loadMemoryStats() {
         try {
@@ -99,46 +99,88 @@
         `;
     }
 
-    // ── List ─────────────────────────────────────────────────────────────────
+    function buildMemoryQuery() {
+        const params = new URLSearchParams();
+        params.set('limit', String(memoryLimit));
+        params.set('offset', String(memoryOffset));
+        if (memorySearchQuery) params.set('search', memorySearchQuery);
+        if (memoryFilterCategory) params.set('category', memoryFilterCategory);
+        if (memoryFilterStatus) params.set('status', memoryFilterStatus);
+        if (memoryFilterConfidence) params.set('confidence', memoryFilterConfidence);
+        if (memoryFilterEntity) params.set('entity', memoryFilterEntity);
+        if (memoryIncludeDismissed) params.set('include_dismissed', '1');
+        return `/api/memories?${params.toString()}`;
+    }
 
-    async function loadMemoryEntries() {
+    async function loadMemoryEntries(reset) {
         const listEl = document.getElementById('memory-list');
         if (!listEl) return;
+        if (memoryLoading) return;
+        if (!reset && !memoryHasMore) return;
 
-        listEl.innerHTML = '<div class="memory-loading">Loading...</div>';
+        memoryLoading = true;
+        if (reset) {
+            memoryOffset = 0;
+            memoryHasMore = true;
+            allEntries = [];
+            listEl.innerHTML = '<div class="memory-loading">Loading...</div>';
+            setMemoryListFooter('');
+        } else {
+            setMemoryListFooter('Loading more...');
+        }
 
         try {
-            let url = '/api/memories?limit=500';
-            if (memorySearchQuery) url += `&search=${encodeURIComponent(memorySearchQuery)}`;
-            if (memoryFilterCategory) url += `&category=${encodeURIComponent(memoryFilterCategory)}`;
-
-            const data = await apiFetch(url);
+            const data = await apiFetch(buildMemoryQuery());
             memoryEnabled = data.enabled !== false;
 
             if (!memoryEnabled) {
                 listEl.innerHTML = `<div class="memory-disabled-notice">${data.message || 'Persistent memory is not enabled.'}</div>`;
+                setMemoryListFooter('');
                 return;
             }
 
-            allEntries = data.entries || [];
-            renderMemoryList(allEntries);
+            const entries = data.entries || [];
+            memoryHasMore = data.has_more === true;
+            memoryOffset += entries.length;
+            allEntries = reset ? entries.slice() : allEntries.concat(entries);
+
+            renderMemoryList(entries, reset);
+            updateMemoryCount(Number.isFinite(data.total) ? data.total : allEntries.length);
+
+            if (allEntries.length === 0) {
+                setMemoryListFooter('');
+            } else if (memoryHasMore) {
+                setMemoryListFooter('Scroll down to load more...');
+            } else {
+                setMemoryListFooter('All entries loaded.');
+            }
         } catch (e) {
-            listEl.innerHTML = `<div class="memory-error">Failed to load entries: ${escHtml(e.message)}</div>`;
+            if (reset) {
+                listEl.innerHTML = `<div class="memory-error">Failed to load entries: ${escHtml(e.message)}</div>`;
+            } else {
+                setMemoryListFooter(`Load failed: ${escHtml(e.message)}`);
+            }
+        } finally {
+            memoryLoading = false;
         }
     }
 
-    function renderMemoryList(entries) {
+    function renderMemoryList(entries, reset) {
         const listEl = document.getElementById('memory-list');
         if (!listEl) return;
 
-        updateMemoryCount(entries.length);
-
-        if (entries.length === 0) {
-            listEl.innerHTML = '<div class="memory-empty">No memory entries found.</div>';
+        if (reset) {
+            if (entries.length === 0) {
+                listEl.innerHTML = '<div class="memory-empty">No memory entries found.</div>';
+                return;
+            }
+            listEl.innerHTML = entries.map(renderEntryRow).join('');
             return;
         }
 
-        listEl.innerHTML = entries.map(e => renderEntryRow(e)).join('');
+        if (entries.length > 0) {
+            listEl.insertAdjacentHTML('beforeend', entries.map(renderEntryRow).join(''));
+        }
     }
 
     function renderEntryRow(e) {
@@ -185,13 +227,33 @@
         if (el) el.textContent = `${count} ${count === 1 ? 'entry' : 'entries'}`;
     }
 
-    // ── Search / Filter ──────────────────────────────────────────────────────
+    function setMemoryListFooter(text) {
+        const footer = document.getElementById('memory-list-footer');
+        if (footer) footer.textContent = text || '';
+    }
+
+    function bindMemoryScroll() {
+        if (memoryScrollBound) return;
+        const listEl = document.getElementById('memory-list');
+        if (!listEl) return;
+        listEl.addEventListener('scroll', () => {
+            if (memoryLoading || !memoryHasMore) return;
+            const remaining = listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight;
+            if (remaining < 120) {
+                loadMemoryEntries(false);
+            }
+        });
+        memoryScrollBound = true;
+    }
 
     function onMemorySearchInput(value) {
         memorySearchQuery = value.trim();
         const clearBtn = document.getElementById('memory-search-clear');
         if (clearBtn) clearBtn.style.display = memorySearchQuery ? 'flex' : 'none';
-        loadMemoryEntries();
+        if (memorySearchTimer) clearTimeout(memorySearchTimer);
+        memorySearchTimer = setTimeout(() => {
+            loadMemoryEntries(true);
+        }, 280);
     }
 
     function clearMemorySearch() {
@@ -200,23 +262,51 @@
         if (input) input.value = '';
         const clearBtn = document.getElementById('memory-search-clear');
         if (clearBtn) clearBtn.style.display = 'none';
-        loadMemoryEntries();
+        loadMemoryEntries(true);
+    }
+
+    function onMemoryEntityInput(value) {
+        memoryFilterEntity = value.trim();
+        if (memorySearchTimer) clearTimeout(memorySearchTimer);
+        memorySearchTimer = setTimeout(() => {
+            loadMemoryEntries(true);
+        }, 220);
+    }
+
+    function onMemoryStatusFilterChange(value) {
+        memoryFilterStatus = (value || '').trim();
+        loadMemoryEntries(true);
+    }
+
+    function onMemoryConfidenceFilterChange(value) {
+        memoryFilterConfidence = (value || '').trim();
+        loadMemoryEntries(true);
+    }
+
+    function toggleMemoryIncludeDismissed(checked) {
+        memoryIncludeDismissed = !!checked;
+        loadMemoryEntries(true);
     }
 
     function filterMemoryByCategory(cat) {
-        // Toggle filter: clicking the same category again clears it
         memoryFilterCategory = (memoryFilterCategory === cat) ? '' : cat;
-
-        // Update active state on filter buttons
         document.querySelectorAll('.memory-filter-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.cat === memoryFilterCategory);
         });
-
-        loadMemoryEntries();
+        loadMemoryEntries(true);
         loadMemoryStats();
     }
 
-    // ── Create / Edit modal ──────────────────────────────────────────────────
+    function syncFilterUI() {
+        const statusEl = document.getElementById('memory-status-filter');
+        if (statusEl) statusEl.value = memoryFilterStatus;
+        const confEl = document.getElementById('memory-confidence-filter');
+        if (confEl) confEl.value = memoryFilterConfidence;
+        const entityEl = document.getElementById('memory-entity-filter');
+        if (entityEl) entityEl.value = memoryFilterEntity;
+        const dismissedEl = document.getElementById('memory-include-dismissed');
+        if (dismissedEl) dismissedEl.checked = memoryIncludeDismissed;
+    }
 
     function openCreateMemoryModal() {
         setModalMode('create');
@@ -228,7 +318,7 @@
         const entry = allEntries.find(e => e.id === id);
         if (!entry) {
             showMemoryNotification('Entry not found in local cache. Refreshing…', 'warning');
-            loadMemoryEntries();
+            loadMemoryEntries(true);
             return;
         }
         setModalMode('edit', id);
@@ -311,7 +401,7 @@
                 showMemoryNotification('Memory entry updated.', 'success');
             }
             closeMemoryModal();
-            await Promise.all([loadMemoryEntries(), loadMemoryStats()]);
+            await Promise.all([loadMemoryEntries(true), loadMemoryStats()]);
         } catch (e) {
             showMemoryNotification(`Save failed: ${e.message}`, 'error');
         } finally {
@@ -319,14 +409,12 @@
         }
     }
 
-    // ── Delete ───────────────────────────────────────────────────────────────
-
     async function deleteMemoryEntry(id) {
         if (!confirm('Delete this memory entry? This cannot be undone.')) return;
         try {
             await apiFetch(`/api/memories/${id}`, { method: 'DELETE' });
             showMemoryNotification('Entry deleted.', 'success');
-            await Promise.all([loadMemoryEntries(), loadMemoryStats()]);
+            await Promise.all([loadMemoryEntries(true), loadMemoryStats()]);
         } catch (e) {
             showMemoryNotification(`Delete failed: ${e.message}`, 'error');
         }
@@ -344,13 +432,11 @@
         try {
             const data = await apiFetch(url, { method: 'DELETE' });
             showMemoryNotification(`Deleted ${data.deleted} entries.`, 'success');
-            await Promise.all([loadMemoryEntries(), loadMemoryStats()]);
+            await Promise.all([loadMemoryEntries(true), loadMemoryStats()]);
         } catch (e) {
             showMemoryNotification(`Bulk delete failed: ${e.message}`, 'error');
         }
     }
-
-    // ── Notifications ────────────────────────────────────────────────────────
 
     function showMemoryNotification(message, type) {
         const el = document.getElementById('memory-notification');
@@ -360,8 +446,6 @@
         el.style.display = 'block';
         setTimeout(() => { el.style.display = 'none'; }, 3500);
     }
-
-    // ── Helpers ──────────────────────────────────────────────────────────────
 
     function escHtml(str) {
         if (!str) return '';
@@ -392,17 +476,20 @@
         }
     }
 
-    // ── Exports ──────────────────────────────────────────────────────────────
-
-    window.initMemoryPage        = initMemoryPage;
-    window.onMemorySearchInput   = onMemorySearchInput;
-    window.clearMemorySearch     = clearMemorySearch;
+    window.initMemoryPage = initMemoryPage;
+    window.onMemorySearchInput = onMemorySearchInput;
+    window.clearMemorySearch = clearMemorySearch;
+    window.onMemoryEntityInput = onMemoryEntityInput;
+    window.onMemoryStatusFilterChange = onMemoryStatusFilterChange;
+    window.onMemoryConfidenceFilterChange = onMemoryConfidenceFilterChange;
+    window.toggleMemoryIncludeDismissed = toggleMemoryIncludeDismissed;
     window.filterMemoryByCategory = filterMemoryByCategory;
     window.openCreateMemoryModal = openCreateMemoryModal;
-    window.openEditMemoryModal   = openEditMemoryModal;
-    window.closeMemoryModal      = closeMemoryModal;
-    window.saveMemoryEntry       = saveMemoryEntry;
-    window.deleteMemoryEntry     = deleteMemoryEntry;
-    window.deleteAllMemories     = deleteAllMemories;
-    window.loadMemoryEntries     = loadMemoryEntries;
+    window.openEditMemoryModal = openEditMemoryModal;
+    window.closeMemoryModal = closeMemoryModal;
+    window.saveMemoryEntry = saveMemoryEntry;
+    window.deleteMemoryEntry = deleteMemoryEntry;
+    window.deleteAllMemories = deleteAllMemories;
+    window.loadMemoryEntries = function () { return loadMemoryEntries(true); };
 })();
+

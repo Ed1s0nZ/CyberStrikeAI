@@ -1077,53 +1077,73 @@
                             <button class="btn-secondary" onclick="loadMemoryEntries(); loadMemoryStats();" title="Refresh">Refresh</button>
                         </div>
                     </div>
+                    <div class="page-content memory-page-content">
+                        <!-- Notification bar -->
+                        <div id="memory-notification" class="memory-notification" style="display:none;"></div>
 
-                    <!-- Notification bar -->
-                    <div id="memory-notification" class="memory-notification" style="display:none;"></div>
+                        <!-- Stats strip -->
+                        <div id="memory-stats" class="memory-stats-strip"></div>
 
-                    <!-- Stats strip -->
-                    <div id="memory-stats" class="memory-stats-strip"></div>
-
-                    <!-- Toolbar: search + category filters + bulk actions -->
-                    <div class="memory-toolbar">
-                        <div class="memory-search-box">
-                            <svg class="memory-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="11" cy="11" r="8"></circle>
-                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                            </svg>
-                            <input
-                                id="memory-search-input"
-                                type="text"
-                                placeholder="Search by key or value…"
-                                oninput="onMemorySearchInput(this.value)"
-                                onkeydown="if(event.key==='Escape') clearMemorySearch()"
-                            />
-                            <button id="memory-search-clear" class="memory-search-clear" onclick="clearMemorySearch()" style="display:none;" title="Clear search">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-                                    <path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <!-- Toolbar: search + category filters + bulk actions -->
+                        <div class="memory-toolbar">
+                            <div class="memory-search-box">
+                                <svg class="memory-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                                 </svg>
-                            </button>
+                                <input
+                                    id="memory-search-input"
+                                    type="text"
+                                    placeholder="Search key/value/entity…"
+                                    oninput="onMemorySearchInput(this.value)"
+                                    onkeydown="if(event.key==='Escape') clearMemorySearch()"
+                                />
+                                <button id="memory-search-clear" class="memory-search-clear" onclick="clearMemorySearch()" style="display:none;" title="Clear search">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                                        <path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <input id="memory-entity-filter" class="memory-input memory-input-entity" type="text" placeholder="Entity filter…" oninput="onMemoryEntityInput(this.value)" />
+                            <select id="memory-status-filter" class="memory-select" onchange="onMemoryStatusFilterChange(this.value)">
+                                <option value="">All Status</option>
+                                <option value="active">Active</option>
+                                <option value="confirmed">Confirmed</option>
+                                <option value="false_positive">False Positive</option>
+                                <option value="disproven">Disproven</option>
+                            </select>
+                            <select id="memory-confidence-filter" class="memory-select" onchange="onMemoryConfidenceFilterChange(this.value)">
+                                <option value="">All Confidence</option>
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                            <label class="memory-toggle">
+                                <input id="memory-include-dismissed" type="checkbox" checked onchange="toggleMemoryIncludeDismissed(this.checked)" />
+                                <span>Show dismissed</span>
+                            </label>
+                            <div class="memory-filter-strip">
+                                <button class="memory-filter-btn" data-cat="" onclick="filterMemoryByCategory('')">All</button>
+                                <button class="memory-filter-btn memory-cat-credential" data-cat="credential" onclick="filterMemoryByCategory('credential')">Credential</button>
+                                <button class="memory-filter-btn memory-cat-target" data-cat="target" onclick="filterMemoryByCategory('target')">Target</button>
+                                <button class="memory-filter-btn memory-cat-vulnerability" data-cat="vulnerability" onclick="filterMemoryByCategory('vulnerability')">Vulnerability</button>
+                                <button class="memory-filter-btn memory-cat-fact" data-cat="fact" onclick="filterMemoryByCategory('fact')">Fact</button>
+                                <button class="memory-filter-btn memory-cat-note" data-cat="note" onclick="filterMemoryByCategory('note')">Note</button>
+                                <button class="memory-filter-btn memory-cat-tool_run" data-cat="tool_run" onclick="filterMemoryByCategory('tool_run')">Tool Run</button>
+                                <button class="memory-filter-btn memory-cat-discovery" data-cat="discovery" onclick="filterMemoryByCategory('discovery')">Discovery</button>
+                                <button class="memory-filter-btn memory-cat-plan" data-cat="plan" onclick="filterMemoryByCategory('plan')">Plan</button>
+                            </div>
+                            <div class="memory-toolbar-right">
+                                <span id="memory-count" class="memory-count"></span>
+                                <button class="btn-danger-outline" onclick="deleteAllMemories()" title="Delete all visible entries">Delete All</button>
+                            </div>
                         </div>
-                        <div class="memory-filter-strip">
-                            <button class="memory-filter-btn" data-cat="" onclick="filterMemoryByCategory('')">All</button>
-                            <button class="memory-filter-btn memory-cat-credential" data-cat="credential" onclick="filterMemoryByCategory('credential')">Credential</button>
-                            <button class="memory-filter-btn memory-cat-target" data-cat="target" onclick="filterMemoryByCategory('target')">Target</button>
-                            <button class="memory-filter-btn memory-cat-vulnerability" data-cat="vulnerability" onclick="filterMemoryByCategory('vulnerability')">Vulnerability</button>
-                            <button class="memory-filter-btn memory-cat-fact" data-cat="fact" onclick="filterMemoryByCategory('fact')">Fact</button>
-                            <button class="memory-filter-btn memory-cat-note" data-cat="note" onclick="filterMemoryByCategory('note')">Note</button>
-                            <button class="memory-filter-btn memory-cat-tool_run" data-cat="tool_run" onclick="filterMemoryByCategory('tool_run')">Tool Run</button>
-                            <button class="memory-filter-btn memory-cat-discovery" data-cat="discovery" onclick="filterMemoryByCategory('discovery')">Discovery</button>
-                            <button class="memory-filter-btn memory-cat-plan" data-cat="plan" onclick="filterMemoryByCategory('plan')">Plan</button>
-                        </div>
-                        <div class="memory-toolbar-right">
-                            <span id="memory-count" class="memory-count"></span>
-                            <button class="btn-danger-outline" onclick="deleteAllMemories()" title="Delete all visible entries">Delete All</button>
-                        </div>
-                    </div>
 
-                    <!-- Entry list -->
-                    <div id="memory-list" class="memory-list"></div>
+                        <!-- Entry list -->
+                        <div id="memory-list" class="memory-list"></div>
+                        <div id="memory-list-footer" class="memory-list-footer"></div>
+                    </div>
                 </div>
 
                 <!-- Memory create/edit modal -->

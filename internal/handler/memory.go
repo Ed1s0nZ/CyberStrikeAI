@@ -46,8 +46,11 @@ func (h *MemoryHandler) ListMemories(c *gin.Context) {
 	categoryStr := c.Query("category")
 	search := c.Query("search")
 	entity := c.Query("entity")
+	statusStr := strings.TrimSpace(c.Query("status"))
+	confidenceStr := strings.TrimSpace(c.Query("confidence"))
 	includeDismissedStr := c.Query("include_dismissed")
 	limitStr := c.DefaultQuery("limit", "100")
+	offsetStr := c.DefaultQuery("offset", "0")
 
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil || limit <= 0 {
@@ -56,52 +59,49 @@ func (h *MemoryHandler) ListMemories(c *gin.Context) {
 	if limit > 500 {
 		limit = 500
 	}
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		offset = 0
+	}
 
 	cat := agent.MemoryCategory(strings.TrimSpace(categoryStr))
+	if categoryStr != "" {
+		if _, ok := validMemoryCategories[cat]; !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid category"})
+			return
+		}
+	}
+
+	if statusStr != "" {
+		switch agent.MemoryStatus(statusStr) {
+		case agent.MemoryStatusActive, agent.MemoryStatusConfirmed, agent.MemoryStatusFalsePositive, agent.MemoryStatusDisproven:
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid status"})
+			return
+		}
+	}
+	if confidenceStr != "" {
+		if _, ok := validMemoryConfidences[agent.MemoryConfidence(confidenceStr)]; !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid confidence"})
+			return
+		}
+	}
+
 	includeDismissed := includeDismissedStr == "true" || includeDismissedStr == "1"
 
 	var entries []*agent.MemoryEntry
-	if entity != "" {
-		// Respect category/include_dismissed filters even when entity is provided.
-		entity = strings.TrimSpace(entity)
-		searchLower := strings.ToLower(strings.TrimSpace(search))
+	baseLimit := 5000
+	if search != "" {
 		if includeDismissed {
-			entries, err = h.memory.ListAll(cat, 5000)
+			entries, err = h.memory.RetrieveAll(search, cat, baseLimit)
 		} else {
-			entries, err = h.memory.List(cat, 5000)
-		}
-		if err == nil {
-			filtered := make([]*agent.MemoryEntry, 0, len(entries))
-			for _, entry := range entries {
-				if !strings.EqualFold(strings.TrimSpace(entry.Entity), entity) {
-					continue
-				}
-				// If search is provided together with entity, apply it as well.
-				if searchLower != "" {
-					keyLower := strings.ToLower(entry.Key)
-					valueLower := strings.ToLower(entry.Value)
-					if !strings.Contains(keyLower, searchLower) && !strings.Contains(valueLower, searchLower) {
-						continue
-					}
-				}
-				filtered = append(filtered, entry)
-				if len(filtered) >= limit {
-					break
-				}
-			}
-			entries = filtered
-		}
-	} else if search != "" {
-		if includeDismissed {
-			entries, err = h.memory.RetrieveAll(search, cat, limit)
-		} else {
-			entries, err = h.memory.Retrieve(search, cat, limit)
+			entries, err = h.memory.Retrieve(search, cat, baseLimit)
 		}
 	} else {
 		if includeDismissed {
-			entries, err = h.memory.ListAll(cat, limit)
+			entries, err = h.memory.ListAll(cat, baseLimit)
 		} else {
-			entries, err = h.memory.List(cat, limit)
+			entries, err = h.memory.List(cat, baseLimit)
 		}
 	}
 	if err != nil {
@@ -114,9 +114,41 @@ func (h *MemoryHandler) ListMemories(c *gin.Context) {
 		entries = []*agent.MemoryEntry{}
 	}
 
+	entityLower := strings.ToLower(strings.TrimSpace(entity))
+	filtered := make([]*agent.MemoryEntry, 0, len(entries))
+	for _, entry := range entries {
+		if entityLower != "" && !strings.Contains(strings.ToLower(entry.Entity), entityLower) {
+			continue
+		}
+		if statusStr != "" && string(entry.Status) != statusStr {
+			continue
+		}
+		if confidenceStr != "" && string(entry.Confidence) != confidenceStr {
+			continue
+		}
+		filtered = append(filtered, entry)
+	}
+
+	total := len(filtered)
+	if offset > total {
+		offset = total
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	paged := filtered[offset:end]
+	hasMore := end < total
+
 	c.JSON(http.StatusOK, gin.H{
-		"entries": entries,
-		"total":   len(entries),
+		"entries":   paged,
+		"total":     total,
+		"offset":    offset,
+		"limit":     limit,
+		"has_more":  hasMore,
+		"returned":  len(paged),
+		"filtered":  total,
+		"requested": limit,
 	})
 }
 
