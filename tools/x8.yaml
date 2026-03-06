@@ -29,7 +29,7 @@ parameters:
     required: false
     flag: "--wordlist"
     format: "flag"
-    default: "/usr/share/wordlists/x8/params.txt"
+    default: "/usr/share/dirb/wordlists/common.txt"
   - name: "method"
     type: "string"
     description: "HTTP method"

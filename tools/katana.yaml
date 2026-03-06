@@ -41,7 +41,7 @@ parameters:
     type: "bool"
     description: "Enable form extraction"
     required: false
-    flag: "-forms"
+    flag: "-fx"
     format: "flag"
     default: true
   - name: "additional_args"

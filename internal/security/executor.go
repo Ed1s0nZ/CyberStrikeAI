@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -387,26 +388,56 @@ func (e *Executor) buildCommandArgs(toolName string, toolConfig *config.ToolConf
 			switch format {
 			case "flag":
 				// --flag value or -f value
+				formattedValue := e.formatParamValue(param, value)
+				if strings.TrimSpace(formattedValue) == "" {
+					if param.Required {
+						e.logger.Warn("required flag parameter has empty value",
+							zap.String("tool", toolName),
+							zap.String("param", param.Name),
+						)
+						return []string{}
+					}
+					continue
+				}
 				if param.Flag != "" {
 					cmdArgs = append(cmdArgs, param.Flag)
 				}
-				formattedValue := e.formatParamValue(param, value)
-				if formattedValue != "" {
-					cmdArgs = append(cmdArgs, formattedValue)
-				}
+				cmdArgs = append(cmdArgs, formattedValue)
 			case "combined":
 				// --flag=value or -f=value
+				formattedValue := e.formatParamValue(param, value)
+				if strings.TrimSpace(formattedValue) == "" {
+					if param.Required {
+						e.logger.Warn("required combined parameter has empty value",
+							zap.String("tool", toolName),
+							zap.String("param", param.Name),
+						)
+						return []string{}
+					}
+					continue
+				}
 				if param.Flag != "" {
-					cmdArgs = append(cmdArgs, fmt.Sprintf("%s=%s", param.Flag, e.formatParamValue(param, value)))
+					cmdArgs = append(cmdArgs, fmt.Sprintf("%s=%s", param.Flag, formattedValue))
 				} else {
-					cmdArgs = append(cmdArgs, e.formatParamValue(param, value))
+					cmdArgs = append(cmdArgs, formattedValue)
 				}
 			case "template":
 				// use template string
+				formattedValue := e.formatParamValue(param, value)
+				if strings.TrimSpace(formattedValue) == "" {
+					if param.Required {
+						e.logger.Warn("required template parameter has empty value",
+							zap.String("tool", toolName),
+							zap.String("param", param.Name),
+						)
+						return []string{}
+					}
+					continue
+				}
 				if param.Template != "" {
 					template := param.Template
 					template = strings.ReplaceAll(template, "{flag}", param.Flag)
-					template = strings.ReplaceAll(template, "{value}", e.formatParamValue(param, value))
+					template = strings.ReplaceAll(template, "{value}", formattedValue)
 					template = strings.ReplaceAll(template, "{name}", param.Name)
 					cmdArgs = append(cmdArgs, strings.Fields(template)...)
 				} else {
@@ -414,14 +445,36 @@ func (e *Executor) buildCommandArgs(toolName string, toolConfig *config.ToolConf
 					if param.Flag != "" {
 						cmdArgs = append(cmdArgs, param.Flag)
 					}
-					cmdArgs = append(cmdArgs, e.formatParamValue(param, value))
+					cmdArgs = append(cmdArgs, formattedValue)
 				}
 			case "positional":
 				// positional parameter (already handled above)
-				cmdArgs = append(cmdArgs, e.formatParamValue(param, value))
+				formattedValue := e.formatParamValue(param, value)
+				if strings.TrimSpace(formattedValue) == "" {
+					if param.Required {
+						e.logger.Warn("required positional parameter has empty value",
+							zap.String("tool", toolName),
+							zap.String("param", param.Name),
+						)
+						return []string{}
+					}
+					continue
+				}
+				cmdArgs = append(cmdArgs, formattedValue)
 			default:
 				// default: add value directly
-				cmdArgs = append(cmdArgs, e.formatParamValue(param, value))
+				formattedValue := e.formatParamValue(param, value)
+				if strings.TrimSpace(formattedValue) == "" {
+					if param.Required {
+						e.logger.Warn("required parameter has empty value",
+							zap.String("tool", toolName),
+							zap.String("param", param.Name),
+						)
+						return []string{}
+					}
+					continue
+				}
+				cmdArgs = append(cmdArgs, formattedValue)
 			}
 		}
 
@@ -471,7 +524,19 @@ func (e *Executor) buildCommandArgs(toolName string, toolConfig *config.ToolConf
 					}
 					// only add to command arguments when value is not nil
 					if value != nil {
-						cmdArgs = append(cmdArgs, e.formatParamValue(param, value))
+						formattedValue := e.formatParamValue(param, value)
+						if strings.TrimSpace(formattedValue) == "" {
+							if param.Required {
+								e.logger.Warn("required positional parameter has empty value",
+									zap.String("tool", toolName),
+									zap.String("param", param.Name),
+									zap.Int("position", *param.Position),
+								)
+								return []string{}
+							}
+						} else {
+							cmdArgs = append(cmdArgs, formattedValue)
+						}
 					}
 					break
 				}
@@ -491,24 +556,24 @@ func (e *Executor) buildCommandArgs(toolName string, toolConfig *config.ToolConf
 		if hasScanType {
 			scanTypeArgs := e.parseAdditionalArgs(scanTypeValue)
 			if len(scanTypeArgs) > 0 {
-				// for nmap, scan_type should replace the default scan type parameters
-				// since we already skipped the default args, now need to insert scan_type at the right position
-				// find the target parameter position (usually the last positional parameter)
-				insertPos := len(cmdArgs)
-				for i := len(cmdArgs) - 1; i >= 0; i-- {
-					// target is usually the last non-flag argument
-					if !strings.HasPrefix(cmdArgs[i], "-") {
-						insertPos = i
-						break
-					}
-				}
-				// insert scan_type parameters before target
+				// prepend scan_type args to avoid splitting flag-value pairs that may exist in
+				// additional_args (e.g. "--min-rate 500"), which can happen with heuristic insertion.
 				newArgs := make([]string, 0, len(cmdArgs)+len(scanTypeArgs))
-				newArgs = append(newArgs, cmdArgs[:insertPos]...)
 				newArgs = append(newArgs, scanTypeArgs...)
-				newArgs = append(newArgs, cmdArgs[insertPos:]...)
+				newArgs = append(newArgs, cmdArgs...)
 				cmdArgs = newArgs
 			}
+		}
+
+		if toolName == "nmap" {
+			sanitized, changed := sanitizeNmapArgs(cmdArgs, os.Geteuid() == 0)
+			if changed {
+				e.logger.Warn("sanitized nmap arguments for non-root execution",
+					zap.Strings("originalArgs", cmdArgs),
+					zap.Strings("sanitizedArgs", sanitized),
+				)
+			}
+			cmdArgs = sanitized
 		}
 
 		return cmdArgs
@@ -659,6 +724,40 @@ func (e *Executor) formatParamValue(param config.ParameterConfig, value interfac
 		}
 		return formattedValue
 	}
+}
+
+// sanitizeNmapArgs removes nmap options that require root when running as non-root.
+// This keeps scans running instead of hard-failing with privilege errors.
+func sanitizeNmapArgs(args []string, isRoot bool) ([]string, bool) {
+	if isRoot {
+		return args, false
+	}
+
+	sanitized := make([]string, 0, len(args))
+	changed := false
+	hasSynScan := false
+	hasTcpConnect := false
+
+	for _, arg := range args {
+		switch arg {
+		case "-O", "-A", "--osscan-guess":
+			changed = true
+			continue
+		case "-sS":
+			hasSynScan = true
+			changed = true
+			continue
+		case "-sT":
+			hasTcpConnect = true
+		}
+		sanitized = append(sanitized, arg)
+	}
+
+	if hasSynScan && !hasTcpConnect {
+		sanitized = append([]string{"-sT"}, sanitized...)
+	}
+
+	return sanitized, changed
 }
 
 // isBackgroundCommand detects whether a command is a fully background command (has & at the end, but not inside quotes)

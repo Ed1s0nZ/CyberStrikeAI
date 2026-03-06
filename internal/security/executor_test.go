@@ -265,3 +265,168 @@ func TestPaginateLines(t *testing.T) {
 		t.Errorf("empty list should return empty result. actual: %d lines", len(emptyPage.Lines))
 	}
 }
+
+func TestBuildCommandArgs_NmapEmptyPortsDoesNotEmitBarePortFlag(t *testing.T) {
+	executor, _ := setupTestExecutor(t)
+
+	targetPos := 0
+	toolConfig := &config.ToolConfig{
+		Name:    "nmap",
+		Command: "nmap",
+		Args:    []string{"-sT", "-sV", "-sC"},
+		Parameters: []config.ParameterConfig{
+			{
+				Name:     "target",
+				Type:     "string",
+				Required: true,
+				Position: &targetPos,
+				Format:   "positional",
+			},
+			{
+				Name:     "ports",
+				Type:     "string",
+				Required: false,
+				Flag:     "-p",
+				Format:   "flag",
+			},
+		},
+	}
+
+	args := map[string]interface{}{
+		"target": "127.0.0.1",
+		"ports":  "",
+	}
+
+	cmdArgs := executor.buildCommandArgs("nmap", toolConfig, args)
+	for i := 0; i < len(cmdArgs); i++ {
+		if cmdArgs[i] == "-p" {
+			t.Fatalf("unexpected bare -p flag in command args: %#v", cmdArgs)
+		}
+	}
+	if len(cmdArgs) == 0 {
+		t.Fatal("command args should not be empty")
+	}
+}
+
+func TestBuildCommandArgs_NmapScanTypeDoesNotBreakMinRatePair(t *testing.T) {
+	executor, _ := setupTestExecutor(t)
+
+	targetPos := 0
+	toolConfig := &config.ToolConfig{
+		Name:    "nmap",
+		Command: "nmap",
+		Args:    []string{"-sT", "-sV", "-sC"},
+		Parameters: []config.ParameterConfig{
+			{
+				Name:     "target",
+				Type:     "string",
+				Required: true,
+				Position: &targetPos,
+				Format:   "positional",
+			},
+			{
+				Name:     "ports",
+				Type:     "string",
+				Required: false,
+				Flag:     "-p",
+				Format:   "flag",
+			},
+			{
+				Name:     "scan_type",
+				Type:     "string",
+				Required: false,
+				Format:   "template",
+				Template: "{value}",
+			},
+			{
+				Name:     "additional_args",
+				Type:     "string",
+				Required: false,
+				Format:   "positional",
+			},
+		},
+	}
+
+	args := map[string]interface{}{
+		"target":          "example.com",
+		"ports":           "1-1000",
+		"scan_type":       "-sV -sC",
+		"additional_args": "-T4 --min-rate 500",
+	}
+
+	cmdArgs := executor.buildCommandArgs("nmap", toolConfig, args)
+
+	for i := 0; i < len(cmdArgs)-1; i++ {
+		if cmdArgs[i] == "--min-rate" && cmdArgs[i+1] != "500" {
+			t.Fatalf("--min-rate value pairing broken: %#v", cmdArgs)
+		}
+	}
+}
+
+func TestSanitizeNmapArgs_NonRoot(t *testing.T) {
+	input := []string{"-sS", "-O", "example.com", "-p", "80,443", "-A"}
+	got, changed := sanitizeNmapArgs(input, false)
+
+	if !changed {
+		t.Fatal("expected nmap args to be sanitized for non-root")
+	}
+
+	joined := strings.Join(got, " ")
+	if strings.Contains(joined, "-sS") || strings.Contains(joined, " -O") || strings.Contains(joined, " -A") {
+		t.Fatalf("sanitized args still contain privileged flags: %#v", got)
+	}
+	if !strings.Contains(joined, "-sT") {
+		t.Fatalf("expected -sT fallback in sanitized args: %#v", got)
+	}
+}
+
+func TestBuildCommandArgs_NmapPortsAndScanTypeOrder(t *testing.T) {
+	executor, _ := setupTestExecutor(t)
+
+	targetPos := 0
+	toolConfig := &config.ToolConfig{
+		Name:    "nmap",
+		Command: "nmap",
+		Args:    []string{"-sT", "-sV", "-sC"},
+		Parameters: []config.ParameterConfig{
+			{
+				Name:     "target",
+				Type:     "string",
+				Required: true,
+				Position: &targetPos,
+				Format:   "positional",
+			},
+			{
+				Name:   "ports",
+				Type:   "string",
+				Flag:   "-p",
+				Format: "flag",
+			},
+			{
+				Name:     "scan_type",
+				Type:     "string",
+				Format:   "template",
+				Template: "{value}",
+			},
+			{
+				Name:   "additional_args",
+				Type:   "string",
+				Format: "positional",
+			},
+		},
+	}
+
+	args := map[string]interface{}{
+		"target":          "104.21.64.164",
+		"ports":           "1-10000",
+		"scan_type":       "-sV -sC",
+		"additional_args": "-T4 -A",
+	}
+
+	cmdArgs := executor.buildCommandArgs("nmap", toolConfig, args)
+	for i := 0; i < len(cmdArgs)-1; i++ {
+		if cmdArgs[i] == "-p" && strings.HasPrefix(cmdArgs[i+1], "-") {
+			t.Fatalf("invalid -p argument ordering: %#v", cmdArgs)
+		}
+	}
+}

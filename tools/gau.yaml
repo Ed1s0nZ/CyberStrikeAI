@@ -27,13 +27,13 @@ parameters:
     type: "string"
     description: "Data sources (wayback,commoncrawl,otx,urlscan)"
     required: false
-    flag: "-providers"
+    flag: "--providers"
     format: "flag"
   - name: "include_subs"
     type: "bool"
     description: "Include subdomains"
     required: false
-    flag: "-subs"
+    flag: "--subs"
     format: "flag"
     default: true
   - name: "additional_args"

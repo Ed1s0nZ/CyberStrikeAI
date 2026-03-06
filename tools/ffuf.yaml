@@ -28,7 +28,7 @@ parameters:
     type: "string"
     description: "Wordlist file path"
     required: false
-    default: "/usr/share/wordlists/dirb/common.txt"
+    default: "/usr/share/dirb/wordlists/common.txt"
     flag: "-w"
     format: "flag"
   - name: "match_codes"

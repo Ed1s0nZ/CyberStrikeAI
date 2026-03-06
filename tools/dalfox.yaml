@@ -17,19 +17,20 @@ description: |
   - Bug bounty reconnaissance
   - Security testing
 parameters:
+  - name: "mode"
+    type: "string"
+    description: "Dalfox mode/subcommand (url, pipe, file, sxss)"
+    required: false
+    position: 0
+    format: "positional"
+    default: "url"
+    options: ["url", "pipe", "file", "sxss"]
   - name: "url"
     type: "string"
-    description: "Target URL"
+    description: "Target URL (used with mode=url)"
     required: true
-    flag: "-u"
-    format: "flag"
-  - name: "pipe_mode"
-    type: "bool"
-    description: "Use pipe mode input"
-    required: false
-    flag: "--pipe"
-    format: "flag"
-    default: false
+    position: 1
+    format: "positional"
   - name: "blind"
     type: "string"
     description: "Blind XSS callback address (e.g. Burp Collaborator URL)"

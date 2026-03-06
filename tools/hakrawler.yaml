@@ -1,5 +1,9 @@
 name: "hakrawler"
-command: "hakrawler"
+command: "/bin/bash"
+args:
+  - "-lc"
+  - "url=\"$1\"; shift; printf '%s\n' \"$url\" | hakrawler \"$@\""
+  - "_"
 enabled: true
 short_description: "Web endpoint discovery tool"
 description: |
@@ -21,8 +25,8 @@ parameters:
     type: "string"
     description: "Target URL"
     required: true
-    flag: "-url"
-    format: "flag"
+    position: 0
+    format: "positional"
   - name: "depth"
     type: "int"
     description: "Crawl depth"
@@ -32,9 +36,9 @@ parameters:
     default: 2
   - name: "forms"
     type: "bool"
-    description: "Include forms"
+    description: "Show URL source hints (includes form/script/href origin tags)"
     required: false
-    flag: "-forms"
+    flag: "-s"
     format: "flag"
     default: true
   - name: "additional_args"

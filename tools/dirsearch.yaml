@@ -1,5 +1,5 @@
 name: "dirsearch"
-command: "dirsearch"
+command: "/usr/bin/dirsearch"
 enabled: true
 short_description: "Advanced directory and file discovery tool"
 description: |
