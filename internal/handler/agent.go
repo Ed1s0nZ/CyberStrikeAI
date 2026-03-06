@@ -128,9 +128,9 @@ type ChatRequest struct {
 }
 
 const (
-	maxAttachments        = 10
+	maxAttachments         = 10
 	maxAttachmentSizeBytes = 50 * 1024 * 1024 // 50 MB per file
-	chatUploadsDirName    = "chat_uploads"     // root directory for conversation attachments (relative to current working directory)
+	chatUploadsDirName     = "chat_uploads"   // root directory for conversation attachments (relative to current working directory)
 )
 
 // saveAttachmentsToDateAndConversationDir saves attachments to chat_uploads/YYYY-MM-DD/{conversationID}/, returns the saved path for each file (in the same order as attachments)
@@ -255,6 +255,117 @@ func appendAttachmentsToMessage(msg string, attachments []ChatAttachment, savedP
 	return b.String()
 }
 
+// buildContinuationBrief summarizes recent session state so follow-up turns can continue
+// from current status, focus, findings, memory, and tool usage instead of restarting work.
+func (h *AgentHandler) buildContinuationBrief(conversationID string) string {
+	recentDetails, err := h.db.GetRecentProcessDetailsByConversation(conversationID, 60)
+	if err != nil {
+		h.logger.Warn("Failed to load recent process details for continuation context", zap.String("conversationId", conversationID), zap.Error(err))
+		return ""
+	}
+
+	messages, err := h.db.GetMessages(conversationID)
+	if err != nil {
+		h.logger.Warn("Failed to load messages for continuation context", zap.String("conversationId", conversationID), zap.Error(err))
+		return ""
+	}
+
+	if len(recentDetails) == 0 && len(messages) == 0 {
+		return ""
+	}
+
+	lastStatus := ""
+	currentFocus := ""
+	tools := make([]string, 0, 12)
+	seenTools := make(map[string]struct{})
+
+	// recentDetails are ordered newest first
+	for _, d := range recentDetails {
+		if lastStatus == "" && d.Message != "" {
+			switch d.EventType {
+			case "error", "cancelled", "timeout", "progress", "iteration", "tool_deferred", "tool_result":
+				lastStatus = d.Message
+			}
+		}
+		if currentFocus == "" && (d.EventType == "thinking" || d.EventType == "progress") && d.Message != "" {
+			currentFocus = d.Message
+		}
+
+		if d.Data != "" && len(tools) < 12 {
+			var dataMap map[string]interface{}
+			if err := json.Unmarshal([]byte(d.Data), &dataMap); err == nil {
+				if toolName, ok := dataMap["toolName"].(string); ok && toolName != "" {
+					if _, exists := seenTools[toolName]; !exists {
+						seenTools[toolName] = struct{}{}
+						tools = append(tools, toolName)
+					}
+				}
+			}
+		}
+	}
+
+	lastAssistant := ""
+	for i := len(messages) - 1; i >= 0; i-- {
+		msg := messages[i]
+		if msg.Role == "assistant" {
+			content := strings.TrimSpace(msg.Content)
+			if content == "" || content == "Processing..." {
+				continue
+			}
+			lastAssistant = safeTruncateString(content, 800)
+			break
+		}
+	}
+
+	var b strings.Builder
+	b.WriteString("[Session Continuation Context]\n")
+	b.WriteString("- Conversation ID: ")
+	b.WriteString(conversationID)
+	b.WriteString("\n")
+	if lastStatus != "" {
+		b.WriteString("- Last known status: ")
+		b.WriteString(safeTruncateString(lastStatus, 260))
+		b.WriteString("\n")
+	}
+	if currentFocus != "" {
+		b.WriteString("- Current focus: ")
+		b.WriteString(safeTruncateString(currentFocus, 360))
+		b.WriteString("\n")
+	}
+	if len(tools) > 0 {
+		b.WriteString("- Recently used tools: ")
+		b.WriteString(strings.Join(tools, ", "))
+		b.WriteString("\n")
+	}
+	if lastAssistant != "" {
+		b.WriteString("- Latest findings summary: ")
+		b.WriteString(lastAssistant)
+		b.WriteString("\n")
+	}
+
+	return strings.TrimSpace(b.String())
+}
+
+// applyContinuationContext injects a compact continuation brief so follow-up turns
+// keep prior findings and tool state while prioritizing the current user input.
+func (h *AgentHandler) applyContinuationContext(conversationID, currentInput, modelInput string, historyCount int) string {
+	if conversationID == "" || historyCount == 0 {
+		return modelInput
+	}
+
+	brief := h.buildContinuationBrief(conversationID)
+	if brief == "" {
+		return modelInput
+	}
+
+	return modelInput + "\n\n" +
+		"[Continuation Behavior]\n" +
+		"Continue this same session using prior validated findings, memory, task status, and tool state. " +
+		"Do not restart completed work unless necessary. Prioritize the current user input.\n\n" +
+		brief + "\n\n" +
+		"[Current User Input]\n" + currentInput
+}
+
 // ChatResponse chat response
 type ChatResponse struct {
 	Response        string    `json:"response"`
@@ -362,6 +473,7 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 		}
 	}
 	finalMessage = appendAttachmentsToMessage(finalMessage, req.Attachments, savedPaths)
+	finalMessage = h.applyContinuationContext(conversationID, req.Message, finalMessage, len(agentHistoryMessages))
 
 	// Save user message: when attachments are present, also save attachment names and paths,
 	// so they are visible after refresh and the model can retrieve paths from history when continuing conversation
@@ -457,6 +569,7 @@ func (h *AgentHandler) ProcessMessageForRobot(ctx context.Context, conversationI
 			roleSkills = r.Skills
 		}
 	}
+	finalMessage = h.applyContinuationContext(conversationID, message, finalMessage, len(agentHistoryMessages))
 
 	if _, err = h.db.AddMessage(conversationID, "user", message, nil); err != nil {
 		return "", "", fmt.Errorf("failed to save user message: %w", err)
@@ -555,6 +668,7 @@ func (h *AgentHandler) ProcessMessageForRobotStream(
 			roleSkills = r.Skills
 		}
 	}
+	finalMessage = h.applyContinuationContext(conversationID, message, finalMessage, len(agentHistoryMessages))
 
 	if _, err = h.db.AddMessage(conversationID, "user", message, nil); err != nil {
 		return "", "", fmt.Errorf("failed to save user message: %w", err)
@@ -708,8 +822,8 @@ func (h *AgentHandler) createProgressCallback(conversationID, assistantMessageID
 					if query == "" {
 						if result, ok := dataMap["result"].(string); ok && result != "" {
 							// Try to extract query from result (if result contains "No knowledge related to query 'xxx' found")
-										if strings.Contains(result, "No relevant knowledge found for query '") {
-											start := strings.Index(result, "No relevant knowledge found for query '") + len("No relevant knowledge found for query '")
+							if strings.Contains(result, "No relevant knowledge found for query '") {
+								start := strings.Index(result, "No relevant knowledge found for query '") + len("No relevant knowledge found for query '")
 								end := strings.Index(result[start:], "'")
 								if end > 0 {
 									query = result[start : start+end]
@@ -750,7 +864,7 @@ func (h *AgentHandler) createProgressCallback(conversationID, assistantMessageID
 						}
 
 						// If not extracted from metadata, but result contains "found", at least mark as having results
-								if len(retrievedItems) == 0 && strings.Contains(result, "Found") && !strings.Contains(result, "Not found") {
+						if len(retrievedItems) == 0 && strings.Contains(result, "Found") && !strings.Contains(result, "Not found") {
 							// Has results but cannot accurately extract IDs, use special marker
 							retrievedItems = []string{"_has_results"}
 						}
@@ -950,6 +1064,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	}
 	// Only append attachment saved paths to finalMessage, avoid inlining file content into model context
 	finalMessage = appendAttachmentsToMessage(finalMessage, req.Attachments, savedPaths)
+	finalMessage = h.applyContinuationContext(conversationID, req.Message, finalMessage, len(agentHistoryMessages))
 	// If roleTools is empty, it means use all tools (default role or role without configured tools)
 
 	// Save user message: when attachments are present, also save attachment names and paths,
@@ -985,47 +1100,76 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	defer cancelWithCause(nil)
 
 	if _, err := h.tasks.StartTask(conversationID, req.Message, cancelWithCause); err != nil {
-		var errorMsg string
 		if errors.Is(err, ErrTaskAlreadyRunning) {
-			errorMsg = "⚠️ A task is already running in this session. Please wait for the current task to complete or click the 'Stop Task' button before trying again."
-			sendEvent("error", errorMsg, map[string]interface{}{
+			sendEvent("progress", "A previous task is still running for this session. Cancelling it and continuing with your latest input...", map[string]interface{}{
 				"conversationId": conversationID,
-				"errorType":      "task_already_running",
+				"errorType":      "task_replacement",
 			})
+			if _, cancelErr := h.tasks.CancelTask(conversationID, ErrTaskCancelled); cancelErr != nil {
+				h.logger.Warn("Failed to request cancellation for running task", zap.String("conversationId", conversationID), zap.Error(cancelErr))
+			}
+
+			waitDeadline := time.Now().Add(20 * time.Second)
+			for h.tasks.IsTaskRunning(conversationID) && time.Now().Before(waitDeadline) {
+				time.Sleep(200 * time.Millisecond)
+			}
+			if h.tasks.IsTaskRunning(conversationID) {
+				errorMsg := "⚠️ Previous task did not stop in time. Please click 'Stop Task' and retry."
+				sendEvent("error", errorMsg, map[string]interface{}{
+					"conversationId": conversationID,
+					"errorType":      "task_replacement_timeout",
+				})
+				if assistantMessageID != "" {
+					if _, updateErr := h.db.Exec("UPDATE messages SET content = ? WHERE id = ?", errorMsg, assistantMessageID); updateErr != nil {
+						h.logger.Warn("Failed to update assistant message after replacement timeout", zap.Error(updateErr))
+					}
+					if addErr := h.db.AddProcessDetail(assistantMessageID, conversationID, "error", errorMsg, map[string]interface{}{"errorType": "task_replacement_timeout"}); addErr != nil {
+						h.logger.Warn("Failed to save replacement timeout details", zap.Error(addErr))
+					}
+				}
+				sendEvent("done", "", map[string]interface{}{"conversationId": conversationID})
+				return
+			}
+
+			if _, retryErr := h.tasks.StartTask(conversationID, req.Message, cancelWithCause); retryErr != nil {
+				errorMsg := "❌ Failed to continue session: " + retryErr.Error()
+				sendEvent("error", errorMsg, map[string]interface{}{
+					"conversationId": conversationID,
+					"errorType":      "task_restart_failed",
+				})
+				if assistantMessageID != "" {
+					if _, updateErr := h.db.Exec("UPDATE messages SET content = ? WHERE id = ?", errorMsg, assistantMessageID); updateErr != nil {
+						h.logger.Warn("Failed to update assistant message after restart failure", zap.Error(updateErr))
+					}
+					if addErr := h.db.AddProcessDetail(assistantMessageID, conversationID, "error", errorMsg, map[string]interface{}{"errorType": "task_restart_failed"}); addErr != nil {
+						h.logger.Warn("Failed to save restart error details", zap.Error(addErr))
+					}
+				}
+				sendEvent("done", "", map[string]interface{}{"conversationId": conversationID})
+				return
+			}
+			if assistantMessageID != "" {
+				_ = h.db.AddProcessDetail(assistantMessageID, conversationID, "progress", "Session continuation requested: resumed from previous context with latest user input.", map[string]interface{}{
+					"eventType": "task_replaced",
+				})
+			}
 		} else {
-			errorMsg = "❌ Failed to start task: " + err.Error()
+			errorMsg := "❌ Failed to start task: " + err.Error()
 			sendEvent("error", errorMsg, map[string]interface{}{
 				"conversationId": conversationID,
 				"errorType":      "task_start_failed",
 			})
-		}
-
-		// Update assistant message content and save error details to database
-		if assistantMessageID != "" {
-			if _, updateErr := h.db.Exec(
-				"UPDATE messages SET content = ? WHERE id = ?",
-				errorMsg,
-				assistantMessageID,
-			); updateErr != nil {
-				h.logger.Warn("Failed to update assistant message after error", zap.Error(updateErr))
+			if assistantMessageID != "" {
+				if _, updateErr := h.db.Exec("UPDATE messages SET content = ? WHERE id = ?", errorMsg, assistantMessageID); updateErr != nil {
+					h.logger.Warn("Failed to update assistant message after error", zap.Error(updateErr))
+				}
+				if addErr := h.db.AddProcessDetail(assistantMessageID, conversationID, "error", errorMsg, map[string]interface{}{"errorType": "task_start_failed"}); addErr != nil {
+					h.logger.Warn("Failed to save task start error details", zap.Error(addErr))
+				}
 			}
-			// Save error details to database
-			if err := h.db.AddProcessDetail(assistantMessageID, conversationID, "error", errorMsg, map[string]interface{}{
-				"errorType": func() string {
-					if errors.Is(err, ErrTaskAlreadyRunning) {
-						return "task_already_running"
-					}
-					return "task_start_failed"
-				}(),
-			}); err != nil {
-				h.logger.Warn("Failed to save error details", zap.Error(err))
-			}
+			sendEvent("done", "", map[string]interface{}{"conversationId": conversationID})
+			return
 		}
-
-		sendEvent("done", "", map[string]interface{}{
-			"conversationId": conversationID,
-		})
-		return
 	}
 
 	taskStatus := "completed"

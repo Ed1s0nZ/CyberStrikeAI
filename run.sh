@@ -84,6 +84,10 @@ CONFIG_FILE="$ROOT_DIR/config.yaml"
 VENV_DIR="$ROOT_DIR/venv"
 REQUIREMENTS_FILE="$ROOT_DIR/requirements.txt"
 BINARY_NAME="cyberstrike-ai"
+LOG_DIR="$ROOT_DIR/logs"
+LOG_FILE="$LOG_DIR/suite.log"
+PID_FILE="$LOG_DIR/suite.pid"
+HTTP_ADDR="${HTTP_ADDR:-127.0.0.1:18080}"
 
 # Check configuration file
 if [ ! -f "$CONFIG_FILE" ]; then
@@ -156,6 +160,25 @@ setup_python_env() {
     source "$VENV_DIR/bin/activate"
     
     if [ -f "$REQUIREMENTS_FILE" ]; then
+        local req_hash_file="$VENV_DIR/.requirements.sha256"
+        local current_req_hash=""
+        local installed_req_hash=""
+
+        if command -v sha256sum >/dev/null 2>&1; then
+            current_req_hash="$(sha256sum "$REQUIREMENTS_FILE" | awk '{print $1}')"
+        elif command -v shasum >/dev/null 2>&1; then
+            current_req_hash="$(shasum -a 256 "$REQUIREMENTS_FILE" | awk '{print $1}')"
+        fi
+
+        if [ -f "$req_hash_file" ]; then
+            installed_req_hash="$(cat "$req_hash_file" 2>/dev/null || true)"
+        fi
+
+        if [ -n "$current_req_hash" ] && [ "$current_req_hash" = "$installed_req_hash" ]; then
+            success "Python dependencies unchanged, skipping pip install"
+            return
+        fi
+
         echo ""
         note "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         note "⚠️  Using temporary pip mirror (only valid for this script run)"
@@ -206,6 +229,9 @@ setup_python_env() {
         
         if [ $PIP_EXIT_CODE -eq 0 ]; then
             success "Python dependencies installed"
+            if [ -n "$current_req_hash" ]; then
+                echo "$current_req_hash" > "$req_hash_file"
+            fi
         else
             # Check if angr installation failed (requires Rust)
             if grep -q "angr" "$PIP_LOG" && grep -q "Rust compiler\|can't find Rust" "$PIP_LOG"; then
@@ -354,6 +380,34 @@ need_rebuild() {
 
 # Main flow
 main() {
+    local action="${1:-start}"
+
+    mkdir -p "$LOG_DIR"
+
+    case "$action" in
+        stop)
+            stop_server
+            exit 0
+            ;;
+        status)
+            status_server
+            exit 0
+            ;;
+        logs)
+            tail_logs
+            exit 0
+            ;;
+        restart)
+            stop_server
+            ;;
+        start|foreground)
+            ;;
+        *)
+            show_usage
+            exit 1
+            ;;
+    esac
+
     # Environment check
     info "Checking runtime environment..."
     check_python
@@ -374,16 +428,137 @@ main() {
     fi
     echo ""
     
-    # Start server
     success "All preparations complete!"
     echo ""
-    info "Starting CyberStrikeAI server..."
-    echo "=========================================="
+
+    if [ "$action" = "foreground" ]; then
+        info "Starting CyberStrikeAI server in foreground..."
+        echo "=========================================="
+        echo ""
+        exec "./$BINARY_NAME"
+    fi
+
+    start_server
+}
+
+show_usage() {
+    cat <<'EOF'
+Usage: ./run.sh [start|stop|restart|status|logs|foreground]
+  start       Build if needed and run server in background (default)
+  stop        Stop background server
+  restart     Stop and start background server
+  status      Show server status and listeners
+  logs        Tail server logs
+  foreground  Build if needed and run server in foreground
+EOF
+}
+
+is_running() {
+    if [ ! -f "$PID_FILE" ]; then
+        return 1
+    fi
+    local pid
+    pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+    if [ -z "$pid" ]; then
+        return 1
+    fi
+    if ! kill -0 "$pid" 2>/dev/null; then
+        return 1
+    fi
+    local cmd
+    cmd="$(ps -p "$pid" -o comm= 2>/dev/null || true)"
+    [ "$cmd" = "$BINARY_NAME" ]
+}
+
+start_server() {
+    if is_running; then
+        local pid
+        pid="$(cat "$PID_FILE")"
+        success "Server is already running (PID $pid)"
+        status_server
+        return 0
+    fi
+
+    info "Starting CyberStrikeAI server in background..."
+    nohup setsid "./$BINARY_NAME" >> "$LOG_FILE" 2>&1 < /dev/null &
+    local pid=$!
+    disown "$pid" 2>/dev/null || true
+    echo "$pid" > "$PID_FILE"
+
+    local ok=0
+    for _ in $(seq 1 40); do
+        if curl -fsS "http://${HTTP_ADDR}/" >/dev/null 2>&1; then
+            ok=1
+            break
+        fi
+        sleep 0.25
+    done
+
+    if [ "$ok" -eq 1 ]; then
+        success "Server started (PID $pid)"
+        status_server
+        return 0
+    fi
+
+    error "Server failed to become healthy on http://${HTTP_ADDR}/"
+    tail -n 80 "$LOG_FILE" || true
+    return 1
+}
+
+stop_server() {
+    if ! is_running; then
+        warning "Server is not running"
+        rm -f "$PID_FILE"
+        return 0
+    fi
+
+    local pid
+    pid="$(cat "$PID_FILE")"
+    info "Stopping server (PID $pid)..."
+    kill "$pid" 2>/dev/null || true
+
+    for _ in $(seq 1 40); do
+        if ! kill -0 "$pid" 2>/dev/null; then
+            rm -f "$PID_FILE"
+            success "Server stopped"
+            return 0
+        fi
+        sleep 0.25
+    done
+
+    warning "Graceful stop timed out; forcing termination"
+    kill -9 "$pid" 2>/dev/null || true
+    rm -f "$PID_FILE"
+}
+
+status_server() {
+    if is_running; then
+        local pid
+        pid="$(cat "$PID_FILE")"
+        success "Server is running (PID $pid)"
+    else
+        warning "Server is not running"
+    fi
+
     echo ""
-    
-    # Run server
-    exec "./$BINARY_NAME"
+    info "Listener status:"
+    ss -ltnp 2>/dev/null | grep -E ':18080|:18081' || echo "  No listeners on 18080/18081"
+    echo ""
+    info "Health check:"
+    if curl -fsS "http://${HTTP_ADDR}/" >/dev/null 2>&1; then
+        echo "  http://${HTTP_ADDR}/ -> OK"
+    else
+        echo "  http://${HTTP_ADDR}/ -> FAIL"
+    fi
+}
+
+tail_logs() {
+    if [ ! -f "$LOG_FILE" ]; then
+        warning "Log file not found: $LOG_FILE"
+        exit 0
+    fi
+    tail -f "$LOG_FILE"
 }
 
 # Execute main flow
-main
+main "${1:-start}"

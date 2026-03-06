@@ -476,3 +476,43 @@ func (db *DB) GetProcessDetailsByConversation(conversationID string) (map[string
 
 	return detailsMap, nil
 }
+
+// GetRecentProcessDetailsByConversation gets recent process detail events for a conversation (newest first).
+func (db *DB) GetRecentProcessDetailsByConversation(conversationID string, limit int) ([]ProcessDetail, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+
+	rows, err := db.Query(
+		"SELECT id, message_id, conversation_id, event_type, message, data, created_at FROM process_details WHERE conversation_id = ? ORDER BY created_at DESC LIMIT ?",
+		conversationID, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query recent process details: %w", err)
+	}
+	defer rows.Close()
+
+	details := make([]ProcessDetail, 0, limit)
+	for rows.Next() {
+		var detail ProcessDetail
+		var createdAt string
+
+		if err := rows.Scan(&detail.ID, &detail.MessageID, &detail.ConversationID, &detail.EventType, &detail.Message, &detail.Data, &createdAt); err != nil {
+			return nil, fmt.Errorf("failed to scan process detail: %w", err)
+		}
+
+		// try multiple time format parsings
+		var parseErr error
+		detail.CreatedAt, parseErr = time.Parse("2006-01-02 15:04:05.999999999-07:00", createdAt)
+		if parseErr != nil {
+			detail.CreatedAt, parseErr = time.Parse("2006-01-02 15:04:05", createdAt)
+		}
+		if parseErr != nil {
+			detail.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+		}
+
+		details = append(details, detail)
+	}
+
+	return details, nil
+}

@@ -46,7 +46,7 @@ func NewAgentTaskManager() *AgentTaskManager {
 	return &AgentTaskManager{
 		tasks:            make(map[string]*AgentTask),
 		completedTasks:   make([]*CompletedTask, 0),
-		maxHistorySize:   50,           // keep at most 50 history records
+		maxHistorySize:   50,             // keep at most 50 history records
 		historyRetention: 24 * time.Hour, // retain for 24 hours
 	}
 }
@@ -190,6 +190,14 @@ func (m *AgentTaskManager) GetActiveTasks() []*AgentTask {
 		})
 	}
 	return result
+}
+
+// IsTaskRunning returns whether a task is currently running for the conversation.
+func (m *AgentTaskManager) IsTaskRunning(conversationID string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	_, exists := m.tasks[conversationID]
+	return exists
 }
 
 // GetCompletedTasks returns recently completed task history
