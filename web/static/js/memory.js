@@ -10,7 +10,13 @@
     let memoryFilterCategory = ''; // current category filter
     let memoryEnabled = true;     // whether the feature is available
 
-    const CATEGORIES = ['credential', 'target', 'vulnerability', 'fact', 'note'];
+    const CATEGORIES = ['credential', 'target', 'vulnerability', 'fact', 'note', 'tool_run', 'discovery', 'plan'];
+    const STATUS_LABELS = {
+        active: 'Active',
+        confirmed: 'Confirmed',
+        false_positive: 'False Positive',
+        disproven: 'Disproven'
+    };
 
     // ── Init ─────────────────────────────────────────────────────────────────
 
@@ -137,12 +143,15 @@
 
     function renderEntryRow(e) {
         const catClass = `memory-cat-${escHtml(e.category || 'fact')}`;
+        const status = String(e.status || 'active').toLowerCase();
+        const statusLabel = STATUS_LABELS[status] || status;
         const updatedAt = e.updated_at ? formatDate(e.updated_at) : '';
         return `
         <div class="memory-entry" data-id="${escHtml(e.id)}">
             <div class="memory-entry-header">
                 <span class="memory-entry-key" title="${escHtml(e.key)}">${escHtml(e.key)}</span>
                 <span class="memory-entry-cat ${catClass}">${escHtml(e.category || 'fact')}</span>
+                <span class="memory-entry-status memory-status-${escHtml(status)}">${escHtml(statusLabel)}</span>
                 <span class="memory-entry-time">${updatedAt}</span>
                 <div class="memory-entry-actions">
                     <button class="btn-icon" title="Edit" onclick="openEditMemoryModal('${escHtml(e.id)}')">
@@ -163,6 +172,10 @@
                 </div>
             </div>
             <div class="memory-entry-value">${escHtml(e.value)}</div>
+            <div class="memory-entry-meta">
+                ${e.entity ? `<span class="memory-entry-entity">Entity: ${escHtml(e.entity)}</span>` : ''}
+                ${e.confidence ? `<span class="memory-entry-confidence">Confidence: ${escHtml(e.confidence)}</span>` : ''}
+            </div>
             ${e.conversation_id ? `<div class="memory-entry-conv">Conv: ${escHtml(e.conversation_id)}</div>` : ''}
         </div>`;
     }

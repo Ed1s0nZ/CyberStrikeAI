@@ -1,5 +1,7 @@
 name: "dirsearch"
-command: "/usr/bin/dirsearch"
+command: "/usr/bin/python3"
+args:
+  - "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py"
 enabled: true
 short_description: "Advanced directory and file discovery tool"
 description: |

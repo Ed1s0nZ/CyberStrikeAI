@@ -17,6 +17,23 @@ type MemoryHandler struct {
 	logger *zap.Logger
 }
 
+var validMemoryCategories = map[agent.MemoryCategory]struct{}{
+	agent.MemoryCategoryCredential:    {},
+	agent.MemoryCategoryTarget:        {},
+	agent.MemoryCategoryVulnerability: {},
+	agent.MemoryCategoryFact:          {},
+	agent.MemoryCategoryNote:          {},
+	agent.MemoryCategoryToolRun:       {},
+	agent.MemoryCategoryDiscovery:     {},
+	agent.MemoryCategoryPlan:          {},
+}
+
+var validMemoryConfidences = map[agent.MemoryConfidence]struct{}{
+	agent.MemoryConfidenceHigh:   {},
+	agent.MemoryConfidenceMedium: {},
+	agent.MemoryConfidenceLow:    {},
+}
+
 // NewMemoryHandler creates a MemoryHandler backed by the given PersistentMemory.
 func NewMemoryHandler(memory *agent.PersistentMemory, logger *zap.Logger) *MemoryHandler {
 	return &MemoryHandler{memory: memory, logger: logger}
@@ -45,7 +62,25 @@ func (h *MemoryHandler) ListMemories(c *gin.Context) {
 
 	var entries []*agent.MemoryEntry
 	if entity != "" {
-		entries, err = h.memory.ListByEntity(entity, limit)
+		// Respect category/include_dismissed filters even when entity is provided.
+		entity = strings.TrimSpace(entity)
+		if includeDismissed {
+			entries, err = h.memory.ListAll(cat, 5000)
+		} else {
+			entries, err = h.memory.List(cat, 5000)
+		}
+		if err == nil {
+			filtered := make([]*agent.MemoryEntry, 0, len(entries))
+			for _, entry := range entries {
+				if strings.EqualFold(strings.TrimSpace(entry.Entity), entity) {
+					filtered = append(filtered, entry)
+					if len(filtered) >= limit {
+						break
+					}
+				}
+			}
+			entries = filtered
+		}
 	} else if search != "" {
 		if includeDismissed {
 			entries, err = h.memory.RetrieveAll(search, cat, limit)
@@ -99,7 +134,10 @@ func (h *MemoryHandler) GetMemoryStats(c *gin.Context) {
 		}
 		count := len(entries)
 		stats[string(cat)] = count
-		total += count
+	}
+	allEntries, err := h.memory.ListAll("", 10000)
+	if err == nil {
+		total = len(allEntries)
 	}
 
 	// Count by status.
@@ -185,10 +223,18 @@ func (h *MemoryHandler) CreateMemory(c *gin.Context) {
 	if cat == "" {
 		cat = agent.MemoryCategoryFact
 	}
+	if _, ok := validMemoryCategories[cat]; !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid category"})
+		return
+	}
 
 	confidence := agent.MemoryConfidence(strings.TrimSpace(req.Confidence))
 	if confidence == "" {
 		confidence = agent.MemoryConfidenceMedium
+	}
+	if _, ok := validMemoryConfidences[confidence]; !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid confidence: must be low, medium, or high"})
+		return
 	}
 
 	entry, err := h.memory.StoreFull(req.Key, req.Value, cat, req.ConversationID, req.Entity, confidence, agent.MemoryStatusActive)
@@ -223,6 +269,10 @@ func (h *MemoryHandler) UpdateMemory(c *gin.Context) {
 	cat := agent.MemoryCategory(strings.TrimSpace(req.Category))
 	if cat == "" {
 		cat = agent.MemoryCategoryFact
+	}
+	if _, ok := validMemoryCategories[cat]; !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid category"})
+		return
 	}
 
 	entry, err := h.memory.UpdateByID(id, req.Key, req.Value, cat)

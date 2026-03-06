@@ -11806,6 +11806,9 @@ header {
 .memory-filter-btn.memory-cat-vulnerability.active { background: #f5a623; border-color: #f5a623; }
 .memory-filter-btn.memory-cat-fact.active       { background: #28a745; border-color: #28a745; }
 .memory-filter-btn.memory-cat-note.active       { background: #8e44ad; border-color: #8e44ad; }
+.memory-filter-btn.memory-cat-tool_run.active   { background: #007d7d; border-color: #007d7d; }
+.memory-filter-btn.memory-cat-discovery.active  { background: #c77d00; border-color: #c77d00; }
+.memory-filter-btn.memory-cat-plan.active       { background: #1f5bb5; border-color: #1f5bb5; }
 
 .memory-toolbar-right {
     display: flex;
@@ -11891,6 +11894,25 @@ header {
 .memory-cat-vulnerability { background: #fff5e6; color: #f5a623; }
 .memory-cat-fact        { background: #eafbee; color: #28a745; }
 .memory-cat-note        { background: #f5e9ff; color: #8e44ad; }
+.memory-cat-tool_run    { background: #e6ffff; color: #007d7d; }
+.memory-cat-discovery   { background: #fff0d9; color: #c77d00; }
+.memory-cat-plan        { background: #e8efff; color: #1f5bb5; }
+
+.memory-entry-status {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 20px;
+    border: 1px solid transparent;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    flex-shrink: 0;
+}
+
+.memory-status-active { background: #eef3ff; color: #1f5bb5; border-color: #d9e4ff; }
+.memory-status-confirmed { background: #eafbee; color: #1c7430; border-color: #c9f0d2; }
+.memory-status-false_positive { background: #fff4e5; color: #8a5300; border-color: #ffe0b2; }
+.memory-status-disproven { background: #fdecea; color: #9b1e1e; border-color: #f8c9c9; }
 
 .memory-entry-time {
     font-size: 0.75rem;
@@ -11917,6 +11939,19 @@ header {
     font-size: 0.72rem;
     color: var(--text-muted);
     margin-top: 4px;
+}
+
+.memory-entry-meta {
+    margin-top: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.memory-entry-entity,
+.memory-entry-confidence {
+    font-size: 0.72rem;
+    color: var(--text-muted);
 }
 
 /* ── State placeholders ───────────────────────────────────────────────────── */
