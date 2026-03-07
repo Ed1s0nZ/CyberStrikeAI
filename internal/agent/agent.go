@@ -23,7 +23,8 @@ import (
 // Agent represents an AI agent
 type Agent struct {
 	openAIClient          *openai.Client
-	toolOpenAIClient      *openai.Client // separate client for tool-calling (different base URL / API key)
+	toolOpenAIClient      *openai.Client      // separate client for tool-calling (different base URL / API key)
+	httpClient            *http.Client         // shared HTTP client (kept for creating new openai clients at runtime)
 	config                *config.OpenAIConfig
 	agentConfig           *config.AgentConfig
 	memoryCompressor      *MemoryCompressor
@@ -158,6 +159,7 @@ func NewAgent(cfg *config.OpenAIConfig, agentCfg *config.AgentConfig, mcpServer 
 	return &Agent{
 		openAIClient:          llmClient,
 		toolOpenAIClient:      toolClient,
+		httpClient:            httpClient,
 		config:                cfg,
 		agentConfig:           agentCfg,
 		memoryCompressor:      memoryCompressor,
@@ -2493,7 +2495,7 @@ func (a *Agent) UpdateConfig(cfg *config.OpenAIConfig) {
 		if a.toolOpenAIClient != nil {
 			a.toolOpenAIClient.UpdateConfig(toolCfg)
 		} else {
-			a.toolOpenAIClient = openai.NewClient(toolCfg, nil, a.logger)
+			a.toolOpenAIClient = openai.NewClient(toolCfg, a.httpClient, a.logger)
 		}
 	} else {
 		a.toolOpenAIClient = nil

@@ -327,18 +327,9 @@ func (mc *MemoryCompressor) countMessageTokens(msg ChatMessage) int {
 }
 
 // getModelName returns the name of the model currently in use for summarization.
+// summaryModel is always kept up-to-date by UpdateConfig and is guaranteed non-empty
+// after construction (NewMemoryCompressor requires it).
 func (mc *MemoryCompressor) getModelName() string {
-	// summaryModel is always kept up-to-date by UpdateConfig;
-	// it reflects the dedicated summary model when set, or falls back to the main model.
-	if mc.summaryModel != "" {
-		return mc.summaryModel
-	}
-	// Last resort: read from the completion client config
-	if openAIClient, ok := mc.completionClient.(*OpenAICompletionClient); ok {
-		if openAIClient.config != nil && openAIClient.config.Model != "" {
-			return openAIClient.config.Model
-		}
-	}
 	return mc.summaryModel
 }
 
