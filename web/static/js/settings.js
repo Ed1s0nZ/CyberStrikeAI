@@ -236,8 +236,16 @@ async function loadConfig(loadTools = true) {
         document.getElementById('openai-model').value = currentConfig.openai.model || '';
         const toolModelEl = document.getElementById('openai-tool-model');
         if (toolModelEl) toolModelEl.value = currentConfig.openai.tool_model || '';
+        const toolBaseUrlEl = document.getElementById('openai-tool-base-url');
+        if (toolBaseUrlEl) toolBaseUrlEl.value = currentConfig.openai.tool_base_url || '';
+        const toolApiKeyEl = document.getElementById('openai-tool-api-key');
+        if (toolApiKeyEl) toolApiKeyEl.value = currentConfig.openai.tool_api_key || '';
         const summaryModelEl = document.getElementById('openai-summary-model');
         if (summaryModelEl) summaryModelEl.value = currentConfig.openai.summary_model || '';
+        const summaryBaseUrlEl = document.getElementById('openai-summary-base-url');
+        if (summaryBaseUrlEl) summaryBaseUrlEl.value = currentConfig.openai.summary_base_url || '';
+        const summaryApiKeyEl = document.getElementById('openai-summary-api-key');
+        if (summaryApiKeyEl) summaryApiKeyEl.value = currentConfig.openai.summary_api_key || '';
 
         // Fill FOFA config
         const fofa = currentConfig.fofa || {};
@@ -910,7 +918,11 @@ async function applySettings() {
                 base_url: baseUrl,
                 model: model,
                 tool_model: document.getElementById('openai-tool-model')?.value.trim() || '',
+                tool_base_url: document.getElementById('openai-tool-base-url')?.value.trim() || '',
+                tool_api_key: document.getElementById('openai-tool-api-key')?.value.trim() || '',
                 summary_model: document.getElementById('openai-summary-model')?.value.trim() || '',
+                summary_base_url: document.getElementById('openai-summary-base-url')?.value.trim() || '',
+                summary_api_key: document.getElementById('openai-summary-api-key')?.value.trim() || '',
                 max_total_tokens: parseInt(document.getElementById('openai-max-total-tokens')?.value) || 120000
             },
             fofa: {

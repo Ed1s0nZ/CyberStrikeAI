@@ -149,7 +149,17 @@ func NewMemoryCompressor(cfg MemoryCompressorConfig) (*MemoryCompressor, error) 
 				Timeout: 5 * time.Minute,
 			}
 		}
-		cfg.CompletionClient = NewOpenAICompletionClient(cfg.OpenAIConfig, cfg.HTTPClient, cfg.Logger)
+		// Use summary-specific endpoint when configured, falling back to main config.
+		summaryCfg := cfg.OpenAIConfig
+		if cfg.OpenAIConfig.SummaryBaseURL != "" || cfg.OpenAIConfig.SummaryAPIKey != "" {
+			summaryBaseURL, summaryAPIKey := cfg.OpenAIConfig.EffectiveSummaryConfig()
+			summaryCfg = &config.OpenAIConfig{
+				APIKey:  summaryAPIKey,
+				BaseURL: summaryBaseURL,
+				Model:   cfg.SummaryModel,
+			}
+		}
+		cfg.CompletionClient = NewOpenAICompletionClient(summaryCfg, cfg.HTTPClient, cfg.Logger)
 	}
 
 	return &MemoryCompressor{
@@ -178,9 +188,20 @@ func (mc *MemoryCompressor) UpdateConfig(cfg *config.OpenAIConfig) {
 		mc.summaryModel = cfg.Model
 	}
 
-	// Update config in completionClient (if it is an OpenAICompletionClient)
+	// Update config in completionClient (if it is an OpenAICompletionClient).
+	// When a summary-specific endpoint is configured, pass it through so the
+	// completion client targets the correct server.
 	if openAIClient, ok := mc.completionClient.(*OpenAICompletionClient); ok {
-		openAIClient.UpdateConfig(cfg)
+		effectiveCfg := cfg
+		if cfg.SummaryBaseURL != "" || cfg.SummaryAPIKey != "" {
+			summaryBaseURL, summaryAPIKey := cfg.EffectiveSummaryConfig()
+			effectiveCfg = &config.OpenAIConfig{
+				APIKey:  summaryAPIKey,
+				BaseURL: summaryBaseURL,
+				Model:   mc.summaryModel,
+			}
+		}
+		openAIClient.UpdateConfig(effectiveCfg)
 		mc.logger.Info("MemoryCompressor config updated",
 			zap.String("summary_model", mc.summaryModel),
 		)

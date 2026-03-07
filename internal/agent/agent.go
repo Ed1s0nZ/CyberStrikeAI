@@ -23,6 +23,7 @@ import (
 // Agent represents an AI agent
 type Agent struct {
 	openAIClient          *openai.Client
+	toolOpenAIClient      *openai.Client // separate client for tool-calling (different base URL / API key)
 	config                *config.OpenAIConfig
 	agentConfig           *config.AgentConfig
 	memoryCompressor      *MemoryCompressor
@@ -126,6 +127,17 @@ func NewAgent(cfg *config.OpenAIConfig, agentCfg *config.AgentConfig, mcpServer 
 	}
 	llmClient := openai.NewClient(cfg, httpClient, logger)
 
+	// Create a separate client for tool-calling if a dedicated base URL or API key is configured.
+	var toolClient *openai.Client
+	if cfg != nil && (cfg.ToolBaseURL != "" || cfg.ToolAPIKey != "") {
+		toolBaseURL, toolAPIKey := cfg.EffectiveToolConfig()
+		toolCfg := &config.OpenAIConfig{
+			APIKey:  toolAPIKey,
+			BaseURL: toolBaseURL,
+		}
+		toolClient = openai.NewClient(toolCfg, httpClient, logger)
+	}
+
 	var memoryCompressor *MemoryCompressor
 	if cfg != nil {
 		mc, err := NewMemoryCompressor(MemoryCompressorConfig{
@@ -145,6 +157,7 @@ func NewAgent(cfg *config.OpenAIConfig, agentCfg *config.AgentConfig, mcpServer 
 
 	return &Agent{
 		openAIClient:          llmClient,
+		toolOpenAIClient:      toolClient,
 		config:                cfg,
 		agentConfig:           agentCfg,
 		memoryCompressor:      memoryCompressor,
@@ -1956,11 +1969,17 @@ func (a *Agent) callOpenAISingle(ctx context.Context, messages []ChatMessage, to
 		zap.Int("toolsCount", len(tools)),
 	)
 
+	// Use the dedicated tool client when tools are present and it's configured.
+	client := a.openAIClient
+	if len(tools) > 0 && a.toolOpenAIClient != nil {
+		client = a.toolOpenAIClient
+	}
+
 	var response OpenAIResponse
-	if a.openAIClient == nil {
+	if client == nil {
 		return nil, fmt.Errorf("OpenAI client not initialized")
 	}
-	if err := a.openAIClient.ChatCompletion(ctx, reqBody, &response); err != nil {
+	if err := client.ChatCompletion(ctx, reqBody, &response); err != nil {
 		return nil, err
 	}
 
@@ -2459,6 +2478,27 @@ func (a *Agent) UpdateConfig(cfg *config.OpenAIConfig) {
 	defer a.mu.Unlock()
 	a.config = cfg
 
+	// Update the main OpenAI client config
+	if a.openAIClient != nil {
+		a.openAIClient.UpdateConfig(cfg)
+	}
+
+	// Rebuild tool client: create when tool-specific endpoint is configured, clear when not.
+	if cfg.ToolBaseURL != "" || cfg.ToolAPIKey != "" {
+		toolBaseURL, toolAPIKey := cfg.EffectiveToolConfig()
+		toolCfg := &config.OpenAIConfig{
+			APIKey:  toolAPIKey,
+			BaseURL: toolBaseURL,
+		}
+		if a.toolOpenAIClient != nil {
+			a.toolOpenAIClient.UpdateConfig(toolCfg)
+		} else {
+			a.toolOpenAIClient = openai.NewClient(toolCfg, nil, a.logger)
+		}
+	} else {
+		a.toolOpenAIClient = nil
+	}
+
 	// Also update MemoryCompressor configuration (if it exists)
 	if a.memoryCompressor != nil {
 		a.memoryCompressor.UpdateConfig(cfg)
@@ -2467,6 +2507,10 @@ func (a *Agent) UpdateConfig(cfg *config.OpenAIConfig) {
 	a.logger.Info("Agent configuration updated",
 		zap.String("base_url", cfg.BaseURL),
 		zap.String("model", cfg.Model),
+		zap.String("tool_model", cfg.ToolModel),
+		zap.String("tool_base_url", cfg.ToolBaseURL),
+		zap.String("summary_model", cfg.SummaryModel),
+		zap.String("summary_base_url", cfg.SummaryBaseURL),
 	)
 }
 

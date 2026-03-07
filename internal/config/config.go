@@ -88,12 +88,44 @@ type MCPConfig struct {
 }
 
 type OpenAIConfig struct {
-	APIKey         string `yaml:"api_key" json:"api_key"`
-	BaseURL        string `yaml:"base_url" json:"base_url"`
-	Model          string `yaml:"model" json:"model"`
-	ToolModel      string `yaml:"tool_model,omitempty" json:"tool_model,omitempty"`
-	SummaryModel   string `yaml:"summary_model,omitempty" json:"summary_model,omitempty"`
-	MaxTotalTokens int    `yaml:"max_total_tokens,omitempty" json:"max_total_tokens,omitempty"`
+	APIKey          string `yaml:"api_key" json:"api_key"`
+	BaseURL         string `yaml:"base_url" json:"base_url"`
+	Model           string `yaml:"model" json:"model"`
+	ToolModel       string `yaml:"tool_model,omitempty" json:"tool_model,omitempty"`
+	ToolBaseURL     string `yaml:"tool_base_url,omitempty" json:"tool_base_url,omitempty"`
+	ToolAPIKey      string `yaml:"tool_api_key,omitempty" json:"tool_api_key,omitempty"`
+	SummaryModel    string `yaml:"summary_model,omitempty" json:"summary_model,omitempty"`
+	SummaryBaseURL  string `yaml:"summary_base_url,omitempty" json:"summary_base_url,omitempty"`
+	SummaryAPIKey   string `yaml:"summary_api_key,omitempty" json:"summary_api_key,omitempty"`
+	MaxTotalTokens  int    `yaml:"max_total_tokens,omitempty" json:"max_total_tokens,omitempty"`
+}
+
+// EffectiveToolConfig returns the base URL and API key to use for tool-calling requests.
+// Falls back to the main config values when tool-specific ones are empty.
+func (c *OpenAIConfig) EffectiveToolConfig() (baseURL, apiKey string) {
+	baseURL = c.ToolBaseURL
+	if baseURL == "" {
+		baseURL = c.BaseURL
+	}
+	apiKey = c.ToolAPIKey
+	if apiKey == "" {
+		apiKey = c.APIKey
+	}
+	return
+}
+
+// EffectiveSummaryConfig returns the base URL and API key to use for summarization requests.
+// Falls back to the main config values when summary-specific ones are empty.
+func (c *OpenAIConfig) EffectiveSummaryConfig() (baseURL, apiKey string) {
+	baseURL = c.SummaryBaseURL
+	if baseURL == "" {
+		baseURL = c.BaseURL
+	}
+	apiKey = c.SummaryAPIKey
+	if apiKey == "" {
+		apiKey = c.APIKey
+	}
+	return
 }
 
 type FofaConfig struct {

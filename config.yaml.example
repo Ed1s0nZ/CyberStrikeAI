@@ -43,7 +43,11 @@ openai:
   api_key: sk-your-api-key                                      # API key (required)
   model: qwen3-max                                             # Model name (required)
   tool_model: ""                                                 # Separate model for tool-calling iterations (optional; uses main model if empty)
+  tool_base_url: ""                                              # Base URL for tool model server (optional; uses main base_url if empty)
+  tool_api_key: ""                                               # API key for tool model server (optional; uses main api_key if empty)
   summary_model: ""                                              # Separate model for context summarization (optional; uses main model if empty)
+  summary_base_url: ""                                           # Base URL for summary model server (optional; uses main base_url if empty)
+  summary_api_key: ""                                            # API key for summary model server (optional; uses main api_key if empty)
   max_total_tokens: 120000              # Maximum token limit for LLM-related context (shared by memory compression and attack-chain building)
 
 # ============================================

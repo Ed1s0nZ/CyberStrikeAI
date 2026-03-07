@@ -1089,7 +1089,11 @@ func updateOpenAIConfig(doc *yaml.Node, cfg config.OpenAIConfig) {
 	setStringInMap(openaiNode, "base_url", cfg.BaseURL)
 	setStringInMap(openaiNode, "model", cfg.Model)
 	setStringInMap(openaiNode, "tool_model", cfg.ToolModel)
+	setStringInMap(openaiNode, "tool_base_url", cfg.ToolBaseURL)
+	setStringInMap(openaiNode, "tool_api_key", cfg.ToolAPIKey)
 	setStringInMap(openaiNode, "summary_model", cfg.SummaryModel)
+	setStringInMap(openaiNode, "summary_base_url", cfg.SummaryBaseURL)
+	setStringInMap(openaiNode, "summary_api_key", cfg.SummaryAPIKey)
 	if cfg.MaxTotalTokens > 0 {
 		setIntInMap(openaiNode, "max_total_tokens", cfg.MaxTotalTokens)
 	}

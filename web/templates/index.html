@@ -1243,13 +1243,35 @@
                                             <label for="openai-model">Model <span style="color: red;">*</span></label>
                                             <input type="text" id="openai-model" placeholder="gpt-4" required />
                                         </div>
-                                        <div class="form-group">
-                                            <label for="openai-tool-model">Tool Model <span style="color: #888; font-weight: normal;">(optional)</span></label>
-                                            <input type="text" id="openai-tool-model" placeholder="Leave empty to use main model for tool calls" />
+                                        <div class="settings-subsection-header">
+                                            <h5>Tool Model <span style="color: #888; font-weight: normal;">(optional — leave empty to use main config)</span></h5>
                                         </div>
                                         <div class="form-group">
-                                            <label for="openai-summary-model">Summary Model <span style="color: #888; font-weight: normal;">(optional)</span></label>
-                                            <input type="text" id="openai-summary-model" placeholder="Leave empty to use main model for summarization" />
+                                            <label for="openai-tool-model">Model</label>
+                                            <input type="text" id="openai-tool-model" placeholder="Leave empty to use main model" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="openai-tool-base-url">Base URL</label>
+                                            <input type="text" id="openai-tool-base-url" placeholder="Leave empty to use main Base URL" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="openai-tool-api-key">API Key</label>
+                                            <input type="password" id="openai-tool-api-key" placeholder="Leave empty to use main API Key" autocomplete="off" />
+                                        </div>
+                                        <div class="settings-subsection-header">
+                                            <h5>Summary Model <span style="color: #888; font-weight: normal;">(optional — leave empty to use main config)</span></h5>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="openai-summary-model">Model</label>
+                                            <input type="text" id="openai-summary-model" placeholder="Leave empty to use main model" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="openai-summary-base-url">Base URL</label>
+                                            <input type="text" id="openai-summary-base-url" placeholder="Leave empty to use main Base URL" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="openai-summary-api-key">API Key</label>
+                                            <input type="password" id="openai-summary-api-key" placeholder="Leave empty to use main API Key" autocomplete="off" />
                                         </div>
                                         <div class="form-group">
                                             <label for="openai-max-total-tokens">Max Total Tokens</label>
