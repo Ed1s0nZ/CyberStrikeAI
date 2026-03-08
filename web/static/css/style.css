@@ -12764,3 +12764,176 @@ header {
     }
 }
 
+/* ── Parallel Scan ──────────────────────────────────── */
+.scan-mode-toggle {
+    display: flex;
+    gap: 4px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary, #f5f5f5);
+}
+.mode-btn {
+    padding: 6px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+.mode-btn.active {
+    background: var(--primary-color, #4f46e5);
+    color: #fff;
+    border-color: var(--primary-color, #4f46e5);
+}
+.parallel-scan-form {
+    padding: 24px;
+    overflow-y: auto;
+    max-height: calc(100vh - 200px);
+}
+.ps-form-group { margin-bottom: 16px; }
+.ps-form-group label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 13px; color: var(--text-primary); }
+.ps-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 14px;
+    background: var(--bg-primary, #fff);
+    color: var(--text-primary);
+    box-sizing: border-box;
+}
+.ps-input:focus { outline: none; border-color: var(--primary-color, #4f46e5); }
+.ps-form-row { display: flex; gap: 16px; }
+.ps-form-half { flex: 1; }
+.ps-checkbox-group { display: flex; flex-direction: column; gap: 8px; }
+.ps-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.ps-checkbox-label:hover { background: var(--bg-secondary); }
+.ps-checkbox-name { font-weight: 600; font-size: 13px; min-width: 120px; }
+.ps-checkbox-desc { font-size: 12px; color: var(--text-secondary); }
+.ps-start-btn {
+    padding: 10px 24px;
+    background: var(--primary-color, #4f46e5);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+.ps-start-btn:hover { opacity: 0.9; }
+
+/* Tabs */
+.parallel-scan-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.ps-tabs-header {
+    display: flex;
+    gap: 2px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    flex-wrap: wrap;
+    align-items: center;
+}
+.ps-tab-btn {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 6px 6px 0 0;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.15s;
+}
+.ps-tab-btn.active {
+    background: var(--bg-primary, #fff);
+    color: var(--primary-color, #4f46e5);
+    box-shadow: 0 -2px 0 var(--primary-color, #4f46e5) inset;
+}
+.ps-tabs-actions { margin-left: auto; }
+.ps-stop-all-btn {
+    padding: 4px 12px;
+    background: #ef4444;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+}
+.ps-tab-content {
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* Summary table */
+.ps-summary-info { margin-bottom: 16px; font-size: 14px; }
+.ps-summary-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ps-summary-table th, .ps-summary-table td {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    text-align: left;
+}
+.ps-summary-table th { background: var(--bg-secondary); font-weight: 600; }
+.ps-status-running { color: #f59e0b; font-weight: 600; }
+.ps-status-completed { color: #10b981; font-weight: 600; }
+.ps-status-cancelled { color: #ef4444; font-weight: 600; }
+.ps-status-pending { color: var(--text-secondary); }
+.ps-btn-sm {
+    padding: 2px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: transparent;
+    font-size: 11px;
+    cursor: pointer;
+    margin-right: 4px;
+}
+.ps-btn-sm:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Agent tab */
+.ps-agent-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+.ps-agent-name { font-weight: 700; font-size: 15px; }
+.ps-agent-status { font-size: 13px; color: var(--text-secondary); }
+.ps-agent-stop-btn, .ps-agent-restart-btn, .ps-agent-chat-btn {
+    padding: 4px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: transparent;
+    font-size: 12px;
+    cursor: pointer;
+}
+.ps-agent-log {
+    font-family: monospace;
+    font-size: 12px;
+    background: var(--bg-tertiary, #1a1a2e);
+    color: #e0e0e0;
+    padding: 12px;
+    border-radius: 6px;
+    max-height: calc(100vh - 350px);
+    overflow-y: auto;
+}
+.ps-log-entry { padding: 2px 0; line-height: 1.5; }
+.ps-log-tool_call { color: #60a5fa; }
+.ps-log-vulnerability { color: #f87171; font-weight: 600; }
+.ps-log-iteration { color: #a78bfa; }
+.ps-log-agent_status { color: #34d399; }
+.ps-log-agent_done { color: #10b981; font-weight: 600; }
+

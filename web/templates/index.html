@@ -515,8 +515,19 @@
                             </div>
                         </div>
 
+                        <!-- 扫描模式切换 -->
+                        <div class="scan-mode-toggle">
+                            <button id="mode-btn-single" class="mode-btn active" onclick="toggleScanMode('single')">Single</button>
+                            <button id="mode-btn-parallel" class="mode-btn" onclick="toggleScanMode('parallel')">Parallel</button>
+                        </div>
+
+                        <!-- 并行扫描表单 -->
+                        <div id="parallel-scan-form" class="parallel-scan-form" style="display: none;"></div>
+                        <!-- 并行扫描结果容器 -->
+                        <div id="parallel-scan-container" class="parallel-scan-container" style="display: none;"></div>
+
                         <!-- 对话界面 -->
-                        <div class="chat-container">
+                        <div id="chat-container-wrapper" class="chat-container">
                             <!-- 会话顶部栏（只在有会话选中时显示） -->
                             <div id="conversation-header" class="conversation-header" style="display: none;">
                                 <div class="conversation-header-content">
@@ -2316,6 +2327,7 @@ version: 1.0.0<br>
     <script src="/static/js/webshell.js"></script>
     <script src="/static/js/tasks.js"></script>
     <script src="/static/js/roles.js"></script>
+    <script src="/static/js/parallel-scan.js"></script>
 </body>
 </html>
 
