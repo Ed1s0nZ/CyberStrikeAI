@@ -354,6 +354,10 @@ func (db *DB) initTables() error {
 		return fmt.Errorf("创建索引失败: %w", err)
 	}
 
+	if err := db.initParallelScanTables(); err != nil {
+		return fmt.Errorf("初始化并行扫描表失败: %w", err)
+	}
+
 	db.logger.Info("数据库表初始化完成")
 	return nil
 }
