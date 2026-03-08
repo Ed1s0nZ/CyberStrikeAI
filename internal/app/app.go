@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"cyberstrike-ai/internal/agent"
+	agentpkg "cyberstrike-ai/internal/agent"
 	"cyberstrike-ai/internal/config"
 	"cyberstrike-ai/internal/database"
 	"cyberstrike-ai/internal/handler"
@@ -337,6 +338,10 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	robotHandler := handler.NewRobotHandler(cfg, db, agentHandler, log.Logger)
 	openAPIHandler := handler.NewOpenAPIHandler(db, log.Logger, resultStorage, conversationHandler, agentHandler)
 
+	// 创建并行扫描管理器和处理器
+	parallelScanManager := agentpkg.NewParallelScanManager(agent, db, log.Logger)
+	parallelScanHandler := handler.NewParallelScanHandler(parallelScanManager, log.Logger)
+
 	// 创建 App 实例（部分字段稍后填充）
 	app := &App{
 		config:             cfg,
@@ -446,6 +451,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 		mcpServer,
 		authManager,
 		openAPIHandler,
+		parallelScanHandler,
 	)
 
 	return app, nil
@@ -574,6 +580,7 @@ func setupRoutes(
 	mcpServer *mcp.Server,
 	authManager *security.AuthManager,
 	openAPIHandler *handler.OpenAPIHandler,
+	parallelScanHandler *handler.ParallelScanHandler,
 ) {
 	// API路由
 	api := router.Group("/api")
@@ -623,6 +630,17 @@ func setupRoutes(
 		protected.PUT("/batch-tasks/:queueId/tasks/:taskId", agentHandler.UpdateBatchTask)
 		protected.POST("/batch-tasks/:queueId/tasks", agentHandler.AddBatchTask)
 		protected.DELETE("/batch-tasks/:queueId/tasks/:taskId", agentHandler.DeleteBatchTask)
+
+		// 并行扫描
+		protected.POST("/parallel-scan", parallelScanHandler.CreateScan)
+		protected.GET("/parallel-scan", parallelScanHandler.ListScans)
+		protected.GET("/parallel-scan/vectors", parallelScanHandler.GetAttackVectors)
+		protected.GET("/parallel-scan/:id", parallelScanHandler.GetScan)
+		protected.GET("/parallel-scan/:id/stream", parallelScanHandler.StreamScan)
+		protected.POST("/parallel-scan/:id/stop", parallelScanHandler.StopScan)
+		protected.POST("/parallel-scan/:id/agents/:agentId/stop", parallelScanHandler.StopAgent)
+		protected.POST("/parallel-scan/:id/agents/:agentId/restart", parallelScanHandler.RestartAgent)
+		protected.DELETE("/parallel-scan/:id", parallelScanHandler.DeleteScan)
 
 		// 对话历史
 		protected.POST("/conversations", conversationHandler.CreateConversation)
