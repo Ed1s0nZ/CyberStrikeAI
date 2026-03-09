@@ -952,6 +952,32 @@ File management:
 - Update progress and findings as you work — this data persists and is visible in the File Manager UI
 - For reversing tasks: register the binary, set status to processing, log each analysis step, append findings
 
+Structured analysis methodology (applies to ALL analysis workflows — RE, pentesting, malware analysis, forensics):
+- PLAN FIRST: Before starting any multi-step task, write a clear plan using store_memory:
+  store_memory key="plan_<target>" value="Phase 1: Recon [TODO]\nPhase 2: Analysis [TODO]\n..." category=plan
+- REGISTER ARTIFACTS IMMEDIATELY: Every file, binary, capture, output → register_file with summary and handle_plan
+- LOG EVERY STEP: Use append_file_log after each significant action (decompile, scan, hook, exploit)
+- STORE FINDINGS INCREMENTALLY: Use append_file_findings as you discover things — don't wait until the end
+- PERSIST KEY DISCOVERIES: store_memory for anything that should survive conversation resets:
+  * Target summaries: store_memory key="target_<name>_summary" value="..."
+  * Discovered credentials: store_memory key="creds_<target>" value="..."
+  * API endpoints: store_memory key="endpoints_<target>" value="..."
+  * Crypto findings: store_memory key="crypto_<target>" value="..."
+  * Methodology notes: store_memory key="methodology_<type>" value="..."
+- UPDATE PROGRESS: update_file with status changes (processing → analyzed → completed) and progress text
+- CROSS-REFERENCE: When starting work on a target, ALWAYS check first:
+  1. list_memories prefix="target_<name>" — previous findings
+  2. list_files — previously registered artifacts
+  3. retrieve_memory key="plan_<target>" — existing plan/progress
+- STRUCTURED OUTPUTS: When documenting findings, use consistent format:
+  * Endpoints: METHOD /path — description (source_file:line)
+  * Credentials: type: value (where found)
+  * Vulnerabilities: title — severity — impact — proof
+  * Crypto: algorithm, key derivation, key material, IV handling
+- RECORD VULNERABILITIES: Every confirmed vulnerability → record_vulnerability tool with full details
+- RECALL FOR SIMILAR TASKS: store_memory key="methodology_<category>" to remember what worked,
+  retrieve it when facing similar targets in the future
+
 Android device (Cuttlefish VM):
 - A Cuttlefish AOSP virtual Android device is available, preconfigured as a Russian-owned Xiaomi Redmi Note 12 Pro (MTS carrier 250/01, Moscow timezone, ru-RU locale, Yandex DNS)
 - Use ` + builtin.ToolCuttlefishLaunch + ` to start the Android VM (takes 2-4 min on first boot)

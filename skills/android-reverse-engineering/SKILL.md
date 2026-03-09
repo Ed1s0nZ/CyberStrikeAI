@@ -347,6 +347,123 @@ CROSS-REFERENCE:
 - Hardcoded secrets in source → validate they're actually used at runtime
 ```
 
+## Phase 7: Artifact Management and Process Memory
+
+### IMPORTANT: Every step of the RE process MUST be tracked and persisted.
+
+### Register the APK on Receipt
+As soon as an APK is received or uploaded, register it with the File Manager:
+```
+register_file
+  file_path: "/path/to/target.apk"
+  file_type: "apk"
+  summary: "Target Android APK — <app name>, <package name>, <version if known>"
+  handle_plan: "1. Decompile (jadx + Ghidra) 2. Analyze structure 3. Extract APIs 4. Dynamic test on Cuttlefish"
+  status: "processing"
+```
+
+### Store Decompiled Source
+After decompilation, register the output:
+```
+register_file
+  file_path: "/tmp/decompiled/"
+  file_type: "directory"
+  summary: "Decompiled source of <package_name> — jadx with deobfuscation"
+  status: "analyzed"
+
+# Log the decompilation step
+append_file_log
+  file_id: "<apk_file_id>"
+  log: "Decompiled with jadx --deobf to /tmp/decompiled/. Found X classes, Y activities."
+```
+
+### Store Every Finding
+As you discover API endpoints, keys, crypto functions, vulnerabilities — record them immediately:
+```
+# After finding API endpoints
+append_file_findings
+  file_id: "<apk_file_id>"
+  findings: "API Endpoints:\n- POST /api/v1/auth/login (AuthApiService.java:45)\n- GET /api/v1/users/{id} (UserApiService.java:23)\n- Base URL: https://api.target.com\n\nHardcoded Secrets:\n- API_KEY = 'abc123...' (BuildConfig.java:12)\n- AES key = '...' (CryptoHelper.java:78)"
+
+# After Ghidra analysis
+append_file_findings
+  file_id: "<apk_file_id>"
+  findings: "Native lib analysis (libnative.so):\n- JNI_OnLoad at 0x1234 — registers 5 native methods\n- decrypt_payload at 0x5678 — AES-256-CBC, key derived from device ID\n- anti_debug_check at 0x9abc — checks TracerPid, calls ptrace"
+
+# After dynamic analysis
+append_file_findings
+  file_id: "<apk_file_id>"
+  findings: "Dynamic analysis (Cuttlefish + Frida):\n- Login sends credentials to POST /api/v1/auth/login over TLS 1.3\n- Token stored in SharedPreferences (NOT encrypted)\n- Certificate pinning present but bypassed with Frida\n- AES key confirmed via hook: 'k3y_fr0m_d3v1c3'"
+```
+
+### Store Persistent Memories for Cross-Session Recall
+Use the persistent memory system to remember key findings that should survive conversation resets:
+```
+# Store the overall analysis summary
+store_memory
+  key: "re_<package_name>_summary"
+  value: "Package: com.target.app v2.1.0\nArchitecture: MVVM + Retrofit\nServer: https://api.target.com\nAuth: Bearer token via /api/v1/auth/login\nCrypto: AES-256-CBC in libnative.so, key from device ID\nAnti-debug: ptrace check in JNI_OnLoad\nVulnerabilities: token stored unencrypted, cert pinning bypassable"
+
+# Store discovered endpoints
+store_memory
+  key: "re_<package_name>_endpoints"
+  value: "POST /api/v1/auth/login - email+password→token\nGET /api/v1/users/{id} - get user profile\nPUT /api/v1/devices - register device\nGET /api/v1/commands - poll for commands (C2-like)\nPOST /api/v1/telemetry - send device data"
+
+# Store crypto findings
+store_memory
+  key: "re_<package_name>_crypto"
+  value: "Algorithm: AES-256-CBC\nKey derivation: SHA256(device_id + hardcoded_salt)\nSalt: 'x7k9m2p4' (CryptoHelper.java:15)\nIV: first 16 bytes of ciphertext\nUsed for: command payload encryption, telemetry data"
+
+# Store the RE methodology used (for future similar APKs)
+store_memory
+  key: "re_methodology_<app_category>"
+  value: "Effective approach for <category> apps:\n1. jadx --deobf first pass\n2. Ghidra for native .so libs\n3. Focus on: auth flow, command channel, crypto\n4. Frida hooks on: encrypt/decrypt, TrustManager, API calls\n5. Key finding locations: BuildConfig, CryptoHelper, ApiService"
+```
+
+### Retrieve Previous Analysis
+When returning to a previously analyzed APK:
+```
+# Recall what we found before
+retrieve_memory key="re_<package_name>_summary"
+retrieve_memory key="re_<package_name>_endpoints"
+retrieve_memory key="re_<package_name>_crypto"
+
+# List all RE-related memories
+list_memories prefix="re_"
+
+# Get the file manager entry with all findings and logs
+list_files type="apk"
+get_file file_id="<id>"
+```
+
+### Update Progress Throughout
+```
+# Update file status as work progresses
+update_file
+  file_id: "<apk_file_id>"
+  status: "in_progress"
+  progress: "Phase 3/6: Structure analysis complete. Found 12 API endpoints, 3 crypto functions. Starting call flow tracing."
+
+# When done
+update_file
+  file_id: "<apk_file_id>"
+  status: "completed"
+  progress: "Full RE complete. 18 endpoints documented, encryption scheme broken, C2 protocol mapped."
+```
+
+### Artifact Checklist
+For every APK analysis, ensure these artifacts are stored:
+- [ ] Original APK registered in File Manager
+- [ ] Decompiled source path logged
+- [ ] AndroidManifest.xml key findings
+- [ ] All discovered API endpoints (with methods, paths, auth)
+- [ ] All discovered hardcoded secrets/keys
+- [ ] Crypto analysis (algorithms, keys, IVs, key derivation)
+- [ ] Native library analysis (if .so files present)
+- [ ] Dynamic analysis results (Frida hooks, traffic capture)
+- [ ] Vulnerabilities recorded via record_vulnerability tool
+- [ ] Summary stored in persistent memory for cross-session access
+
 ## Key Patterns to Search
 
 | Pattern | What It Reveals |
