@@ -515,14 +515,16 @@
                             </div>
                         </div>
 
-                        <!-- 扫描模式切换 -->
-                        <div class="scan-mode-toggle">
-                            <button id="mode-btn-single" class="mode-btn active" onclick="toggleScanMode('single')">Single</button>
-                            <button id="mode-btn-parallel" class="mode-btn" onclick="toggleScanMode('parallel')">Parallel</button>
+                        <!-- 并行扫描表单（弹窗） -->
+                        <div id="parallel-scan-overlay" class="ps-overlay" style="display: none;">
+                            <div class="ps-modal">
+                                <div class="ps-modal-header">
+                                    <h3>Parallel Scan</h3>
+                                    <button class="ps-modal-close" onclick="toggleScanMode('single')">&times;</button>
+                                </div>
+                                <div id="parallel-scan-form" class="ps-modal-body"></div>
+                            </div>
                         </div>
-
-                        <!-- 并行扫描表单 -->
-                        <div id="parallel-scan-form" class="parallel-scan-form" style="display: none;"></div>
                         <!-- 并行扫描结果容器 -->
                         <div id="parallel-scan-container" class="parallel-scan-container" style="display: none;"></div>
 
@@ -574,6 +576,11 @@
                                 <button type="button" class="chat-upload-btn" onclick="document.getElementById('chat-file-input').click()" data-i18n="chat.uploadFile" data-i18n-attr="title" title="上传文件（可多选或拖拽到此处）">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </button>
+                                <button class="parallel-scan-trigger" onclick="toggleScanMode('parallel')" title="Parallel Scan">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                     </svg>
                                 </button>
                                 <button class="send-btn" onclick="sendMessage()">

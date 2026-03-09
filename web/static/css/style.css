@@ -12765,35 +12765,90 @@ header {
 }
 
 /* ── Parallel Scan ──────────────────────────────────── */
-.scan-mode-toggle {
+
+/* Trigger button in chat input bar */
+.parallel-scan-trigger {
     display: flex;
-    gap: 4px;
-    padding: 8px 16px;
-    border-bottom: 1px solid var(--border-color);
-    background: var(--bg-secondary, #f5f5f5);
-}
-.mode-btn {
-    padding: 6px 16px;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: 8px;
     background: transparent;
     color: var(--text-secondary);
     cursor: pointer;
-    font-size: 13px;
-    transition: all 0.2s;
+    transition: all 0.15s;
+    flex-shrink: 0;
 }
-.mode-btn.active {
-    background: var(--primary-color, #4f46e5);
-    color: #fff;
-    border-color: var(--primary-color, #4f46e5);
+.parallel-scan-trigger:hover {
+    background: var(--bg-secondary);
+    color: var(--accent-color, #4f46e5);
+    border-color: var(--accent-color, #4f46e5);
 }
-.parallel-scan-form {
-    padding: 24px;
+
+/* Modal overlay */
+.ps-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: psFadeIn 0.15s ease;
+}
+@keyframes psFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.ps-modal {
+    background: var(--bg-primary, #fff);
+    border-radius: 12px;
+    width: 560px;
+    max-width: 90vw;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: psSlideUp 0.2s ease;
+}
+@keyframes psSlideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.ps-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+.ps-modal-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+}
+.ps-modal-close {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    font-size: 20px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.ps-modal-close:hover { background: var(--bg-secondary); }
+
+.ps-modal-body {
+    padding: 20px;
     overflow-y: auto;
-    max-height: calc(100vh - 200px);
+    flex: 1;
 }
-.ps-form-group { margin-bottom: 16px; }
-.ps-form-group label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 13px; color: var(--text-primary); }
+
+/* Form inside modal */
+.ps-form-group { margin-bottom: 14px; }
+.ps-form-group label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 13px; color: var(--text-primary); }
 .ps-input {
     width: 100%;
     padding: 8px 12px;
@@ -12804,49 +12859,77 @@ header {
     color: var(--text-primary);
     box-sizing: border-box;
 }
-.ps-input:focus { outline: none; border-color: var(--primary-color, #4f46e5); }
-.ps-form-row { display: flex; gap: 16px; }
+.ps-input:focus { outline: none; border-color: var(--accent-color, #4f46e5); }
+.ps-form-row { display: flex; gap: 12px; }
 .ps-form-half { flex: 1; }
-.ps-checkbox-group { display: flex; flex-direction: column; gap: 8px; }
+
+/* Compact checkbox grid — 2 columns */
+.ps-checkbox-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    max-height: 240px;
+    overflow-y: auto;
+    padding: 2px;
+}
 .ps-checkbox-label {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
+    gap: 6px;
+    padding: 6px 8px;
     border: 1px solid var(--border-color);
     border-radius: 6px;
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background 0.1s;
+    font-size: 12px;
 }
 .ps-checkbox-label:hover { background: var(--bg-secondary); }
-.ps-checkbox-name { font-weight: 600; font-size: 13px; min-width: 120px; }
-.ps-checkbox-desc { font-size: 12px; color: var(--text-secondary); }
+.ps-checkbox-name { font-weight: 600; font-size: 12px; white-space: nowrap; }
+.ps-checkbox-desc { display: none; }
+.ps-checkbox-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+.ps-checkbox-actions button {
+    padding: 2px 8px;
+    border: none;
+    background: transparent;
+    color: var(--accent-color, #4f46e5);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+}
+.ps-checkbox-actions button:hover { text-decoration: underline; }
+
 .ps-start-btn {
-    padding: 10px 24px;
-    background: var(--primary-color, #4f46e5);
+    width: 100%;
+    padding: 10px;
+    background: var(--accent-color, #4f46e5);
     color: #fff;
     border: none;
-    border-radius: 6px;
+    border-radius: 8px;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     transition: opacity 0.15s;
+    margin-top: 4px;
 }
 .ps-start-btn:hover { opacity: 0.9; }
 
-/* Tabs */
+/* Tabs — results view replaces chat */
 .parallel-scan-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .ps-tabs-header {
     display: flex;
     gap: 2px;
-    padding: 8px 16px;
+    padding: 6px 12px;
     border-bottom: 1px solid var(--border-color);
     background: var(--bg-secondary);
     flex-wrap: wrap;
     align-items: center;
 }
 .ps-tab-btn {
-    padding: 6px 14px;
+    padding: 5px 12px;
     border: none;
     border-radius: 6px 6px 0 0;
     background: transparent;
@@ -12858,12 +12941,22 @@ header {
 }
 .ps-tab-btn.active {
     background: var(--bg-primary, #fff);
-    color: var(--primary-color, #4f46e5);
-    box-shadow: 0 -2px 0 var(--primary-color, #4f46e5) inset;
+    color: var(--accent-color, #4f46e5);
+    box-shadow: 0 -2px 0 var(--accent-color, #4f46e5) inset;
 }
-.ps-tabs-actions { margin-left: auto; }
+.ps-tabs-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.ps-back-btn {
+    padding: 4px 10px;
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+}
+.ps-back-btn:hover { background: var(--bg-tertiary); }
 .ps-stop-all-btn {
-    padding: 4px 12px;
+    padding: 4px 10px;
     background: #ef4444;
     color: #fff;
     border: none;
@@ -12872,20 +12965,20 @@ header {
     cursor: pointer;
 }
 .ps-tab-content {
-    padding: 16px;
+    padding: 12px 16px;
     overflow-y: auto;
     flex: 1;
 }
 
 /* Summary table */
-.ps-summary-info { margin-bottom: 16px; font-size: 14px; }
-.ps-summary-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ps-summary-info { margin-bottom: 12px; font-size: 13px; color: var(--text-secondary); }
+.ps-summary-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .ps-summary-table th, .ps-summary-table td {
-    padding: 8px 12px;
+    padding: 6px 10px;
     border: 1px solid var(--border-color);
     text-align: left;
 }
-.ps-summary-table th { background: var(--bg-secondary); font-weight: 600; }
+.ps-summary-table th { background: var(--bg-secondary); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); }
 .ps-status-running { color: #f59e0b; font-weight: 600; }
 .ps-status-completed { color: #10b981; font-weight: 600; }
 .ps-status-cancelled { color: #ef4444; font-weight: 600; }
@@ -12905,32 +12998,32 @@ header {
 .ps-agent-header {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 12px;
+    gap: 10px;
+    margin-bottom: 10px;
     padding-bottom: 8px;
     border-bottom: 1px solid var(--border-color);
 }
-.ps-agent-name { font-weight: 700; font-size: 15px; }
-.ps-agent-status { font-size: 13px; color: var(--text-secondary); }
+.ps-agent-name { font-weight: 700; font-size: 14px; }
+.ps-agent-status { font-size: 12px; color: var(--text-secondary); }
 .ps-agent-stop-btn, .ps-agent-restart-btn, .ps-agent-chat-btn {
-    padding: 4px 10px;
+    padding: 3px 8px;
     border: 1px solid var(--border-color);
     border-radius: 4px;
     background: transparent;
-    font-size: 12px;
+    font-size: 11px;
     cursor: pointer;
 }
 .ps-agent-log {
-    font-family: monospace;
+    font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
     font-size: 12px;
-    background: var(--bg-tertiary, #1a1a2e);
+    background: #1a1a2e;
     color: #e0e0e0;
     padding: 12px;
-    border-radius: 6px;
-    max-height: calc(100vh - 350px);
+    border-radius: 8px;
+    max-height: calc(100vh - 300px);
     overflow-y: auto;
 }
-.ps-log-entry { padding: 2px 0; line-height: 1.5; }
+.ps-log-entry { padding: 1px 0; line-height: 1.4; }
 .ps-log-tool_call { color: #60a5fa; }
 .ps-log-vulnerability { color: #f87171; font-weight: 600; }
 .ps-log-iteration { color: #a78bfa; }

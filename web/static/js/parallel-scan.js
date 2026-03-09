@@ -37,7 +37,6 @@
             return;
         }
 
-        // Collect selected agents
         const selectedAgents = [];
         document.querySelectorAll('.parallel-agent-checkbox:checked').forEach(cb => {
             selectedAgents.push(cb.value);
@@ -71,9 +70,10 @@
             scanAgents = {};
             (scan.agents || []).forEach(a => { scanAgents[a.id] = a; });
 
-            renderParallelScanTabs(scan);
+            // Close modal, show results
+            closeModal();
+            showScanResults(scan);
             connectScanStream(scan.id);
-            showParallelScanView();
         } catch (e) {
             console.error('Start parallel scan error:', e);
             alert('Error: ' + e.message);
@@ -82,9 +82,7 @@
 
     // ── SSE Stream ────────────────────────────────────────
     function connectScanStream(scanId) {
-        if (scanEventSource) {
-            scanEventSource.close();
-        }
+        if (scanEventSource) scanEventSource.close();
 
         const token = localStorage.getItem('auth_token') || '';
         const url = `/api/parallel-scan/${scanId}/stream?token=${encodeURIComponent(token)}`;
@@ -92,8 +90,7 @@
 
         scanEventSource.onmessage = function (e) {
             try {
-                const event = JSON.parse(e.data);
-                handleScanEvent(event);
+                handleScanEvent(JSON.parse(e.data));
             } catch (err) {
                 console.error('Parse SSE event error:', err);
             }
@@ -105,7 +102,6 @@
     }
 
     function handleScanEvent(event) {
-        // Update agent state
         if (event.agentId && scanAgents[event.agentId]) {
             const agent = scanAgents[event.agentId];
             if (event.data) {
@@ -118,19 +114,12 @@
             if (event.type === 'vulnerability') agent.totalVulns = (agent.totalVulns || 0) + 1;
         }
 
-        // Update summary tab
         updateSummaryTable();
-
-        // Append event to agent tab log
         appendAgentLog(event);
 
-        // Handle scan completion
         if (event.type === 'scan_done') {
             updateScanStatus('completed');
-            if (scanEventSource) {
-                scanEventSource.close();
-                scanEventSource = null;
-            }
+            if (scanEventSource) { scanEventSource.close(); scanEventSource = null; }
         }
         if (event.type === 'agent_done') {
             const agent = scanAgents[event.agentId];
@@ -146,7 +135,15 @@
         }
     }
 
-    // ── Tabs UI ───────────────────────────────────────────
+    // ── Results Tabs UI ──────────────────────────────────
+    function showScanResults(scan) {
+        const chatWrapper = document.getElementById('chat-container-wrapper');
+        const container = document.getElementById('parallel-scan-container');
+        if (chatWrapper) chatWrapper.style.display = 'none';
+        if (container) container.style.display = 'flex';
+        renderParallelScanTabs(scan);
+    }
+
     function renderParallelScanTabs(scan) {
         const container = document.getElementById('parallel-scan-container');
         if (!container) return;
@@ -159,20 +156,20 @@
             tabsHtml += `<button class="ps-tab-btn" data-tab="ps-agent-${a.id}">${a.name}</button>`;
         });
         tabsHtml += `<div class="ps-tabs-actions">
+            <button class="ps-back-btn" onclick="closeScanResults()">Back to Chat</button>
             <button class="ps-stop-all-btn" onclick="stopParallelScan()">Stop All</button>
         </div></div>`;
 
-        // Tab content
         let contentHtml = `<div id="ps-summary" class="ps-tab-content active">
             <div class="ps-summary-info">
                 <strong>Target:</strong> ${escapeHtml(scan.target)} &nbsp;|&nbsp;
                 <strong>Status:</strong> <span id="ps-scan-status">${scan.status}</span> &nbsp;|&nbsp;
-                <strong>Max Rounds:</strong> ${scan.maxRounds}
+                <strong>Rounds:</strong> ${scan.maxRounds}
             </div>
             <table class="ps-summary-table">
                 <thead><tr>
                     <th>Agent</th><th>Status</th><th>Round</th>
-                    <th>Iterations</th><th>Tool Calls</th><th>Vulns</th><th>Actions</th>
+                    <th>Iters</th><th>Tools</th><th>Vulns</th><th>Actions</th>
                 </tr></thead>
                 <tbody id="ps-summary-tbody"></tbody>
             </table>
@@ -193,7 +190,6 @@
 
         container.innerHTML = tabsHtml + contentHtml;
 
-        // Wire tab clicks
         container.querySelectorAll('.ps-tab-btn').forEach(btn => {
             btn.addEventListener('click', function () {
                 container.querySelectorAll('.ps-tab-btn').forEach(b => b.classList.remove('active'));
@@ -206,6 +202,13 @@
 
         updateSummaryTable();
     }
+
+    window.closeScanResults = function () {
+        const chatWrapper = document.getElementById('chat-container-wrapper');
+        const container = document.getElementById('parallel-scan-container');
+        if (chatWrapper) chatWrapper.style.display = '';
+        if (container) container.style.display = 'none';
+    };
 
     function updateSummaryTable() {
         const tbody = document.getElementById('ps-summary-tbody');
@@ -252,16 +255,13 @@
             if (toolName) text += ' → ' + toolName;
         }
         if (event.type === 'vulnerability' && event.data) {
-            const severity = event.data.severity || '';
-            const title = event.data.title || event.message || '';
-            text += ` [${severity}] ${title}`;
+            text += ` [${event.data.severity || ''}] ${event.data.title || event.message || ''}`;
         }
 
         entry.textContent = text;
         logEl.appendChild(entry);
         logEl.scrollTop = logEl.scrollHeight;
 
-        // Also update agent status badge in tab content
         const statusEl = document.getElementById('ps-agent-status-' + event.agentId);
         if (statusEl && event.data && event.data.status) {
             statusEl.textContent = event.data.status;
@@ -299,40 +299,38 @@
 
     window.openAgentConversation = function (conversationId) {
         if (typeof loadConversation === 'function') {
+            closeScanResults();
             loadConversation(conversationId);
         }
     };
 
-    // ── Mode Toggle ───────────────────────────────────────
+    // ── Modal Toggle ──────────────────────────────────────
     window.toggleScanMode = function (mode) {
-        const singleView = document.getElementById('chat-container-wrapper');
-        const parallelForm = document.getElementById('parallel-scan-form');
-        const parallelContainer = document.getElementById('parallel-scan-container');
-        const btnSingle = document.getElementById('mode-btn-single');
-        const btnParallel = document.getElementById('mode-btn-parallel');
-
+        const overlay = document.getElementById('parallel-scan-overlay');
         if (mode === 'parallel') {
-            if (singleView) singleView.style.display = 'none';
-            if (parallelForm) parallelForm.style.display = 'block';
-            if (parallelContainer) parallelContainer.style.display = 'block';
-            if (btnSingle) btnSingle.classList.remove('active');
-            if (btnParallel) btnParallel.classList.add('active');
+            if (overlay) overlay.style.display = 'flex';
             renderParallelScanForm();
         } else {
-            if (singleView) singleView.style.display = '';
-            if (parallelForm) parallelForm.style.display = 'none';
-            if (parallelContainer) parallelContainer.style.display = 'none';
-            if (btnSingle) btnSingle.classList.add('active');
-            if (btnParallel) btnParallel.classList.remove('active');
+            closeModal();
         }
     };
 
-    function showParallelScanView() {
-        const form = document.getElementById('parallel-scan-form');
-        if (form) form.style.display = 'none';
-        const container = document.getElementById('parallel-scan-container');
-        if (container) container.style.display = 'block';
+    function closeModal() {
+        const overlay = document.getElementById('parallel-scan-overlay');
+        if (overlay) overlay.style.display = 'none';
     }
+
+    // Close modal on overlay click
+    document.addEventListener('click', function (e) {
+        if (e.target && e.target.classList.contains('ps-overlay')) {
+            closeModal();
+        }
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeModal();
+    });
 
     function renderParallelScanForm() {
         const form = document.getElementById('parallel-scan-form');
@@ -343,7 +341,6 @@
             agentCheckboxes += `<label class="ps-checkbox-label">
                 <input type="checkbox" class="parallel-agent-checkbox" value="${v.name}" checked>
                 <span class="ps-checkbox-name">${v.name}</span>
-                <span class="ps-checkbox-desc">${v.description}</span>
             </label>`;
         });
 
@@ -354,6 +351,10 @@
             </div>
             <div class="ps-form-group">
                 <label>Attack Vectors</label>
+                <div class="ps-checkbox-actions">
+                    <button type="button" onclick="document.querySelectorAll('.parallel-agent-checkbox').forEach(c=>c.checked=true)">Select All</button>
+                    <button type="button" onclick="document.querySelectorAll('.parallel-agent-checkbox').forEach(c=>c.checked=false)">Deselect All</button>
+                </div>
                 <div class="ps-checkbox-group">${agentCheckboxes}</div>
             </div>
             <div class="ps-form-row">
@@ -361,10 +362,10 @@
                     <label for="parallel-scan-rounds">Max Rounds</label>
                     <input type="number" id="parallel-scan-rounds" value="20" min="1" max="100" class="ps-input">
                 </div>
-            </div>
-            <div class="ps-form-group">
-                <label for="parallel-scan-recon">Recon Context (optional)</label>
-                <textarea id="parallel-scan-recon" rows="3" class="ps-input" placeholder="Paste any recon data, subdomains, etc."></textarea>
+                <div class="ps-form-group ps-form-half">
+                    <label for="parallel-scan-recon">Recon Context</label>
+                    <textarea id="parallel-scan-recon" rows="2" class="ps-input" placeholder="Optional recon data..."></textarea>
+                </div>
             </div>
             <button class="ps-start-btn" onclick="startParallelScan()">Start Parallel Scan</button>
         `;
@@ -376,7 +377,7 @@
         return div.innerHTML;
     }
 
-    // Auto-init when chat page loads
+    // Auto-init
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initParallelScanUI);
     } else {
