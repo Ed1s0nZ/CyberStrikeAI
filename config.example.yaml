@@ -57,6 +57,19 @@ fofa:
   base_url: https://fofa.info/api/v1/search/all # Optional; leave blank to use the default
   email: "" # FOFA account email (optional; recommended to fill in via System Settings)
   api_key: "" # FOFA API key (optional; recommended to fill in via System Settings)
+# ZoomEye cyberspace search engine (optional)
+# Get your API key at https://www.zoomeye.ai/profile
+zoomeye:
+  api_key: "" # ZoomEye API key
+# Shodan search engine (optional)
+# Get your API key at https://account.shodan.io
+shodan:
+  api_key: "" # Shodan API key
+# Censys search engine (optional)
+# Get your credentials at https://search.censys.io/account/api
+censys:
+  api_id: "" # Censys API ID
+  api_secret: "" # Censys API Secret
 # Agent configuration
 # When the maximum iteration count is reached, the AI will automatically summarize the test results.
 agent:

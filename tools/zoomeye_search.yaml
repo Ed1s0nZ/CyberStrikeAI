@@ -13,7 +13,7 @@ args:
     # Configure your ZoomEye account information here
     # You can also set the environment variable: ZOOMEYE_API_KEY
     # enable defaults to false, must be enabled to call this MCP
-    ZOOMEYE_API_KEY = "FE10EE81-CF29-E5E29-d227-1189240ddac"  # ZoomEye API key
+    ZOOMEYE_API_KEY = ""  # ZoomEye API key (prefer ZOOMEYE_API_KEY env var or config.yaml zoomeye.api_key)
     # ==================================================
 
     # ZoomEye API base URL

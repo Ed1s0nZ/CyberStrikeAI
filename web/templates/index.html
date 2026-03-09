@@ -769,11 +769,21 @@
                     <div class="page-header">
                         <h2>Information Gathering</h2>
                         <div class="page-header-actions">
-                            <button class="btn-secondary" onclick="resetFofaForm()">Reset</button>
-                            <button class="btn-primary" onclick="submitFofaSearch()">Submit</button>
+                            <button class="btn-secondary" onclick="resetReconForm()">Reset</button>
+                            <button class="btn-primary" onclick="submitReconSearch()">Submit</button>
                         </div>
                     </div>
                     <div class="page-content">
+                        <!-- Engine tabs -->
+                        <div class="recon-tabs" id="recon-tabs">
+                            <button class="recon-tab active" data-engine="fofa" onclick="switchReconTab('fofa')">FOFA</button>
+                            <button class="recon-tab" data-engine="zoomeye" onclick="switchReconTab('zoomeye')">ZoomEye</button>
+                            <button class="recon-tab" data-engine="shodan" onclick="switchReconTab('shodan')">Shodan</button>
+                            <button class="recon-tab" data-engine="censys" onclick="switchReconTab('censys')">Censys</button>
+                        </div>
+
+                        <!-- FOFA panel -->
+                        <div class="recon-panel active" id="recon-panel-fofa">
                         <div class="info-collect-panel">
                             <div class="info-collect-form">
                                 <div class="form-group">
@@ -861,6 +871,148 @@
                                 </table>
                             </div>
                         </div>
+                        </div><!-- /recon-panel-fofa -->
+
+                        <!-- ZoomEye panel -->
+                        <div class="recon-panel" id="recon-panel-zoomeye" style="display:none">
+                        <div class="info-collect-panel">
+                            <div class="info-collect-form">
+                                <div class="form-group">
+                                    <label for="zoomeye-query">ZoomEye Query</label>
+                                    <textarea id="zoomeye-query" class="info-collect-query-input" rows="1" placeholder='Example: app:"Apache" && country:"US"'></textarea>
+                                    <small class="form-hint">ZoomEye query syntax. Use app:, title:, domain:, ip:, port:, country:, city:, etc.</small>
+                                    <div class="info-collect-presets" aria-label="ZoomEye Query Examples">
+                                        <button class="preset-chip" type="button" onclick="document.getElementById('zoomeye-query').value='app:\"Apache\" && country:\"US\"'">Apache + US</button>
+                                        <button class="preset-chip" type="button" onclick="document.getElementById('zoomeye-query').value='port:443 && service:\"https\"'">HTTPS on 443</button>
+                                        <button class="preset-chip" type="button" onclick="document.getElementById('zoomeye-query').value='title:\"login\" && country:\"RU\"'">Login + RU</button>
+                                    </div>
+                                </div>
+                                <div class="info-collect-form-row">
+                                    <div class="form-group">
+                                        <label for="zoomeye-size">Results per Page</label>
+                                        <input type="number" id="zoomeye-size" min="1" max="10000" value="20" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="zoomeye-page">Page</label>
+                                        <input type="number" id="zoomeye-page" min="1" value="1" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="info-collect-results">
+                            <div class="info-collect-results-header">
+                                <div class="info-collect-results-header-left">
+                                    <div class="info-collect-results-title">Query Results</div>
+                                    <div class="info-collect-results-meta" id="zoomeye-results-meta">-</div>
+                                </div>
+                                <div class="info-collect-results-toolbar">
+                                    <button class="btn-secondary btn-small" type="button" onclick="exportReconResults('zoomeye','csv')">Export CSV</button>
+                                    <button class="btn-secondary btn-small" type="button" onclick="exportReconResults('zoomeye','json')">Export JSON</button>
+                                </div>
+                            </div>
+                            <div class="info-collect-results-table-wrap">
+                                <table class="info-collect-table">
+                                    <thead id="zoomeye-results-thead"></thead>
+                                    <tbody id="zoomeye-results-tbody">
+                                        <tr><td class="muted" style="padding: 16px;">No data</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        </div><!-- /recon-panel-zoomeye -->
+
+                        <!-- Shodan panel -->
+                        <div class="recon-panel" id="recon-panel-shodan" style="display:none">
+                        <div class="info-collect-panel">
+                            <div class="info-collect-form">
+                                <div class="form-group">
+                                    <label for="shodan-query">Shodan Query</label>
+                                    <textarea id="shodan-query" class="info-collect-query-input" rows="1" placeholder='Example: apache country:US'></textarea>
+                                    <small class="form-hint">Shodan search syntax. Use product:, port:, country:, city:, org:, os:, etc.</small>
+                                    <div class="info-collect-presets" aria-label="Shodan Query Examples">
+                                        <button class="preset-chip" type="button" onclick="document.getElementById('shodan-query').value='apache country:US'">Apache + US</button>
+                                        <button class="preset-chip" type="button" onclick="document.getElementById('shodan-query').value='port:22 product:OpenSSH'">SSH servers</button>
+                                        <button class="preset-chip" type="button" onclick="document.getElementById('shodan-query').value='webcam country:JP'">Webcams + JP</button>
+                                    </div>
+                                </div>
+                                <div class="info-collect-form-row">
+                                    <div class="form-group">
+                                        <label for="shodan-page">Page</label>
+                                        <input type="number" id="shodan-page" min="1" value="1" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="info-collect-results">
+                            <div class="info-collect-results-header">
+                                <div class="info-collect-results-header-left">
+                                    <div class="info-collect-results-title">Query Results</div>
+                                    <div class="info-collect-results-meta" id="shodan-results-meta">-</div>
+                                </div>
+                                <div class="info-collect-results-toolbar">
+                                    <button class="btn-secondary btn-small" type="button" onclick="exportReconResults('shodan','csv')">Export CSV</button>
+                                    <button class="btn-secondary btn-small" type="button" onclick="exportReconResults('shodan','json')">Export JSON</button>
+                                </div>
+                            </div>
+                            <div class="info-collect-results-table-wrap">
+                                <table class="info-collect-table">
+                                    <thead id="shodan-results-thead"></thead>
+                                    <tbody id="shodan-results-tbody">
+                                        <tr><td class="muted" style="padding: 16px;">No data</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        </div><!-- /recon-panel-shodan -->
+
+                        <!-- Censys panel -->
+                        <div class="recon-panel" id="recon-panel-censys" style="display:none">
+                        <div class="info-collect-panel">
+                            <div class="info-collect-form">
+                                <div class="form-group">
+                                    <label for="censys-query">Censys Query</label>
+                                    <textarea id="censys-query" class="info-collect-query-input" rows="1" placeholder='Example: services.port=443 and location.country=US'></textarea>
+                                    <small class="form-hint">Censys search syntax. Use services.port, location.country, autonomous_system.name, etc.</small>
+                                    <div class="info-collect-presets" aria-label="Censys Query Examples">
+                                        <button class="preset-chip" type="button" onclick="document.getElementById('censys-query').value='services.port=443 and location.country=US'">HTTPS + US</button>
+                                        <button class="preset-chip" type="button" onclick="document.getElementById('censys-query').value='services.service_name=SSH'">SSH services</button>
+                                        <button class="preset-chip" type="button" onclick="document.getElementById('censys-query').value='services.http.response.body:\"login\"'">Login pages</button>
+                                    </div>
+                                </div>
+                                <div class="info-collect-form-row">
+                                    <div class="form-group">
+                                        <label for="censys-size">Results per Page</label>
+                                        <input type="number" id="censys-size" min="1" max="100" value="25" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="censys-page">Page</label>
+                                        <input type="number" id="censys-page" min="1" value="1" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="info-collect-results">
+                            <div class="info-collect-results-header">
+                                <div class="info-collect-results-header-left">
+                                    <div class="info-collect-results-title">Query Results</div>
+                                    <div class="info-collect-results-meta" id="censys-results-meta">-</div>
+                                </div>
+                                <div class="info-collect-results-toolbar">
+                                    <button class="btn-secondary btn-small" type="button" onclick="exportReconResults('censys','csv')">Export CSV</button>
+                                    <button class="btn-secondary btn-small" type="button" onclick="exportReconResults('censys','json')">Export JSON</button>
+                                </div>
+                            </div>
+                            <div class="info-collect-results-table-wrap">
+                                <table class="info-collect-table">
+                                    <thead id="censys-results-thead"></thead>
+                                    <tbody id="censys-results-tbody">
+                                        <tr><td class="muted" style="padding: 16px;">No data</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        </div><!-- /recon-panel-censys -->
+
                     </div>
                 </div>
 
@@ -1461,6 +1613,46 @@
                                             <label for="fofa-api-key">API Key</label>
                                             <input type="password" id="fofa-api-key" placeholder="Enter FOFA API Key" autocomplete="off" />
                                             <small class="form-hint">Stored in server config only (`config.yaml`).</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- ZoomEye configuration -->
+                                <div class="settings-subsection">
+                                    <h4>ZoomEye Configuration</h4>
+                                    <div class="settings-form">
+                                        <div class="form-group">
+                                            <label for="zoomeye-api-key">API Key <span id="zoomeye-key-status" class="recon-key-status"></span></label>
+                                            <input type="password" id="zoomeye-api-key" placeholder="Enter ZoomEye API Key" autocomplete="off" />
+                                            <small class="form-hint">Get your key at <a href="https://www.zoomeye.ai/profile" target="_blank">zoomeye.ai/profile</a>. Auto-validated on save.</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Shodan configuration -->
+                                <div class="settings-subsection">
+                                    <h4>Shodan Configuration</h4>
+                                    <div class="settings-form">
+                                        <div class="form-group">
+                                            <label for="shodan-api-key">API Key <span id="shodan-key-status" class="recon-key-status"></span></label>
+                                            <input type="password" id="shodan-api-key" placeholder="Enter Shodan API Key" autocomplete="off" />
+                                            <small class="form-hint">Get your key at <a href="https://account.shodan.io" target="_blank">account.shodan.io</a>. Auto-validated on save.</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Censys configuration -->
+                                <div class="settings-subsection">
+                                    <h4>Censys Configuration</h4>
+                                    <div class="settings-form">
+                                        <div class="form-group">
+                                            <label for="censys-api-id">API ID <span id="censys-key-status" class="recon-key-status"></span></label>
+                                            <input type="text" id="censys-api-id" placeholder="Enter Censys API ID" autocomplete="off" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="censys-api-secret">API Secret</label>
+                                            <input type="password" id="censys-api-secret" placeholder="Enter Censys API Secret" autocomplete="off" />
+                                            <small class="form-hint">Get credentials at <a href="https://search.censys.io/account/api" target="_blank">censys.io/account/api</a>. Auto-validated on save.</small>
                                         </div>
                                     </div>
                                 </div>

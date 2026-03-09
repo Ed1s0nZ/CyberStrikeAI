@@ -418,7 +418,24 @@ async function loadConfig(loadTools = true) {
         if (fofaEmailEl) fofaEmailEl.value = fofa.email || '';
         if (fofaKeyEl) fofaKeyEl.value = fofa.api_key || '';
         if (fofaBaseUrlEl) fofaBaseUrlEl.value = fofa.base_url || '';
-        
+
+        // Fill ZoomEye config
+        const zoomeye = currentConfig.zoomeye || {};
+        const zoomeyeKeyEl = document.getElementById('zoomeye-api-key');
+        if (zoomeyeKeyEl) zoomeyeKeyEl.value = zoomeye.api_key || '';
+
+        // Fill Shodan config
+        const shodan = currentConfig.shodan || {};
+        const shodanKeyEl = document.getElementById('shodan-api-key');
+        if (shodanKeyEl) shodanKeyEl.value = shodan.api_key || '';
+
+        // Fill Censys config
+        const censys = currentConfig.censys || {};
+        const censysIdEl = document.getElementById('censys-api-id');
+        const censysSecretEl = document.getElementById('censys-api-secret');
+        if (censysIdEl) censysIdEl.value = censys.api_id || '';
+        if (censysSecretEl) censysSecretEl.value = censys.api_secret || '';
+
         // Fill OpenAI max total tokens
         const maxTotalTokensEl = document.getElementById('openai-max-total-tokens');
         if (maxTotalTokensEl) maxTotalTokensEl.value = currentConfig.openai.max_total_tokens || 120000;
@@ -1120,6 +1137,16 @@ async function applySettings() {
                 email: document.getElementById('fofa-email')?.value.trim() || '',
                 api_key: document.getElementById('fofa-api-key')?.value.trim() || '',
                 base_url: document.getElementById('fofa-base-url')?.value.trim() || ''
+            },
+            zoomeye: {
+                api_key: document.getElementById('zoomeye-api-key')?.value.trim() || ''
+            },
+            shodan: {
+                api_key: document.getElementById('shodan-api-key')?.value.trim() || ''
+            },
+            censys: {
+                api_id: document.getElementById('censys-api-id')?.value.trim() || '',
+                api_secret: document.getElementById('censys-api-secret')?.value.trim() || ''
             },
             agent: {
                 max_iterations: parseInt(document.getElementById('agent-max-iterations').value) || 30,
@@ -2103,3 +2130,82 @@ openSettings = async function() {
     await originalOpenSettings();
     await loadExternalMCPs();
 };
+
+// ── Recon engine API key validation ─────────────────────────────────────
+// Auto-validates keys on blur and after save. Shows status indicators.
+async function validateReconKey(engine) {
+    const statusEl = document.getElementById(engine + '-key-status');
+    if (!statusEl) return;
+
+    let body = {};
+    let endpoint = '/api/recon/' + engine + '/validate';
+
+    if (engine === 'fofa') {
+        const email = document.getElementById('fofa-email')?.value.trim();
+        const key = document.getElementById('fofa-api-key')?.value.trim();
+        if (!email || !key) { statusEl.textContent = ''; return; }
+        body = { email, api_key: key };
+    } else if (engine === 'zoomeye') {
+        const key = document.getElementById('zoomeye-api-key')?.value.trim();
+        if (!key) { statusEl.textContent = ''; return; }
+        body = { api_key: key };
+    } else if (engine === 'shodan') {
+        const key = document.getElementById('shodan-api-key')?.value.trim();
+        if (!key) { statusEl.textContent = ''; return; }
+        body = { api_key: key };
+    } else if (engine === 'censys') {
+        const id = document.getElementById('censys-api-id')?.value.trim();
+        const secret = document.getElementById('censys-api-secret')?.value.trim();
+        if (!id || !secret) { statusEl.textContent = ''; return; }
+        body = { api_id: id, api_secret: secret };
+    }
+
+    statusEl.textContent = '...';
+    statusEl.className = 'recon-key-status validating';
+
+    try {
+        const resp = await apiFetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await resp.json();
+        if (data.valid) {
+            statusEl.textContent = ' ✓';
+            statusEl.className = 'recon-key-status valid';
+            statusEl.title = data.info || 'Valid';
+        } else {
+            statusEl.textContent = ' ✗';
+            statusEl.className = 'recon-key-status invalid';
+            statusEl.title = data.error || 'Invalid';
+        }
+    } catch (e) {
+        statusEl.textContent = ' ?';
+        statusEl.className = 'recon-key-status error';
+        statusEl.title = 'Validation failed: ' + e.message;
+    }
+}
+
+// Bind blur validation on key inputs
+document.addEventListener('DOMContentLoaded', function() {
+    const bindings = [
+        { ids: ['zoomeye-api-key'], engine: 'zoomeye' },
+        { ids: ['shodan-api-key'], engine: 'shodan' },
+        { ids: ['censys-api-id', 'censys-api-secret'], engine: 'censys' },
+    ];
+    for (const b of bindings) {
+        for (const id of b.ids) {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('blur', () => validateReconKey(b.engine));
+            }
+        }
+    }
+});
+
+// Validate all configured keys after settings save
+function validateAllReconKeys() {
+    for (const engine of ['zoomeye', 'shodan', 'censys']) {
+        validateReconKey(engine);
+    }
+}

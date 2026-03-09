@@ -1121,3 +1121,242 @@ window.hideAllFofaColumns = hideAllFofaColumns;
 window.toggleFofaColumn = toggleFofaColumn;
 window.exportFofaResults = exportFofaResults;
 window.batchScanSelectedFofaRows = batchScanSelectedFofaRows;
+
+// ═══════════════════════════════════════════════════════════════════════
+// Multi-engine Recon: Tab switching, generic search, result rendering
+// ═══════════════════════════════════════════════════════════════════════
+
+let activeReconEngine = 'fofa';
+
+// Per-engine result cache
+const reconResults = {};
+
+const RECON_ENGINES = {
+    fofa: {
+        name: 'FOFA',
+        searchEndpoint: '/api/fofa/search',
+        buildPayload: function() {
+            return {
+                query: document.getElementById('fofa-query')?.value.trim() || '',
+                size: parseInt(document.getElementById('fofa-size')?.value) || 100,
+                page: parseInt(document.getElementById('fofa-page')?.value) || 1,
+                fields: document.getElementById('fofa-fields')?.value.trim() || 'host,ip,port,domain,title',
+                full: document.getElementById('fofa-full')?.checked || false
+            };
+        },
+        // FOFA uses its own existing submitFofaSearch()
+        useNativeSearch: true
+    },
+    zoomeye: {
+        name: 'ZoomEye',
+        searchEndpoint: '/api/recon/zoomeye/search',
+        buildPayload: function() {
+            return {
+                query: document.getElementById('zoomeye-query')?.value.trim() || '',
+                pagesize: parseInt(document.getElementById('zoomeye-size')?.value) || 20,
+                page: parseInt(document.getElementById('zoomeye-page')?.value) || 1
+            };
+        }
+    },
+    shodan: {
+        name: 'Shodan',
+        searchEndpoint: '/api/recon/shodan/search',
+        buildPayload: function() {
+            return {
+                query: document.getElementById('shodan-query')?.value.trim() || '',
+                page: parseInt(document.getElementById('shodan-page')?.value) || 1
+            };
+        }
+    },
+    censys: {
+        name: 'Censys',
+        searchEndpoint: '/api/recon/censys/search',
+        buildPayload: function() {
+            return {
+                query: document.getElementById('censys-query')?.value.trim() || '',
+                per_page: parseInt(document.getElementById('censys-size')?.value) || 25,
+                page: parseInt(document.getElementById('censys-page')?.value) || 1
+            };
+        }
+    }
+};
+
+function switchReconTab(engine) {
+    if (!RECON_ENGINES[engine]) return;
+    activeReconEngine = engine;
+
+    // Update tab buttons
+    document.querySelectorAll('.recon-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.engine === engine);
+    });
+
+    // Show/hide panels
+    document.querySelectorAll('.recon-panel').forEach(panel => {
+        const isActive = panel.id === 'recon-panel-' + engine;
+        panel.style.display = isActive ? '' : 'none';
+        panel.classList.toggle('active', isActive);
+    });
+}
+
+function submitReconSearch() {
+    const engine = activeReconEngine;
+    const cfg = RECON_ENGINES[engine];
+    if (!cfg) return;
+
+    // FOFA uses its own native search function
+    if (cfg.useNativeSearch) {
+        submitFofaSearch();
+        return;
+    }
+
+    const payload = cfg.buildPayload();
+    if (!payload.query) {
+        alert(cfg.name + ': please enter a query');
+        return;
+    }
+
+    const metaEl = document.getElementById(engine + '-results-meta');
+    const theadEl = document.getElementById(engine + '-results-thead');
+    const tbodyEl = document.getElementById(engine + '-results-tbody');
+    if (metaEl) metaEl.textContent = 'Searching...';
+    if (tbodyEl) tbodyEl.innerHTML = '<tr><td class="muted" style="padding:16px">Loading...</td></tr>';
+
+    apiFetch(cfg.searchEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(resp => {
+        if (!resp.ok) return resp.json().then(d => { throw new Error(d.error || 'Search failed'); });
+        return resp.json();
+    })
+    .then(data => {
+        reconResults[engine] = data;
+        renderReconResults(engine, data);
+    })
+    .catch(err => {
+        if (metaEl) metaEl.textContent = 'Error: ' + err.message;
+        if (tbodyEl) tbodyEl.innerHTML = '<tr><td class="muted" style="padding:16px;color:var(--color-error)">' + escapeHtml(err.message) + '</td></tr>';
+    });
+}
+
+function renderReconResults(engine, data) {
+    const metaEl = document.getElementById(engine + '-results-meta');
+    const theadEl = document.getElementById(engine + '-results-thead');
+    const tbodyEl = document.getElementById(engine + '-results-tbody');
+
+    if (!data || !data.results || data.results.length === 0) {
+        if (metaEl) metaEl.textContent = 'No results';
+        if (tbodyEl) tbodyEl.innerHTML = '<tr><td class="muted" style="padding:16px">No results found</td></tr>';
+        return;
+    }
+
+    if (metaEl) metaEl.textContent = `Total: ${data.total || 0} | Page: ${data.page || 1} | Showing: ${data.results_count || data.results.length}`;
+
+    const fields = data.fields || Object.keys(data.results[0]);
+
+    // Render header
+    if (theadEl) {
+        theadEl.innerHTML = '<tr>' + fields.map(f => '<th>' + escapeHtml(f) + '</th>').join('') + '</tr>';
+    }
+
+    // Render body
+    if (tbodyEl) {
+        tbodyEl.innerHTML = data.results.map(row => {
+            return '<tr>' + fields.map(f => {
+                let val = row[f];
+                if (val === null || val === undefined) val = '';
+                if (typeof val === 'object') val = JSON.stringify(val);
+                val = String(val);
+                if (val.length > 120) val = val.substring(0, 120) + '...';
+                return '<td>' + escapeHtml(val) + '</td>';
+            }).join('') + '</tr>';
+        }).join('');
+    }
+}
+
+function resetReconForm() {
+    const engine = activeReconEngine;
+    if (engine === 'fofa') {
+        resetFofaForm();
+        return;
+    }
+    const queryEl = document.getElementById(engine + '-query');
+    if (queryEl) queryEl.value = '';
+    const sizeEl = document.getElementById(engine + '-size');
+    if (sizeEl) sizeEl.value = engine === 'censys' ? '25' : '20';
+    const pageEl = document.getElementById(engine + '-page');
+    if (pageEl) pageEl.value = '1';
+    const metaEl = document.getElementById(engine + '-results-meta');
+    if (metaEl) metaEl.textContent = '-';
+    const tbodyEl = document.getElementById(engine + '-results-tbody');
+    if (tbodyEl) tbodyEl.innerHTML = '<tr><td class="muted" style="padding:16px">No data</td></tr>';
+    const theadEl = document.getElementById(engine + '-results-thead');
+    if (theadEl) theadEl.innerHTML = '';
+}
+
+function exportReconResults(engine, format) {
+    const data = reconResults[engine];
+    if (!data || !data.results || data.results.length === 0) {
+        alert('No results to export');
+        return;
+    }
+
+    const fields = data.fields || Object.keys(data.results[0]);
+    let content, filename, mime;
+
+    if (format === 'json') {
+        content = JSON.stringify(data.results, null, 2);
+        filename = engine + '_results.json';
+        mime = 'application/json';
+    } else {
+        // CSV
+        const rows = [fields.join(',')];
+        for (const row of data.results) {
+            rows.push(fields.map(f => {
+                let v = row[f];
+                if (v === null || v === undefined) v = '';
+                if (typeof v === 'object') v = JSON.stringify(v);
+                v = String(v).replace(/"/g, '""');
+                return '"' + v + '"';
+            }).join(','));
+        }
+        content = rows.join('\n');
+        filename = engine + '_results.csv';
+        mime = 'text/csv;charset=utf-8';
+    }
+
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// Update recon tab availability based on config
+function updateReconTabStates() {
+    if (typeof currentConfig === 'undefined') return;
+    const checks = {
+        fofa: !!(currentConfig.fofa?.email && currentConfig.fofa?.api_key),
+        zoomeye: !!currentConfig.zoomeye?.api_key,
+        shodan: !!currentConfig.shodan?.api_key,
+        censys: !!(currentConfig.censys?.api_id && currentConfig.censys?.api_secret)
+    };
+    document.querySelectorAll('.recon-tab').forEach(tab => {
+        const engine = tab.dataset.engine;
+        if (engine && checks[engine] !== undefined) {
+            const configured = checks[engine];
+            tab.classList.toggle('disabled', !configured);
+            tab.title = configured ? '' : 'API key not configured — set it in Settings';
+        }
+    });
+}
+
+// Expose to global
+window.switchReconTab = switchReconTab;
+window.submitReconSearch = submitReconSearch;
+window.resetReconForm = resetReconForm;
+window.exportReconResults = exportReconResults;
+window.updateReconTabStates = updateReconTabStates;

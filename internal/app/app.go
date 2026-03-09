@@ -67,6 +67,20 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 
+	// Export recon engine API keys as env vars for tool subprocesses
+	if k := strings.TrimSpace(cfg.ZoomEye.APIKey); k != "" {
+		os.Setenv("ZOOMEYE_API_KEY", k)
+	}
+	if k := strings.TrimSpace(cfg.Shodan.APIKey); k != "" {
+		os.Setenv("SHODAN_API_KEY", k)
+	}
+	if k := strings.TrimSpace(cfg.Censys.APIID); k != "" {
+		os.Setenv("CENSYS_API_ID", k)
+	}
+	if k := strings.TrimSpace(cfg.Censys.APISecret); k != "" {
+		os.Setenv("CENSYS_API_SECRET", k)
+	}
+
 	// CORS middleware
 	router.Use(corsMiddleware())
 
@@ -421,6 +435,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	roleHandler.SetSkillsManager(skillsManager) // set Skills manager on RoleHandler
 	skillsHandler := handler.NewSkillsHandler(skillsManager, cfg, configPath, log.Logger)
 	fofaHandler := handler.NewFofaHandler(cfg, log.Logger)
+	reconHandler := handler.NewReconHandler(cfg, log.Logger)
 	terminalHandler := handler.NewTerminalHandler(log.Logger)
 	dockerHandler := handler.NewDockerHandler(filepath.Dir(configPath), log.Logger)
 	if db != nil {
@@ -569,6 +584,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 		roleHandler,
 		skillsHandler,
 		fofaHandler,
+		reconHandler,
 		terminalHandler,
 		dockerHandler,
 		mcpServer,
@@ -720,6 +736,7 @@ func setupRoutes(
 	roleHandler *handler.RoleHandler,
 	skillsHandler *handler.SkillsHandler,
 	fofaHandler *handler.FofaHandler,
+	reconHandler *handler.ReconHandler,
 	terminalHandler *handler.TerminalHandler,
 	dockerHandler *handler.DockerHandler,
 	mcpServer *mcp.Server,
@@ -779,6 +796,15 @@ func setupRoutes(
 		protected.POST("/fofa/search", fofaHandler.Search)
 		// information gathering - parse natural language to FOFA syntax (requires manual confirmation before querying)
 		protected.POST("/fofa/parse", fofaHandler.ParseNaturalLanguage)
+
+		// Multi-engine recon: search proxies and API key validation
+		protected.POST("/recon/fofa/validate", reconHandler.ValidateFofaKey)
+		protected.POST("/recon/zoomeye/search", reconHandler.ZoomEyeSearch)
+		protected.POST("/recon/zoomeye/validate", reconHandler.ValidateZoomEyeKey)
+		protected.POST("/recon/shodan/search", reconHandler.ShodanSearch)
+		protected.POST("/recon/shodan/validate", reconHandler.ValidateShodanKey)
+		protected.POST("/recon/censys/search", reconHandler.CensysSearch)
+		protected.POST("/recon/censys/validate", reconHandler.ValidateCensysKey)
 
 		// batch task management
 		protected.POST("/batch-tasks", agentHandler.CreateBatchQueue)

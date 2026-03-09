@@ -11320,7 +11320,71 @@ header {
     color: var(--text-secondary);
 }
 
-/* ==================== Information Gathering (FOFA) Page ==================== */
+/* ==================== Recon Engine Tabs ==================== */
+.recon-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 0;
+}
+
+.recon-tab {
+    padding: 8px 20px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: color 0.2s, border-color 0.2s;
+    margin-bottom: -2px;
+}
+
+.recon-tab:hover {
+    color: var(--text-primary);
+}
+
+.recon-tab.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+}
+
+.recon-tab.disabled {
+    color: var(--text-secondary);
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.recon-tab.disabled:hover {
+    color: var(--text-secondary);
+}
+
+/* Recon key validation status in settings */
+.recon-key-status {
+    font-size: 13px;
+    font-weight: 600;
+    margin-left: 4px;
+}
+
+.recon-key-status.valid {
+    color: #22c55e;
+}
+
+.recon-key-status.invalid {
+    color: #ef4444;
+}
+
+.recon-key-status.validating {
+    color: var(--text-secondary);
+}
+
+.recon-key-status.error {
+    color: #f59e0b;
+}
+
+/* ==================== Information Gathering Page ==================== */
 .info-collect-panel {
     background: var(--bg-primary);
     border: 1px solid var(--border-color);

@@ -184,6 +184,9 @@ type SecuritySettingsResponse struct {
 type GetConfigResponse struct {
 	OpenAI    config.OpenAIConfig      `json:"openai"`
 	FOFA      config.FofaConfig        `json:"fofa"`
+	ZoomEye   config.ZoomEyeConfig     `json:"zoomeye"`
+	Shodan    config.ShodanConfig      `json:"shodan"`
+	Censys    config.CensysConfig      `json:"censys"`
 	MCP       config.MCPConfig         `json:"mcp"`
 	Tools     []ToolConfigInfo         `json:"tools"`
 	Agent     config.AgentConfig       `json:"agent"`
@@ -258,6 +261,9 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, GetConfigResponse{
 		OpenAI:    h.config.OpenAI,
 		FOFA:      h.config.FOFA,
+		ZoomEye:   h.config.ZoomEye,
+		Shodan:    h.config.Shodan,
+		Censys:    h.config.Censys,
 		MCP:       h.config.MCP,
 		Tools:     tools,
 		Agent:     h.config.Agent,
@@ -524,6 +530,9 @@ type SecuritySettingsRequest struct {
 type UpdateConfigRequest struct {
 	OpenAI    *config.OpenAIConfig     `json:"openai,omitempty"`
 	FOFA      *config.FofaConfig       `json:"fofa,omitempty"`
+	ZoomEye   *config.ZoomEyeConfig    `json:"zoomeye,omitempty"`
+	Shodan    *config.ShodanConfig     `json:"shodan,omitempty"`
+	Censys    *config.CensysConfig     `json:"censys,omitempty"`
 	MCP       *config.MCPConfig        `json:"mcp,omitempty"`
 	Tools     []ToolEnableStatus       `json:"tools,omitempty"`
 	Agent     *config.AgentConfig      `json:"agent,omitempty"`
@@ -594,6 +603,24 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 	if req.FOFA != nil {
 		h.config.FOFA = *req.FOFA
 		h.logger.Info("Updating FOFA config", zap.String("email", h.config.FOFA.Email))
+	}
+
+	// Update ZoomEye config
+	if req.ZoomEye != nil {
+		h.config.ZoomEye = *req.ZoomEye
+		h.logger.Info("Updating ZoomEye config", zap.Bool("has_key", h.config.ZoomEye.APIKey != ""))
+	}
+
+	// Update Shodan config
+	if req.Shodan != nil {
+		h.config.Shodan = *req.Shodan
+		h.logger.Info("Updating Shodan config", zap.Bool("has_key", h.config.Shodan.APIKey != ""))
+	}
+
+	// Update Censys config
+	if req.Censys != nil {
+		h.config.Censys = *req.Censys
+		h.logger.Info("Updating Censys config", zap.Bool("has_id", h.config.Censys.APIID != ""))
 	}
 
 	// Update MCP config

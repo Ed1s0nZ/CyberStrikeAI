@@ -19,6 +19,9 @@ type Config struct {
 	MCP         MCPConfig             `yaml:"mcp"`
 	OpenAI      OpenAIConfig          `yaml:"openai"`
 	FOFA        FofaConfig            `yaml:"fofa,omitempty" json:"fofa,omitempty"`
+	ZoomEye     ZoomEyeConfig         `yaml:"zoomeye,omitempty" json:"zoomeye,omitempty"`
+	Shodan      ShodanConfig          `yaml:"shodan,omitempty" json:"shodan,omitempty"`
+	Censys      CensysConfig          `yaml:"censys,omitempty" json:"censys,omitempty"`
 	Agent       AgentConfig           `yaml:"agent"`
 	Security    SecurityConfig        `yaml:"security"`
 	Database    DatabaseConfig        `yaml:"database"`
@@ -147,6 +150,19 @@ type FofaConfig struct {
 	Email   string `yaml:"email,omitempty" json:"email,omitempty"`
 	APIKey  string `yaml:"api_key,omitempty" json:"api_key,omitempty"`
 	BaseURL string `yaml:"base_url,omitempty" json:"base_url,omitempty"` // Default: https://fofa.info/api/v1/search/all
+}
+
+type ZoomEyeConfig struct {
+	APIKey string `yaml:"api_key,omitempty" json:"api_key,omitempty"` // ZoomEye API key (from https://www.zoomeye.ai/profile)
+}
+
+type ShodanConfig struct {
+	APIKey string `yaml:"api_key,omitempty" json:"api_key,omitempty"` // Shodan API key (from https://account.shodan.io)
+}
+
+type CensysConfig struct {
+	APIID     string `yaml:"api_id,omitempty" json:"api_id,omitempty"`         // Censys API ID
+	APISecret string `yaml:"api_secret,omitempty" json:"api_secret,omitempty"` // Censys API Secret
 }
 
 type SecurityConfig struct {
