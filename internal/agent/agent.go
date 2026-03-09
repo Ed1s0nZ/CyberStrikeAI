@@ -952,6 +952,25 @@ File management:
 - Update progress and findings as you work — this data persists and is visible in the File Manager UI
 - For reversing tasks: register the binary, set status to processing, log each analysis step, append findings
 
+Android device (Cuttlefish VM):
+- A Cuttlefish AOSP virtual Android device is available, preconfigured as a Russian-owned Xiaomi Redmi Note 12 Pro (MTS carrier 250/01, Moscow timezone, ru-RU locale, Yandex DNS)
+- Use ` + builtin.ToolCuttlefishLaunch + ` to start the Android VM (takes 2-4 min on first boot)
+- Use ` + builtin.ToolCuttlefishStop + ` to stop the VM
+- Use ` + builtin.ToolCuttlefishStatus + ` to check if the device is running and get its properties
+- Use ` + builtin.ToolCuttlefishInstall + ` to install APKs (supports debug/downgrade/replace flags)
+- Use ` + builtin.ToolCuttlefishHotswap + ` for rapid APK hot-swap: force-stop → reinstall → relaunch
+- Use ` + builtin.ToolCuttlefishShell + ` to run any shell command on the device (ls, pm, am, getprop, cat, etc.)
+- Use ` + builtin.ToolCuttlefishPush + ` / ` + builtin.ToolCuttlefishPull + ` to transfer files to/from device
+- Use ` + builtin.ToolCuttlefishScreenshot + ` to capture the device screen
+- Use ` + builtin.ToolCuttlefishLogcat + ` to read Android logs (with filtering and grep)
+- Use ` + builtin.ToolCuttlefishPackages + ` to list/inspect/manage packages (info, permissions, activities, clear-data, etc.)
+- Use ` + builtin.ToolCuttlefishFrida + ` to set up Frida server for dynamic instrumentation
+- Use ` + builtin.ToolCuttlefishProxy + ` to set/clear HTTP proxy for traffic interception (Burp/mitmproxy)
+- Use ` + builtin.ToolCuttlefishCert + ` to install CA certificates into the system trust store
+- Use ` + builtin.ToolCuttlefishSnapshot + ` to save/restore device state snapshots (save before destructive testing)
+- Use ` + builtin.ToolCuttlefishDroidRun + ` to run DroidRun AI agent for autonomous UI automation via natural language
+- Mobile testing workflow: launch VM → install target APK → setup Frida/proxy/cert → test → snapshot → analyze
+
 Time awareness:
 - Use ` + builtin.ToolGetCurrentTime + ` whenever you need the exact current time (e.g. for timestamping reports, calculating scan windows)
 - The current date/time is already injected above in the <time_context> block

@@ -1,13 +1,16 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
 	"html"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -202,6 +205,13 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 			log.Logger.Info("file manager initialized", zap.String("storage_dir", fileStorageDir))
 		}
 	}
+
+	// ── Cuttlefish (Android VM) tools ──────────────────────────────────────
+	cvdHome := os.Getenv("CVD_HOME")
+	if cvdHome == "" {
+		cvdHome = filepath.Join(os.Getenv("HOME"), "cuttlefish-workspace")
+	}
+	registerCuttlefishTools(mcpServer, cvdHome, log.Logger)
 
 	// initialize knowledge base module (if enabled)
 	var knowledgeManager *knowledge.Manager
@@ -2384,4 +2394,587 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cuttlefish (Android VM) MCP Tools
+// ─────────────────────────────────────────────────────────────────────────────
+
+// cvdExec runs a command in the Cuttlefish workspace and returns combined output.
+func cvdExec(ctx context.Context, cvdHome string, name string, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Dir = cvdHome
+	cmd.Env = append(os.Environ(), "CVD_HOME="+cvdHome)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	out := stdout.String()
+	if stderr.Len() > 0 {
+		out += "\n" + stderr.String()
+	}
+	if len(out) > 100000 {
+		out = out[:100000] + "\n... (truncated)"
+	}
+	return out, err
+}
+
+// cvdADB returns the path to the Cuttlefish-bundled adb, falling back to system adb.
+func cvdADB(cvdHome string) string {
+	p := filepath.Join(cvdHome, "bin", "adb")
+	if _, err := os.Stat(p); err == nil {
+		return p
+	}
+	return "adb"
+}
+
+func registerCuttlefishTools(mcpServer *mcp.Server, cvdHome string, logger *zap.Logger) {
+	adb := cvdADB(cvdHome)
+	bridgeScript := filepath.Join(cvdHome, "..", "CyberStrikeAI", "scripts", "cuttlefish", "droidrun-bridge.py")
+	// Also try the absolute common path
+	if _, err := os.Stat(bridgeScript); err != nil {
+		bridgeScript = filepath.Join(os.Getenv("HOME"), "CyberStrikeAI", "scripts", "cuttlefish", "droidrun-bridge.py")
+	}
+
+	logger.Info("registering Cuttlefish (Android VM) MCP tools", zap.String("cvd_home", cvdHome), zap.String("adb", adb))
+
+	// ── cuttlefish_launch ────────────────────────────────────────────────
+	mcpServer.RegisterTool(mcp.Tool{
+		Name:             builtin.ToolCuttlefishLaunch,
+		Description:      "Launch the Cuttlefish Android virtual device. Starts an AOSP VM with QEMU/KVM preconfigured as a Russian-owned Xiaomi Redmi Note 12 Pro (MTS carrier, Moscow timezone, ru-RU locale). The device becomes available via ADB and WebRTC (https://localhost:8443). Takes 2-4 minutes for first boot.",
+		ShortDescription: "Launch Cuttlefish Android VM",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"fresh": map[string]interface{}{
+					"type":        "boolean",
+					"description": "If true, create a fresh data partition (factory reset). Default false.",
+				},
+				"memory_mb": map[string]interface{}{
+					"type":        "integer",
+					"description": "RAM in MB (default 8192)",
+				},
+				"cpus": map[string]interface{}{
+					"type":        "integer",
+					"description": "Number of virtual CPUs (default 4)",
+				},
+			},
+		},
+	}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		env := os.Environ()
+		env = append(env, "CVD_HOME="+cvdHome)
+		if fresh, ok := args["fresh"].(bool); ok && fresh {
+			env = append(env, "FRESH=1")
+		}
+		if mem, ok := args["memory_mb"].(float64); ok {
+			env = append(env, "CVD_MEMORY="+strconv.Itoa(int(mem)))
+		}
+		if cpus, ok := args["cpus"].(float64); ok {
+			env = append(env, "CVD_CPUS="+strconv.Itoa(int(cpus)))
+		}
+
+		launchScript := filepath.Join(cvdHome, "cvd-launch.sh")
+		cmd := exec.CommandContext(ctx, launchScript)
+		cmd.Dir = cvdHome
+		cmd.Env = env
+		var buf bytes.Buffer
+		cmd.Stdout = &buf
+		cmd.Stderr = &buf
+		err := cmd.Run()
+		out := buf.String()
+		if err != nil {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "Launch failed: " + err.Error() + "\n" + out}}, IsError: true}, nil
+		}
+		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: out}}}, nil
+	})
+
+	// ── cuttlefish_stop ─────────────────────────────────────────────────
+	mcpServer.RegisterTool(mcp.Tool{
+		Name:             builtin.ToolCuttlefishStop,
+		Description:      "Stop the running Cuttlefish Android virtual device.",
+		ShortDescription: "Stop Cuttlefish Android VM",
+		InputSchema:      map[string]interface{}{"type": "object", "properties": map[string]interface{}{}},
+	}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		out, err := cvdExec(ctx, cvdHome, filepath.Join(cvdHome, "cvd-stop.sh"))
+		if err != nil {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "Stop failed: " + err.Error() + "\n" + out}}, IsError: true}, nil
+		}
+		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: out}}}, nil
+	})
+
+	// ── cuttlefish_status ───────────────────────────────────────────────
+	mcpServer.RegisterTool(mcp.Tool{
+		Name:             builtin.ToolCuttlefishStatus,
+		Description:      "Check if Cuttlefish is running, get ADB device serial, and current device properties (locale, carrier, model).",
+		ShortDescription: "Check Cuttlefish device status",
+		InputSchema:      map[string]interface{}{"type": "object", "properties": map[string]interface{}{}},
+	}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		// Check ADB devices
+		devOut, _ := cvdExec(ctx, cvdHome, adb, "devices", "-l")
+		// Get key properties if device is connected
+		propsOut, _ := cvdExec(ctx, cvdHome, adb, "shell",
+			"echo 'boot_completed='$(getprop sys.boot_completed)"+
+				" && echo 'locale='$(getprop persist.sys.locale)"+
+				" && echo 'timezone='$(getprop persist.sys.timezone)"+
+				" && echo 'carrier='$(getprop gsm.sim.operator.alpha)"+
+				" && echo 'model='$(getprop ro.product.model)"+
+				" && echo 'manufacturer='$(getprop ro.product.manufacturer)"+
+				" && echo 'sdk='$(getprop ro.build.version.sdk)"+
+				" && echo 'android='$(getprop ro.build.version.release)")
+		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "ADB Devices:\n" + devOut + "\nProperties:\n" + propsOut}}}, nil
+	})
+
+	// ── cuttlefish_install_apk ──────────────────────────────────────────
+	mcpServer.RegisterTool(mcp.Tool{
+		Name:             builtin.ToolCuttlefishInstall,
+		Description:      "Install an APK on the Cuttlefish Android device. Supports debug (-t), downgrade (-d), and replace (-r) flags.",
+		ShortDescription: "Install APK on Cuttlefish",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"apk_path": map[string]interface{}{
+					"type":        "string",
+					"description": "Absolute path to the APK file",
+				},
+				"replace": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Replace existing app (default true)",
+				},
+				"downgrade": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Allow version downgrade",
+				},
+				"debug": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Allow test-only APKs",
+				},
+			},
+			"required": []string{"apk_path"},
+		},
+	}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		apkPath, _ := args["apk_path"].(string)
+		installArgs := []string{"install"}
+		if r, ok := args["replace"].(bool); !ok || r {
+			installArgs = append(installArgs, "-r")
+		}
+		if d, ok := args["downgrade"].(bool); ok && d {
+			installArgs = append(installArgs, "-d")
+		}
+		if t, ok := args["debug"].(bool); ok && t {
+			installArgs = append(installArgs, "-t")
+		}
+		installArgs = append(installArgs, apkPath)
+		out, err := cvdExec(ctx, cvdHome, adb, installArgs...)
+		if err != nil {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "Install failed: " + err.Error() + "\n" + out}}, IsError: true}, nil
+		}
+		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: out}}}, nil
+	})
+
+	// ── cuttlefish_hotswap ──────────────────────────────────────────────
+	mcpServer.RegisterTool(mcp.Tool{
+		Name:             builtin.ToolCuttlefishHotswap,
+		Description:      "Hot-swap reinstall an APK: force-stops the running app, reinstalls with -r -d -t flags, and relaunches. Use for rapid iteration during testing/reversing.",
+		ShortDescription: "Hot-swap APK on Cuttlefish",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"apk_path": map[string]interface{}{
+					"type":        "string",
+					"description": "Path to the APK file",
+				},
+				"package_name": map[string]interface{}{
+					"type":        "string",
+					"description": "Package name (e.g. com.example.app). Auto-detected if omitted.",
+				},
+			},
+			"required": []string{"apk_path"},
+		},
+	}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		apkPath, _ := args["apk_path"].(string)
+		cmdArgs := []string{apkPath}
+		if pkg, ok := args["package_name"].(string); ok && pkg != "" {
+			cmdArgs = append(cmdArgs, pkg)
+		}
+		out, err := cvdExec(ctx, cvdHome, filepath.Join(cvdHome, "cvd-hotswap.sh"), cmdArgs...)
+		if err != nil {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "Hotswap failed: " + err.Error() + "\n" + out}}, IsError: true}, nil
+		}
+		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: out}}}, nil
+	})
+
+	// ── cuttlefish_shell ────────────────────────────────────────────────
+	mcpServer.RegisterTool(mcp.Tool{
+		Name:             builtin.ToolCuttlefishShell,
+		Description:      "Execute a shell command on the Cuttlefish Android device via ADB. Returns stdout/stderr. Use for any direct device interaction: file browsing, process listing, property queries, app management, etc.",
+		ShortDescription: "Run shell command on Android device",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"command": map[string]interface{}{
+					"type":        "string",
+					"description": "Shell command to execute on device (e.g. 'ls /data/local/tmp', 'pm list packages -3', 'getprop ro.product.model')",
+				},
+			},
+			"required": []string{"command"},
+		},
+	}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		command, _ := args["command"].(string)
+		out, err := cvdExec(ctx, cvdHome, adb, "shell", command)
+		if err != nil {
+			// ADB shell returns the device command's exit code, which may be non-zero
+			// but still have useful output
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: out}}}, nil
+		}
+		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: out}}}, nil
+	})
+
+	// ── cuttlefish_push ─────────────────────────────────────────────────
+	mcpServer.RegisterTool(mcp.Tool{
+		Name:             builtin.ToolCuttlefishPush,
+		Description:      "Push a file from host to the Cuttlefish Android device via ADB.",
+		ShortDescription: "Push file to Android device",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"local_path": map[string]interface{}{
+					"type":        "string",
+					"description": "Path to the file on the host",
+				},
+				"device_path": map[string]interface{}{
+					"type":        "string",
+					"description": "Destination path on the device (e.g. /data/local/tmp/file)",
+				},
+			},
+			"required": []string{"local_path", "device_path"},
+		},
+	}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		localPath, _ := args["local_path"].(string)
+		devicePath, _ := args["device_path"].(string)
+		out, err := cvdExec(ctx, cvdHome, adb, "push", localPath, devicePath)
+		if err != nil {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "Push failed: " + err.Error() + "\n" + out}}, IsError: true}, nil
+		}
+		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: out}}}, nil
+	})
+
+	// ── cuttlefish_pull ─────────────────────────────────────────────────
+	mcpServer.RegisterTool(mcp.Tool{
+		Name:             builtin.ToolCuttlefishPull,
+		Description:      "Pull a file from the Cuttlefish Android device to the host via ADB.",
+		ShortDescription: "Pull file from Android device",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"device_path": map[string]interface{}{
+					"type":        "string",
+					"description": "Path on the device to pull (e.g. /data/data/com.app/databases/db.sqlite)",
+				},
+				"local_path": map[string]interface{}{
+					"type":        "string",
+					"description": "Destination path on the host",
+				},
+			},
+			"required": []string{"device_path", "local_path"},
+		},
+	}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		devicePath, _ := args["device_path"].(string)
+		localPath, _ := args["local_path"].(string)
+		out, err := cvdExec(ctx, cvdHome, adb, "pull", devicePath, localPath)
+		if err != nil {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "Pull failed: " + err.Error() + "\n" + out}}, IsError: true}, nil
+		}
+		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: out}}}, nil
+	})
+
+	// ── cuttlefish_screenshot ───────────────────────────────────────────
+	mcpServer.RegisterTool(mcp.Tool{
+		Name:             builtin.ToolCuttlefishScreenshot,
+		Description:      "Take a screenshot of the Cuttlefish Android device. Returns the path to the saved PNG file.",
+		ShortDescription: "Screenshot Android device",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"output_path": map[string]interface{}{
+					"type":        "string",
+					"description": "Where to save the screenshot (default: /tmp/cvd_screenshot.png)",
+				},
+			},
+		},
+	}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		outPath := "/tmp/cvd_screenshot.png"
+		if p, ok := args["output_path"].(string); ok && p != "" {
+			outPath = p
+		}
+		cmd := exec.CommandContext(ctx, adb, "exec-out", "screencap", "-p")
+		cmd.Dir = cvdHome
+		var buf bytes.Buffer
+		cmd.Stdout = &buf
+		if err := cmd.Run(); err != nil {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "Screenshot failed: " + err.Error()}}, IsError: true}, nil
+		}
+		if err := os.WriteFile(outPath, buf.Bytes(), 0644); err != nil {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "Failed to write screenshot: " + err.Error()}}, IsError: true}, nil
+		}
+		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: fmt.Sprintf("Screenshot saved to %s (%d bytes)", outPath, buf.Len())}}}, nil
+	})
+
+	// ── cuttlefish_logcat ───────────────────────────────────────────────
+	mcpServer.RegisterTool(mcp.Tool{
+		Name:             builtin.ToolCuttlefishLogcat,
+		Description:      "Read Android logcat output from the Cuttlefish device. Supports filtering by tag, priority, and line count.",
+		ShortDescription: "Read Android logcat",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"filter": map[string]interface{}{
+					"type":        "string",
+					"description": "Logcat filter expression (e.g. 'ActivityManager:I *:S' or tag name)",
+				},
+				"lines": map[string]interface{}{
+					"type":        "integer",
+					"description": "Number of recent lines to return (default 100)",
+				},
+				"grep": map[string]interface{}{
+					"type":        "string",
+					"description": "Grep pattern to filter output",
+				},
+			},
+		},
+	}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		lines := 100
+		if n, ok := args["lines"].(float64); ok && n > 0 {
+			lines = int(n)
+		}
+		logArgs := []string{"logcat", "-d", "-t", strconv.Itoa(lines)}
+		if filter, ok := args["filter"].(string); ok && filter != "" {
+			logArgs = append(logArgs, filter)
+		}
+		out, _ := cvdExec(ctx, cvdHome, adb, logArgs...)
+		if grepPat, ok := args["grep"].(string); ok && grepPat != "" {
+			var filtered []string
+			for _, line := range strings.Split(out, "\n") {
+				if strings.Contains(line, grepPat) {
+					filtered = append(filtered, line)
+				}
+			}
+			out = strings.Join(filtered, "\n")
+		}
+		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: out}}}, nil
+	})
+
+	// ── cuttlefish_frida_setup ──────────────────────────────────────────
+	mcpServer.RegisterTool(mcp.Tool{
+		Name:             builtin.ToolCuttlefishFrida,
+		Description:      "Set up Frida server on the Cuttlefish device for dynamic instrumentation. Downloads the matching frida-server binary, pushes it to the device, and starts it. After setup, use frida/frida-tools from the host to attach to processes.",
+		ShortDescription: "Setup Frida on Android device",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"version": map[string]interface{}{
+					"type":        "string",
+					"description": "Frida version (default: 16.6.6)",
+				},
+			},
+		},
+	}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		out, err := cvdExec(ctx, cvdHome, filepath.Join(cvdHome, "cvd-api.sh"), "frida-setup")
+		if err != nil {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "Frida setup failed: " + err.Error() + "\n" + out}}, IsError: true}, nil
+		}
+		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: out}}}, nil
+	})
+
+	// ── cuttlefish_proxy ────────────────────────────────────────────────
+	mcpServer.RegisterTool(mcp.Tool{
+		Name:             builtin.ToolCuttlefishProxy,
+		Description:      "Set or clear HTTP proxy on the Cuttlefish device. Useful for traffic interception with Burp Suite, mitmproxy, etc.",
+		ShortDescription: "Set/clear proxy on Android device",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"action": map[string]interface{}{
+					"type":        "string",
+					"enum":        []string{"set", "clear"},
+					"description": "set or clear the proxy",
+				},
+				"host": map[string]interface{}{
+					"type":        "string",
+					"description": "Proxy host (required for 'set')",
+				},
+				"port": map[string]interface{}{
+					"type":        "string",
+					"description": "Proxy port (required for 'set')",
+				},
+			},
+			"required": []string{"action"},
+		},
+	}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		action, _ := args["action"].(string)
+		if action == "clear" {
+			out, _ := cvdExec(ctx, cvdHome, adb, "shell", "settings put global http_proxy :0")
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "Proxy cleared.\n" + out}}}, nil
+		}
+		host, _ := args["host"].(string)
+		port, _ := args["port"].(string)
+		if host == "" || port == "" {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "host and port required for set action"}}, IsError: true}, nil
+		}
+		out, _ := cvdExec(ctx, cvdHome, adb, "shell", "settings put global http_proxy "+host+":"+port)
+		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: fmt.Sprintf("Proxy set to %s:%s\n%s", host, port, out)}}}, nil
+	})
+
+	// ── cuttlefish_install_cert ─────────────────────────────────────────
+	mcpServer.RegisterTool(mcp.Tool{
+		Name:             builtin.ToolCuttlefishCert,
+		Description:      "Install a CA certificate into the Android system trust store on the Cuttlefish device. Required for HTTPS traffic interception. The device must have root access (Cuttlefish userdebug builds support this).",
+		ShortDescription: "Install CA cert on Android device",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"cert_path": map[string]interface{}{
+					"type":        "string",
+					"description": "Path to the PEM-encoded CA certificate file on the host",
+				},
+			},
+			"required": []string{"cert_path"},
+		},
+	}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		certPath, _ := args["cert_path"].(string)
+		out, err := cvdExec(ctx, cvdHome, filepath.Join(cvdHome, "cvd-api.sh"), "install-cert", certPath)
+		if err != nil {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "Cert install failed: " + err.Error() + "\n" + out}}, IsError: true}, nil
+		}
+		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: out}}}, nil
+	})
+
+	// ── cuttlefish_snapshot ─────────────────────────────────────────────
+	mcpServer.RegisterTool(mcp.Tool{
+		Name:             builtin.ToolCuttlefishSnapshot,
+		Description:      "Save, restore, or list device state snapshots. Use 'save' before destructive testing, 'restore' to revert to a known-good state.",
+		ShortDescription: "Manage Cuttlefish device snapshots",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"action": map[string]interface{}{
+					"type":        "string",
+					"enum":        []string{"save", "restore", "list"},
+					"description": "Snapshot action",
+				},
+				"name": map[string]interface{}{
+					"type":        "string",
+					"description": "Snapshot name (default: 'default')",
+				},
+			},
+			"required": []string{"action"},
+		},
+	}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		action, _ := args["action"].(string)
+		cmdArgs := []string{action}
+		if name, ok := args["name"].(string); ok && name != "" {
+			cmdArgs = append(cmdArgs, name)
+		}
+		out, err := cvdExec(ctx, cvdHome, filepath.Join(cvdHome, "cvd-snapshot.sh"), cmdArgs...)
+		if err != nil {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "Snapshot failed: " + err.Error() + "\n" + out}}, IsError: true}, nil
+		}
+		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: out}}}, nil
+	})
+
+	// ── cuttlefish_packages ─────────────────────────────────────────────
+	mcpServer.RegisterTool(mcp.Tool{
+		Name:             builtin.ToolCuttlefishPackages,
+		Description:      "List, inspect, or manage packages on the Cuttlefish device. Actions: list (all/third-party), info (package details), permissions, activities, clear-data, force-stop, enable, disable.",
+		ShortDescription: "Manage packages on Android device",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"action": map[string]interface{}{
+					"type":        "string",
+					"enum":        []string{"list", "list-third-party", "info", "permissions", "activities", "clear-data", "force-stop", "enable", "disable", "uninstall"},
+					"description": "Package management action",
+				},
+				"package": map[string]interface{}{
+					"type":        "string",
+					"description": "Package name (required for info/permissions/activities/clear-data/force-stop/enable/disable/uninstall)",
+				},
+			},
+			"required": []string{"action"},
+		},
+	}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		action, _ := args["action"].(string)
+		pkg, _ := args["package"].(string)
+		var out string
+		var err error
+		switch action {
+		case "list":
+			out, err = cvdExec(ctx, cvdHome, adb, "shell", "pm list packages")
+		case "list-third-party":
+			out, err = cvdExec(ctx, cvdHome, adb, "shell", "pm list packages -3")
+		case "info":
+			out, err = cvdExec(ctx, cvdHome, adb, "shell", "dumpsys package "+pkg)
+		case "permissions":
+			out, err = cvdExec(ctx, cvdHome, adb, "shell", "dumpsys package "+pkg+" | grep -A 100 'granted=true'")
+		case "activities":
+			out, err = cvdExec(ctx, cvdHome, adb, "shell", "dumpsys package "+pkg+" | grep -A 5 'Activity'")
+		case "clear-data":
+			out, err = cvdExec(ctx, cvdHome, adb, "shell", "pm clear "+pkg)
+		case "force-stop":
+			out, err = cvdExec(ctx, cvdHome, adb, "shell", "am force-stop "+pkg)
+		case "enable":
+			out, err = cvdExec(ctx, cvdHome, adb, "shell", "pm enable "+pkg)
+		case "disable":
+			out, err = cvdExec(ctx, cvdHome, adb, "shell", "pm disable-user --user 0 "+pkg)
+		case "uninstall":
+			out, err = cvdExec(ctx, cvdHome, adb, "shell", "pm uninstall "+pkg)
+		default:
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "Unknown action: " + action}}, IsError: true}, nil
+		}
+		if err != nil {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: out}}}, nil
+		}
+		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: out}}}, nil
+	})
+
+	// ── cuttlefish_droidrun ─────────────────────────────────────────────
+	mcpServer.RegisterTool(mcp.Tool{
+		Name:             builtin.ToolCuttlefishDroidRun,
+		Description:      "Run DroidRun AI agent on the Cuttlefish device. Give a natural language goal and the agent will autonomously interact with the Android UI to accomplish it (e.g. 'Open Settings and find device info', 'Install and test the login flow of the app'). Requires DroidRun and its dependencies to be installed (pip install droidrun).",
+		ShortDescription: "Run DroidRun AI agent on Cuttlefish",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"goal": map[string]interface{}{
+					"type":        "string",
+					"description": "Natural language goal for the DroidRun agent",
+				},
+				"install_apk": map[string]interface{}{
+					"type":        "string",
+					"description": "APK path to install before running the goal (optional)",
+				},
+				"config": map[string]interface{}{
+					"type":        "string",
+					"description": "Path to custom DroidRun config YAML (optional)",
+				},
+			},
+			"required": []string{"goal"},
+		},
+	}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		goal, _ := args["goal"].(string)
+		cmdArgs := []string{bridgeScript}
+		if apk, ok := args["install_apk"].(string); ok && apk != "" {
+			cmdArgs = append(cmdArgs, "--install", apk)
+		}
+		if cfg, ok := args["config"].(string); ok && cfg != "" {
+			cmdArgs = append(cmdArgs, "--config", cfg)
+		}
+		cmdArgs = append(cmdArgs, goal)
+		out, err := cvdExec(ctx, cvdHome, "python3", cmdArgs...)
+		if err != nil {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "DroidRun failed: " + err.Error() + "\n" + out}}, IsError: true}, nil
+		}
+		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: out}}}, nil
+	})
+
+	logger.Info("registered Cuttlefish MCP tools", zap.Int("count", 16))
 }

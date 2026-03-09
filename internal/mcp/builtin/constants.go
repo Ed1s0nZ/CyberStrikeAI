@@ -31,6 +31,24 @@ const (
 	ToolGetFile          = "get_file"
 	ToolAppendFileLog    = "append_file_log"
 	ToolAppendFindings   = "append_file_findings"
+
+	// Cuttlefish (Android VM) tools
+	ToolCuttlefishLaunch   = "cuttlefish_launch"
+	ToolCuttlefishStop     = "cuttlefish_stop"
+	ToolCuttlefishStatus   = "cuttlefish_status"
+	ToolCuttlefishInstall  = "cuttlefish_install_apk"
+	ToolCuttlefishHotswap  = "cuttlefish_hotswap"
+	ToolCuttlefishShell    = "cuttlefish_shell"
+	ToolCuttlefishPush     = "cuttlefish_push"
+	ToolCuttlefishPull     = "cuttlefish_pull"
+	ToolCuttlefishScreenshot = "cuttlefish_screenshot"
+	ToolCuttlefishLogcat   = "cuttlefish_logcat"
+	ToolCuttlefishFrida    = "cuttlefish_frida_setup"
+	ToolCuttlefishProxy    = "cuttlefish_proxy"
+	ToolCuttlefishCert     = "cuttlefish_install_cert"
+	ToolCuttlefishSnapshot = "cuttlefish_snapshot"
+	ToolCuttlefishPackages = "cuttlefish_packages"
+	ToolCuttlefishDroidRun = "cuttlefish_droidrun"
 )
 
 // IsBuiltinTool reports whether the given tool name is a built-in tool.
@@ -52,7 +70,23 @@ func IsBuiltinTool(toolName string) bool {
 		ToolListFiles,
 		ToolGetFile,
 		ToolAppendFileLog,
-		ToolAppendFindings:
+		ToolAppendFindings,
+		ToolCuttlefishLaunch,
+		ToolCuttlefishStop,
+		ToolCuttlefishStatus,
+		ToolCuttlefishInstall,
+		ToolCuttlefishHotswap,
+		ToolCuttlefishShell,
+		ToolCuttlefishPush,
+		ToolCuttlefishPull,
+		ToolCuttlefishScreenshot,
+		ToolCuttlefishLogcat,
+		ToolCuttlefishFrida,
+		ToolCuttlefishProxy,
+		ToolCuttlefishCert,
+		ToolCuttlefishSnapshot,
+		ToolCuttlefishPackages,
+		ToolCuttlefishDroidRun:
 		return true
 	default:
 		return false
@@ -79,5 +113,21 @@ func GetAllBuiltinTools() []string {
 		ToolGetFile,
 		ToolAppendFileLog,
 		ToolAppendFindings,
+		ToolCuttlefishLaunch,
+		ToolCuttlefishStop,
+		ToolCuttlefishStatus,
+		ToolCuttlefishInstall,
+		ToolCuttlefishHotswap,
+		ToolCuttlefishShell,
+		ToolCuttlefishPush,
+		ToolCuttlefishPull,
+		ToolCuttlefishScreenshot,
+		ToolCuttlefishLogcat,
+		ToolCuttlefishFrida,
+		ToolCuttlefishProxy,
+		ToolCuttlefishCert,
+		ToolCuttlefishSnapshot,
+		ToolCuttlefishPackages,
+		ToolCuttlefishDroidRun,
 	}
 }
