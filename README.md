@@ -116,7 +116,7 @@ CyberStrikeAI ships with 100+ curated tools covering the whole kill chain:
 **One-Command Deployment:**
 ```bash
 git clone https://github.com/Ed1s0nZ/CyberStrikeAI.git
-cd CyberStrikeAI-main
+cd CyberStrikeAI
 chmod +x run.sh && ./run.sh
 ```
 
