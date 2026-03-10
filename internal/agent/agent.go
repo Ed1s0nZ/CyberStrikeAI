@@ -1393,6 +1393,44 @@ Skills Library:
 			}
 		}
 	}
+	waitForDeferredToolResults := func(reason string) error {
+		if deferredInFlight == 0 {
+			return nil
+		}
+
+		sendProgress("progress", fmt.Sprintf("Waiting for %d background tool(s) to complete before %s...", deferredInFlight, reason), map[string]interface{}{
+			"reason":   reason,
+			"deferred": deferredInFlight,
+		})
+
+		for deferredInFlight > 0 {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+
+			got := drainBackgroundToolResults(2 * time.Second)
+			persistToolPoolSnapshot()
+
+			if got > 0 {
+				sendProgress("progress", fmt.Sprintf("Received %d background tool result(s); %d still running before %s.", got, deferredInFlight, reason), map[string]interface{}{
+					"reason":    reason,
+					"received":  got,
+					"remaining": deferredInFlight,
+				})
+				continue
+			}
+
+			sendProgress("progress", fmt.Sprintf("Still waiting for %d background tool(s) to complete before %s...", deferredInFlight, reason), map[string]interface{}{
+				"reason":   reason,
+				"deferred": deferredInFlight,
+			})
+		}
+
+		sendProgress("progress", fmt.Sprintf("All background tool results received; continuing %s.", reason), map[string]interface{}{
+			"reason": reason,
+		})
+		return nil
+	}
 
 	// ── Pre-flight health checks ──────────────────────────────────────────
 	// Verify LLM connectivity, external MCP servers, and key tool binaries
@@ -2025,6 +2063,12 @@ Skills Library:
 
 			// If this is the last iteration, require AI to summarize after executing tools
 			if isLastIteration {
+				if err := waitForDeferredToolResults("final summary"); err != nil {
+					result.LastReActInput = currentReActInput
+					result.Response = fmt.Sprintf("Task execution interrupted: %v", err)
+					result.LastReActOutput = result.Response
+					return result, err
+				}
 				sendProgress("progress", "Last iteration: generating summary and next steps...", nil)
 				// Add user message requesting AI to summarize
 				messages = append(messages, ChatMessage{
@@ -2069,6 +2113,12 @@ Skills Library:
 
 		// If this is the last iteration, require AI to summarize regardless of finish_reason
 		if isLastIteration {
+			if err := waitForDeferredToolResults("final summary"); err != nil {
+				result.LastReActInput = currentReActInput
+				result.Response = fmt.Sprintf("Task execution interrupted: %v", err)
+				result.LastReActOutput = result.Response
+				return result, err
+			}
 			sendProgress("progress", "Last iteration: generating summary and next steps...", nil)
 			// Add user message requesting AI to summarize
 			messages = append(messages, ChatMessage{
@@ -2104,11 +2154,11 @@ Skills Library:
 		// If complete, return result
 		if choice.FinishReason == "stop" {
 			if deferredInFlight > 0 {
-				got := drainBackgroundToolResults(2 * time.Second)
-				if got > 0 {
-					sendProgress("progress", fmt.Sprintf("Received %d background tool result(s), continuing analysis...", got), nil)
-				} else {
-					sendProgress("progress", fmt.Sprintf("Waiting for %d background tool(s) to complete...", deferredInFlight), nil)
+				if err := waitForDeferredToolResults("final reply"); err != nil {
+					result.LastReActInput = currentReActInput
+					result.Response = fmt.Sprintf("Task execution interrupted: %v", err)
+					result.LastReActOutput = result.Response
+					return result, err
 				}
 				// Keep iterating while deferred tools are still in-flight so model can consume late results.
 				continue
@@ -2122,6 +2172,12 @@ Skills Library:
 
 	// If loop ends without returning, the maximum iteration count has been reached
 	// Try one final AI call to get a summary
+	if err := waitForDeferredToolResults("final summary"); err != nil {
+		result.LastReActInput = currentReActInput
+		result.Response = fmt.Sprintf("Task execution interrupted: %v", err)
+		result.LastReActOutput = result.Response
+		return result, err
+	}
 	sendProgress("progress", "Maximum iteration count reached, generating summary...", nil)
 	finalSummaryPrompt := ChatMessage{
 		Role:    "user",

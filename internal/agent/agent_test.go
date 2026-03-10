@@ -1,9 +1,15 @@
 package agent
 
 import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -281,5 +287,248 @@ func TestAgent_NewAgent_CustomConfig(t *testing.T) {
 
 	if threshold != 100*1024 {
 		t.Errorf("threshold mismatch. expected: %d, got: %d", 100*1024, threshold)
+	}
+}
+
+func newOpenAITestServer(t *testing.T, responder func(call int, req OpenAIRequest) OpenAIResponse) (*httptest.Server, *int32, *[]OpenAIRequest) {
+	t.Helper()
+
+	var callCount int32
+	var (
+		mu       sync.Mutex
+		requests []OpenAIRequest
+	)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/chat/completions" {
+			http.NotFound(w, r)
+			return
+		}
+
+		var req OpenAIRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("failed to decode OpenAI request: %v", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		call := int(atomic.AddInt32(&callCount, 1))
+
+		mu.Lock()
+		requests = append(requests, req)
+		mu.Unlock()
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(responder(call, req)); err != nil {
+			t.Errorf("failed to encode OpenAI response: %v", err)
+		}
+	}))
+
+	t.Cleanup(server.Close)
+	return server, &callCount, &requests
+}
+
+func testToolCallResponse(toolName string, args map[string]interface{}) OpenAIResponse {
+	return OpenAIResponse{
+		ID: "test-response",
+		Choices: []Choice{
+			{
+				FinishReason: "tool_calls",
+				Message: MessageWithTools{
+					Role:    "assistant",
+					Content: "Calling tool",
+					ToolCalls: []ToolCall{
+						{
+							ID:   "call_1",
+							Type: "function",
+							Function: FunctionCall{
+								Name:      toolName,
+								Arguments: args,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func testAssistantResponse(content, finishReason string) OpenAIResponse {
+	return OpenAIResponse{
+		ID: "test-response",
+		Choices: []Choice{
+			{
+				FinishReason: finishReason,
+				Message: MessageWithTools{
+					Role:    "assistant",
+					Content: content,
+				},
+			},
+		},
+	}
+}
+
+func messagesContain(messages []ChatMessage, needle string) bool {
+	for _, msg := range messages {
+		if strings.Contains(msg.Content, needle) {
+			return true
+		}
+	}
+	return false
+}
+
+func formatMessagesForDebug(messages []ChatMessage) string {
+	var b strings.Builder
+	for i, msg := range messages {
+		b.WriteString(msg.Role)
+		b.WriteString(": ")
+		b.WriteString(msg.Content)
+		if i < len(messages)-1 {
+			b.WriteString("\n---\n")
+		}
+	}
+	return b.String()
+}
+
+func TestAgentLoop_LastIterationSummaryWaitsForDeferredToolResults(t *testing.T) {
+	releaseTool := make(chan struct{})
+	go func() {
+		time.Sleep(25 * time.Millisecond)
+		close(releaseTool)
+	}()
+
+	server, callCount, _ := newOpenAITestServer(t, func(call int, req OpenAIRequest) OpenAIResponse {
+		switch call {
+		case 1:
+			return testToolCallResponse("slow_tool", map[string]interface{}{"target": "example.com"})
+		case 2:
+			if !messagesContain(req.Messages, "Background tool slow_tool finished.") {
+				t.Errorf("summary request did not include late background tool notice\n%s", formatMessagesForDebug(req.Messages))
+			}
+			if !messagesContain(req.Messages, "late tool result from summary path") {
+				t.Errorf("summary request did not include late tool output\n%s", formatMessagesForDebug(req.Messages))
+			}
+			if !messagesContain(req.Messages, "This is the last iteration.") {
+				t.Errorf("summary request did not include last-iteration summary prompt\n%s", formatMessagesForDebug(req.Messages))
+			}
+			return testAssistantResponse("summary saw late tool result", "stop")
+		default:
+			t.Fatalf("unexpected OpenAI call %d", call)
+			return OpenAIResponse{}
+		}
+	})
+
+	logger := zap.NewNop()
+	mcpServer := mcp.NewServer(logger)
+	mcpServer.RegisterTool(mcp.Tool{
+		Name:        "slow_tool",
+		Description: "slow test tool",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"target": map[string]interface{}{"type": "string"},
+			},
+		},
+	}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		<-releaseTool
+		return &mcp.ToolResult{
+			Content: []mcp.Content{{Type: "text", Text: "late tool result from summary path"}},
+		}, nil
+	})
+
+	agent := NewAgent(&config.OpenAIConfig{
+		APIKey:  "test-key",
+		BaseURL: server.URL,
+		Model:   "test-model",
+	}, &config.AgentConfig{
+		ParallelToolExecution: true,
+		LargeResultThreshold:  1024,
+	}, mcpServer, nil, logger, 1)
+	agent.parallelToolWait = 10 * time.Millisecond
+	agent.memoryCompressor = nil
+
+	result, err := agent.AgentLoop(context.Background(), "run slow tool", nil)
+	if err != nil {
+		t.Fatalf("AgentLoop returned error: %v", err)
+	}
+
+	if result.Response != "summary saw late tool result" {
+		t.Fatalf("unexpected final response: %q", result.Response)
+	}
+
+	if got := atomic.LoadInt32(callCount); got != 2 {
+		t.Fatalf("expected 2 OpenAI calls, got %d", got)
+	}
+}
+
+func TestAgentLoop_StopWaitsForDeferredToolResults(t *testing.T) {
+	releaseTool := make(chan struct{})
+
+	server, callCount, _ := newOpenAITestServer(t, func(call int, req OpenAIRequest) OpenAIResponse {
+		switch call {
+		case 1:
+			return testToolCallResponse("slow_tool", map[string]interface{}{"target": "example.com"})
+		case 2:
+			if messagesContain(req.Messages, "late tool result from stop path") {
+				t.Errorf("tool result should not be available on the intermediate reasoning pass")
+			}
+			return testAssistantResponse("working on other tasks", "length")
+		case 3:
+			close(releaseTool)
+			return testAssistantResponse("ready to finish", "stop")
+		case 4:
+			if !messagesContain(req.Messages, "Background tool slow_tool finished.") {
+				t.Errorf("final reasoning request did not include late background tool notice\n%s", formatMessagesForDebug(req.Messages))
+			}
+			if !messagesContain(req.Messages, "late tool result from stop path") {
+				t.Errorf("final reasoning request did not include late tool output\n%s", formatMessagesForDebug(req.Messages))
+			}
+			return testAssistantResponse("final answer with late tool result", "stop")
+		default:
+			t.Fatalf("unexpected OpenAI call %d", call)
+			return OpenAIResponse{}
+		}
+	})
+
+	logger := zap.NewNop()
+	mcpServer := mcp.NewServer(logger)
+	mcpServer.RegisterTool(mcp.Tool{
+		Name:        "slow_tool",
+		Description: "slow test tool",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"target": map[string]interface{}{"type": "string"},
+			},
+		},
+	}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		<-releaseTool
+		return &mcp.ToolResult{
+			Content: []mcp.Content{{Type: "text", Text: "late tool result from stop path"}},
+		}, nil
+	})
+
+	agent := NewAgent(&config.OpenAIConfig{
+		APIKey:  "test-key",
+		BaseURL: server.URL,
+		Model:   "test-model",
+	}, &config.AgentConfig{
+		ParallelToolExecution: true,
+		LargeResultThreshold:  1024,
+	}, mcpServer, nil, logger, 5)
+	agent.parallelToolWait = 10 * time.Millisecond
+	agent.memoryCompressor = nil
+
+	result, err := agent.AgentLoop(context.Background(), "run slow tool", nil)
+	if err != nil {
+		t.Fatalf("AgentLoop returned error: %v", err)
+	}
+
+	if result.Response != "final answer with late tool result" {
+		t.Fatalf("unexpected final response: %q", result.Response)
+	}
+
+	if got := atomic.LoadInt32(callCount); got != 4 {
+		t.Fatalf("expected 4 OpenAI calls, got %d", got)
 	}
 }
