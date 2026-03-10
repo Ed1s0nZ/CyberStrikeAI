@@ -50,6 +50,9 @@ const (
 	ToolCuttlefishPackages = "cuttlefish_packages"
 	ToolCuttlefishDroidRun = "cuttlefish_droidrun"
 
+	// Tool discovery — lets the model request full descriptions on demand
+	ToolGetToolDetails = "get_tool_details"
+
 	// DroidRun proxy tools — high-level LLM-friendly device interaction
 	// These are easier for the LLM than raw ADB: indexed elements, formatted state, vision support
 	ToolDroidRunConnect    = "droidrun_connect"
@@ -113,7 +116,8 @@ func IsBuiltinTool(toolName string) bool {
 		ToolDroidRunOpenApp,
 		ToolDroidRunListApps,
 		ToolDroidRunInstall,
-		ToolDroidRunWait:
+		ToolDroidRunWait,
+		ToolGetToolDetails:
 		return true
 	default:
 		return false
@@ -168,5 +172,6 @@ func GetAllBuiltinTools() []string {
 		ToolDroidRunListApps,
 		ToolDroidRunInstall,
 		ToolDroidRunWait,
+		ToolGetToolDetails,
 	}
 }
