@@ -149,6 +149,7 @@ Automatically converted to a comma-separated string.
 ```yaml
 - name: "ports"
   type: "array"
+  item_type: "number"
   description: "List of ports to scan"
   required: false
   # Input: [80, 443, 8080]

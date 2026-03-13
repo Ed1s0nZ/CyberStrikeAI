@@ -143,6 +143,7 @@ parameters:
     format: "positional"
   - name: "payloads"
     type: "array"
+    item_type: "string"
     description: "载荷列表（数组格式），如 [\"test1\", \"test2\", \"test3\"]"
     required: true
     position: 4

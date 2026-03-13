@@ -202,6 +202,7 @@ description: |
 ```yaml
 - name: "ports"
   type: "array"
+  item_type: "number"
   description: "端口列表"
   required: false
   # 输入: [80, 443, 8080]
