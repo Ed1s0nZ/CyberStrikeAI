@@ -896,17 +896,28 @@ function addTimelineItem(timeline, type, options) {
     item.className = `timeline-item timeline-item-${type}`;
     // 记录类型与参数，便于 languagechange 时刷新标题文案
     item.dataset.timelineType = type;
-    if (type === 'iteration' && options.iterationN != null) {
-        item.dataset.iterationN = String(options.iterationN);
+    if (type === 'iteration') {
+        const n = options.iterationN != null ? options.iterationN : (options.data && options.data.iteration != null ? options.data.iteration : 1);
+        item.dataset.iterationN = String(n);
+    }
+    if (type === 'progress' && options.message) {
+        item.dataset.progressMessage = options.message;
     }
     if (type === 'tool_calls_detected' && options.data && options.data.count != null) {
         item.dataset.toolCallsCount = String(options.data.count);
     }
-    // 保存事件时间 ISO，语言切换时可重算时间格式
-    try {
-        item.dataset.createdAtIso = eventTime.toISOString();
-    } catch (e) { /* ignore */ }
-    
+    if (type === 'tool_call' && options.data) {
+        const d = options.data;
+        item.dataset.toolName = (d.toolName != null && d.toolName !== '') ? String(d.toolName) : '';
+        item.dataset.toolIndex = (d.index != null) ? String(d.index) : '0';
+        item.dataset.toolTotal = (d.total != null) ? String(d.total) : '0';
+    }
+    if (type === 'tool_result' && options.data) {
+        const d = options.data;
+        item.dataset.toolName = (d.toolName != null && d.toolName !== '') ? String(d.toolName) : '';
+        item.dataset.toolSuccess = d.success !== false ? '1' : '0';
+    }
+
     // 使用传入的createdAt时间，如果没有则使用当前时间（向后兼容）
     let eventTime;
     if (options.createdAt) {
@@ -925,7 +936,11 @@ function addTimelineItem(timeline, type, options) {
     } else {
         eventTime = new Date();
     }
-    
+    // 保存事件时间 ISO，语言切换时可重算时间格式
+    try {
+        item.dataset.createdAtIso = eventTime.toISOString();
+    } catch (e) { /* ignore */ }
+
     const timeLocale = getCurrentTimeLocale();
     const timeOpts = getTimeFormatOptions();
     const time = eventTime.toLocaleTimeString(timeLocale, timeOpts);
@@ -948,7 +963,7 @@ function addTimelineItem(timeline, type, options) {
             <div class="timeline-item-content">
                 <div class="tool-details">
                     <div class="tool-arg-section">
-                        <strong>${escapeHtml(paramsLabel)}</strong>
+                        <strong data-i18n="timeline.params">${escapeHtml(paramsLabel)}</strong>
                         <pre class="tool-args">${escapeHtml(JSON.stringify(args, null, 2))}</pre>
                     </div>
                 </div>
@@ -965,9 +980,9 @@ function addTimelineItem(timeline, type, options) {
         content += `
             <div class="timeline-item-content">
                 <div class="tool-result-section ${isError ? 'error' : 'success'}">
-                    <strong>${escapeHtml(execResultLabel)}</strong>
+                    <strong data-i18n="timeline.executionResult">${escapeHtml(execResultLabel)}</strong>
                     <pre class="tool-result">${escapeHtml(resultStr)}</pre>
-                    ${data.executionId ? `<div class="tool-execution-id">${escapeHtml(execIdLabel)} <code>${escapeHtml(data.executionId)}</code></div>` : ''}
+                    ${data.executionId ? `<div class="tool-execution-id"><span data-i18n="timeline.executionId">${escapeHtml(execIdLabel)}</span> <code>${escapeHtml(data.executionId)}</code></div>` : ''}
                 </div>
             </div>
         `;
@@ -1771,6 +1786,11 @@ function refreshProgressAndTimelineI18n() {
             titleEl.textContent = '\uD83D\uDD0D ' + translateProgressMessage(raw);
         }
     });
+    // 转换后的详情区顶栏「渗透测试详情」：仅刷新不在 .progress-message 内的 progress 标题
+    document.querySelectorAll('.progress-container .progress-header .progress-title').forEach(function (titleEl) {
+        if (titleEl.closest('.progress-message')) return;
+        titleEl.textContent = '\uD83D\uDCCB ' + _t('chat.penetrationTestDetail');
+    });
 
     // 时间线项：按类型重算标题，并重绘时间戳
     document.querySelectorAll('.timeline-item').forEach(function (item) {
@@ -1786,6 +1806,20 @@ function refreshProgressAndTimelineI18n() {
         } else if (type === 'tool_calls_detected' && item.dataset.toolCallsCount != null) {
             const count = parseInt(item.dataset.toolCallsCount, 10) || 0;
             titleSpan.textContent = '\uD83D\uDD27 ' + _t('chat.toolCallsDetected', { count: count });
+        } else if (type === 'tool_call' && (item.dataset.toolName !== undefined || item.dataset.toolIndex !== undefined)) {
+            const name = (item.dataset.toolName != null && item.dataset.toolName !== '') ? item.dataset.toolName : _t('chat.unknownTool');
+            const index = parseInt(item.dataset.toolIndex, 10) || 0;
+            const total = parseInt(item.dataset.toolTotal, 10) || 0;
+            titleSpan.textContent = '\uD83D\uDD27 ' + _t('chat.callTool', { name: name, index: index, total: total });
+        } else if (type === 'tool_result' && (item.dataset.toolName !== undefined || item.dataset.toolSuccess !== undefined)) {
+            const name = (item.dataset.toolName != null && item.dataset.toolName !== '') ? item.dataset.toolName : _t('chat.unknownTool');
+            const success = item.dataset.toolSuccess === '1';
+            const icon = success ? '\u2705 ' : '\u274C ';
+            titleSpan.textContent = icon + (success ? _t('chat.toolExecComplete', { name: name }) : _t('chat.toolExecFailed', { name: name }));
+        } else if (type === 'cancelled') {
+            titleSpan.textContent = '\u26D4 ' + _t('chat.taskCancelled');
+        } else if (type === 'progress' && item.dataset.progressMessage !== undefined) {
+            titleSpan.textContent = typeof window.translateProgressMessage === 'function' ? window.translateProgressMessage(item.dataset.progressMessage) : item.dataset.progressMessage;
         }
         if (timeSpan && item.dataset.createdAtIso) {
             const d = new Date(item.dataset.createdAtIso);

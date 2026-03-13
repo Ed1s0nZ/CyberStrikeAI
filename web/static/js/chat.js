@@ -1244,6 +1244,9 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
     const msgTimeOpts = { hour: '2-digit', minute: '2-digit' };
     if (msgTimeLocale === 'zh-CN') msgTimeOpts.hour12 = false;
     timeDiv.textContent = messageTime.toLocaleTimeString(msgTimeLocale, msgTimeOpts);
+    try {
+        timeDiv.dataset.messageTime = messageTime.toISOString();
+    } catch (e) { /* ignore */ }
     contentWrapper.appendChild(timeDiv);
     
     // 如果有MCP执行ID或进度ID，添加查看详情区域（统一使用"渗透测试详情"样式）
@@ -1594,10 +1597,19 @@ async function showMCPDetail(executionId) {
             const normalizedStatus = (exec.status || 'unknown').toLowerCase();
             statusEl.textContent = getStatusText(exec.status);
             statusEl.className = `status-chip status-${normalizedStatus}`;
+            try {
+                statusEl.dataset.detailStatus = (exec.status || '') + '';
+            } catch (e) { /* ignore */ }
             const detailTimeLocale = (typeof window.__locale === 'string' && window.__locale.startsWith('zh')) ? 'zh-CN' : 'en-US';
-            document.getElementById('detail-time').textContent = exec.startTime
-                ? new Date(exec.startTime).toLocaleString(detailTimeLocale)
-                : '—';
+            const detailTimeEl = document.getElementById('detail-time');
+            if (detailTimeEl) {
+                detailTimeEl.textContent = exec.startTime
+                    ? new Date(exec.startTime).toLocaleString(detailTimeLocale)
+                    : '—';
+                try {
+                    detailTimeEl.dataset.detailTimeIso = exec.startTime ? new Date(exec.startTime).toISOString() : '';
+                } catch (e) { /* ignore */ }
+            }
             
             // 请求参数
             const requestData = {
@@ -5273,9 +5285,60 @@ function closeBatchManageModal() {
     allConversationsForBatch = [];
 }
 
-// 语言切换时刷新批量管理模态框标题（若当前正在显示）；并刷新对话列表时间格式与系统就绪提示
+// 语言切换时刷新当前聊天页内的时间与动态文案（消息时间、执行流程时间由 monitor 的 refreshProgressAndTimelineI18n 处理）
+function refreshChatPanelI18n() {
+    const locale = (typeof window.__locale === 'string' && window.__locale.startsWith('zh')) ? 'zh-CN' : 'en-US';
+    const timeOpts = { hour: '2-digit', minute: '2-digit' };
+    if (locale === 'zh-CN') timeOpts.hour12 = false;
+    const t = typeof window.t === 'function' ? window.t : function (k) { return k; };
+
+    const messagesEl = document.getElementById('chat-messages');
+    if (messagesEl) {
+        messagesEl.querySelectorAll('.message-time[data-message-time]').forEach(function (el) {
+            try {
+                const d = new Date(el.dataset.messageTime);
+                if (!isNaN(d.getTime())) {
+                    el.textContent = d.toLocaleTimeString(locale, timeOpts);
+                }
+            } catch (e) { /* ignore */ }
+        });
+        messagesEl.querySelectorAll('.mcp-call-label').forEach(function (el) {
+            el.textContent = '\uD83D\uDCCB ' + t('chat.penetrationTestDetail');
+        });
+        messagesEl.querySelectorAll('.process-detail-btn').forEach(function (btn) {
+            const span = btn.querySelector('span');
+            if (!span) return;
+            const assistantEl = btn.closest('.message.assistant');
+            const messageId = assistantEl && assistantEl.id;
+            const detailsId = messageId ? 'process-details-' + messageId : '';
+            const timeline = detailsId ? document.getElementById(detailsId) && document.getElementById(detailsId).querySelector('.progress-timeline') : null;
+            const expanded = timeline && timeline.classList.contains('expanded');
+            span.textContent = expanded ? t('tasks.collapseDetail') : t('chat.expandDetail');
+        });
+    }
+
+    const mcpModal = document.getElementById('mcp-detail-modal');
+    if (mcpModal && mcpModal.style.display === 'block') {
+        const detailTimeEl = document.getElementById('detail-time');
+        if (detailTimeEl && detailTimeEl.dataset.detailTimeIso) {
+            try {
+                const d = new Date(detailTimeEl.dataset.detailTimeIso);
+                if (!isNaN(d.getTime())) {
+                    detailTimeEl.textContent = d.toLocaleString(locale);
+                }
+            } catch (e) { /* ignore */ }
+        }
+        const statusEl = document.getElementById('detail-status');
+        if (statusEl && statusEl.dataset.detailStatus !== undefined && typeof getStatusText === 'function') {
+            statusEl.textContent = getStatusText(statusEl.dataset.detailStatus);
+        }
+    }
+}
+
+// 语言切换时刷新批量管理模态框标题（若当前正在显示）；并刷新对话列表时间格式与系统就绪提示；刷新当前页消息时间与动态文案
 document.addEventListener('languagechange', function () {
     refreshSystemReadyMessageBubbles();
+    refreshChatPanelI18n();
     const modal = document.getElementById('batch-manage-modal');
     if (modal && modal.style.display === 'flex') {
         updateBatchManageTitle(allConversationsForBatch.length);
