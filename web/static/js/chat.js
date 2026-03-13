@@ -2243,8 +2243,16 @@ async function deleteConversation(conversationId, skipConfirm = false) {
             await loadGroupConversations(currentGroupId);
         }
         
-        // 刷新对话列表
-        loadConversations();
+        // 刷新对话列表（使用分组接口以与其他入口一致）
+        if (typeof loadConversationsWithGroups === 'function') {
+            loadConversationsWithGroups();
+        } else if (typeof loadConversations === 'function') {
+            loadConversations();
+        }
+        // 通知其他模块（如 WebShell AI 助手）同步删除，保持列表一致
+        try {
+            document.dispatchEvent(new CustomEvent('conversation-deleted', { detail: { conversationId } }));
+        } catch (e) { /* ignore */ }
     } catch (error) {
         console.error('删除对话失败:', error);
         alert('删除对话失败: ' + error.message);
@@ -6282,6 +6290,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                     loadConversationsWithGroups();
                 }
             }
+        }
+    });
+
+    // 任意入口删除对话后同步：若删除的是当前对话则清空主区，并刷新侧边栏列表（如从 WebShell AI 助手删除）
+    document.addEventListener('conversation-deleted', (e) => {
+        const id = e.detail && e.detail.conversationId;
+        if (!id) return;
+        if (id === currentConversationId) {
+            currentConversationId = null;
+            const messagesDiv = document.getElementById('chat-messages');
+            if (messagesDiv) messagesDiv.innerHTML = '';
+            const readyMsg = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。';
+            addMessage('assistant', readyMsg, null, null, null, { systemReadyMessage: true });
+            addAttackChainButton(null);
+        }
+        if (typeof loadConversationsWithGroups === 'function') {
+            loadConversationsWithGroups();
+        } else if (typeof loadConversations === 'function') {
+            loadConversations();
         }
     });
 });

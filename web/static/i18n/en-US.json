@@ -171,7 +171,9 @@
     "lastIterSummary": "Last iteration: generating summary and next steps...",
     "summaryDone": "Summary complete",
     "generatingFinalReply": "Generating final reply...",
-    "maxIterSummary": "Max iterations reached, generating summary..."
+    "maxIterSummary": "Max iterations reached, generating summary...",
+    "analyzingRequestShort": "Analyzing your request...",
+    "analyzingRequestPlanning": "Analyzing your request and planning test strategy..."
   },
   "timeline": {
     "params": "Parameters:",

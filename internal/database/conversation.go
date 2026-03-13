@@ -103,6 +103,37 @@ func (db *DB) GetConversationByWebshellConnectionID(connectionID string) (*Conve
 		return nil, fmt.Errorf("加载消息失败: %w", err)
 	}
 	conv.Messages = messages
+
+	// 加载过程详情并附加到对应消息（与 GetConversation 一致，便于刷新后仍可查看执行过程）
+	processDetailsMap, err := db.GetProcessDetailsByConversation(conv.ID)
+	if err != nil {
+		db.logger.Warn("加载过程详情失败", zap.Error(err))
+		processDetailsMap = make(map[string][]ProcessDetail)
+	}
+	for i := range conv.Messages {
+		if details, ok := processDetailsMap[conv.Messages[i].ID]; ok {
+			detailsJSON := make([]map[string]interface{}, len(details))
+			for j, detail := range details {
+				var data interface{}
+				if detail.Data != "" {
+					if err := json.Unmarshal([]byte(detail.Data), &data); err != nil {
+						db.logger.Warn("解析过程详情数据失败", zap.Error(err))
+					}
+				}
+				detailsJSON[j] = map[string]interface{}{
+					"id":             detail.ID,
+					"messageId":      detail.MessageID,
+					"conversationId": detail.ConversationID,
+					"eventType":      detail.EventType,
+					"message":        detail.Message,
+					"data":           data,
+					"createdAt":      detail.CreatedAt,
+				}
+			}
+			conv.Messages[i].ProcessDetails = detailsJSON
+		}
+	}
+
 	return &conv, nil
 }
 

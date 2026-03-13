@@ -171,7 +171,9 @@
     "lastIterSummary": "最后一次迭代：正在生成总结和下一步计划...",
     "summaryDone": "总结生成完成",
     "generatingFinalReply": "正在生成最终回复...",
-    "maxIterSummary": "达到最大迭代次数，正在生成总结..."
+    "maxIterSummary": "达到最大迭代次数，正在生成总结...",
+    "analyzingRequestShort": "正在分析您的请求...",
+    "analyzingRequestPlanning": "开始分析请求并制定测试策略"
   },
   "timeline": {
     "params": "参数:",

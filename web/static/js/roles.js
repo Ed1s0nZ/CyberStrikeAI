@@ -57,7 +57,11 @@ async function loadRoles() {
         return roles;
     } catch (error) {
         console.error('加载角色失败:', error);
-        showNotification(_t('roles.loadFailed') + ': ' + error.message, 'error');
+        // 提示文案使用 i18n；若此时 i18n 尚未初始化，则回退为可读中文，而不是暴露 key（roles.loadFailed）
+        var loadFailedLabel = (typeof window !== 'undefined' && typeof window.t === 'function')
+            ? window.t('roles.loadFailed')
+            : '加载角色失败';
+        showNotification(loadFailedLabel + ': ' + error.message, 'error');
         return [];
     }
 }

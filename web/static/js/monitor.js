@@ -36,12 +36,16 @@ function translateProgressMessage(message) {
         '总结生成完成': 'progress.summaryDone',
         '正在生成最终回复...': 'progress.generatingFinalReply',
         '达到最大迭代次数，正在生成总结...': 'progress.maxIterSummary',
+        '正在分析您的请求...': 'progress.analyzingRequestShort',
+        '开始分析请求并制定测试策略': 'progress.analyzingRequestPlanning',
         // 英文（与 en-US.json 一致，避免后端/缓存已是英文时无法随语言切换）
         'Calling AI model...': 'progress.callingAI',
         'Last iteration: generating summary and next steps...': 'progress.lastIterSummary',
         'Summary complete': 'progress.summaryDone',
         'Generating final reply...': 'progress.generatingFinalReply',
-        'Max iterations reached, generating summary...': 'progress.maxIterSummary'
+        'Max iterations reached, generating summary...': 'progress.maxIterSummary',
+        'Analyzing your request...': 'progress.analyzingRequestShort',
+        'Analyzing your request and planning test strategy...': 'progress.analyzingRequestPlanning'
     };
     if (map[trim]) return window.t(map[trim]);
     const callingToolPrefixCn = '正在调用工具: ';

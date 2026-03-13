@@ -51,11 +51,14 @@ body {
     flex: 1;
     overflow: hidden;
     min-height: 0;
+    /* 主侧边栏与右侧内容之间预留水平间距，避免导航项文字贴到内容边框 */
+    column-gap: 12px;
 }
 
 /* 主侧边栏样式 - 紧凑宽度，参考常见后台 200~220px */
 .main-sidebar {
-    width: 208px;
+    /* 稍微拉宽侧边栏，给多语言菜单文案更多缓冲空间 */
+    width: 224px;
     background: linear-gradient(180deg, #fafbfc 0%, #f5f7fa 100%);
     color: var(--text-primary);
     display: flex;
@@ -164,7 +167,8 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 10px 16px;
+    /* 侧边栏导航项：左 16px 对齐图标，右 32px 预留更大安全间距，避免长文案贴边 */
+    padding: 10px 32px 10px 16px;
     cursor: pointer;
     transition: all 0.2s ease;
     color: var(--text-primary);
@@ -240,6 +244,9 @@ body {
     font-size: 0.9375rem;
     font-weight: 400;
     white-space: nowrap;
+    /* 防止长标题顶到边界：在右侧内边距内做省略而不是越界 */
+    overflow: hidden;
+    text-overflow: ellipsis;
     opacity: 1;
     transition: opacity 0.2s ease;
 }
@@ -9228,6 +9235,35 @@ header {
     white-space: pre-wrap;
     word-break: break-word;
     max-height: 120px;
+    overflow-y: auto;
+}
+.webshell-ai-process-block.process-details-container {
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+.webshell-ai-process-toggle {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+}
+.webshell-ai-process-toggle:hover {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+}
+.webshell-ai-process-block .process-details-content .progress-timeline {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+.webshell-ai-process-block .process-details-content .progress-timeline.expanded {
+    max-height: 2000px;
     overflow-y: auto;
 }
 .webshell-ai-old-conv {
