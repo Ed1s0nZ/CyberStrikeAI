@@ -1064,6 +1064,12 @@ func (a *Agent) convertSchemaTypes(schema map[string]interface{}) map[string]int
 						convertedProp[pk] = pv
 					}
 				}
+				// OpenAI requires "items" on array types
+				if typeStr, _ := convertedProp["type"].(string); typeStr == "array" {
+					if _, hasItems := convertedProp["items"]; !hasItems {
+						convertedProp["items"] = map[string]interface{}{"type": "string"}
+					}
+				}
 				convertedProperties[propName] = convertedProp
 			} else {
 				convertedProperties[propName] = propValue

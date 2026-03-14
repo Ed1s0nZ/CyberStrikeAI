@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -85,9 +87,11 @@ type MCPConfig struct {
 
 type OpenAIConfig struct {
 	APIKey         string `yaml:"api_key" json:"api_key"`
+	APIKeyKeychain string `yaml:"api_key_keychain,omitempty" json:"api_key_keychain,omitempty"` // macOS Keychain service name (account: "cyberstrike")
 	BaseURL        string `yaml:"base_url" json:"base_url"`
 	Model          string `yaml:"model" json:"model"`
 	MaxTotalTokens int    `yaml:"max_total_tokens,omitempty" json:"max_total_tokens,omitempty"`
+	Provider       string `yaml:"provider,omitempty" json:"provider,omitempty"` // "openai" (default) or "anthropic"
 }
 
 type FofaConfig struct {
@@ -207,6 +211,15 @@ func Load(path string) (*Config, error) {
 		} else {
 			cfg.Auth.GeneratedPasswordPersisted = true
 		}
+	}
+
+	// If api_key is empty but api_key_keychain is set, resolve from macOS Keychain
+	if strings.TrimSpace(cfg.OpenAI.APIKey) == "" && strings.TrimSpace(cfg.OpenAI.APIKeyKeychain) != "" {
+		key, err := readFromKeychain(cfg.OpenAI.APIKeyKeychain)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read API key from macOS Keychain (service: %s): %w", cfg.OpenAI.APIKeyKeychain, err)
+		}
+		cfg.OpenAI.APIKey = key
 	}
 
 	// 如果配置了工具目录，从目录加载工具配置
@@ -782,4 +795,17 @@ type RoleConfig struct {
 	MCPs        []string `yaml:"mcps,omitempty" json:"mcps,omitempty"`     // 向后兼容：关联的MCP服务器列表（已废弃，使用tools替代）
 	Skills      []string `yaml:"skills,omitempty" json:"skills,omitempty"` // 关联的skills列表（skill名称列表，在执行任务前会读取这些skills的内容）
 	Enabled     bool     `yaml:"enabled" json:"enabled"`                   // 是否启用
+}
+
+// readFromKeychain reads a secret from macOS Keychain using the `security` CLI.
+// serviceName is the Keychain service name; account is always "cyberstrike".
+func readFromKeychain(serviceName string) (string, error) {
+	if runtime.GOOS != "darwin" {
+		return "", fmt.Errorf("keychain is only supported on macOS")
+	}
+	out, err := exec.Command("security", "find-generic-password", "-a", "cyberstrike", "-s", serviceName, "-w").Output()
+	if err != nil {
+		return "", fmt.Errorf("keychain lookup failed: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
 }

@@ -53,6 +53,7 @@ func (c *Client) UpdateConfig(cfg *config.OpenAIConfig) {
 }
 
 // ChatCompletion 调用 /chat/completions 接口。
+// 当 provider 为 "anthropic" 时，自动将 OpenAI 格式转换为 Anthropic Messages API 格式。
 func (c *Client) ChatCompletion(ctx context.Context, payload interface{}, out interface{}) error {
 	if c == nil {
 		return fmt.Errorf("openai client is not initialized")
@@ -60,6 +61,11 @@ func (c *Client) ChatCompletion(ctx context.Context, payload interface{}, out in
 	if c.config == nil {
 		return fmt.Errorf("openai config is nil")
 	}
+
+	if strings.EqualFold(c.config.Provider, "anthropic") {
+		return c.anthropicChatCompletion(ctx, payload, out)
+	}
+
 	if strings.TrimSpace(c.config.APIKey) == "" {
 		return fmt.Errorf("openai api key is empty")
 	}
