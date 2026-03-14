@@ -1,5 +1,5 @@
 name: "pwntools"
-command: "python3"
+command: "./venv/bin/python3"
 args:
   - "-c"
   - |

@@ -1,5 +1,5 @@
 name: "api-fuzzer"
-command: "python3"
+command: "./venv/bin/python3"
 args:
   - "-c"
   - |
