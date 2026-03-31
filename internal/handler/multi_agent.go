@@ -57,7 +57,7 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 			return
 		}
 		// 用户主动停止时，Eino 可能仍会并发上报 eventType=="error"。
-		// 为避免 UI 看到“取消错误 + cancelled 文案”两条回复，这里直接丢弃取消对应的 error。
+		// 为避免 UI 看到"取消错误 + cancelled 文案"两条回复，这里直接丢弃取消对应的 error。
 		if eventType == "error" && baseCtx != nil && errors.Is(context.Cause(baseCtx), ErrTaskCancelled) {
 			return
 		}

@@ -707,7 +707,7 @@ func (a *Agent) AgentLoopWithProgress(ctx context.Context, userInput string, his
 		// 检查是否有工具调用
 		if len(choice.Message.ToolCalls) > 0 {
 			// 思考内容：如果本轮启用了思考流式增量（thinking_stream_*），前端会去重；
-			// 同时也需要在该“思考阶段结束”时补一条可落库的 thinking（用于刷新后持久化展示）。
+			// 同时也需要在该"思考阶段结束"时补一条可落库的 thinking（用于刷新后持久化展示）。
 			if choice.Message.Content != "" {
 				sendProgress("thinking", choice.Message.Content, map[string]interface{}{
 					"iteration": i + 1,
@@ -1262,7 +1262,7 @@ func (a *Agent) callOpenAISingle(ctx context.Context, messages []ChatMessage, to
 	return &response, nil
 }
 
-// callOpenAISingleStreamText 单次调用OpenAI的流式模式，只用于“不会调用工具”的纯文本输出（tools 为空时最佳）。
+// callOpenAISingleStreamText 单次调用OpenAI的流式模式，只用于"不会调用工具"的纯文本输出（tools 为空时最佳）。
 // onDelta 每收到一段 content delta，就回调一次；如果 callback 返回错误，会终止读取并返回错误。
 func (a *Agent) callOpenAISingleStreamText(ctx context.Context, messages []ChatMessage, tools []Tool, onDelta func(delta string) error) (string, error) {
 	reqBody := OpenAIRequest{
@@ -1281,7 +1281,7 @@ func (a *Agent) callOpenAISingleStreamText(ctx context.Context, messages []ChatM
 	return a.openAIClient.ChatCompletionStream(ctx, reqBody, onDelta)
 }
 
-// callOpenAIStreamText 调用OpenAI流式模式（带重试），仅在“未输出任何 delta”时才允许重试，避免重复发送已下发的内容。
+// callOpenAIStreamText 调用OpenAI流式模式（带重试），仅在"未输出任何 delta"时才允许重试，避免重复发送已下发的内容。
 func (a *Agent) callOpenAIStreamText(ctx context.Context, messages []ChatMessage, tools []Tool, onDelta func(delta string) error) (string, error) {
 	maxRetries := 3
 	var lastErr error

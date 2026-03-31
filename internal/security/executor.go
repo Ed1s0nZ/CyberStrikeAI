@@ -24,7 +24,7 @@ import (
 )
 
 // ToolOutputCallback 用于在工具执行过程中把 stdout/stderr 增量推给上层（SSE）。
-// 通过 context 传递，避免修改 MCP ToolHandler 签名导致的”写死工具”问题。
+// 通过 context 传递，避免修改 MCP ToolHandler 签名导致的"写死工具"问题。
 type ToolOutputCallback func(chunk string)
 
 type toolOutputCallbackCtxKey struct{}
@@ -1802,19 +1802,19 @@ func (e *Executor) executeSystemCommand(ctx context.Context, args map[string]int
 }
 
 // resolveToolWorkDir resolves the tool working directory.
-// Priority: explicit args[“workdir”] -> executor default workdir.
+// Priority: explicit args["workdir"] -> executor default workdir.
 func (e *Executor) resolveToolWorkDir(args map[string]interface{}) string {
 	base := e.defaultWorkDir
-	if wd, ok := args[“workdir”].(string); ok && strings.TrimSpace(wd) != “” {
+	if wd, ok := args["workdir"].(string); ok && strings.TrimSpace(wd) != "" {
 		if filepath.IsAbs(wd) {
 			return filepath.Clean(wd)
 		}
-		if base == “” {
+		if base == "" {
 			if cwd, err := os.Getwd(); err == nil {
 				base = cwd
 			}
 		}
-		if base != “” {
+		if base != "" {
 			return filepath.Clean(filepath.Join(base, wd))
 		}
 		return filepath.Clean(wd)
@@ -1824,7 +1824,7 @@ func (e *Executor) resolveToolWorkDir(args map[string]interface{}) string {
 
 // detectDefaultToolWorkDir determines a stable workspace directory for tool execution.
 func detectDefaultToolWorkDir() string {
-	if env := strings.TrimSpace(os.Getenv(“CYBERSTRIKE_WORKDIR”)); env != “” {
+	if env := strings.TrimSpace(os.Getenv("CYBERSTRIKE_WORKDIR")); env != "" {
 		if info, err := os.Stat(env); err == nil && info.IsDir() {
 			return env
 		}
@@ -1843,7 +1843,7 @@ func detectDefaultToolWorkDir() string {
 		}
 	}
 
-	return “”
+	return ""
 }
 
 // streamCommandOutput reads command stdout/stderr incrementally, calling cb(chunk)
@@ -1851,17 +1851,17 @@ func detectDefaultToolWorkDir() string {
 func streamCommandOutput(cmd *exec.Cmd, cb ToolOutputCallback) (string, error) {
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
-		return “”, err
+		return "", err
 	}
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil {
 		_ = stdoutPipe.Close()
-		return “”, err
+		return "", err
 	}
 	if err := cmd.Start(); err != nil {
 		_ = stdoutPipe.Close()
 		_ = stderrPipe.Close()
-		return “”, err
+		return "", err
 	}
 
 	chunks := make(chan string, 64)
@@ -1871,7 +1871,7 @@ func streamCommandOutput(cmd *exec.Cmd, cb ToolOutputCallback) (string, error) {
 		br := bufio.NewReader(r)
 		for {
 			s, readErr := br.ReadString('\n')
-			if s != “” {
+			if s != "" {
 				chunks <- s
 			}
 			if readErr != nil {

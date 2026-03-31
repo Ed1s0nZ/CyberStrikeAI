@@ -535,7 +535,7 @@ func (pm *PersistentMemory) ListAll(category MemoryCategory, limit int) ([]*Memo
 
 // ListByConversation returns memories scoped to a specific conversation.
 // It includes both conversation-specific memories AND entity-scoped global
-// memories (entity != ” AND conversation_id = ”) since those represent
+// memories (entity != " AND conversation_id = ") since those represent
 // shared knowledge about targets that may be relevant.
 func (pm *PersistentMemory) ListByConversation(conversationID string, limit int) ([]*MemoryEntry, error) {
 	pm.mu.RLock()
