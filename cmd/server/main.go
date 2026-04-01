@@ -9,37 +9,37 @@ import (
 )
 
 func main() {
-	var configPath = flag.String("config", "config.yaml", "配置文件路径")
+	var configPath = flag.String("config", "config.yaml", "config file path")
 	flag.Parse()
 
-	// 加载配置
+	// Load configuration
 	cfg, err := config.Load(*configPath)
 	if err != nil {
-		fmt.Printf("加载配置失败: %v\n", err)
+		fmt.Printf("failed to load config: %v\n", err)
 		return
 	}
 
-	// MCP 启用且 auth_header_value 为空时，自动生成随机密钥并写回配置
+	// When MCP is enabled and auth_header_value is empty, auto-generate a random key and write it back to config
 	if err := config.EnsureMCPAuth(*configPath, cfg); err != nil {
-		fmt.Printf("MCP 鉴权配置失败: %v\n", err)
+		fmt.Printf("MCP auth configuration failed: %v\n", err)
 		return
 	}
 	if cfg.MCP.Enabled {
 		config.PrintMCPConfigJSON(cfg.MCP)
 	}
 
-	// 初始化日志
+	// Initialize logger
 	log := logger.New(cfg.Log.Level, cfg.Log.Output)
 
-	// 创建应用
+	// Create application
 	application, err := app.New(cfg, log)
 	if err != nil {
-		log.Fatal("应用初始化失败", "error", err)
+		log.Fatal("application initialization failed", "error", err)
 	}
 
-	// 启动服务器
+	// Start server
 	if err := application.Run(); err != nil {
-		log.Fatal("服务器启动失败", "error", err)
+		log.Fatal("server startup failed", "error", err)
 	}
 }
 

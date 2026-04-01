@@ -16,14 +16,15 @@ import (
 	"go.uber.org/zap"
 )
 
-// Client 统一封装与OpenAI兼容模型交互的HTTP客户端。
+// Client unified HTTP client for interacting with OpenAI-compatible models.
 type Client struct {
 	httpClient *http.Client
 	config     *config.OpenAIConfig
 	logger     *zap.Logger
+	limiter    *rateLimiter // serialize API calls, backoff on 429
 }
 
-// APIError 表示OpenAI接口返回的非200错误。
+// APIError OpenAIreturns200error。
 type APIError struct {
 	StatusCode int
 	Body       string
@@ -33,7 +34,7 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("openai api error: status=%d body=%s", e.StatusCode, e.Body)
 }
 
-// NewClient 创建一个新的OpenAI客户端。
+// NewClient creates a new OpenAI client。
 func NewClient(cfg *config.OpenAIConfig, httpClient *http.Client, logger *zap.Logger) *Client {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
@@ -45,15 +46,33 @@ func NewClient(cfg *config.OpenAIConfig, httpClient *http.Client, logger *zap.Lo
 		httpClient: httpClient,
 		config:     cfg,
 		logger:     logger,
+		limiter:    newRateLimiter(rateLimitFromConfig(cfg)), // configurable: rate_limit_delay_ms (0=no limit for local models)
 	}
 }
 
-// UpdateConfig 动态更新OpenAI配置。
-func (c *Client) UpdateConfig(cfg *config.OpenAIConfig) {
-	c.config = cfg
+// rateLimitFromConfig returns the rate limit interval from config.
+// 0 = no limit (local models). Default 2000ms for Anthropic, 0 for others.
+func rateLimitFromConfig(cfg *config.OpenAIConfig) time.Duration {
+	if cfg == nil {
+		return 0
+	}
+	if cfg.RateLimitDelayMs > 0 {
+		return time.Duration(cfg.RateLimitDelayMs) * time.Millisecond
+	}
+	// Auto-detect: Anthropic free tier needs throttling, local/OpenAI usually doesn't
+	if cfg.Provider == "anthropic" || strings.HasPrefix(cfg.APIKey, "sk-ant-") {
+		return 2 * time.Second
+	}
+	return 0 // no limit for local models / OpenAI
 }
 
-// ChatCompletion 调用 /chat/completions 接口。
+// UpdateConfig update OpenAI config.
+func (c *Client) UpdateConfig(cfg *config.OpenAIConfig) {
+	c.config = cfg
+	c.limiter = newRateLimiter(rateLimitFromConfig(cfg))
+}
+
+// ChatCompletion call /chat/completions API。
 func (c *Client) ChatCompletion(ctx context.Context, payload interface{}, out interface{}) error {
 	if c == nil {
 		return fmt.Errorf("openai client is not initialized")
@@ -63,6 +82,11 @@ func (c *Client) ChatCompletion(ctx context.Context, payload interface{}, out in
 	}
 	if strings.TrimSpace(c.config.APIKey) == "" {
 		return fmt.Errorf("openai api key is empty")
+	}
+
+	// Route to Anthropic adapter if configured
+	if c.isAnthropic() {
+		return c.anthropicChatCompletion(ctx, payload, out)
 	}
 
 	baseURL := strings.TrimSuffix(c.config.BaseURL, "/")
@@ -78,6 +102,9 @@ func (c *Client) ChatCompletion(ctx context.Context, payload interface{}, out in
 	c.logger.Debug("sending OpenAI chat completion request",
 		zap.Int("payloadSizeKB", len(body)/1024))
 
+	// Rate limit: serialize requests, back off on 429
+	c.limiter.wait()
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("build openai request: %w", err)
@@ -91,6 +118,23 @@ func (c *Client) ChatCompletion(ctx context.Context, payload interface{}, out in
 		return fmt.Errorf("call openai api: %w", err)
 	}
 	defer resp.Body.Close()
+
+	// Auto-retry on 429 rate limit
+	if resp.StatusCode == 429 {
+		resp.Body.Close()
+		retryAfter := 30 * time.Second
+		c.limiter.backoff(retryAfter)
+		c.logger.Warn("rate limited (429), backing off", zap.Duration("backoff", retryAfter))
+		c.limiter.wait()
+		req2, _ := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/chat/completions", bytes.NewReader(body))
+		req2.Header.Set("Content-Type", "application/json")
+		req2.Header.Set("Authorization", "Bearer "+c.config.APIKey)
+		resp, err = c.httpClient.Do(req2)
+		if err != nil {
+			return fmt.Errorf("call openai api (retry): %w", err)
+		}
+		defer resp.Body.Close()
+	}
 
 	bodyChan := make(chan []byte, 1)
 	errChan := make(chan error, 1)
@@ -144,8 +188,8 @@ func (c *Client) ChatCompletion(ctx context.Context, payload interface{}, out in
 	return nil
 }
 
-// ChatCompletionStream 调用 /chat/completions 的流式模式（stream=true），并在每个 delta 到达时回调 onDelta。
-// 返回最终拼接的 content（只拼 content delta；工具调用 delta 未做处理）。
+// ChatCompletionStream /chat/completions streaming mode（stream=true）， delta onDelta。
+// returns final concatenated content（ content delta； delta ）。
 func (c *Client) ChatCompletionStream(ctx context.Context, payload interface{}, onDelta func(delta string) error) (string, error) {
 	if c == nil {
 		return "", fmt.Errorf("openai client is not initialized")
@@ -157,6 +201,11 @@ func (c *Client) ChatCompletionStream(ctx context.Context, payload interface{}, 
 		return "", fmt.Errorf("openai api key is empty")
 	}
 
+	// Route to Anthropic adapter if configured
+	if c.isAnthropic() {
+		return c.anthropicChatCompletionStream(ctx, payload, onDelta)
+	}
+
 	baseURL := strings.TrimSuffix(c.config.BaseURL, "/")
 	if baseURL == "" {
 		baseURL = "https://api.openai.com/v1"
@@ -166,6 +215,8 @@ func (c *Client) ChatCompletionStream(ctx context.Context, payload interface{}, 
 	if err != nil {
 		return "", fmt.Errorf("marshal openai payload: %w", err)
 	}
+
+	c.limiter.wait()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
@@ -181,7 +232,7 @@ func (c *Client) ChatCompletionStream(ctx context.Context, payload interface{}, 
 	}
 	defer resp.Body.Close()
 
-	// 非200：读完 body 返回
+	// non-200: read body and return
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
 		return "", &APIError{
@@ -191,7 +242,7 @@ func (c *Client) ChatCompletionStream(ctx context.Context, payload interface{}, 
 	}
 
 	type streamDelta struct {
-		// OpenAI 兼容流式通常使用 content；但部分兼容实现可能用 text。
+		// OpenAI content； text。
 		Content string `json:"content,omitempty"`
 		Text    string `json:"text,omitempty"`
 	}
@@ -211,7 +262,7 @@ func (c *Client) ChatCompletionStream(ctx context.Context, payload interface{}, 
 	reader := bufio.NewReader(resp.Body)
 	var full strings.Builder
 
-	// 典型 SSE 结构：
+	// SSE ：
 	// data: {...}\n\n
 	// data: [DONE]\n\n
 	for {
@@ -236,7 +287,7 @@ func (c *Client) ChatCompletionStream(ctx context.Context, payload interface{}, 
 
 		var chunk streamResponse
 		if err := json.Unmarshal([]byte(dataStr), &chunk); err != nil {
-			// 解析失败跳过（兼容各种兼容层的差异）
+			// parseskip（compatible with various compatibility layers）
 			continue
 		}
 		if chunk.Error != nil && strings.TrimSpace(chunk.Error.Message) != "" {
@@ -270,7 +321,7 @@ func (c *Client) ChatCompletionStream(ctx context.Context, payload interface{}, 
 	return full.String(), nil
 }
 
-// StreamToolCall 流式工具调用的累积结果（arguments 以字符串形式拼接，留给上层再解析为 JSON）。
+// StreamToolCall accumulated result of streaming tool calls（arguments ，parse JSON）。
 type StreamToolCall struct {
 	Index            int
 	ID               string
@@ -279,7 +330,7 @@ type StreamToolCall struct {
 	FunctionArgsStr string
 }
 
-// ChatCompletionStreamWithToolCalls 流式模式：同时把 content delta 实时回调，并在结束后返回 tool_calls 和 finish_reason。
+// ChatCompletionStreamWithToolCalls streaming mode：simultaneously real-time callback for content delta，returns tool_calls finish_reason。
 func (c *Client) ChatCompletionStreamWithToolCalls(
 	ctx context.Context,
 	payload interface{},
@@ -295,6 +346,11 @@ func (c *Client) ChatCompletionStreamWithToolCalls(
 		return "", nil, "", fmt.Errorf("openai api key is empty")
 	}
 
+	// Route to Anthropic adapter if configured
+	if c.isAnthropic() {
+		return c.anthropicChatCompletionStreamWithToolCalls(ctx, payload, onContentDelta)
+	}
+
 	baseURL := strings.TrimSuffix(c.config.BaseURL, "/")
 	if baseURL == "" {
 		baseURL = "https://api.openai.com/v1"
@@ -304,6 +360,8 @@ func (c *Client) ChatCompletionStreamWithToolCalls(
 	if err != nil {
 		return "", nil, "", fmt.Errorf("marshal openai payload: %w", err)
 	}
+
+	c.limiter.wait()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
@@ -327,7 +385,7 @@ func (c *Client) ChatCompletionStreamWithToolCalls(
 		}
 	}
 
-	// delta tool_calls 的增量结构
+	// delta tool_calls incremental structure
 	type toolCallFunctionDelta struct {
 		Name      string `json:"name,omitempty"`
 		Arguments string `json:"arguments,omitempty"`
@@ -389,7 +447,7 @@ func (c *Client) ChatCompletionStreamWithToolCalls(
 
 		var chunk streamResponse2
 		if err := json.Unmarshal([]byte(dataStr), &chunk); err != nil {
-			// 兼容：解析失败跳过
+			// ：parseskip
 			continue
 		}
 		if chunk.Error != nil && strings.TrimSpace(chunk.Error.Message) != "" {
@@ -442,12 +500,12 @@ func (c *Client) ChatCompletionStreamWithToolCalls(
 		}
 	}
 
-	// 组装 tool calls
+	// assemble tool calls
 	indices := make([]int, 0, len(toolCallAccums))
 	for idx := range toolCallAccums {
 		indices = append(indices, idx)
 	}
-	// 手写简单排序（避免额外 import）
+	// simple manual sort (avoid extra import)
 	for i := 0; i < len(indices); i++ {
 		for j := i + 1; j < len(indices); j++ {
 			if indices[j] < indices[i] {

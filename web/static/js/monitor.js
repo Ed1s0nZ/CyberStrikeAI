@@ -1,9 +1,9 @@
 const progressTaskState = new Map();
 let activeTaskInterval = null;
-const ACTIVE_TASK_REFRESH_INTERVAL = 10000; // 10秒检查一次
+const ACTIVE_TASK_REFRESH_INTERVAL = 10000; // 10
 const TASK_FINAL_STATUSES = new Set(['failed', 'timeout', 'cancelled', 'completed']);
 
-// 当前界面语言对应的 BCP 47 标签（与时间格式化一致）
+// BCP 47 （）
 function getCurrentTimeLocale() {
     if (typeof window.__locale === 'string' && window.__locale.length) {
         return window.__locale.startsWith('zh') ? 'zh-CN' : 'en-US';
@@ -14,7 +14,7 @@ function getCurrentTimeLocale() {
     return 'zh-CN';
 }
 
-// toLocaleTimeString 选项：中文用 24 小时制，避免仍显示 AM/PM
+// toLocaleTimeString ： 24 ， AM/PM
 function getTimeFormatOptions() {
     const loc = getCurrentTimeLocale();
     const base = { hour: '2-digit', minute: '2-digit', second: '2-digit' };
@@ -24,22 +24,22 @@ function getTimeFormatOptions() {
     return base;
 }
 
-// 将后端下发的进度文案转为当前语言的翻译（中英双向映射，切换语言后能跟上）
+// （，）
 function translateProgressMessage(message) {
     if (!message || typeof message !== 'string') return message;
     if (typeof window.t !== 'function') return message;
     const trim = message.trim();
     const map = {
-        // 中文
-        '正在调用AI模型...': 'progress.callingAI',
-        '最后一次迭代：正在生成总结和下一步计划...': 'progress.lastIterSummary',
-        '总结生成完成': 'progress.summaryDone',
-        '正在生成最终回复...': 'progress.generatingFinalReply',
-        '达到最大迭代次数，正在生成总结...': 'progress.maxIterSummary',
-        '正在分析您的请求...': 'progress.analyzingRequestShort',
-        '开始分析请求并制定测试策略': 'progress.analyzingRequestPlanning',
-        '正在启动 Eino DeepAgent...': 'progress.startingEinoDeepAgent',
-        // 英文（与 en-US.json 一致，避免后端/缓存已是英文时无法随语言切换）
+ // 
+ 'AI...': 'progress.callingAI',
+ '：...': 'progress.lastIterSummary',
+ '': 'progress.summaryDone',
+ '...': 'progress.generatingFinalReply',
+ '，...': 'progress.maxIterSummary',
+ '...': 'progress.analyzingRequestShort',
+ '': 'progress.analyzingRequestPlanning',
+ ' Eino DeepAgent...': 'progress.startingEinoDeepAgent',
+ // （ en-US.json ，/）
         'Calling AI model...': 'progress.callingAI',
         'Last iteration: generating summary and next steps...': 'progress.lastIterSummary',
         'Summary complete': 'progress.summaryDone',
@@ -55,7 +55,7 @@ function translateProgressMessage(message) {
     if (einoM) {
         return window.t('progress.einoAgent', { name: einoM[1] });
     }
-    const callingToolPrefixCn = '正在调用工具: ';
+ const callingToolPrefixCn = ': ';
     const callingToolPrefixEn = 'Calling tool: ';
     if (trim.indexOf(callingToolPrefixCn) === 0) {
         const name = trim.slice(callingToolPrefixCn.length);
@@ -71,32 +71,32 @@ if (typeof window !== 'undefined') {
     window.translateProgressMessage = translateProgressMessage;
 }
 
-// 存储工具调用ID到DOM元素的映射，用于更新执行状态
+// IDDOM，
 const toolCallStatusMap = new Map();
 
-// 模型流式输出缓存：progressId -> { assistantId, buffer }
+// ：progressId -> { assistantId, buffer }
 const responseStreamStateByProgressId = new Map();
 
-// AI 思考流式输出：progressId -> Map(streamId -> { itemId, buffer })
+// AI ：progressId -> Map(streamId -> { itemId, buffer })
 const thinkingStreamStateByProgressId = new Map();
 
-// Eino 子代理回复流式：progressId -> Map(streamId -> { itemId, buffer })
+// Eino ：progressId -> Map(streamId -> { itemId, buffer })
 const einoAgentReplyStreamStateByProgressId = new Map();
 
-// 工具输出流式增量：progressId::toolCallId -> { itemId, buffer }
+// ：progressId::toolCallId -> { itemId, buffer }
 const toolResultStreamStateByKey = new Map();
 function toolResultStreamKey(progressId, toolCallId) {
     return String(progressId) + '::' + String(toolCallId);
 }
 
-/** Eino 多代理：时间线标题前加 [agentId]，标明哪一代理产生该工具调用/结果/回复 */
+/** Eino ： [agentId]，// */
 function timelineAgentBracketPrefix(data) {
     if (!data || data.einoAgent == null) return '';
     const s = String(data.einoAgent).trim();
     return s ? ('[' + s + '] ') : '';
 }
 
-/** 主/子代理视觉区分：左边框与浅底色（与工具黄/绿状态并存时由具体项类型覆盖次要边） */
+/** /：（/） */
 function applyEinoTimelineRole(item, data) {
     if (!item || !data) return;
     const role = data.einoRole;
@@ -111,7 +111,7 @@ function applyEinoTimelineRole(item, data) {
     }
 }
 
-// markdown 渲染（用于最终合并渲染；流式增量阶段用纯转义避免部分语法不稳定）
+// markdown （；）
 const assistantMarkdownSanitizeConfig = {
     ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'code', 'pre', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'a', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'hr'],
     ALLOWED_ATTR: ['href', 'title', 'alt', 'src', 'class'],
@@ -148,7 +148,7 @@ function updateAssistantBubbleContent(assistantMessageId, content, renderMarkdow
     const bubble = assistantElement.querySelector('.message-bubble');
     if (!bubble) return;
 
-    // 保留复制按钮：addMessage 会把按钮 append 在 message-bubble 里
+ // ：addMessage append message-bubble 
     const copyBtn = bubble.querySelector('.message-copy-btn');
     if (copyBtn) copyBtn.remove();
 
@@ -159,7 +159,7 @@ function updateAssistantBubbleContent(assistantMessageId, content, renderMarkdow
 
     bubble.innerHTML = html;
 
-    // 更新原始内容（给复制功能用）
+ // （）
     assistantElement.dataset.originalContent = newContent;
 
     if (typeof wrapTablesInBubble === 'function') {
@@ -191,10 +191,10 @@ function isConversationTaskRunning(conversationId) {
     return conversationExecutionTracker.isRunning(conversationId);
 }
 
-/** 距底部该像素内视为「跟随底部」；流式输出时仅在此情况下自动滚到底部，避免用户上滑查看历史时被强制拉回 */
+/** 「」；， */
 const CHAT_SCROLL_PIN_THRESHOLD_PX = 120;
 
-/** wasPinned 须在 DOM 追加内容之前计算，否则 scrollHeight 变大后会误判 */
+/** wasPinned DOM ， scrollHeight */
 function scrollChatMessagesToBottomIfPinned(wasPinned) {
     const messagesDiv = document.getElementById('chat-messages');
     if (!messagesDiv || !wasPinned) return;
@@ -243,7 +243,7 @@ function finalizeProgressTask(progressId, finalLabel) {
         if (finalLabel !== undefined && finalLabel !== '') {
             stopBtn.textContent = finalLabel;
         } else {
-            stopBtn.textContent = typeof window.t === 'function' ? window.t('tasks.statusCompleted') : '已完成';
+ stopBtn.textContent = typeof window.t === 'function' ? window.t('tasks.statusCompleted') : '';
         }
     }
     progressTaskState.delete(progressId);
@@ -259,7 +259,7 @@ async function requestCancel(conversationId) {
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) {
-        throw new Error(result.error || (typeof window.t === 'function' ? window.t('tasks.cancelFailed') : '取消失败'));
+ throw new Error(result.error || (typeof window.t === 'function' ? window.t('tasks.cancelFailed') : ''));
     }
     return result;
 }
@@ -277,9 +277,9 @@ function addProgressMessage() {
     
     const bubble = document.createElement('div');
     bubble.className = 'message-bubble progress-container';
-    const progressTitleText = typeof window.t === 'function' ? window.t('chat.progressInProgress') : '渗透测试进行中...';
-    const stopTaskText = typeof window.t === 'function' ? window.t('tasks.stopTask') : '停止任务';
-    const collapseDetailText = typeof window.t === 'function' ? window.t('tasks.collapseDetail') : '收起详情';
+ const progressTitleText = typeof window.t === 'function' ? window.t('chat.progressInProgress') : '...';
+ const stopTaskText = typeof window.t === 'function' ? window.t('tasks.stopTask') : '';
+ const collapseDetailText = typeof window.t === 'function' ? window.t('tasks.collapseDetail') : '';
     bubble.innerHTML = `
         <div class="progress-header">
             <span class="progress-title">🔍 ${progressTitleText}</span>
@@ -303,15 +303,15 @@ function addProgressMessage() {
     return id;
 }
 
-// 切换进度详情显示
+// 
 function toggleProgressDetails(progressId) {
     const timeline = document.getElementById(progressId + '-timeline');
     const toggleBtns = document.querySelectorAll(`#${progressId} .progress-toggle`);
     
     if (!timeline || !toggleBtns.length) return;
     
-    const expandT = typeof window.t === 'function' ? window.t('chat.expandDetail') : '展开详情';
-    const collapseT = typeof window.t === 'function' ? window.t('tasks.collapseDetail') : '收起详情';
+ const expandT = typeof window.t === 'function' ? window.t('chat.expandDetail') : '';
+ const collapseT = typeof window.t === 'function' ? window.t('tasks.collapseDetail') : '';
     if (timeline.classList.contains('expanded')) {
         timeline.classList.remove('expanded');
         toggleBtns.forEach((btn) => { btn.textContent = expandT; });
@@ -321,7 +321,7 @@ function toggleProgressDetails(progressId) {
     }
 }
 
-// 编排器开始输出最终回复时隐藏整条进度消息（迭代阶段保持展开可见；此处整行收起而非仅折叠时间线）
+// （；）
 function hideProgressMessageForFinalReply(progressId) {
     if (!progressId) return;
     const el = document.getElementById(progressId);
@@ -330,52 +330,52 @@ function hideProgressMessageForFinalReply(progressId) {
     }
 }
 
-// 折叠所有进度详情
+// 
 function collapseAllProgressDetails(assistantMessageId, progressId) {
-    // 折叠集成到MCP区域的详情
+ // MCP
     if (assistantMessageId) {
         const detailsId = 'process-details-' + assistantMessageId;
         const detailsContainer = document.getElementById(detailsId);
         if (detailsContainer) {
             const timeline = detailsContainer.querySelector('.progress-timeline');
             if (timeline) {
-                // 确保移除expanded类（无论是否包含）
+ // expanded（）
                 timeline.classList.remove('expanded');
                 document.querySelectorAll(`#${assistantMessageId} .process-detail-btn`).forEach((btn) => {
-                    btn.innerHTML = '<span>' + (typeof window.t === 'function' ? window.t('chat.expandDetail') : '展开详情') + '</span>';
+ btn.innerHTML = '<span>' + (typeof window.t === 'function' ? window.t('chat.expandDetail') : '') + '</span>';
                 });
             }
         }
     }
     
-    // 折叠独立的详情组件（通过convertProgressToDetails创建的）
-    // 查找所有以details-开头的详情组件
+ // （convertProgressToDetails）
+ // details-
     const allDetails = document.querySelectorAll('[id^="details-"]');
     allDetails.forEach(detail => {
         const timeline = detail.querySelector('.progress-timeline');
         const toggleBtns = detail.querySelectorAll('.progress-toggle');
         if (timeline) {
             timeline.classList.remove('expanded');
-            const expandT = typeof window.t === 'function' ? window.t('chat.expandDetail') : '展开详情';
+ const expandT = typeof window.t === 'function' ? window.t('chat.expandDetail') : '';
             toggleBtns.forEach((btn) => { btn.textContent = expandT; });
         }
     });
     
-    // 折叠原始的进度消息（如果还存在）
+ // （）
     if (progressId) {
         const progressTimeline = document.getElementById(progressId + '-timeline');
         const progressToggleBtns = document.querySelectorAll(`#${progressId} .progress-toggle`);
         if (progressTimeline) {
             progressTimeline.classList.remove('expanded');
-            const expandT = typeof window.t === 'function' ? window.t('chat.expandDetail') : '展开详情';
+ const expandT = typeof window.t === 'function' ? window.t('chat.expandDetail') : '';
             progressToggleBtns.forEach((btn) => { btn.textContent = expandT; });
         }
     }
 }
 
-// 获取当前助手消息ID（用于done事件）
+// ID（done）
 function getAssistantId() {
-    // 从最近的助手消息中获取ID
+ // ID
     const messages = document.querySelectorAll('.message.assistant');
     if (messages.length > 0) {
         return messages[messages.length - 1].id;
@@ -383,21 +383,21 @@ function getAssistantId() {
     return null;
 }
 
-// 将进度详情集成到工具调用区域（流式阶段助手消息不挂 mcp 条，结束时在此创建，避免图二整行 MCP 芯片样式）
+// （ mcp ，， MCP ）
 function integrateProgressToMCPSection(progressId, assistantMessageId, mcpExecutionIds) {
     const progressElement = document.getElementById(progressId);
     if (!progressElement) return;
 
     const mcpIds = Array.isArray(mcpExecutionIds) ? mcpExecutionIds : [];
     
-    // 获取时间线内容
+ // 
     const timeline = document.getElementById(progressId + '-timeline');
     let timelineHTML = '';
     if (timeline) {
         timelineHTML = timeline.innerHTML;
     }
     
-    // 获取助手消息元素
+ // 
     const assistantElement = document.getElementById(assistantMessageId);
     if (!assistantElement) {
         removeMessage(progressId);
@@ -410,14 +410,14 @@ function integrateProgressToMCPSection(progressId, assistantMessageId, mcpExecut
         return;
     }
     
-    // 查找或创建 MCP 区域
+ // MCP 
     let mcpSection = assistantElement.querySelector('.mcp-call-section');
     if (!mcpSection) {
         mcpSection = document.createElement('div');
         mcpSection.className = 'mcp-call-section';
         const mcpLabel = document.createElement('div');
         mcpLabel.className = 'mcp-call-label';
-        mcpLabel.textContent = '📋 ' + (typeof window.t === 'function' ? window.t('chat.penetrationTestDetail') : '渗透测试详情');
+ mcpLabel.textContent = '📋 ' + (typeof window.t === 'function' ? window.t('chat.penetrationTestDetail') : '');
         mcpSection.appendChild(mcpLabel);
         const buttonsContainerInit = document.createElement('div');
         buttonsContainerInit.className = 'mcp-call-buttons';
@@ -425,13 +425,13 @@ function integrateProgressToMCPSection(progressId, assistantMessageId, mcpExecut
         contentWrapper.appendChild(mcpSection);
     }
     
-    // 获取时间线内容
+ // 
     const hasContent = timelineHTML.trim().length > 0;
     
-    // 检查时间线中是否有错误项
+ // 
     const hasError = timeline && timeline.querySelector('.timeline-item-error');
     
-    // 确保按钮容器存在
+ // 
     let buttonsContainer = mcpSection.querySelector('.mcp-call-buttons');
     if (!buttonsContainer) {
         buttonsContainer = document.createElement('div');
@@ -444,7 +444,7 @@ function integrateProgressToMCPSection(progressId, assistantMessageId, mcpExecut
         mcpIds.forEach((execId, index) => {
             const detailBtn = document.createElement('button');
             detailBtn.className = 'mcp-detail-btn';
-            detailBtn.innerHTML = '<span>' + (typeof window.t === 'function' ? window.t('chat.callNumber', { n: index + 1 }) : '调用 #' + (index + 1)) + '</span>';
+ detailBtn.innerHTML = '<span>' + (typeof window.t === 'function' ? window.t('chat.callNumber', { n: index + 1 }) : ' #' + (index + 1)) + '</span>';
             detailBtn.onclick = () => showMCPDetail(execId);
             buttonsContainer.appendChild(detailBtn);
             if (typeof updateButtonWithToolName === 'function') {
@@ -455,12 +455,12 @@ function integrateProgressToMCPSection(progressId, assistantMessageId, mcpExecut
     if (!buttonsContainer.querySelector('.process-detail-btn')) {
         const progressDetailBtn = document.createElement('button');
         progressDetailBtn.className = 'mcp-detail-btn process-detail-btn';
-        progressDetailBtn.innerHTML = '<span>' + (typeof window.t === 'function' ? window.t('chat.expandDetail') : '展开详情') + '</span>';
+ progressDetailBtn.innerHTML = '<span>' + (typeof window.t === 'function' ? window.t('chat.expandDetail') : '') + '</span>';
         progressDetailBtn.onclick = () => toggleProcessDetails(null, assistantMessageId);
         buttonsContainer.appendChild(progressDetailBtn);
     }
     
-    // 创建详情容器，放在MCP按钮区域下方（统一结构）
+ // ，MCP（）
     const detailsId = 'process-details-' + assistantMessageId;
     let detailsContainer = document.getElementById(detailsId);
     
@@ -468,7 +468,7 @@ function integrateProgressToMCPSection(progressId, assistantMessageId, mcpExecut
         detailsContainer = document.createElement('div');
         detailsContainer.id = detailsId;
         detailsContainer.className = 'process-details-container';
-        // 确保容器在按钮容器之后
+ // 
         if (buttonsContainer.nextSibling) {
             mcpSection.insertBefore(detailsContainer, buttonsContainer.nextSibling);
         } else {
@@ -476,67 +476,67 @@ function integrateProgressToMCPSection(progressId, assistantMessageId, mcpExecut
         }
     }
     
-    // 设置详情内容（如果有错误，默认折叠；否则默认折叠）
+ // （，；）
     detailsContainer.innerHTML = `
         <div class="process-details-content">
-            ${hasContent ? `<div class="progress-timeline" id="${detailsId}-timeline">${timelineHTML}</div>` : '<div class="progress-timeline-empty">' + (typeof window.t === 'function' ? window.t('chat.noProcessDetail') : '暂无过程详情（可能执行过快或未触发详细事件）') + '</div>'}
+ ${hasContent ? `<div class="progress-timeline" id="${detailsId}-timeline">${timelineHTML}</div>` : '<div class="progress-timeline-empty">' + (typeof window.t === 'function' ? window.t('chat.noProcessDetail') : '（）') + '</div>'}
         </div>
     `;
     
-    // 确保初始状态是折叠的（默认折叠，特别是错误时）
+ // （，）
     if (hasContent) {
         const timeline = document.getElementById(detailsId + '-timeline');
         if (timeline) {
-            // 如果有错误，确保折叠；否则也默认折叠
+ // ，；
             timeline.classList.remove('expanded');
         }
         
-        const expandLabel = typeof window.t === 'function' ? window.t('chat.expandDetail') : '展开详情';
+ const expandLabel = typeof window.t === 'function' ? window.t('chat.expandDetail') : '';
         document.querySelectorAll(`#${assistantMessageId} .process-detail-btn`).forEach((btn) => {
             btn.innerHTML = '<span>' + expandLabel + '</span>';
         });
     }
     
-    // 移除原来的进度消息
+ // 
     removeMessage(progressId);
 }
 
-// 切换过程详情显示
+// 
 function toggleProcessDetails(progressId, assistantMessageId) {
     const detailsId = 'process-details-' + assistantMessageId;
     const detailsContainer = document.getElementById(detailsId);
     if (!detailsContainer) return;
 
-    // 懒加载：首次展开时才从后端拉取该条消息的过程详情
+ // ：
     const maybeLazy = detailsContainer.dataset && detailsContainer.dataset.lazyNotLoaded === '1' && detailsContainer.dataset.loaded !== '1';
     if (maybeLazy) {
         const messageEl = document.getElementById(assistantMessageId);
         const backendMessageId = messageEl && messageEl.dataset ? messageEl.dataset.backendMessageId : '';
         if (backendMessageId && typeof apiFetch === 'function' && typeof renderProcessDetails === 'function') {
             if (detailsContainer.dataset.loading === '1') {
-                // 正在加载中，避免重复请求
+ // ，
             } else {
                 detailsContainer.dataset.loading = '1';
-                // 先展开容器，显示加载态
+ // ，
                 const timeline = detailsContainer.querySelector('.progress-timeline');
                 if (timeline) {
-                    timeline.innerHTML = '<div class="progress-timeline-empty">' + ((typeof window.t === 'function') ? window.t('common.loading') : '加载中…') + '</div>';
+ timeline.innerHTML = '<div class="progress-timeline-empty">' + ((typeof window.t === 'function') ? window.t('common.loading') : '…') + '</div>';
                 }
                 apiFetch(`/api/messages/${encodeURIComponent(String(backendMessageId))}/process-details`)
                     .then(async (res) => {
                         const j = await res.json().catch(() => ({}));
                         if (!res.ok) throw new Error((j && j.error) ? j.error : res.status);
                         const details = (j && Array.isArray(j.processDetails)) ? j.processDetails : [];
-                        // 重新渲染详情（renderProcessDetails 会清掉 lazy 标记并写入 loaded）
+ // （renderProcessDetails lazy loaded）
                         renderProcessDetails(assistantMessageId, details);
                     })
                     .catch((e) => {
-                        console.error('加载过程详情失败:', e);
+ console.error(':', e);
                         const tl = detailsContainer.querySelector('.progress-timeline');
                         if (tl) {
-                            tl.innerHTML = '<div class="progress-timeline-empty">' + ((typeof window.t === 'function') ? window.t('chat.noProcessDetail') : '暂无过程详情（加载失败）') + '</div>';
+ tl.innerHTML = '<div class="progress-timeline-empty">' + ((typeof window.t === 'function') ? window.t('chat.noProcessDetail') : '（）') + '</div>';
                         }
-                        // 失败时保留 lazy 状态，允许用户重试
+ // lazy ，
                         detailsContainer.dataset.lazyNotLoaded = '1';
                         detailsContainer.dataset.loaded = '0';
                     })
@@ -551,8 +551,8 @@ function toggleProcessDetails(progressId, assistantMessageId) {
     const timeline = detailsContainer.querySelector('.progress-timeline');
     const detailBtns = document.querySelectorAll(`#${assistantMessageId} .process-detail-btn`);
     
-    const expandT = typeof window.t === 'function' ? window.t('chat.expandDetail') : '展开详情';
-    const collapseT = typeof window.t === 'function' ? window.t('tasks.collapseDetail') : '收起详情';
+ const expandT = typeof window.t === 'function' ? window.t('chat.expandDetail') : '';
+ const collapseT = typeof window.t === 'function' ? window.t('tasks.collapseDetail') : '';
     const setDetailBtnLabels = (label) => {
         detailBtns.forEach((btn) => { btn.innerHTML = '<span>' + label + '</span>'; });
     };
@@ -574,16 +574,16 @@ function toggleProcessDetails(progressId, assistantMessageId) {
         }
     }
     
-    // 滚动到展开的详情位置，而不是滚动到底部
+ // ，
     if (timeline && timeline.classList.contains('expanded')) {
         setTimeout(() => {
-            // 使用 scrollIntoView 滚动到详情容器位置
+ // scrollIntoView 
             detailsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }, 100);
     }
 }
 
-// 停止当前进度对应的任务
+// 
 async function cancelProgressTask(progressId) {
     const state = progressTaskState.get(progressId);
     const stopBtn = document.getElementById(`${progressId}-stop-btn`);
@@ -595,7 +595,7 @@ async function cancelProgressTask(progressId) {
                 stopBtn.disabled = false;
             }, 1500);
         }
-        alert(typeof window.t === 'function' ? window.t('tasks.taskInfoNotSynced') : '任务信息尚未同步，请稍后再试。');
+ alert(typeof window.t === 'function' ? window.t('tasks.taskInfoNotSynced') : '，。');
         return;
     }
 
@@ -606,18 +606,18 @@ async function cancelProgressTask(progressId) {
     markProgressCancelling(progressId);
     if (stopBtn) {
         stopBtn.disabled = true;
-        stopBtn.textContent = typeof window.t === 'function' ? window.t('tasks.cancelling') : '取消中...';
+ stopBtn.textContent = typeof window.t === 'function' ? window.t('tasks.cancelling') : '...';
     }
 
     try {
         await requestCancel(state.conversationId);
         loadActiveTasks();
     } catch (error) {
-        console.error('取消任务失败:', error);
-        alert((typeof window.t === 'function' ? window.t('tasks.cancelTaskFailed') : '取消任务失败') + ': ' + error.message);
+ console.error(':', error);
+ alert((typeof window.t === 'function' ? window.t('tasks.cancelTaskFailed') : '') + ': ' + error.message);
         if (stopBtn) {
             stopBtn.disabled = false;
-            stopBtn.textContent = typeof window.t === 'function' ? window.t('tasks.stopTask') : '停止任务';
+ stopBtn.textContent = typeof window.t === 'function' ? window.t('tasks.stopTask') : '';
         }
         const currentState = progressTaskState.get(progressId);
         if (currentState) {
@@ -626,27 +626,27 @@ async function cancelProgressTask(progressId) {
     }
 }
 
-// 将进度消息转换为可折叠的详情组件
+// 
 function convertProgressToDetails(progressId, assistantMessageId) {
     const progressElement = document.getElementById(progressId);
     if (!progressElement) return;
     
-    // 获取时间线内容
+ // 
     const timeline = document.getElementById(progressId + '-timeline');
-    // 即使时间线不存在，也创建详情组件（显示空状态）
+ // ，（）
     let timelineHTML = '';
     if (timeline) {
         timelineHTML = timeline.innerHTML;
     }
     
-    // 获取助手消息元素
+ // 
     const assistantElement = document.getElementById(assistantMessageId);
     if (!assistantElement) {
         removeMessage(progressId);
         return;
     }
     
-    // 创建详情组件
+ // 
     const detailsId = 'details-' + Date.now() + '-' + messageCounter++;
     const detailsDiv = document.createElement('div');
     detailsDiv.id = detailsId;
@@ -658,20 +658,20 @@ function convertProgressToDetails(progressId, assistantMessageId) {
     const bubble = document.createElement('div');
     bubble.className = 'message-bubble progress-container completed';
     
-    // 获取时间线HTML内容
+ // HTML
     const hasContent = timelineHTML.trim().length > 0;
     
-    // 检查时间线中是否有错误项
+ // 
     const hasError = timeline && timeline.querySelector('.timeline-item-error');
     
-    // 如果有错误，默认折叠；否则默认展开
+ // ，；
     const shouldExpand = !hasError;
     const expandedClass = shouldExpand ? 'expanded' : '';
-    const collapseDetailText = typeof window.t === 'function' ? window.t('tasks.collapseDetail') : '收起详情';
-    const expandDetailText = typeof window.t === 'function' ? window.t('chat.expandDetail') : '展开详情';
+ const collapseDetailText = typeof window.t === 'function' ? window.t('tasks.collapseDetail') : '';
+ const expandDetailText = typeof window.t === 'function' ? window.t('chat.expandDetail') : '';
     const toggleText = shouldExpand ? collapseDetailText : expandDetailText;
-    const penetrationDetailText = typeof window.t === 'function' ? window.t('chat.penetrationTestDetail') : '渗透测试详情';
-    const noProcessDetailText = typeof window.t === 'function' ? window.t('chat.noProcessDetail') : '暂无过程详情（可能执行过快或未触发详细事件）';
+ const penetrationDetailText = typeof window.t === 'function' ? window.t('chat.penetrationTestDetail') : '';
+ const noProcessDetailText = typeof window.t === 'function' ? window.t('chat.noProcessDetail') : '（）';
     bubble.innerHTML = `
         <div class="progress-header">
             <span class="progress-title">📋 ${penetrationDetailText}</span>
@@ -683,31 +683,31 @@ function convertProgressToDetails(progressId, assistantMessageId) {
     contentWrapper.appendChild(bubble);
     detailsDiv.appendChild(contentWrapper);
     
-    // 将详情组件插入到助手消息之后
+ // 
     const messagesDiv = document.getElementById('chat-messages');
     const insertWasPinned = isChatMessagesPinnedToBottom();
-    // assistantElement 是消息div，需要插入到它的下一个兄弟节点之前
+ // assistantElement div，
     if (assistantElement.nextSibling) {
         messagesDiv.insertBefore(detailsDiv, assistantElement.nextSibling);
     } else {
-        // 如果没有下一个兄弟节点，直接追加
+ // ，
         messagesDiv.appendChild(detailsDiv);
     }
     
-    // 移除原来的进度消息
+ // 
     removeMessage(progressId);
     
     scrollChatMessagesToBottomIfPinned(insertWasPinned);
 }
 
-// 处理流式事件
+// 
 function handleStreamEvent(event, progressElement, progressId, 
                           getAssistantId, setAssistantId, getMcpIds, setMcpIds) {
     const streamScrollWasPinned = isChatMessagesPinnedToBottom();
     const timeline = document.getElementById(progressId + '-timeline');
     if (!timeline) return;
 
-    // 终态事件（error/cancelled）优先复用现有助手消息，避免重复追加相同报错
+ // （error/cancelled），
     const upsertTerminalAssistantMessage = (message, preferredMessageId = null) => {
         const preferredIds = [];
         if (preferredMessageId) preferredIds.push(preferredMessageId);
@@ -732,33 +732,33 @@ function handleStreamEvent(event, progressElement, progressId,
     
     switch (event.type) {
         case 'heartbeat':
-            // SSE 长连接保活，无需更新 UI
+ // SSE ， UI
             break;
         case 'conversation':
             if (event.data && event.data.conversationId) {
-                // 在更新之前，先获取任务对应的原始对话ID
+ // ，ID
                 const taskState = progressTaskState.get(progressId);
                 const originalConversationId = taskState?.conversationId;
                 
-                // 更新任务状态
+ // 
                 updateProgressConversation(progressId, event.data.conversationId);
                 
-                // 如果用户已经开始了新对话（currentConversationId 为 null），
-                // 且这个 conversation 事件来自旧对话，就不更新 currentConversationId
+ // （currentConversationId null），
+ // conversation ， currentConversationId
                 if (currentConversationId === null && originalConversationId !== null) {
-                    // 用户已经开始了新对话，忽略旧对话的 conversation 事件
-                    // 但仍然更新任务状态，以便正确显示任务信息
+ // ， conversation 
+ // ，
                     break;
                 }
                 
-                // 更新当前对话ID
+ // ID
                 currentConversationId = event.data.conversationId;
                 updateActiveConversation();
                 addAttackChainButton(currentConversationId);
                 loadActiveTasks();
-                // 延迟刷新对话列表，确保用户消息已保存，updated_at已更新
-                // 这样新对话才能正确显示在最近对话列表的顶部
-                // 使用loadConversationsWithGroups确保分组映射缓存正确加载，无论是否有分组都能立即显示
+ // ，，updated_at
+ // 
+ // loadConversationsWithGroups，
                 setTimeout(() => {
                     if (typeof loadConversationsWithGroups === 'function') {
                         loadConversationsWithGroups();
@@ -775,16 +775,16 @@ function handleStreamEvent(event, progressElement, progressId,
             if (d.einoScope === 'main') {
                 iterTitle = typeof window.t === 'function'
                     ? window.t('chat.einoOrchestratorRound', { n: n })
-                    : ('主代理 · 第 ' + n + ' 轮');
+ : (' · ' + n + ' ');
             } else if (d.einoScope === 'sub') {
                 const ag = d.einoAgent != null ? String(d.einoAgent).trim() : '';
                 iterTitle = typeof window.t === 'function'
                     ? window.t('chat.einoSubAgentStep', { n: n, agent: ag })
-                    : ('子代理 · ' + ag + ' · 第 ' + n + ' 步');
+ : (' · ' + ag + ' · ' + n + ' ');
             } else {
                 iterTitle = typeof window.t === 'function'
                     ? window.t('chat.iterationRound', { n: n })
-                    : ('第 ' + n + ' 轮迭代');
+ : (' ' + n + ' ');
             }
             addTimelineItem(timeline, 'iteration', {
                 title: iterTitle,
@@ -805,8 +805,8 @@ function handleStreamEvent(event, progressElement, progressId,
                 state = new Map();
                 thinkingStreamStateByProgressId.set(progressId, state);
             }
-            // 若已存在，重置 buffer
-            const thinkBase = typeof window.t === 'function' ? window.t('chat.aiThinking') : 'AI思考';
+ // ， buffer
+ const thinkBase = typeof window.t === 'function' ? window.t('chat.aiThinking') : 'AI';
             const title = timelineAgentBracketPrefix(d) + '🤔 ' + thinkBase;
             const itemId = addTimelineItem(timeline, 'thinking', {
                 title: title,
@@ -844,7 +844,7 @@ function handleStreamEvent(event, progressElement, progressId,
         }
 
         case 'thinking':
-            // 如果本 thinking 是由 thinking_stream_* 聚合出来的（带 streamId），避免重复创建 timeline item
+ // thinking thinking_stream_* （ streamId）， timeline item
             if (event.data && event.data.streamId) {
                 const streamId = event.data.streamId;
                 const state = thinkingStreamStateByProgressId.get(progressId);
@@ -855,7 +855,7 @@ function handleStreamEvent(event, progressElement, progressId,
                     if (item) {
                         const contentEl = item.querySelector('.timeline-item-content');
                         if (contentEl) {
-                            // contentEl.innerHTML 用于兼容 Markdown 展示
+ // contentEl.innerHTML Markdown 
                             if (typeof formatMarkdown === 'function') {
                                 contentEl.innerHTML = formatMarkdown(s.buffer);
                             } else {
@@ -868,7 +868,7 @@ function handleStreamEvent(event, progressElement, progressId,
             }
 
             addTimelineItem(timeline, 'thinking', {
-                title: timelineAgentBracketPrefix(event.data) + '🤔 ' + (typeof window.t === 'function' ? window.t('chat.aiThinking') : 'AI思考'),
+ title: timelineAgentBracketPrefix(event.data) + '🤔 ' + (typeof window.t === 'function' ? window.t('chat.aiThinking') : 'AI'),
                 message: event.message,
                 data: event.data
             });
@@ -876,7 +876,7 @@ function handleStreamEvent(event, progressElement, progressId,
             
         case 'tool_calls_detected':
             addTimelineItem(timeline, 'tool_calls_detected', {
-                title: timelineAgentBracketPrefix(event.data) + '🔧 ' + (typeof window.t === 'function' ? window.t('chat.toolCallsDetected', { count: event.data?.count || 0 }) : '检测到 ' + (event.data?.count || 0) + ' 个工具调用'),
+ title: timelineAgentBracketPrefix(event.data) + '🔧 ' + (typeof window.t === 'function' ? window.t('chat.toolCallsDetected', { count: event.data?.count || 0 }) : ' ' + (event.data?.count || 0) + ' '),
                 message: event.message,
                 data: event.data
             });
@@ -892,11 +892,11 @@ function handleStreamEvent(event, progressElement, progressId,
             
         case 'tool_call':
             const toolInfo = event.data || {};
-            const toolName = toolInfo.toolName || (typeof window.t === 'function' ? window.t('chat.unknownTool') : '未知工具');
+ const toolName = toolInfo.toolName || (typeof window.t === 'function' ? window.t('chat.unknownTool') : '');
             const index = toolInfo.index || 0;
             const total = toolInfo.total || 0;
             const toolCallId = toolInfo.toolCallId || null;
-            const toolCallTitle = typeof window.t === 'function' ? window.t('chat.callTool', { name: escapeHtml(toolName), index: index, total: total }) : '调用工具: ' + escapeHtml(toolName) + ' (' + index + '/' + total + ')';
+ const toolCallTitle = typeof window.t === 'function' ? window.t('chat.callTool', { name: escapeHtml(toolName), index: index, total: total }) : ': ' + escapeHtml(toolName) + ' (' + index + '/' + total + ')';
             const toolCallItemId = addTimelineItem(timeline, 'tool_call', {
                 title: timelineAgentBracketPrefix(toolInfo) + '🔧 ' + toolCallTitle,
                 message: event.message,
@@ -904,14 +904,14 @@ function handleStreamEvent(event, progressElement, progressId,
                 expanded: false
             });
             
-            // 如果有toolCallId，存储映射关系以便后续更新状态
+ // toolCallId，
             if (toolCallId && toolCallItemId) {
                 toolCallStatusMap.set(toolCallId, {
                     itemId: toolCallItemId,
                     timeline: timeline
                 });
                 
-                // 添加执行中状态指示器
+ // 
                 updateToolCallStatus(toolCallId, 'running');
             }
             break;
@@ -923,13 +923,13 @@ function handleStreamEvent(event, progressElement, progressId,
 
             const key = toolResultStreamKey(progressId, toolCallId);
             let state = toolResultStreamStateByKey.get(key);
-            const toolNameDelta = deltaInfo.toolName || (typeof window.t === 'function' ? window.t('chat.unknownTool') : '未知工具');
+ const toolNameDelta = deltaInfo.toolName || (typeof window.t === 'function' ? window.t('chat.unknownTool') : '');
             const deltaText = event.message || '';
             if (!deltaText) break;
 
             if (!state) {
-                // 首次增量：创建一个 tool_result 占位条目，后续不断更新 pre 内容
-                const runningLabel = typeof window.t === 'function' ? window.t('timeline.running') : '执行中...';
+ // ： tool_result ， pre 
+ const runningLabel = typeof window.t === 'function' ? window.t('timeline.running') : '...';
                 const title = timelineAgentBracketPrefix(deltaInfo) + '⏳ ' + (typeof window.t === 'function'
                     ? window.t('timeline.running')
                     : runningLabel) + ' ' + (typeof window.t === 'function' ? window.t('chat.callTool', { name: escapeHtmlLocal(toolNameDelta), index: deltaInfo.index || 0, total: deltaInfo.total || 0 }) : toolNameDelta);
@@ -969,13 +969,13 @@ function handleStreamEvent(event, progressElement, progressId,
             
         case 'tool_result':
             const resultInfo = event.data || {};
-            const resultToolName = resultInfo.toolName || (typeof window.t === 'function' ? window.t('chat.unknownTool') : '未知工具');
+ const resultToolName = resultInfo.toolName || (typeof window.t === 'function' ? window.t('chat.unknownTool') : '');
             const success = resultInfo.success !== false;
             const statusIcon = success ? '✅' : '❌';
             const resultToolCallId = resultInfo.toolCallId || null;
-            const resultExecText = success ? (typeof window.t === 'function' ? window.t('chat.toolExecComplete', { name: escapeHtml(resultToolName) }) : '工具 ' + escapeHtml(resultToolName) + ' 执行完成') : (typeof window.t === 'function' ? window.t('chat.toolExecFailed', { name: escapeHtml(resultToolName) }) : '工具 ' + escapeHtml(resultToolName) + ' 执行失败');
+ const resultExecText = success ? (typeof window.t === 'function' ? window.t('chat.toolExecComplete', { name: escapeHtml(resultToolName) }) : ' ' + escapeHtml(resultToolName) + ' ') : (typeof window.t === 'function' ? window.t('chat.toolExecFailed', { name: escapeHtml(resultToolName) }) : ' ' + escapeHtml(resultToolName) + ' ');
 
-            // 若此 tool 已经流式推送过增量，则复用占位条目并更新最终结果，避免重复添加一条
+ // tool ，，
             if (resultToolCallId) {
                 const key = toolResultStreamKey(progressId, resultToolCallId);
                 const state = toolResultStreamStateByKey.get(key);
@@ -1001,7 +1001,7 @@ function handleStreamEvent(event, progressElement, progressId,
                     }
                     toolResultStreamStateByKey.delete(key);
 
-                    // 同时更新 tool_call 的状态
+ // tool_call 
                     if (resultToolCallId && toolCallStatusMap.has(resultToolCallId)) {
                         updateToolCallStatus(resultToolCallId, success ? 'completed' : 'failed');
                         toolCallStatusMap.delete(resultToolCallId);
@@ -1031,8 +1031,8 @@ function handleStreamEvent(event, progressElement, progressId,
                 stateMap = new Map();
                 einoAgentReplyStreamStateByProgressId.set(progressId, stateMap);
             }
-            const streamingLabel = typeof window.t === 'function' ? window.t('timeline.running') : '执行中...';
-            const replyTitleBase = typeof window.t === 'function' ? window.t('chat.einoAgentReplyTitle') : '子代理回复';
+ const streamingLabel = typeof window.t === 'function' ? window.t('timeline.running') : '...';
+ const replyTitleBase = typeof window.t === 'function' ? window.t('chat.einoAgentReplyTitle') : '';
             const itemId = addTimelineItem(timeline, 'eino_agent_reply', {
                 title: timelineAgentBracketPrefix(d) + '💬 ' + replyTitleBase + ' · ' + streamingLabel,
                 message: ' ',
@@ -1087,7 +1087,7 @@ function handleStreamEvent(event, progressElement, progressId,
                 if (item) {
                     const titleEl = item.querySelector('.timeline-item-title');
                     if (titleEl) {
-                        const replyTitleBase = typeof window.t === 'function' ? window.t('chat.einoAgentReplyTitle') : '子代理回复';
+ const replyTitleBase = typeof window.t === 'function' ? window.t('chat.einoAgentReplyTitle') : '';
                         titleEl.textContent = timelineAgentBracketPrefix(d) + '💬 ' + replyTitleBase;
                     }
                     let contentEl = item.querySelector('.timeline-item-content');
@@ -1112,7 +1112,7 @@ function handleStreamEvent(event, progressElement, progressId,
 
         case 'eino_agent_reply': {
             const replyData = event.data || {};
-            const replyTitleBase = typeof window.t === 'function' ? window.t('chat.einoAgentReplyTitle') : '子代理回复';
+ const replyTitleBase = typeof window.t === 'function' ? window.t('chat.einoAgentReplyTitle') : '';
             addTimelineItem(timeline, 'eino_agent_reply', {
                 title: timelineAgentBracketPrefix(replyData) + '💬 ' + replyTitleBase,
                 message: event.message || '',
@@ -1125,7 +1125,7 @@ function handleStreamEvent(event, progressElement, progressId,
         case 'progress':
             const progressTitle = document.querySelector(`#${progressId} .progress-title`);
             if (progressTitle) {
-                // 保存原文，语言切换时可用 translateProgressMessage 重新套当前语言
+ // ， translateProgressMessage 
                 const progressEl = document.getElementById(progressId);
                 if (progressEl) {
                     progressEl.dataset.progressRawMessage = event.message || '';
@@ -1136,7 +1136,7 @@ function handleStreamEvent(event, progressElement, progressId,
             break;
         
         case 'cancelled':
-            const taskCancelledText = typeof window.t === 'function' ? window.t('chat.taskCancelled') : '任务已取消';
+ const taskCancelledText = typeof window.t === 'function' ? window.t('chat.taskCancelled') : '';
             addTimelineItem(timeline, 'cancelled', {
                 title: '⛔ ' + taskCancelledText,
                 message: event.message,
@@ -1151,10 +1151,10 @@ function handleStreamEvent(event, progressElement, progressId,
                 cancelProgressContainer.classList.add('completed');
             }
             if (progressTaskState.has(progressId)) {
-                finalizeProgressTask(progressId, typeof window.t === 'function' ? window.t('tasks.statusCancelled') : '已取消');
+ finalizeProgressTask(progressId, typeof window.t === 'function' ? window.t('tasks.statusCancelled') : '');
             }
             
-            // 复用已有助手消息（若有），避免终态事件重复插入消息
+ // （），
             {
                 const preferredMessageId = event.data && event.data.messageId ? event.data.messageId : null;
                 const { assistantId, assistantElement } = upsertTerminalAssistantMessage(event.message, preferredMessageId);
@@ -1169,7 +1169,7 @@ function handleStreamEvent(event, progressElement, progressId,
                 }
             }
             
-            // 立即刷新任务状态
+ // 
             loadActiveTasks();
             break;
             
@@ -1182,7 +1182,7 @@ function handleStreamEvent(event, progressElement, progressId,
             setMcpIds(mcpIds);
 
             if (responseData.conversationId) {
-                // 如果用户已经开始了新对话（currentConversationId 为 null），且这个事件来自旧对话，则忽略
+ // （currentConversationId null），，
                 if (currentConversationId === null && responseOriginalConversationId !== null) {
                     updateProgressConversation(progressId, responseData.conversationId);
                     break;
@@ -1194,10 +1194,10 @@ function handleStreamEvent(event, progressElement, progressId,
                 loadActiveTasks();
             }
 
-            // 多代理模式下，迭代过程中的输出只显示在时间线中，不创建助手消息气泡
-            // 创建时间线条目用于显示迭代过程中的输出
+ // ，，
+ // 
             const agentPrefix = timelineAgentBracketPrefix(responseData);
-            const title = agentPrefix + '📝 ' + (typeof window.t === 'function' ? window.t('chat.planning') : '规划中');
+ const title = agentPrefix + '📝 ' + (typeof window.t === 'function' ? window.t('chat.planning') : '');
             const itemId = addTimelineItem(timeline, 'thinking', {
                 title: title,
                 message: ' ',
@@ -1219,8 +1219,8 @@ function handleStreamEvent(event, progressElement, progressId,
                 }
             }
 
-            // 多代理模式下，迭代过程中的输出只显示在时间线中
-            // 更新时间线条目内容
+ // ，
+ // 
             let state = responseStreamStateByProgressId.get(progressId);
             if (!state) {
                 state = { itemId: null, buffer: '' };
@@ -1230,7 +1230,7 @@ function handleStreamEvent(event, progressElement, progressId,
             const deltaContent = event.message || '';
             state.buffer += deltaContent;
 
-            // 更新时间线条目内容
+ // 
             if (state.itemId) {
                 const item = document.getElementById(state.itemId);
                 if (item) {
@@ -1248,16 +1248,16 @@ function handleStreamEvent(event, progressElement, progressId,
         }
 
         case 'response':
-            // 在更新之前，先获取任务对应的原始对话ID
+ // ，ID
             const responseTaskState = progressTaskState.get(progressId);
             const responseOriginalConversationId = responseTaskState?.conversationId;
 
-            // 先更新 mcp ids
+ // mcp ids
             const responseData = event.data || {};
             const mcpIds = responseData.mcpExecutionIds || [];
             setMcpIds(mcpIds);
 
-            // 更新对话ID
+ // ID
             if (responseData.conversationId) {
                 if (currentConversationId === null && responseOriginalConversationId !== null) {
                     updateProgressConversation(progressId, responseData.conversationId);
@@ -1271,7 +1271,7 @@ function handleStreamEvent(event, progressElement, progressId,
                 loadActiveTasks();
             }
 
-            // 如果之前已经在 response_start/response_delta 阶段创建过占位，则复用该消息更新最终内容
+ // response_start/response_delta ，
             const streamState = responseStreamStateByProgressId.get(progressId);
             const existingAssistantId = streamState?.assistantId || getAssistantId();
             let assistantIdFinal = existingAssistantId;
@@ -1284,10 +1284,10 @@ function handleStreamEvent(event, progressElement, progressId,
                 updateAssistantBubbleContent(assistantIdFinal, event.message, true);
             }
 
-            // 最终回复时隐藏进度卡片（多代理模式下，迭代过程已完整展示）
+ // （，）
             hideProgressMessageForFinalReply(progressId);
 
-            // 将进度详情集成到工具调用区域（放在最终 response 之后，保证时间线已完整）
+ // （ response ，）
             integrateProgressToMCPSection(progressId, assistantIdFinal, mcpIds);
             responseStreamStateByProgressId.delete(progressId);
 
@@ -1301,31 +1301,31 @@ function handleStreamEvent(event, progressElement, progressId,
             break;
             
         case 'error':
-            // 显示错误
+ // 
             addTimelineItem(timeline, 'error', {
-                title: '❌ ' + (typeof window.t === 'function' ? window.t('chat.error') : '错误'),
+ title: '❌ ' + (typeof window.t === 'function' ? window.t('chat.error') : ''),
                 message: event.message,
                 data: event.data
             });
             
-            // 更新进度标题为错误状态
+ // 
             const errorTitle = document.querySelector(`#${progressId} .progress-title`);
             if (errorTitle) {
-                errorTitle.textContent = '❌ ' + (typeof window.t === 'function' ? window.t('chat.executionFailed') : '执行失败');
+ errorTitle.textContent = '❌ ' + (typeof window.t === 'function' ? window.t('chat.executionFailed') : '');
             }
             
-            // 更新进度容器为已完成状态（添加completed类）
+ // （completed）
             const progressContainer = document.querySelector(`#${progressId} .progress-container`);
             if (progressContainer) {
                 progressContainer.classList.add('completed');
             }
             
-            // 完成进度任务（标记为失败）
+ // （）
             if (progressTaskState.has(progressId)) {
-                finalizeProgressTask(progressId, typeof window.t === 'function' ? window.t('tasks.statusFailed') : '执行失败');
+ finalizeProgressTask(progressId, typeof window.t === 'function' ? window.t('tasks.statusFailed') : '');
             }
             
-            // 复用已有助手消息（若有），避免终态事件重复插入消息
+ // （），
             {
                 const preferredMessageId = event.data && event.data.messageId ? event.data.messageId : null;
                 const { assistantId, assistantElement } = upsertTerminalAssistantMessage(event.message, preferredMessageId);
@@ -1340,28 +1340,28 @@ function handleStreamEvent(event, progressElement, progressId,
                 }
             }
             
-            // 立即刷新任务状态（执行失败时任务状态会更新）
+ // （）
             loadActiveTasks();
             break;
             
         case 'done':
-            // 清理流式输出状态
+ // 
             responseStreamStateByProgressId.delete(progressId);
             thinkingStreamStateByProgressId.delete(progressId);
             einoAgentReplyStreamStateByProgressId.delete(progressId);
-            // 清理工具流式输出占位
+ // 
             const prefix = String(progressId) + '::';
             for (const key of Array.from(toolResultStreamStateByKey.keys())) {
                 if (String(key).startsWith(prefix)) {
                     toolResultStreamStateByKey.delete(key);
                 }
             }
-            // 完成，更新进度标题（如果进度消息还存在）
+ // ，（）
             const doneTitle = document.querySelector(`#${progressId} .progress-title`);
             if (doneTitle) {
-                doneTitle.textContent = '✅ ' + (typeof window.t === 'function' ? window.t('chat.penetrationTestComplete') : '渗透测试完成');
+ doneTitle.textContent = '✅ ' + (typeof window.t === 'function' ? window.t('chat.penetrationTestComplete') : '');
             }
-            // 更新对话ID
+ // ID
             if (event.data && event.data.conversationId) {
                 currentConversationId = event.data.conversationId;
                 updateActiveConversation();
@@ -1369,33 +1369,33 @@ function handleStreamEvent(event, progressElement, progressId,
                 updateProgressConversation(progressId, event.data.conversationId);
             }
             if (progressTaskState.has(progressId)) {
-                finalizeProgressTask(progressId, typeof window.t === 'function' ? window.t('tasks.statusCompleted') : '已完成');
+ finalizeProgressTask(progressId, typeof window.t === 'function' ? window.t('tasks.statusCompleted') : '');
             }
             
-            // 检查时间线中是否有错误项
+ // 
             const hasError = timeline && timeline.querySelector('.timeline-item-error');
             
-            // 立即刷新任务状态（确保任务状态同步）
+ // （）
             loadActiveTasks();
             
-            // 延迟再次刷新任务状态（确保后端已完成状态更新）
+ // （）
             setTimeout(() => {
                 loadActiveTasks();
             }, 200);
             
-            // 完成时自动折叠所有详情（延迟一下确保response事件已处理）
+ // （response）
             setTimeout(() => {
                 const assistantIdFromDone = getAssistantId();
                 if (assistantIdFromDone) {
                     collapseAllProgressDetails(assistantIdFromDone, progressId);
                 } else {
-                    // 如果无法获取助手ID，尝试折叠所有详情
+ // ID，
                     collapseAllProgressDetails(null, progressId);
                 }
                 
-                // 如果有错误，确保详情是折叠的（错误时应该默认折叠）
+ // ，（）
                 if (hasError) {
-                    // 再次确保折叠（延迟一点确保DOM已更新）
+ // （DOM）
                     setTimeout(() => {
                         collapseAllProgressDetails(assistantIdFromDone || null, progressId);
                     }, 200);
@@ -1404,11 +1404,11 @@ function handleStreamEvent(event, progressElement, progressId,
             break;
     }
     
-    // 仅在事件处理前用户已在底部附近时跟随滚到底部（避免上滑看历史时被拉回）
+ // （）
     scrollChatMessagesToBottomIfPinned(streamScrollWasPinned);
 }
 
-// 更新工具调用状态
+// 
 function updateToolCallStatus(toolCallId, status) {
     const mapping = toolCallStatusMap.get(toolCallId);
     if (!mapping) return;
@@ -1419,12 +1419,12 @@ function updateToolCallStatus(toolCallId, status) {
     const titleElement = item.querySelector('.timeline-item-title');
     if (!titleElement) return;
     
-    // 移除之前的状态类
+ // 
     item.classList.remove('tool-call-running', 'tool-call-completed', 'tool-call-failed');
     
-    const runningLabel = typeof window.t === 'function' ? window.t('timeline.running') : '执行中...';
-    const completedLabel = typeof window.t === 'function' ? window.t('timeline.completed') : '已完成';
-    const failedLabel = typeof window.t === 'function' ? window.t('timeline.execFailed') : '执行失败';
+ const runningLabel = typeof window.t === 'function' ? window.t('timeline.running') : '...';
+ const completedLabel = typeof window.t === 'function' ? window.t('timeline.completed') : '';
+ const failedLabel = typeof window.t === 'function' ? window.t('timeline.execFailed') : '';
     let statusText = '';
     if (status === 'running') {
         item.classList.add('tool-call-running');
@@ -1437,21 +1437,21 @@ function updateToolCallStatus(toolCallId, status) {
         statusText = ' <span class="tool-status-badge tool-status-failed">❌ ' + escapeHtml(failedLabel) + '</span>';
     }
     
-    // 更新标题（保留原有文本，追加状态）
+ // （，）
     const originalText = titleElement.innerHTML;
-    // 移除之前可能存在的状态标记
+ // 
     const cleanText = originalText.replace(/\s*<span class="tool-status-badge[^>]*>.*?<\/span>/g, '');
     titleElement.innerHTML = cleanText + statusText;
 }
 
-// 添加时间线项目
+// 
 function addTimelineItem(timeline, type, options) {
     const item = document.createElement('div');
-    // 生成唯一ID
+ // ID
     const itemId = 'timeline-item-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
     item.id = itemId;
     item.className = `timeline-item timeline-item-${type}`;
-    // 记录类型与参数，便于 languagechange 时刷新标题文案
+ // ， languagechange 
     item.dataset.timelineType = type;
     if (type === 'iteration') {
         const n = options.iterationN != null ? options.iterationN : (options.data && options.data.iteration != null ? options.data.iteration : 1);
@@ -1481,10 +1481,10 @@ function addTimelineItem(timeline, type, options) {
         item.dataset.einoAgent = String(options.data.einoAgent).trim();
     }
 
-    // 使用传入的createdAt时间，如果没有则使用当前时间（向后兼容）
+ // createdAt，（）
     let eventTime;
     if (options.createdAt) {
-        // 处理字符串或Date对象
+ // Date
         if (typeof options.createdAt === 'string') {
             eventTime = new Date(options.createdAt);
         } else if (options.createdAt instanceof Date) {
@@ -1492,14 +1492,14 @@ function addTimelineItem(timeline, type, options) {
         } else {
             eventTime = new Date(options.createdAt);
         }
-        // 如果解析失败，使用当前时间
+ // ，
         if (isNaN(eventTime.getTime())) {
             eventTime = new Date();
         }
     } else {
         eventTime = new Date();
     }
-    // 保存事件时间 ISO，语言切换时可重算时间格式
+ // ISO，
     try {
         item.dataset.createdAtIso = eventTime.toISOString();
     } catch (e) { /* ignore */ }
@@ -1515,7 +1515,7 @@ function addTimelineItem(timeline, type, options) {
         </div>
     `;
     
-    // 根据类型添加详细内容
+ // 
     if (type === 'thinking' && options.message) {
         content += `<div class="timeline-item-content">${formatMarkdown(options.message)}</div>`;
     } else if (type === 'tool_call' && options.data) {
@@ -1531,7 +1531,7 @@ function addTimelineItem(timeline, type, options) {
         if (args == null || typeof args !== 'object') {
             args = {};
         }
-        const paramsLabel = typeof window.t === 'function' ? window.t('timeline.params') : '参数:';
+ const paramsLabel = typeof window.t === 'function' ? window.t('timeline.params') : ':';
         content += `
             <div class="timeline-item-content">
                 <div class="tool-details">
@@ -1547,11 +1547,11 @@ function addTimelineItem(timeline, type, options) {
     } else if (type === 'tool_result' && options.data) {
         const data = options.data;
         const isError = data.isError || !data.success;
-        const noResultText = typeof window.t === 'function' ? window.t('timeline.noResult') : '无结果';
+ const noResultText = typeof window.t === 'function' ? window.t('timeline.noResult') : '';
         const result = data.result || data.error || noResultText;
         const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
-        const execResultLabel = typeof window.t === 'function' ? window.t('timeline.executionResult') : '执行结果:';
-        const execIdLabel = typeof window.t === 'function' ? window.t('timeline.executionId') : '执行ID:';
+ const execResultLabel = typeof window.t === 'function' ? window.t('timeline.executionResult') : ':';
+ const execIdLabel = typeof window.t === 'function' ? window.t('timeline.executionId') : 'ID:';
         content += `
             <div class="timeline-item-content">
                 <div class="tool-result-section ${isError ? 'error' : 'success'}">
@@ -1562,7 +1562,7 @@ function addTimelineItem(timeline, type, options) {
             </div>
         `;
     } else if (type === 'cancelled') {
-        const taskCancelledLabel = typeof window.t === 'function' ? window.t('chat.taskCancelled') : '任务已取消';
+ const taskCancelledLabel = typeof window.t === 'function' ? window.t('chat.taskCancelled') : '';
         content += `
             <div class="timeline-item-content">
                 ${escapeHtml(options.message || taskCancelledLabel)}
@@ -1576,17 +1576,17 @@ function addTimelineItem(timeline, type, options) {
     }
     timeline.appendChild(item);
     
-    // 自动展开详情
+ // 
     const expanded = timeline.classList.contains('expanded');
     if (!expanded && (type === 'tool_call' || type === 'tool_result')) {
-        // 对于工具调用和结果，默认显示摘要
+ // ，
     }
     
-    // 返回item ID以便后续更新
+ // item ID
     return itemId;
 }
 
-// 加载活跃任务列表
+// 
 async function loadActiveTasks(showErrors = false) {
     const bar = document.getElementById('active-tasks-bar');
     try {
@@ -1594,15 +1594,15 @@ async function loadActiveTasks(showErrors = false) {
         const result = await response.json().catch(() => ({}));
 
         if (!response.ok) {
-            throw new Error(result.error || (typeof window.t === 'function' ? window.t('tasks.loadActiveTasksFailed') : '获取活跃任务失败'));
+ throw new Error(result.error || (typeof window.t === 'function' ? window.t('tasks.loadActiveTasksFailed') : ''));
         }
 
         renderActiveTasks(result.tasks || []);
     } catch (error) {
-        console.error('获取活跃任务失败:', error);
+ console.error(':', error);
         if (showErrors && bar) {
             bar.style.display = 'block';
-            const cannotGetStatus = typeof window.t === 'function' ? window.t('tasks.cannotGetTaskStatus') : '无法获取任务状态：';
+ const cannotGetStatus = typeof window.t === 'function' ? window.t('tasks.cannotGetTaskStatus') : '：';
             bar.innerHTML = `<div class="active-task-error">${escapeHtml(cannotGetStatus)}${escapeHtml(error.message)}</div>`;
         }
     }
@@ -1663,14 +1663,14 @@ function renderActiveTasks(tasks) {
             </div>
         `;
 
-        // 只有非最终状态的任务才显示停止按钮
+ // 
         if (!isFinalStatus) {
             const cancelBtn = item.querySelector('.active-task-cancel');
             if (cancelBtn) {
                 cancelBtn.onclick = () => cancelActiveTask(task.conversationId, cancelBtn);
                 if (task.status === 'cancelling') {
                     cancelBtn.disabled = true;
-                    cancelBtn.textContent = typeof window.t === 'function' ? window.t('tasks.cancelling') : '取消中...';
+ cancelBtn.textContent = typeof window.t === 'function' ? window.t('tasks.cancelling') : '...';
                 }
             }
         }
@@ -1683,20 +1683,20 @@ async function cancelActiveTask(conversationId, button) {
     if (!conversationId) return;
     const originalText = button.textContent;
     button.disabled = true;
-    button.textContent = typeof window.t === 'function' ? window.t('tasks.cancelling') : '取消中...';
+ button.textContent = typeof window.t === 'function' ? window.t('tasks.cancelling') : '...';
 
     try {
         await requestCancel(conversationId);
         loadActiveTasks();
     } catch (error) {
-        console.error('取消任务失败:', error);
-        alert((typeof window.t === 'function' ? window.t('tasks.cancelTaskFailed') : '取消任务失败') + ': ' + error.message);
+ console.error(':', error);
+ alert((typeof window.t === 'function' ? window.t('tasks.cancelTaskFailed') : '') + ': ' + error.message);
         button.disabled = false;
         button.textContent = originalText;
     }
 }
 
-// 监控面板状态
+// 
 const monitorState = {
     executions: [],
     stats: {},
@@ -1704,7 +1704,7 @@ const monitorState = {
     pagination: {
         page: 1,
         pageSize: (() => {
-            // 从 localStorage 读取保存的每页显示数量，默认为 20
+ // localStorage ， 20
             const saved = localStorage.getItem('monitorPageSize');
             return saved ? parseInt(saved, 10) : 20;
         })(),
@@ -1714,15 +1714,15 @@ const monitorState = {
 };
 
 function openMonitorPanel() {
-    // 切换到MCP监控页面
+ // MCP
     if (typeof switchPage === 'function') {
         switchPage('mcp-monitor');
     }
-    // 初始化每页显示数量选择器
+ // 
     initializeMonitorPageSize();
 }
 
-// 初始化每页显示数量选择器
+// 
 function initializeMonitorPageSize() {
     const pageSizeSelect = document.getElementById('monitor-page-size');
     if (pageSizeSelect) {
@@ -1730,7 +1730,7 @@ function initializeMonitorPageSize() {
     }
 }
 
-// 改变每页显示数量
+// 
 function changeMonitorPageSize() {
     const pageSizeSelect = document.getElementById('monitor-page-size');
     if (!pageSizeSelect) {
@@ -1742,20 +1742,20 @@ function changeMonitorPageSize() {
         return;
     }
     
-    // 保存到 localStorage
+ // localStorage
     localStorage.setItem('monitorPageSize', newPageSize.toString());
     
-    // 更新状态
+ // 
     monitorState.pagination.pageSize = newPageSize;
-    monitorState.pagination.page = 1; // 重置到第一页
+ monitorState.pagination.page = 1; // 
     
-    // 刷新数据
+ // 
     refreshMonitorPanel(1);
 }
 
 function closeMonitorPanel() {
-    // 不再需要关闭功能，因为现在是页面而不是模态框
-    // 如果需要，可以切换回对话页面
+ // ，
+ // ，
     if (typeof switchPage === 'function') {
         switchPage('chat');
     }
@@ -1766,17 +1766,17 @@ async function refreshMonitorPanel(page = null) {
     const execContainer = document.getElementById('monitor-executions');
 
     try {
-        // 如果指定了页码，使用指定页码，否则使用当前页码
+ // ，，
         const currentPage = page !== null ? page : monitorState.pagination.page;
         const pageSize = monitorState.pagination.pageSize;
         
-        // 获取当前的筛选条件
+ // 
         const statusFilter = document.getElementById('monitor-status-filter');
         const toolFilter = document.getElementById('monitor-tool-filter');
         const currentStatusFilter = statusFilter ? statusFilter.value : 'all';
         const currentToolFilter = toolFilter ? (toolFilter.value.trim() || 'all') : 'all';
         
-        // 构建请求 URL
+ // URL
         let url = `/api/monitor?page=${currentPage}&page_size=${pageSize}`;
         if (currentStatusFilter && currentStatusFilter !== 'all') {
             url += `&status=${encodeURIComponent(currentStatusFilter)}`;
@@ -1788,14 +1788,14 @@ async function refreshMonitorPanel(page = null) {
         const response = await apiFetch(url, { method: 'GET' });
         const result = await response.json().catch(() => ({}));
         if (!response.ok) {
-            throw new Error(result.error || '获取监控数据失败');
+ throw new Error(result.error || '');
         }
 
         monitorState.executions = Array.isArray(result.executions) ? result.executions : [];
         monitorState.stats = result.stats || {};
         monitorState.lastFetchedAt = new Date();
         
-        // 更新分页信息
+ // 
         if (result.total !== undefined) {
             monitorState.pagination = {
                 page: result.page || currentPage,
@@ -1809,28 +1809,28 @@ async function refreshMonitorPanel(page = null) {
         renderMonitorExecutions(monitorState.executions, currentStatusFilter);
         renderMonitorPagination();
         
-        // 初始化每页显示数量选择器
+ // 
         initializeMonitorPageSize();
     } catch (error) {
-        console.error('刷新监控面板失败:', error);
+ console.error(':', error);
         if (statsContainer) {
-            statsContainer.innerHTML = `<div class="monitor-error">${escapeHtml(typeof window.t === 'function' ? window.t('mcpMonitor.loadStatsError') : '无法加载统计信息')}：${escapeHtml(error.message)}</div>`;
+ statsContainer.innerHTML = `<div class="monitor-error">${escapeHtml(typeof window.t === 'function' ? window.t('mcpMonitor.loadStatsError') : '')}：${escapeHtml(error.message)}</div>`;
         }
         if (execContainer) {
-            execContainer.innerHTML = `<div class="monitor-error">${escapeHtml(typeof window.t === 'function' ? window.t('mcpMonitor.loadExecutionsError') : '无法加载执行记录')}：${escapeHtml(error.message)}</div>`;
+ execContainer.innerHTML = `<div class="monitor-error">${escapeHtml(typeof window.t === 'function' ? window.t('mcpMonitor.loadExecutionsError') : '')}：${escapeHtml(error.message)}</div>`;
         }
     }
 }
 
-// 处理工具搜索输入（防抖）
+// （）
 let toolFilterDebounceTimer = null;
 function handleToolFilterInput() {
-    // 清除之前的定时器
+ // 
     if (toolFilterDebounceTimer) {
         clearTimeout(toolFilterDebounceTimer);
     }
     
-    // 设置新的定时器，500ms后执行筛选
+ // ，500ms
     toolFilterDebounceTimer = setTimeout(() => {
         applyMonitorFilters();
     }, 500);
@@ -1841,7 +1841,7 @@ async function applyMonitorFilters() {
     const toolFilter = document.getElementById('monitor-tool-filter');
     const status = statusFilter ? statusFilter.value : 'all';
     const tool = toolFilter ? (toolFilter.value.trim() || 'all') : 'all';
-    // 当筛选条件改变时，从后端重新获取数据
+ // ，
     await refreshMonitorPanelWithFilter(status, tool);
 }
 
@@ -1850,10 +1850,10 @@ async function refreshMonitorPanelWithFilter(statusFilter = 'all', toolFilter = 
     const execContainer = document.getElementById('monitor-executions');
 
     try {
-        const currentPage = 1; // 筛选时重置到第一页
+ const currentPage = 1; // 
         const pageSize = monitorState.pagination.pageSize;
         
-        // 构建请求 URL
+ // URL
         let url = `/api/monitor?page=${currentPage}&page_size=${pageSize}`;
         if (statusFilter && statusFilter !== 'all') {
             url += `&status=${encodeURIComponent(statusFilter)}`;
@@ -1865,14 +1865,14 @@ async function refreshMonitorPanelWithFilter(statusFilter = 'all', toolFilter = 
         const response = await apiFetch(url, { method: 'GET' });
         const result = await response.json().catch(() => ({}));
         if (!response.ok) {
-            throw new Error(result.error || '获取监控数据失败');
+ throw new Error(result.error || '');
         }
 
         monitorState.executions = Array.isArray(result.executions) ? result.executions : [];
         monitorState.stats = result.stats || {};
         monitorState.lastFetchedAt = new Date();
         
-        // 更新分页信息
+ // 
         if (result.total !== undefined) {
             monitorState.pagination = {
                 page: result.page || currentPage,
@@ -1886,15 +1886,15 @@ async function refreshMonitorPanelWithFilter(statusFilter = 'all', toolFilter = 
         renderMonitorExecutions(monitorState.executions, statusFilter);
         renderMonitorPagination();
         
-        // 初始化每页显示数量选择器
+ // 
         initializeMonitorPageSize();
     } catch (error) {
-        console.error('刷新监控面板失败:', error);
+ console.error(':', error);
         if (statsContainer) {
-            statsContainer.innerHTML = `<div class="monitor-error">${escapeHtml(typeof window.t === 'function' ? window.t('mcpMonitor.loadStatsError') : '无法加载统计信息')}：${escapeHtml(error.message)}</div>`;
+ statsContainer.innerHTML = `<div class="monitor-error">${escapeHtml(typeof window.t === 'function' ? window.t('mcpMonitor.loadStatsError') : '')}：${escapeHtml(error.message)}</div>`;
         }
         if (execContainer) {
-            execContainer.innerHTML = `<div class="monitor-error">${escapeHtml(typeof window.t === 'function' ? window.t('mcpMonitor.loadExecutionsError') : '无法加载执行记录')}：${escapeHtml(error.message)}</div>`;
+ execContainer.innerHTML = `<div class="monitor-error">${escapeHtml(typeof window.t === 'function' ? window.t('mcpMonitor.loadExecutionsError') : '')}：${escapeHtml(error.message)}</div>`;
         }
     }
 }
@@ -1908,12 +1908,12 @@ function renderMonitorStats(statsMap = {}, lastFetchedAt = null) {
 
     const entries = Object.values(statsMap);
     if (entries.length === 0) {
-        const noStats = typeof window.t === 'function' ? window.t('mcpMonitor.noStatsData') : '暂无统计数据';
+ const noStats = typeof window.t === 'function' ? window.t('mcpMonitor.noStatsData') : '';
         container.innerHTML = '<div class="monitor-empty">' + escapeHtml(noStats) + '</div>';
         return;
     }
 
-    // 计算总体汇总
+ // 
     const totals = entries.reduce(
         (acc, item) => {
             acc.total += item.totalCalls || 0;
@@ -1931,14 +1931,14 @@ function renderMonitorStats(statsMap = {}, lastFetchedAt = null) {
     const successRate = totals.total > 0 ? ((totals.success / totals.total) * 100).toFixed(1) : '0.0';
     const locale = (typeof window.__locale === 'string' && window.__locale.startsWith('zh')) ? 'zh-CN' : undefined;
     const lastUpdatedText = lastFetchedAt ? (lastFetchedAt.toLocaleString ? lastFetchedAt.toLocaleString(locale || 'en-US') : String(lastFetchedAt)) : 'N/A';
-    const noCallsYet = typeof window.t === 'function' ? window.t('mcpMonitor.noCallsYet') : '暂无调用';
+ const noCallsYet = typeof window.t === 'function' ? window.t('mcpMonitor.noCallsYet') : '';
     const lastCallText = totals.lastCallTime ? (totals.lastCallTime.toLocaleString ? totals.lastCallTime.toLocaleString(locale || 'en-US') : String(totals.lastCallTime)) : noCallsYet;
-    const totalCallsLabel = typeof window.t === 'function' ? window.t('mcpMonitor.totalCalls') : '总调用次数';
-    const successFailedLabel = typeof window.t === 'function' ? window.t('mcpMonitor.successFailed', { success: totals.success, failed: totals.failed }) : `成功 ${totals.success} / 失败 ${totals.failed}`;
-    const successRateLabel = typeof window.t === 'function' ? window.t('mcpMonitor.successRate') : '成功率';
-    const statsFromAll = typeof window.t === 'function' ? window.t('mcpMonitor.statsFromAllTools') : '统计自全部工具调用';
-    const lastCallLabel = typeof window.t === 'function' ? window.t('mcpMonitor.lastCall') : '最近一次调用';
-    const lastRefreshLabel = typeof window.t === 'function' ? window.t('mcpMonitor.lastRefreshTime') : '最后刷新时间';
+ const totalCallsLabel = typeof window.t === 'function' ? window.t('mcpMonitor.totalCalls') : '';
+ const successFailedLabel = typeof window.t === 'function' ? window.t('mcpMonitor.successFailed', { success: totals.success, failed: totals.failed }) : ` ${totals.success} / ${totals.failed}`;
+ const successRateLabel = typeof window.t === 'function' ? window.t('mcpMonitor.successRate') : '';
+ const statsFromAll = typeof window.t === 'function' ? window.t('mcpMonitor.statsFromAllTools') : '';
+ const lastCallLabel = typeof window.t === 'function' ? window.t('mcpMonitor.lastCall') : '';
+ const lastRefreshLabel = typeof window.t === 'function' ? window.t('mcpMonitor.lastRefreshTime') : '';
 
     let html = `
         <div class="monitor-stat-card">
@@ -1958,17 +1958,17 @@ function renderMonitorStats(statsMap = {}, lastFetchedAt = null) {
         </div>
     `;
 
-    // 显示最多前4个工具的统计（过滤掉 totalCalls 为 0 的工具）
+ // 4（ totalCalls 0 ）
     const topTools = entries
         .filter(tool => (tool.totalCalls || 0) > 0)
         .slice()
         .sort((a, b) => (b.totalCalls || 0) - (a.totalCalls || 0))
         .slice(0, 4);
 
-    const unknownToolLabel = typeof window.t === 'function' ? window.t('mcpMonitor.unknownTool') : '未知工具';
+ const unknownToolLabel = typeof window.t === 'function' ? window.t('mcpMonitor.unknownTool') : '';
     topTools.forEach(tool => {
         const toolSuccessRate = tool.totalCalls > 0 ? ((tool.successCalls || 0) / tool.totalCalls * 100).toFixed(1) : '0.0';
-        const toolMeta = typeof window.t === 'function' ? window.t('mcpMonitor.successFailedRate', { success: tool.successCalls || 0, failed: tool.failedCalls || 0, rate: toolSuccessRate }) : `成功 ${tool.successCalls || 0} / 失败 ${tool.failedCalls || 0} · 成功率 ${toolSuccessRate}%`;
+ const toolMeta = typeof window.t === 'function' ? window.t('mcpMonitor.successFailedRate', { success: tool.successCalls || 0, failed: tool.failedCalls || 0, rate: toolSuccessRate }) : ` ${tool.successCalls || 0} / ${tool.failedCalls || 0} · ${toolSuccessRate}%`;
         html += `
             <div class="monitor-stat-card">
                 <h4>${escapeHtml(tool.toolName || unknownToolLabel)}</h4>
@@ -1990,18 +1990,18 @@ function renderMonitorExecutions(executions = [], statusFilter = 'all') {
     }
 
     if (!Array.isArray(executions) || executions.length === 0) {
-        // 根据是否有筛选条件显示不同的提示
+ // 
         const toolFilter = document.getElementById('monitor-tool-filter');
         const currentToolFilter = toolFilter ? toolFilter.value : 'all';
         const hasFilter = (statusFilter && statusFilter !== 'all') || (currentToolFilter && currentToolFilter !== 'all');
-        const noRecordsFilter = typeof window.t === 'function' ? window.t('mcpMonitor.noRecordsWithFilter') : '当前筛选条件下暂无记录';
-        const noExecutions = typeof window.t === 'function' ? window.t('mcpMonitor.noExecutions') : '暂无执行记录';
+ const noRecordsFilter = typeof window.t === 'function' ? window.t('mcpMonitor.noRecordsWithFilter') : '';
+ const noExecutions = typeof window.t === 'function' ? window.t('mcpMonitor.noExecutions') : '';
         if (hasFilter) {
             container.innerHTML = '<div class="monitor-empty">' + escapeHtml(noRecordsFilter) + '</div>';
         } else {
             container.innerHTML = '<div class="monitor-empty">' + escapeHtml(noExecutions) + '</div>';
         }
-        // 隐藏批量操作栏
+ // 
         const batchActions = document.getElementById('monitor-batch-actions');
         if (batchActions) {
             batchActions.style.display = 'none';
@@ -2009,13 +2009,13 @@ function renderMonitorExecutions(executions = [], statusFilter = 'all') {
         return;
     }
 
-    // 由于筛选已经在后端完成，这里直接使用所有传入的执行记录
-    // 不再需要前端再次筛选，因为后端已经返回了筛选后的数据
-    const unknownLabel = typeof window.t === 'function' ? window.t('mcpMonitor.unknown') : '未知';
-    const unknownToolLabel = typeof window.t === 'function' ? window.t('mcpMonitor.unknownTool') : '未知工具';
-    const viewDetailLabel = typeof window.t === 'function' ? window.t('mcpMonitor.viewDetail') : '查看详情';
-    const deleteLabel = typeof window.t === 'function' ? window.t('mcpMonitor.delete') : '删除';
-    const deleteExecTitle = typeof window.t === 'function' ? window.t('mcpMonitor.deleteExecTitle') : '删除此执行记录';
+ // ，
+ // ，
+ const unknownLabel = typeof window.t === 'function' ? window.t('mcpMonitor.unknown') : '';
+ const unknownToolLabel = typeof window.t === 'function' ? window.t('mcpMonitor.unknownTool') : '';
+ const viewDetailLabel = typeof window.t === 'function' ? window.t('mcpMonitor.viewDetail') : '';
+ const deleteLabel = typeof window.t === 'function' ? window.t('mcpMonitor.delete') : '';
+ const deleteExecTitle = typeof window.t === 'function' ? window.t('mcpMonitor.deleteExecTitle') : '';
     const statusKeyMap = { pending: 'statusPending', running: 'statusRunning', completed: 'statusCompleted', failed: 'statusFailed' };
     const locale = (typeof window.__locale === 'string' && window.__locale.startsWith('zh')) ? 'zh-CN' : undefined;
     const rows = executions
@@ -2048,25 +2048,25 @@ function renderMonitorExecutions(executions = [], statusFilter = 'all') {
         })
         .join('');
 
-    // 先移除旧的表格容器和加载提示（保留分页控件）
+ // （）
     const oldTableContainer = container.querySelector('.monitor-table-container');
     if (oldTableContainer) {
         oldTableContainer.remove();
     }
-    // 清除"加载中..."等提示信息
+ // "..."
     const oldEmpty = container.querySelector('.monitor-empty');
     if (oldEmpty) {
         oldEmpty.remove();
     }
     
-    // 创建表格容器
+ // 
     const tableContainer = document.createElement('div');
     tableContainer.className = 'monitor-table-container';
-    const colTool = typeof window.t === 'function' ? window.t('mcpMonitor.columnTool') : '工具';
-    const colStatus = typeof window.t === 'function' ? window.t('mcpMonitor.columnStatus') : '状态';
-    const colStartTime = typeof window.t === 'function' ? window.t('mcpMonitor.columnStartTime') : '开始时间';
-    const colDuration = typeof window.t === 'function' ? window.t('mcpMonitor.columnDuration') : '耗时';
-    const colActions = typeof window.t === 'function' ? window.t('mcpMonitor.columnActions') : '操作';
+ const colTool = typeof window.t === 'function' ? window.t('mcpMonitor.columnTool') : '';
+ const colStatus = typeof window.t === 'function' ? window.t('mcpMonitor.columnStatus') : '';
+ const colStartTime = typeof window.t === 'function' ? window.t('mcpMonitor.columnStartTime') : '';
+ const colDuration = typeof window.t === 'function' ? window.t('mcpMonitor.columnDuration') : '';
+ const colActions = typeof window.t === 'function' ? window.t('mcpMonitor.columnActions') : '';
     tableContainer.innerHTML = `
         <table class="monitor-table">
             <thead>
@@ -2085,7 +2085,7 @@ function renderMonitorExecutions(executions = [], statusFilter = 'all') {
         </table>
     `;
     
-    // 在分页控件之前插入表格（如果存在分页控件）
+ // （）
     const existingPagination = container.querySelector('.monitor-pagination');
     if (existingPagination) {
         container.insertBefore(tableContainer, existingPagination);
@@ -2093,16 +2093,16 @@ function renderMonitorExecutions(executions = [], statusFilter = 'all') {
         container.appendChild(tableContainer);
     }
     
-    // 更新批量操作状态
+ // 
     updateBatchActionsState();
 }
 
-// 渲染监控面板分页控件
+// 
 function renderMonitorPagination() {
     const container = document.getElementById('monitor-executions');
     if (!container) return;
     
-    // 移除旧的分页控件
+ // 
     const oldPagination = container.querySelector('.monitor-pagination');
     if (oldPagination) {
         oldPagination.remove();
@@ -2110,20 +2110,20 @@ function renderMonitorPagination() {
     
     const { page, totalPages, total, pageSize } = monitorState.pagination;
     
-    // 始终显示分页控件
+ // 
     const pagination = document.createElement('div');
     pagination.className = 'monitor-pagination';
     
-    // 处理没有数据的情况
+ // 
     const startItem = total === 0 ? 0 : (page - 1) * pageSize + 1;
     const endItem = total === 0 ? 0 : Math.min(page * pageSize, total);
-    const paginationInfoText = typeof window.t === 'function' ? window.t('mcpMonitor.paginationInfo', { start: startItem, end: endItem, total: total }) : `显示 ${startItem}-${endItem} / 共 ${total} 条记录`;
-    const perPageLabel = typeof window.t === 'function' ? window.t('mcpMonitor.perPageLabel') : '每页显示';
-    const firstPageLabel = typeof window.t === 'function' ? window.t('mcp.firstPage') : '首页';
-    const prevPageLabel = typeof window.t === 'function' ? window.t('mcp.prevPage') : '上一页';
-    const pageInfoText = typeof window.t === 'function' ? window.t('mcp.pageInfo', { page: page, total: totalPages || 1 }) : `第 ${page} / ${totalPages || 1} 页`;
-    const nextPageLabel = typeof window.t === 'function' ? window.t('mcp.nextPage') : '下一页';
-    const lastPageLabel = typeof window.t === 'function' ? window.t('mcp.lastPage') : '末页';
+ const paginationInfoText = typeof window.t === 'function' ? window.t('mcpMonitor.paginationInfo', { start: startItem, end: endItem, total: total }) : ` ${startItem}-${endItem} / ${total} `;
+ const perPageLabel = typeof window.t === 'function' ? window.t('mcpMonitor.perPageLabel') : '';
+ const firstPageLabel = typeof window.t === 'function' ? window.t('mcp.firstPage') : '';
+ const prevPageLabel = typeof window.t === 'function' ? window.t('mcp.prevPage') : '';
+ const pageInfoText = typeof window.t === 'function' ? window.t('mcp.pageInfo', { page: page, total: totalPages || 1 }) : ` ${page} / ${totalPages || 1} `;
+ const nextPageLabel = typeof window.t === 'function' ? window.t('mcp.nextPage') : '';
+ const lastPageLabel = typeof window.t === 'function' ? window.t('mcp.lastPage') : '';
     pagination.innerHTML = `
         <div class="pagination-info">
             <span>${escapeHtml(paginationInfoText)}</span>
@@ -2148,17 +2148,17 @@ function renderMonitorPagination() {
     
     container.appendChild(pagination);
     
-    // 初始化每页显示数量选择器
+ // 
     initializeMonitorPageSize();
 }
 
-// 删除执行记录
+// 
 async function deleteExecution(executionId) {
     if (!executionId) {
         return;
     }
     
-    const deleteConfirmMsg = typeof window.t === 'function' ? window.t('mcpMonitor.deleteExecConfirmSingle') : '确定要删除此执行记录吗？此操作不可恢复。';
+ const deleteConfirmMsg = typeof window.t === 'function' ? window.t('mcpMonitor.deleteExecConfirmSingle') : '？。';
     if (!confirm(deleteConfirmMsg)) {
         return;
     }
@@ -2170,24 +2170,24 @@ async function deleteExecution(executionId) {
         
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
-            const deleteFailedMsg = typeof window.t === 'function' ? window.t('mcpMonitor.deleteExecFailed') : '删除执行记录失败';
+ const deleteFailedMsg = typeof window.t === 'function' ? window.t('mcpMonitor.deleteExecFailed') : '';
             throw new Error(error.error || deleteFailedMsg);
         }
         
-        // 删除成功后刷新当前页面
+ // 
         const currentPage = monitorState.pagination.page;
         await refreshMonitorPanel(currentPage);
         
-        const execDeletedMsg = typeof window.t === 'function' ? window.t('mcpMonitor.execDeleted') : '执行记录已删除';
+ const execDeletedMsg = typeof window.t === 'function' ? window.t('mcpMonitor.execDeleted') : '';
         alert(execDeletedMsg);
     } catch (error) {
-        console.error('删除执行记录失败:', error);
-        const deleteFailedMsg = typeof window.t === 'function' ? window.t('mcpMonitor.deleteExecFailed') : '删除执行记录失败';
+ console.error(':', error);
+ const deleteFailedMsg = typeof window.t === 'function' ? window.t('mcpMonitor.deleteExecFailed') : '';
         alert(deleteFailedMsg + ': ' + error.message);
     }
 }
 
-// 更新批量操作状态
+// 
 function updateBatchActionsState() {
     const checkboxes = document.querySelectorAll('.monitor-execution-checkbox:checked');
     const selectedCount = checkboxes.length;
@@ -2204,10 +2204,10 @@ function updateBatchActionsState() {
         }
     }
     if (selectedCountSpan) {
-        selectedCountSpan.textContent = typeof window.t === 'function' ? window.t('mcp.selectedCount', { count: selectedCount }) : '已选择 ' + selectedCount + ' 项';
+ selectedCountSpan.textContent = typeof window.t === 'function' ? window.t('mcp.selectedCount', { count: selectedCount }) : ' ' + selectedCount + ' ';
     }
     
-    // 更新全选复选框状态
+ // 
     const selectAllCheckbox = document.getElementById('monitor-select-all');
     if (selectAllCheckbox) {
         const allCheckboxes = document.querySelectorAll('.monitor-execution-checkbox');
@@ -2217,7 +2217,7 @@ function updateBatchActionsState() {
     }
 }
 
-// 切换全选
+// 
 function toggleSelectAll(checkbox) {
     const checkboxes = document.querySelectorAll('.monitor-execution-checkbox');
     checkboxes.forEach(cb => {
@@ -2226,7 +2226,7 @@ function toggleSelectAll(checkbox) {
     updateBatchActionsState();
 }
 
-// 全选
+// 
 function selectAllExecutions() {
     const checkboxes = document.querySelectorAll('.monitor-execution-checkbox');
     checkboxes.forEach(cb => {
@@ -2240,7 +2240,7 @@ function selectAllExecutions() {
     updateBatchActionsState();
 }
 
-// 取消全选
+// 
 function deselectAllExecutions() {
     const checkboxes = document.querySelectorAll('.monitor-execution-checkbox');
     checkboxes.forEach(cb => {
@@ -2254,18 +2254,18 @@ function deselectAllExecutions() {
     updateBatchActionsState();
 }
 
-// 批量删除执行记录
+// 
 async function batchDeleteExecutions() {
     const checkboxes = document.querySelectorAll('.monitor-execution-checkbox:checked');
     if (checkboxes.length === 0) {
-        const selectFirstMsg = typeof window.t === 'function' ? window.t('mcpMonitor.selectExecFirst') : '请先选择要删除的执行记录';
+ const selectFirstMsg = typeof window.t === 'function' ? window.t('mcpMonitor.selectExecFirst') : '';
         alert(selectFirstMsg);
         return;
     }
     
     const ids = Array.from(checkboxes).map(cb => cb.value);
     const count = ids.length;
-    const batchConfirmMsg = typeof window.t === 'function' ? window.t('mcpMonitor.batchDeleteConfirm', { count: count }) : `确定要删除选中的 ${count} 条执行记录吗？此操作不可恢复。`;
+ const batchConfirmMsg = typeof window.t === 'function' ? window.t('mcpMonitor.batchDeleteConfirm', { count: count }) : ` ${count} ？。`;
     if (!confirm(batchConfirmMsg)) {
         return;
     }
@@ -2281,28 +2281,28 @@ async function batchDeleteExecutions() {
         
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
-            const batchFailedMsg = typeof window.t === 'function' ? window.t('mcp.batchDeleteFailed') : '批量删除执行记录失败';
+ const batchFailedMsg = typeof window.t === 'function' ? window.t('mcp.batchDeleteFailed') : '';
             throw new Error(error.error || batchFailedMsg);
         }
         
         const result = await response.json().catch(() => ({}));
         const deletedCount = result.deleted || count;
         
-        // 删除成功后刷新当前页面
+ // 
         const currentPage = monitorState.pagination.page;
         await refreshMonitorPanel(currentPage);
         
-        const batchSuccessMsg = typeof window.t === 'function' ? window.t('mcpMonitor.batchDeleteSuccess', { count: deletedCount }) : `成功删除 ${deletedCount} 条执行记录`;
+ const batchSuccessMsg = typeof window.t === 'function' ? window.t('mcpMonitor.batchDeleteSuccess', { count: deletedCount }) : ` ${deletedCount} `;
         alert(batchSuccessMsg);
     } catch (error) {
-        console.error('批量删除执行记录失败:', error);
-        const batchFailedMsg = typeof window.t === 'function' ? window.t('mcp.batchDeleteFailed') : '批量删除执行记录失败';
+ console.error(':', error);
+ const batchFailedMsg = typeof window.t === 'function' ? window.t('mcp.batchDeleteFailed') : '';
         alert(batchFailedMsg + ': ' + error.message);
     }
 }
 
 function formatExecutionDuration(start, end) {
-    const unknownLabel = typeof window.t === 'function' ? window.t('mcpMonitor.unknown') : '未知';
+ const unknownLabel = typeof window.t === 'function' ? window.t('mcpMonitor.unknown') : '';
     if (!start) {
         return unknownLabel;
     }
@@ -2314,26 +2314,26 @@ function formatExecutionDuration(start, end) {
     const diffMs = Math.max(0, endTime - startTime);
     const seconds = Math.floor(diffMs / 1000);
     if (seconds < 60) {
-        return typeof window.t === 'function' ? window.t('mcpMonitor.durationSeconds', { n: seconds }) : seconds + ' 秒';
+ return typeof window.t === 'function' ? window.t('mcpMonitor.durationSeconds', { n: seconds }) : seconds + ' ';
     }
     const minutes = Math.floor(seconds / 60);
     if (minutes < 60) {
         const remain = seconds % 60;
         if (remain > 0) {
-            return typeof window.t === 'function' ? window.t('mcpMonitor.durationMinutes', { minutes: minutes, seconds: remain }) : minutes + ' 分 ' + remain + ' 秒';
+ return typeof window.t === 'function' ? window.t('mcpMonitor.durationMinutes', { minutes: minutes, seconds: remain }) : minutes + ' ' + remain + ' ';
         }
-        return typeof window.t === 'function' ? window.t('mcpMonitor.durationMinutesOnly', { minutes: minutes }) : minutes + ' 分';
+ return typeof window.t === 'function' ? window.t('mcpMonitor.durationMinutesOnly', { minutes: minutes }) : minutes + ' ';
     }
     const hours = Math.floor(minutes / 60);
     const remainMinutes = minutes % 60;
     if (remainMinutes > 0) {
-        return typeof window.t === 'function' ? window.t('mcpMonitor.durationHours', { hours: hours, minutes: remainMinutes }) : hours + ' 小时 ' + remainMinutes + ' 分';
+ return typeof window.t === 'function' ? window.t('mcpMonitor.durationHours', { hours: hours, minutes: remainMinutes }) : hours + ' ' + remainMinutes + ' ';
     }
-    return typeof window.t === 'function' ? window.t('mcpMonitor.durationHoursOnly', { hours: hours }) : hours + ' 小时';
+ return typeof window.t === 'function' ? window.t('mcpMonitor.durationHoursOnly', { hours: hours }) : hours + ' ';
 }
 
 /**
- * 语言切换后刷新对话页已渲染的进度条、时间线标题与时间格式（避免仍显示英文或 AM/PM）
+ * 、（ AM/PM）
  */
 function refreshProgressAndTimelineI18n() {
     const _t = function (k, o) {
@@ -2342,7 +2342,7 @@ function refreshProgressAndTimelineI18n() {
     const timeLocale = getCurrentTimeLocale();
     const timeOpts = getTimeFormatOptions();
 
-    // 进度块内停止按钮：未禁用时统一为当前语言的「停止任务」（避免仍显示 Stop task）
+ // ：「」（ Stop task）
     document.querySelectorAll('.progress-message .progress-stop').forEach(function (btn) {
         if (!btn.disabled && btn.id && btn.id.indexOf('-stop-btn') !== -1) {
             const cancelling = _t('tasks.cancelling');
@@ -2364,13 +2364,13 @@ function refreshProgressAndTimelineI18n() {
             titleEl.textContent = '\uD83D\uDD0D ' + translateProgressMessage(raw);
         }
     });
-    // 转换后的详情区顶栏「渗透测试详情」：仅刷新不在 .progress-message 内的 progress 标题
+ // 「」： .progress-message progress 
     document.querySelectorAll('.progress-container .progress-header .progress-title').forEach(function (titleEl) {
         if (titleEl.closest('.progress-message')) return;
         titleEl.textContent = '\uD83D\uDCCB ' + _t('chat.penetrationTestDetail');
     });
 
-    // 时间线项：按类型重算标题，并重绘时间戳
+ // ：，
     document.querySelectorAll('.timeline-item').forEach(function (item) {
         const type = item.dataset.timelineType;
         const titleSpan = item.querySelector('.timeline-item-title');
@@ -2418,7 +2418,7 @@ function refreshProgressAndTimelineI18n() {
         }
     });
 
-    // 详情区「展开/收起」按钮
+ // 「/」
     document.querySelectorAll('.process-detail-btn span').forEach(function (span) {
         const btn = span.closest('.process-detail-btn');
         const assistantId = btn && btn.closest('.message.assistant') && btn.closest('.message.assistant').id;

@@ -16,37 +16,37 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// Embedder 文本嵌入器
+// Embedder embedder
 type Embedder struct {
 	openAIClient   *openai.Client
 	config         *config.KnowledgeConfig
-	openAIConfig   *config.OpenAIConfig // 用于获取 API Key
+	openAIConfig   *config.OpenAIConfig // for getting API Key
 	logger         *zap.Logger
-	rateLimiter    *rate.Limiter       // 速率限制器
-	rateLimitDelay time.Duration       // 请求间隔时间
-	maxRetries     int                 // 最大重试次数
-	retryDelay     time.Duration       // 重试间隔
-	mu             sync.Mutex          // 保护 rateLimiter
+	rateLimiter    *rate.Limiter       // rate limiter
+	rateLimitDelay time.Duration       // request interval time
+	maxRetries     int                 // max retry count
+	retryDelay     time.Duration       // retry delay
+	mu             sync.Mutex          // protects rateLimiter
 }
 
-// NewEmbedder 创建新的嵌入器
+// NewEmbedder creates a new embedder
 func NewEmbedder(cfg *config.KnowledgeConfig, openAIConfig *config.OpenAIConfig, openAIClient *openai.Client, logger *zap.Logger) *Embedder {
-	// 初始化速率限制器
+	// rate limiter
 	var rateLimiter *rate.Limiter
 	var rateLimitDelay time.Duration
 
-	// 如果配置了 MaxRPM，根据 RPM 计算速率限制
+	// if MaxRPM configured，calculate rate limit from RPM
 	if cfg.Indexing.MaxRPM > 0 {
 		rpm := cfg.Indexing.MaxRPM
 		rateLimiter = rate.NewLimiter(rate.Every(time.Minute/time.Duration(rpm)), rpm)
-		logger.Info("知识库索引速率限制已启用", zap.Int("maxRPM", rpm))
+		logger.Info("knowledge baserate limit", zap.Int("maxRPM", rpm))
 	} else if cfg.Indexing.RateLimitDelayMs > 0 {
-		// 如果没有配置 MaxRPM 但配置了固定延迟，使用固定延迟模式
+		// if MaxRPM not configured but fixed delay configured，use fixed delay mode
 		rateLimitDelay = time.Duration(cfg.Indexing.RateLimitDelayMs) * time.Millisecond
-		logger.Info("知识库索引固定延迟已启用", zap.Duration("delay", rateLimitDelay))
+		logger.Info("knowledge base", zap.Duration("delay", rateLimitDelay))
 	}
 
-	// 重试配置
+	// retry config
 	maxRetries := 3
 	retryDelay := 1000 * time.Millisecond
 	if cfg.Indexing.MaxRetries > 0 {
@@ -68,40 +68,40 @@ func NewEmbedder(cfg *config.KnowledgeConfig, openAIConfig *config.OpenAIConfig,
 	}
 }
 
-// EmbeddingRequest OpenAI 嵌入请求
+// EmbeddingRequest OpenAI embedding request
 type EmbeddingRequest struct {
 	Model string   `json:"model"`
 	Input []string `json:"input"`
 }
 
-// EmbeddingResponse OpenAI 嵌入响应
+// EmbeddingResponse OpenAI embedding response
 type EmbeddingResponse struct {
 	Data []EmbeddingData `json:"data"`
 	Error *EmbeddingError `json:"error,omitempty"`
 }
 
-// EmbeddingData 嵌入数据
+// EmbeddingData embedding data
 type EmbeddingData struct {
 	Embedding []float64 `json:"embedding"`
 	Index     int       `json:"index"`
 }
 
-// EmbeddingError 嵌入错误
+// EmbeddingError error
 type EmbeddingError struct {
 	Message string `json:"message"`
 	Type    string `json:"type"`
 }
 
-// waitRateLimiter 等待速率限制器
+// waitRateLimiter rate limiter
 func (e *Embedder) waitRateLimiter() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	if e.rateLimiter != nil {
-		// 等待令牌
+		// wait for token
 		ctx := context.Background()
 		if err := e.rateLimiter.Wait(ctx); err != nil {
-			e.logger.Warn("速率限制器等待失败", zap.Error(err))
+			e.logger.Warn("rate limiter", zap.Error(err))
 		}
 	}
 
@@ -110,19 +110,19 @@ func (e *Embedder) waitRateLimiter() {
 	}
 }
 
-// EmbedText 对文本进行嵌入（带重试和速率限制）
+// EmbedText embed text（with retry and rate limiting）
 func (e *Embedder) EmbedText(ctx context.Context, text string) ([]float32, error) {
 	if e.openAIClient == nil {
-		return nil, fmt.Errorf("OpenAI 客户端未初始化")
+		return nil, fmt.Errorf("OpenAI client not initialized")
 	}
 
 	var lastErr error
 	for attempt := 0; attempt < e.maxRetries; attempt++ {
-		// 速率限制
+		// rate limit
 		if attempt > 0 {
-			// 重试时等待更长时间
+			// wait longer on retry
 			waitTime := e.retryDelay * time.Duration(attempt)
-			e.logger.Debug("重试前等待", zap.Int("attempt", attempt+1), zap.Duration("waitTime", waitTime))
+			e.logger.Debug("waiting before retry", zap.Int("attempt", attempt+1), zap.Duration("waitTime", waitTime))
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -139,23 +139,23 @@ func (e *Embedder) EmbedText(ctx context.Context, text string) ([]float32, error
 
 		lastErr = err
 
-		// 检查是否是可重试的错误（429 速率限制、5xx 服务器错误、网络错误）
+		// error（429 rate limit、5xx error、error）
 		if !e.isRetryableError(err) {
 			return nil, err
 		}
 
-		e.logger.Debug("嵌入请求失败，准备重试",
+		e.logger.Debug("embedding request，",
 			zap.Int("attempt", attempt+1),
 			zap.Int("maxRetries", e.maxRetries),
 			zap.Error(err))
 	}
 
-	return nil, fmt.Errorf("达到最大重试次数 (%d): %v", e.maxRetries, lastErr)
+	return nil, fmt.Errorf("max retry count (%d): %v", e.maxRetries, lastErr)
 }
 
-// doEmbedText 执行实际的嵌入请求（内部方法）
+// doEmbedText embedding request（）
 func (e *Embedder) doEmbedText(ctx context.Context, text string) ([]float32, error) {
-	// 使用配置的嵌入模型
+	// use configured embedding model
 	model := e.config.Embedding.Model
 	if model == "" {
 		model = "text-embedding-3-small"
@@ -166,48 +166,48 @@ func (e *Embedder) doEmbedText(ctx context.Context, text string) ([]float32, err
 		Input: []string{text},
 	}
 
-	// 清理 baseURL：去除前后空格和尾部斜杠
+	// clean baseURL：trim whitespace and trailing slashes
 	baseURL := strings.TrimSpace(e.config.Embedding.BaseURL)
 	baseURL = strings.TrimSuffix(baseURL, "/")
 	if baseURL == "" {
 		baseURL = "https://api.openai.com/v1"
 	}
 
-	// 构建请求
+	// build request
 	body, err := json.Marshal(req)
 	if err != nil {
-		return nil, fmt.Errorf("序列化请求失败：%w", err)
+		return nil, fmt.Errorf("failed to serialize request：%w", err)
 	}
 
 	requestURL := baseURL + "/embeddings"
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, strings.NewReader(string(body)))
 	if err != nil {
-		return nil, fmt.Errorf("创建请求失败：%w", err)
+		return nil, fmt.Errorf("failed to create request：%w", err)
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	// 使用配置的 API Key，如果没有则使用 OpenAI 配置的
+	// use configured API Key，if none, use OpenAI configured one
 	apiKey := strings.TrimSpace(e.config.Embedding.APIKey)
 	if apiKey == "" && e.openAIConfig != nil {
 		apiKey = e.openAIConfig.APIKey
 	}
 	if apiKey == "" {
-		return nil, fmt.Errorf("API Key 未配置")
+		return nil, fmt.Errorf("API Key not configured")
 	}
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 
-	// 发送请求
+	// send request
 	httpClient := &http.Client{
 		Timeout: 30 * time.Second,
 	}
 	resp, err := httpClient.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("发送请求失败：%w", err)
+		return nil, fmt.Errorf("send request：%w", err)
 	}
 	defer resp.Body.Close()
 
-	// 读取响应体以便在错误时输出详细信息
+	// error
 	bodyBytes := make([]byte, 0)
 	buf := make([]byte, 4096)
 	for {
@@ -220,12 +220,12 @@ func (e *Embedder) doEmbedText(ctx context.Context, text string) ([]float32, err
 		}
 	}
 
-	// 记录请求和响应信息（用于调试）
+	// record（）
 	requestBodyPreview := string(body)
 	if len(requestBodyPreview) > 200 {
 		requestBodyPreview = requestBodyPreview[:200] + "..."
 	}
-	e.logger.Debug("嵌入 API 请求",
+	e.logger.Debug("embedding API request",
 		zap.String("url", httpReq.URL.String()),
 		zap.String("model", model),
 		zap.String("requestBody", requestBodyPreview),
@@ -236,17 +236,17 @@ func (e *Embedder) doEmbedText(ctx context.Context, text string) ([]float32, err
 
 	var embeddingResp EmbeddingResponse
 	if err := json.Unmarshal(bodyBytes, &embeddingResp); err != nil {
-		// 输出详细的错误信息
+		// error
 		bodyPreview := string(bodyBytes)
 		if len(bodyPreview) > 500 {
 			bodyPreview = bodyPreview[:500] + "..."
 		}
-		return nil, fmt.Errorf("解析响应失败 (URL: %s, 状态码：%d, 响应长度：%d字节): %w\n请求体：%s\n响应内容预览：%s",
+		return nil, fmt.Errorf("parse (URL: %s, status：%d, response length：%dbytes): %w\nrequest body：%s\nresponse content preview：%s",
 			requestURL, resp.StatusCode, len(bodyBytes), err, requestBodyPreview, bodyPreview)
 	}
 
 	if embeddingResp.Error != nil {
-		return nil, fmt.Errorf("OpenAI API 错误 (状态码：%d): 类型=%s, 消息=%s",
+		return nil, fmt.Errorf("OpenAI API error (status：%d): type=%s, message=%s",
 			resp.StatusCode, embeddingResp.Error.Type, embeddingResp.Error.Message)
 	}
 
@@ -255,7 +255,7 @@ func (e *Embedder) doEmbedText(ctx context.Context, text string) ([]float32, err
 		if len(bodyPreview) > 500 {
 			bodyPreview = bodyPreview[:500] + "..."
 		}
-		return nil, fmt.Errorf("HTTP 请求失败 (URL: %s, 状态码：%d): 响应内容=%s", requestURL, resp.StatusCode, bodyPreview)
+		return nil, fmt.Errorf("HTTP request failed (URL: %s, status：%d): response content=%s", requestURL, resp.StatusCode, bodyPreview)
 	}
 
 	if len(embeddingResp.Data) == 0 {
@@ -263,11 +263,11 @@ func (e *Embedder) doEmbedText(ctx context.Context, text string) ([]float32, err
 		if len(bodyPreview) > 500 {
 			bodyPreview = bodyPreview[:500] + "..."
 		}
-		return nil, fmt.Errorf("未收到嵌入数据 (状态码：%d, 响应长度：%d字节)\n响应内容：%s",
+		return nil, fmt.Errorf("embedding data (status：%d, response length：%dbytes)\nresponse content：%s",
 			resp.StatusCode, len(bodyBytes), bodyPreview)
 	}
 
-	// 转换为 float32
+	// convert to float32
 	embedding := make([]float32, len(embeddingResp.Data[0].Embedding))
 	for i, v := range embeddingResp.Data[0].Embedding {
 		embedding[i] = float32(v)
@@ -276,7 +276,7 @@ func (e *Embedder) doEmbedText(ctx context.Context, text string) ([]float32, err
 	return embedding, nil
 }
 
-// isRetryableError 判断是否是可重试的错误
+// isRetryableError error
 func (e *Embedder) isRetryableError(err error) bool {
 	if err == nil {
 		return false
@@ -284,18 +284,18 @@ func (e *Embedder) isRetryableError(err error) bool {
 
 	errStr := err.Error()
 
-	// 429 速率限制错误
+	// 429 rate limiterror
 	if strings.Contains(errStr, "429") || strings.Contains(errStr, "rate limit") {
 		return true
 	}
 
-	// 5xx 服务器错误
+	// 5xx error
 	if strings.Contains(errStr, "500") || strings.Contains(errStr, "502") ||
 		strings.Contains(errStr, "503") || strings.Contains(errStr, "504") {
 		return true
 	}
 
-	// 网络错误
+	// error
 	if strings.Contains(errStr, "timeout") || strings.Contains(errStr, "connection") ||
 		strings.Contains(errStr, "network") || strings.Contains(errStr, "EOF") {
 		return true
@@ -304,7 +304,7 @@ func (e *Embedder) isRetryableError(err error) bool {
 	return false
 }
 
-// EmbedTexts 批量嵌入文本
+// EmbedTexts batch embed text
 func (e *Embedder) EmbedTexts(ctx context.Context, texts []string) ([][]float32, error) {
 	if len(texts) == 0 {
 		return nil, nil
@@ -314,7 +314,7 @@ func (e *Embedder) EmbedTexts(ctx context.Context, texts []string) ([][]float32,
 	for i, text := range texts {
 		embedding, err := e.EmbedText(ctx, text)
 		if err != nil {
-			return nil, fmt.Errorf("嵌入文本 [%d] 失败：%w", i, err)
+			return nil, fmt.Errorf("embed text [%d] ：%w", i, err)
 		}
 		embeddings[i] = embedding
 	}

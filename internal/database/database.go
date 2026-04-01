@@ -9,21 +9,21 @@ import (
 	"go.uber.org/zap"
 )
 
-// DB 数据库连接
+// DB database connection
 type DB struct {
 	*sql.DB
 	logger *zap.Logger
 }
 
-// NewDB 创建数据库连接
+// NewDB database connection
 func NewDB(dbPath string, logger *zap.Logger) (*DB, error) {
 	db, err := sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_foreign_keys=1")
 	if err != nil {
-		return nil, fmt.Errorf("打开数据库失败: %w", err)
+		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
 	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("连接数据库失败: %w", err)
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
 	database := &DB{
@@ -31,17 +31,17 @@ func NewDB(dbPath string, logger *zap.Logger) (*DB, error) {
 		logger: logger,
 	}
 
-	// 初始化表
+	// 
 	if err := database.initTables(); err != nil {
-		return nil, fmt.Errorf("初始化表失败: %w", err)
+		return nil, fmt.Errorf("failed to initialize tables: %w", err)
 	}
 
 	return database, nil
 }
 
-// initTables 初始化数据库表
+// initTables initialize database
 func (db *DB) initTables() error {
-	// 创建对话表
+	// create conversations table
 	createConversationsTable := `
 	CREATE TABLE IF NOT EXISTS conversations (
 		id TEXT PRIMARY KEY,
@@ -52,7 +52,7 @@ func (db *DB) initTables() error {
 		last_react_output TEXT
 	);`
 
-	// 创建消息表
+	// create messages table
 	createMessagesTable := `
 	CREATE TABLE IF NOT EXISTS messages (
 		id TEXT PRIMARY KEY,
@@ -64,7 +64,7 @@ func (db *DB) initTables() error {
 		FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
 	);`
 
-	// 创建过程详情表
+	// create process details table
 	createProcessDetailsTable := `
 	CREATE TABLE IF NOT EXISTS process_details (
 		id TEXT PRIMARY KEY,
@@ -78,7 +78,7 @@ func (db *DB) initTables() error {
 		FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
 	);`
 
-	// 创建工具执行记录表
+	// create tool execution records table
 	createToolExecutionsTable := `
 	CREATE TABLE IF NOT EXISTS tool_executions (
 		id TEXT PRIMARY KEY,
@@ -93,7 +93,7 @@ func (db *DB) initTables() error {
 		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);`
 
-	// 创建工具统计表
+	// create tool stats table
 	createToolStatsTable := `
 	CREATE TABLE IF NOT EXISTS tool_stats (
 		tool_name TEXT PRIMARY KEY,
@@ -104,7 +104,7 @@ func (db *DB) initTables() error {
 		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);`
 
-	// 创建Skills统计表
+	// create Skills stats table
 	createSkillStatsTable := `
 	CREATE TABLE IF NOT EXISTS skill_stats (
 		skill_name TEXT PRIMARY KEY,
@@ -115,7 +115,7 @@ func (db *DB) initTables() error {
 		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);`
 
-	// 创建攻击链节点表
+	// create attack chain nodes table
 	createAttackChainNodesTable := `
 	CREATE TABLE IF NOT EXISTS attack_chain_nodes (
 		id TEXT PRIMARY KEY,
@@ -130,7 +130,7 @@ func (db *DB) initTables() error {
 		FOREIGN KEY (tool_execution_id) REFERENCES tool_executions(id) ON DELETE SET NULL
 	);`
 
-	// 创建攻击链边表
+	// create attack chain edges table
 	createAttackChainEdgesTable := `
 	CREATE TABLE IF NOT EXISTS attack_chain_edges (
 		id TEXT PRIMARY KEY,
@@ -145,7 +145,7 @@ func (db *DB) initTables() error {
 		FOREIGN KEY (target_node_id) REFERENCES attack_chain_nodes(id) ON DELETE CASCADE
 	);`
 
-	// 创建知识检索日志表（保留在会话数据库中，因为有外键关联）
+	// create knowledge retrieval logs table（，）
 	createKnowledgeRetrievalLogsTable := `
 	CREATE TABLE IF NOT EXISTS knowledge_retrieval_logs (
 		id TEXT PRIMARY KEY,
@@ -159,7 +159,7 @@ func (db *DB) initTables() error {
 		FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE SET NULL
 	);`
 
-	// 创建对话分组表
+	// create conversation groups table
 	createConversationGroupsTable := `
 	CREATE TABLE IF NOT EXISTS conversation_groups (
 		id TEXT PRIMARY KEY,
@@ -169,7 +169,7 @@ func (db *DB) initTables() error {
 		updated_at DATETIME NOT NULL
 	);`
 
-	// 创建对话分组映射表
+	// create conversation group mappings table
 	createConversationGroupMappingsTable := `
 	CREATE TABLE IF NOT EXISTS conversation_group_mappings (
 		id TEXT PRIMARY KEY,
@@ -181,7 +181,7 @@ func (db *DB) initTables() error {
 		UNIQUE(conversation_id, group_id)
 	);`
 
-	// 创建漏洞表
+	// create vulnerabilities table
 	createVulnerabilitiesTable := `
 	CREATE TABLE IF NOT EXISTS vulnerabilities (
 		id TEXT PRIMARY KEY,
@@ -200,7 +200,7 @@ func (db *DB) initTables() error {
 		FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
 	);`
 
-	// 创建批量任务队列表
+	// create batch task queues table
 	createBatchTaskQueuesTable := `
 	CREATE TABLE IF NOT EXISTS batch_task_queues (
 		id TEXT PRIMARY KEY,
@@ -212,7 +212,7 @@ func (db *DB) initTables() error {
 		current_index INTEGER NOT NULL DEFAULT 0
 	);`
 
-	// 创建批量任务表
+	// create batch tasks table
 	createBatchTasksTable := `
 	CREATE TABLE IF NOT EXISTS batch_tasks (
 		id TEXT PRIMARY KEY,
@@ -227,7 +227,7 @@ func (db *DB) initTables() error {
 		FOREIGN KEY (queue_id) REFERENCES batch_task_queues(id) ON DELETE CASCADE
 	);`
 
-	// 创建 WebShell 连接表
+	// create WebShell connections table
 	createWebshellConnectionsTable := `
 	CREATE TABLE IF NOT EXISTS webshell_connections (
 		id TEXT PRIMARY KEY,
@@ -240,7 +240,7 @@ func (db *DB) initTables() error {
 		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);`
 
-	// 创建 WebShell 连接扩展状态表（前端工作区/终端状态持久化）
+	// create WebShell connection states table（/status）
 	createWebshellConnectionStatesTable := `
 	CREATE TABLE IF NOT EXISTS webshell_connection_states (
 		connection_id TEXT PRIMARY KEY,
@@ -249,7 +249,7 @@ func (db *DB) initTables() error {
 		FOREIGN KEY (connection_id) REFERENCES webshell_connections(id) ON DELETE CASCADE
 	);`
 
-	// 创建索引
+	// create indexes
 	createIndexes := `
 	CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
 	CREATE INDEX IF NOT EXISTS idx_conversations_updated_at ON conversations(updated_at);
@@ -280,273 +280,273 @@ func (db *DB) initTables() error {
 	`
 
 	if _, err := db.Exec(createConversationsTable); err != nil {
-		return fmt.Errorf("创建conversations表失败: %w", err)
+		return fmt.Errorf("conversationstable failed: %w", err)
 	}
 
 	if _, err := db.Exec(createMessagesTable); err != nil {
-		return fmt.Errorf("创建messages表失败: %w", err)
+		return fmt.Errorf("messagestable failed: %w", err)
 	}
 
 	if _, err := db.Exec(createProcessDetailsTable); err != nil {
-		return fmt.Errorf("创建process_details表失败: %w", err)
+		return fmt.Errorf("process_detailstable failed: %w", err)
 	}
 
 	if _, err := db.Exec(createToolExecutionsTable); err != nil {
-		return fmt.Errorf("创建tool_executions表失败: %w", err)
+		return fmt.Errorf("tool_executionstable failed: %w", err)
 	}
 
 	if _, err := db.Exec(createToolStatsTable); err != nil {
-		return fmt.Errorf("创建tool_stats表失败: %w", err)
+		return fmt.Errorf("tool_statstable failed: %w", err)
 	}
 
 	if _, err := db.Exec(createSkillStatsTable); err != nil {
-		return fmt.Errorf("创建skill_stats表失败: %w", err)
+		return fmt.Errorf("skill_statstable failed: %w", err)
 	}
 
 	if _, err := db.Exec(createAttackChainNodesTable); err != nil {
-		return fmt.Errorf("创建attack_chain_nodes表失败: %w", err)
+		return fmt.Errorf("attack_chain_nodestable failed: %w", err)
 	}
 
 	if _, err := db.Exec(createAttackChainEdgesTable); err != nil {
-		return fmt.Errorf("创建attack_chain_edges表失败: %w", err)
+		return fmt.Errorf("attack_chain_edgestable failed: %w", err)
 	}
 
 	if _, err := db.Exec(createKnowledgeRetrievalLogsTable); err != nil {
-		return fmt.Errorf("创建knowledge_retrieval_logs表失败: %w", err)
+		return fmt.Errorf("knowledge_retrieval_logstable failed: %w", err)
 	}
 
 	if _, err := db.Exec(createConversationGroupsTable); err != nil {
-		return fmt.Errorf("创建conversation_groups表失败: %w", err)
+		return fmt.Errorf("conversation_groupstable failed: %w", err)
 	}
 
 	if _, err := db.Exec(createConversationGroupMappingsTable); err != nil {
-		return fmt.Errorf("创建conversation_group_mappings表失败: %w", err)
+		return fmt.Errorf("conversation_group_mappingstable failed: %w", err)
 	}
 
 	if _, err := db.Exec(createVulnerabilitiesTable); err != nil {
-		return fmt.Errorf("创建vulnerabilities表失败: %w", err)
+		return fmt.Errorf("vulnerabilitiestable failed: %w", err)
 	}
 
 	if _, err := db.Exec(createBatchTaskQueuesTable); err != nil {
-		return fmt.Errorf("创建batch_task_queues表失败: %w", err)
+		return fmt.Errorf("batch_task_queuestable failed: %w", err)
 	}
 
 	if _, err := db.Exec(createBatchTasksTable); err != nil {
-		return fmt.Errorf("创建batch_tasks表失败: %w", err)
+		return fmt.Errorf("batch_taskstable failed: %w", err)
 	}
 
 	if _, err := db.Exec(createWebshellConnectionsTable); err != nil {
-		return fmt.Errorf("创建webshell_connections表失败: %w", err)
+		return fmt.Errorf("webshell_connectionstable failed: %w", err)
 	}
 
 	if _, err := db.Exec(createWebshellConnectionStatesTable); err != nil {
-		return fmt.Errorf("创建webshell_connection_states表失败: %w", err)
+		return fmt.Errorf("webshell_connection_statestable failed: %w", err)
 	}
 
-	// 为已有表添加新字段（如果不存在）- 必须在创建索引之前
+	// add new fields to existing tables（）- create indexes
 	if err := db.migrateConversationsTable(); err != nil {
-		db.logger.Warn("迁移conversations表失败", zap.Error(err))
-		// 不返回错误，允许继续运行
+		db.logger.Warn("migrateconversationstable failed", zap.Error(err))
+		// do not return error, allow to continue
 	}
 
 	if err := db.migrateConversationGroupsTable(); err != nil {
-		db.logger.Warn("迁移conversation_groups表失败", zap.Error(err))
-		// 不返回错误，允许继续运行
+		db.logger.Warn("migrateconversation_groupstable failed", zap.Error(err))
+		// do not return error, allow to continue
 	}
 
 	if err := db.migrateConversationGroupMappingsTable(); err != nil {
-		db.logger.Warn("迁移conversation_group_mappings表失败", zap.Error(err))
-		// 不返回错误，允许继续运行
+		db.logger.Warn("migrateconversation_group_mappingstable failed", zap.Error(err))
+		// do not return error, allow to continue
 	}
 
 	if err := db.migrateBatchTaskQueuesTable(); err != nil {
-		db.logger.Warn("迁移batch_task_queues表失败", zap.Error(err))
-		// 不返回错误，允许继续运行
+		db.logger.Warn("migratebatch_task_queuestable failed", zap.Error(err))
+		// do not return error, allow to continue
 	}
 
 	if _, err := db.Exec(createIndexes); err != nil {
-		return fmt.Errorf("创建索引失败: %w", err)
+		return fmt.Errorf("create indexes: %w", err)
 	}
 
-	db.logger.Info("数据库表初始化完成")
+	db.logger.Info("database table initialization complete")
 	return nil
 }
 
-// migrateConversationsTable 迁移conversations表，添加新字段
+// migrateConversationsTable migrateconversations，add
 func (db *DB) migrateConversationsTable() error {
-	// 检查last_react_input字段是否存在
+	// last_react_inputfield exists
 	var count int
 	err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('conversations') WHERE name='last_react_input'").Scan(&count)
 	if err != nil {
-		// 如果查询失败，尝试添加字段
+		// if query fails, try to add field
 		if _, addErr := db.Exec("ALTER TABLE conversations ADD COLUMN last_react_input TEXT"); addErr != nil {
-			// 如果字段已存在，忽略错误（SQLite错误信息可能不同）
+			// if field already exists, ignore error（SQLiteerror）
 			errMsg := strings.ToLower(addErr.Error())
 			if !strings.Contains(errMsg, "duplicate column") && !strings.Contains(errMsg, "already exists") {
-				db.logger.Warn("添加last_react_input字段失败", zap.Error(addErr))
+				db.logger.Warn("addlast_react_inputfield failed", zap.Error(addErr))
 			}
 		}
 	} else if count == 0 {
-		// 字段不存在，添加它
+		// field does not exist, add it
 		if _, err := db.Exec("ALTER TABLE conversations ADD COLUMN last_react_input TEXT"); err != nil {
-			db.logger.Warn("添加last_react_input字段失败", zap.Error(err))
+			db.logger.Warn("addlast_react_inputfield failed", zap.Error(err))
 		}
 	}
 
-	// 检查last_react_output字段是否存在
+	// last_react_outputfield exists
 	err = db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('conversations') WHERE name='last_react_output'").Scan(&count)
 	if err != nil {
-		// 如果查询失败，尝试添加字段
+		// if query fails, try to add field
 		if _, addErr := db.Exec("ALTER TABLE conversations ADD COLUMN last_react_output TEXT"); addErr != nil {
-			// 如果字段已存在，忽略错误
+			// if field already exists, ignore error
 			errMsg := strings.ToLower(addErr.Error())
 			if !strings.Contains(errMsg, "duplicate column") && !strings.Contains(errMsg, "already exists") {
-				db.logger.Warn("添加last_react_output字段失败", zap.Error(addErr))
+				db.logger.Warn("addlast_react_outputfield failed", zap.Error(addErr))
 			}
 		}
 	} else if count == 0 {
-		// 字段不存在，添加它
+		// field does not exist, add it
 		if _, err := db.Exec("ALTER TABLE conversations ADD COLUMN last_react_output TEXT"); err != nil {
-			db.logger.Warn("添加last_react_output字段失败", zap.Error(err))
+			db.logger.Warn("addlast_react_outputfield failed", zap.Error(err))
 		}
 	}
 
-	// 检查pinned字段是否存在
+	// pinnedfield exists
 	err = db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('conversations') WHERE name='pinned'").Scan(&count)
 	if err != nil {
-		// 如果查询失败，尝试添加字段
+		// if query fails, try to add field
 		if _, addErr := db.Exec("ALTER TABLE conversations ADD COLUMN pinned INTEGER DEFAULT 0"); addErr != nil {
-			// 如果字段已存在，忽略错误
+			// if field already exists, ignore error
 			errMsg := strings.ToLower(addErr.Error())
 			if !strings.Contains(errMsg, "duplicate column") && !strings.Contains(errMsg, "already exists") {
-				db.logger.Warn("添加pinned字段失败", zap.Error(addErr))
+				db.logger.Warn("addpinnedfield failed", zap.Error(addErr))
 			}
 		}
 	} else if count == 0 {
-		// 字段不存在，添加它
+		// field does not exist, add it
 		if _, err := db.Exec("ALTER TABLE conversations ADD COLUMN pinned INTEGER DEFAULT 0"); err != nil {
-			db.logger.Warn("添加pinned字段失败", zap.Error(err))
+			db.logger.Warn("addpinnedfield failed", zap.Error(err))
 		}
 	}
 
-	// 检查 webshell_connection_id 字段是否存在（WebShell AI 助手对话关联）
+	// webshell_connection_id field exists（WebShell AI conversation）
 	err = db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('conversations') WHERE name='webshell_connection_id'").Scan(&count)
 	if err != nil {
 		if _, addErr := db.Exec("ALTER TABLE conversations ADD COLUMN webshell_connection_id TEXT"); addErr != nil {
 			errMsg := strings.ToLower(addErr.Error())
 			if !strings.Contains(errMsg, "duplicate column") && !strings.Contains(errMsg, "already exists") {
-				db.logger.Warn("添加webshell_connection_id字段失败", zap.Error(addErr))
+				db.logger.Warn("addwebshell_connection_idfield failed", zap.Error(addErr))
 			}
 		}
 	} else if count == 0 {
 		if _, err := db.Exec("ALTER TABLE conversations ADD COLUMN webshell_connection_id TEXT"); err != nil {
-			db.logger.Warn("添加webshell_connection_id字段失败", zap.Error(err))
+			db.logger.Warn("addwebshell_connection_idfield failed", zap.Error(err))
 		}
 	}
 
 	return nil
 }
 
-// migrateConversationGroupsTable 迁移conversation_groups表，添加新字段
+// migrateConversationGroupsTable migrateconversation_groups，add
 func (db *DB) migrateConversationGroupsTable() error {
-	// 检查pinned字段是否存在
+	// pinnedfield exists
 	var count int
 	err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('conversation_groups') WHERE name='pinned'").Scan(&count)
 	if err != nil {
-		// 如果查询失败，尝试添加字段
+		// if query fails, try to add field
 		if _, addErr := db.Exec("ALTER TABLE conversation_groups ADD COLUMN pinned INTEGER DEFAULT 0"); addErr != nil {
-			// 如果字段已存在，忽略错误
+			// if field already exists, ignore error
 			errMsg := strings.ToLower(addErr.Error())
 			if !strings.Contains(errMsg, "duplicate column") && !strings.Contains(errMsg, "already exists") {
-				db.logger.Warn("添加pinned字段失败", zap.Error(addErr))
+				db.logger.Warn("addpinnedfield failed", zap.Error(addErr))
 			}
 		}
 	} else if count == 0 {
-		// 字段不存在，添加它
+		// field does not exist, add it
 		if _, err := db.Exec("ALTER TABLE conversation_groups ADD COLUMN pinned INTEGER DEFAULT 0"); err != nil {
-			db.logger.Warn("添加pinned字段失败", zap.Error(err))
+			db.logger.Warn("addpinnedfield failed", zap.Error(err))
 		}
 	}
 
 	return nil
 }
 
-// migrateConversationGroupMappingsTable 迁移conversation_group_mappings表，添加新字段
+// migrateConversationGroupMappingsTable migrateconversation_group_mappings，add
 func (db *DB) migrateConversationGroupMappingsTable() error {
-	// 检查pinned字段是否存在
+	// pinnedfield exists
 	var count int
 	err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('conversation_group_mappings') WHERE name='pinned'").Scan(&count)
 	if err != nil {
-		// 如果查询失败，尝试添加字段
+		// if query fails, try to add field
 		if _, addErr := db.Exec("ALTER TABLE conversation_group_mappings ADD COLUMN pinned INTEGER DEFAULT 0"); addErr != nil {
-			// 如果字段已存在，忽略错误
+			// if field already exists, ignore error
 			errMsg := strings.ToLower(addErr.Error())
 			if !strings.Contains(errMsg, "duplicate column") && !strings.Contains(errMsg, "already exists") {
-				db.logger.Warn("添加pinned字段失败", zap.Error(addErr))
+				db.logger.Warn("addpinnedfield failed", zap.Error(addErr))
 			}
 		}
 	} else if count == 0 {
-		// 字段不存在，添加它
+		// field does not exist, add it
 		if _, err := db.Exec("ALTER TABLE conversation_group_mappings ADD COLUMN pinned INTEGER DEFAULT 0"); err != nil {
-			db.logger.Warn("添加pinned字段失败", zap.Error(err))
+			db.logger.Warn("addpinnedfield failed", zap.Error(err))
 		}
 	}
 
 	return nil
 }
 
-// migrateBatchTaskQueuesTable 迁移batch_task_queues表，添加title和role字段
+// migrateBatchTaskQueuesTable migratebatch_task_queues，addtitlerole
 func (db *DB) migrateBatchTaskQueuesTable() error {
-	// 检查title字段是否存在
+	// titlefield exists
 	var count int
 	err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('batch_task_queues') WHERE name='title'").Scan(&count)
 	if err != nil {
-		// 如果查询失败，尝试添加字段
+		// if query fails, try to add field
 		if _, addErr := db.Exec("ALTER TABLE batch_task_queues ADD COLUMN title TEXT"); addErr != nil {
-			// 如果字段已存在，忽略错误
+			// if field already exists, ignore error
 			errMsg := strings.ToLower(addErr.Error())
 			if !strings.Contains(errMsg, "duplicate column") && !strings.Contains(errMsg, "already exists") {
-				db.logger.Warn("添加title字段失败", zap.Error(addErr))
+				db.logger.Warn("addtitlefield failed", zap.Error(addErr))
 			}
 		}
 	} else if count == 0 {
-		// 字段不存在，添加它
+		// field does not exist, add it
 		if _, err := db.Exec("ALTER TABLE batch_task_queues ADD COLUMN title TEXT"); err != nil {
-			db.logger.Warn("添加title字段失败", zap.Error(err))
+			db.logger.Warn("addtitlefield failed", zap.Error(err))
 		}
 	}
 
-	// 检查role字段是否存在
+	// rolefield exists
 	var roleCount int
 	err = db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('batch_task_queues') WHERE name='role'").Scan(&roleCount)
 	if err != nil {
-		// 如果查询失败，尝试添加字段
+		// if query fails, try to add field
 		if _, addErr := db.Exec("ALTER TABLE batch_task_queues ADD COLUMN role TEXT"); addErr != nil {
-			// 如果字段已存在，忽略错误
+			// if field already exists, ignore error
 			errMsg := strings.ToLower(addErr.Error())
 			if !strings.Contains(errMsg, "duplicate column") && !strings.Contains(errMsg, "already exists") {
-				db.logger.Warn("添加role字段失败", zap.Error(addErr))
+				db.logger.Warn("addrolefield failed", zap.Error(addErr))
 			}
 		}
 	} else if roleCount == 0 {
-		// 字段不存在，添加它
+		// field does not exist, add it
 		if _, err := db.Exec("ALTER TABLE batch_task_queues ADD COLUMN role TEXT"); err != nil {
-			db.logger.Warn("添加role字段失败", zap.Error(err))
+			db.logger.Warn("addrolefield failed", zap.Error(err))
 		}
 	}
 
 	return nil
 }
 
-// NewKnowledgeDB 创建知识库数据库连接（只包含知识库相关的表）
+// NewKnowledgeDB knowledge basedatabase connection（knowledge base）
 func NewKnowledgeDB(dbPath string, logger *zap.Logger) (*DB, error) {
 	sqlDB, err := sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_foreign_keys=1")
 	if err != nil {
-		return nil, fmt.Errorf("打开知识库数据库失败: %w", err)
+		return nil, fmt.Errorf("knowledge base: %w", err)
 	}
 
 	if err := sqlDB.Ping(); err != nil {
-		return nil, fmt.Errorf("连接知识库数据库失败: %w", err)
+		return nil, fmt.Errorf("knowledge base: %w", err)
 	}
 
 	database := &DB{
@@ -554,17 +554,17 @@ func NewKnowledgeDB(dbPath string, logger *zap.Logger) (*DB, error) {
 		logger: logger,
 	}
 
-	// 初始化知识库表
+	// knowledge base
 	if err := database.initKnowledgeTables(); err != nil {
-		return nil, fmt.Errorf("初始化知识库表失败: %w", err)
+		return nil, fmt.Errorf("knowledge basetable failed: %w", err)
 	}
 
 	return database, nil
 }
 
-// initKnowledgeTables 初始化知识库数据库表（只包含知识库相关的表）
+// initKnowledgeTables knowledge base（knowledge base）
 func (db *DB) initKnowledgeTables() error {
-	// 创建知识库项表
+	// knowledge base
 	createKnowledgeBaseItemsTable := `
 	CREATE TABLE IF NOT EXISTS knowledge_base_items (
 		id TEXT PRIMARY KEY,
@@ -576,7 +576,7 @@ func (db *DB) initKnowledgeTables() error {
 		updated_at DATETIME NOT NULL
 	);`
 
-	// 创建知识库向量表
+	// knowledge base
 	createKnowledgeEmbeddingsTable := `
 	CREATE TABLE IF NOT EXISTS knowledge_embeddings (
 		id TEXT PRIMARY KEY,
@@ -588,7 +588,7 @@ func (db *DB) initKnowledgeTables() error {
 		FOREIGN KEY (item_id) REFERENCES knowledge_base_items(id) ON DELETE CASCADE
 	);`
 
-	// 创建知识检索日志表（在独立知识库数据库中，不使用外键约束，因为conversations和messages表可能不在这个数据库中）
+	// create knowledge retrieval logs table（knowledge base，，conversationsmessages）
 	createKnowledgeRetrievalLogsTable := `
 	CREATE TABLE IF NOT EXISTS knowledge_retrieval_logs (
 		id TEXT PRIMARY KEY,
@@ -600,7 +600,7 @@ func (db *DB) initKnowledgeTables() error {
 		created_at DATETIME NOT NULL
 	);`
 
-	// 创建索引
+	// create indexes
 	createIndexes := `
 	CREATE INDEX IF NOT EXISTS idx_knowledge_items_category ON knowledge_base_items(category);
 	CREATE INDEX IF NOT EXISTS idx_knowledge_embeddings_item_id ON knowledge_embeddings(item_id);
@@ -610,26 +610,26 @@ func (db *DB) initKnowledgeTables() error {
 	`
 
 	if _, err := db.Exec(createKnowledgeBaseItemsTable); err != nil {
-		return fmt.Errorf("创建knowledge_base_items表失败: %w", err)
+		return fmt.Errorf("knowledge_base_itemstable failed: %w", err)
 	}
 
 	if _, err := db.Exec(createKnowledgeEmbeddingsTable); err != nil {
-		return fmt.Errorf("创建knowledge_embeddings表失败: %w", err)
+		return fmt.Errorf("knowledge_embeddingstable failed: %w", err)
 	}
 
 	if _, err := db.Exec(createKnowledgeRetrievalLogsTable); err != nil {
-		return fmt.Errorf("创建knowledge_retrieval_logs表失败: %w", err)
+		return fmt.Errorf("knowledge_retrieval_logstable failed: %w", err)
 	}
 
 	if _, err := db.Exec(createIndexes); err != nil {
-		return fmt.Errorf("创建索引失败: %w", err)
+		return fmt.Errorf("create indexes: %w", err)
 	}
 
-	db.logger.Info("知识库数据库表初始化完成")
+	db.logger.Info("knowledge basedatabase table initialization complete")
 	return nil
 }
 
-// Close 关闭数据库连接
+// Close database connection
 func (db *DB) Close() error {
 	return db.DB.Close()
 }

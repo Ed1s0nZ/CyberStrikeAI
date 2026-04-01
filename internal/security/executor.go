@@ -23,13 +23,13 @@ import (
 	"go.uber.org/zap"
 )
 
-// ToolOutputCallback 用于在工具执行过程中把 stdout/stderr 增量推给上层（SSE）。
-// 通过 context 传递，避免修改 MCP ToolHandler 签名导致的"写死工具"问题。
+// ToolOutputCallback pushes stdout/stderr increments to upper layer (SSE) during tool execution.
+// Passed via context to avoid modifying MCP ToolHandler signature causing "hardcoded tool" issues.
 type ToolOutputCallback func(chunk string)
 
 type toolOutputCallbackCtxKey struct{}
 
-// ToolOutputCallbackCtxKey 是 context 中的 key，供 Agent 写入回调，Executor 读取并流式回调。
+// ToolOutputCallbackCtxKey is the context key for Agent to write callback, Executor reads and streams callback.
 var ToolOutputCallbackCtxKey = toolOutputCallbackCtxKey{}
 
 // Executor security tool executor
@@ -252,7 +252,7 @@ func (e *Executor) ExecuteTool(ctx context.Context, toolName string, args map[st
 
 	var output string
 	var err error
-	// 如果上层提供了 stdout/stderr 增量回调，则边执行边读取并回调。
+	// if upper layer provided stdout/stderr increment callback, read and callback incrementally during execution.
 	if cb, ok := ctx.Value(ToolOutputCallbackCtxKey).(ToolOutputCallback); ok && cb != nil {
 		output, err = streamCommandOutput(cmd, cb)
 	} else {

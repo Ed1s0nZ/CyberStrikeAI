@@ -18,15 +18,15 @@ import (
 
 const (
 	chatUploadsRootDirName = "chat_uploads"
-	maxChatUploadEditBytes = 2 * 1024 * 1024 // 文本编辑上限
+	maxChatUploadEditBytes = 2 * 1024 * 1024 // text edit limit
 )
 
-// ChatUploadsHandler 对话中上传附件（chat_uploads 目录）的管理 API
+// ChatUploadsHandler conversation（chat_uploads ） API
 type ChatUploadsHandler struct {
 	logger *zap.Logger
 }
 
-// NewChatUploadsHandler 创建处理器
+// NewChatUploadsHandler create handlers
 func NewChatUploadsHandler(logger *zap.Logger) *ChatUploadsHandler {
 	return &ChatUploadsHandler{logger: logger}
 }
@@ -39,7 +39,7 @@ func (h *ChatUploadsHandler) absRoot() (string, error) {
 	return filepath.Abs(filepath.Join(cwd, chatUploadsRootDirName))
 }
 
-// resolveUnderChatUploads 校验 relativePath（使用 / 分隔）对应文件必须在 chat_uploads 根下
+// resolveUnderChatUploads validate relativePath（ / ） chat_uploads 
 func (h *ChatUploadsHandler) resolveUnderChatUploads(relativePath string) (abs string, err error) {
 	root, err := h.absRoot()
 	if err != nil {
@@ -65,16 +65,16 @@ func (h *ChatUploadsHandler) resolveUnderChatUploads(relativePath string) (abs s
 	return full, nil
 }
 
-// ChatUploadFileItem 列表项
+// ChatUploadFileItem list
 type ChatUploadFileItem struct {
 	RelativePath   string `json:"relativePath"`
-	AbsolutePath   string `json:"absolutePath"` // 服务器上的绝对路径，便于在对话中引用（与附件落盘路径一致）
+	AbsolutePath string `json:"absolutePath"` // absolute path，conversation（）
 	Name           string `json:"name"`
 	Size           int64  `json:"size"`
 	ModifiedUnix   int64  `json:"modifiedUnix"`
 	Date           string `json:"date"`
 	ConversationID string `json:"conversationId"`
-	// SubPath 为日期、会话目录之下的子路径（不含文件名），如 date/conv/a/b/file 则为 "a/b"；无嵌套则为 ""。
+	// SubPath 、sub-path（filename）， date/conv/a/b/file "a/b"； ""。
 	SubPath string `json:"subPath"`
 }
 
@@ -86,9 +86,9 @@ func (h *ChatUploadsHandler) List(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	// 保证根目录存在，否则「按文件夹」浏览时无法 mkdir，且首次列表为空时界面无路径工具栏
+	// ensure root directory exists，「」 mkdir，list
 	if err := os.MkdirAll(root, 0755); err != nil {
-		h.logger.Warn("创建 chat_uploads 根目录失败", zap.Error(err))
+		h.logger.Warn("failed to create chat_uploads root directory", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -138,7 +138,7 @@ func (h *ChatUploadsHandler) List(c *gin.Context) {
 		return nil
 	})
 	if err != nil {
-		h.logger.Warn("列举对话附件失败", zap.Error(err))
+		h.logger.Warn("conversation", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -212,7 +212,7 @@ type chatUploadMkdirBody struct {
 	Name   string `json:"name"`
 }
 
-// Mkdir POST /api/chat-uploads/mkdir — 在 parent 目录下新建子目录（parent 为 chat_uploads 下相对路径，空表示根目录；name 为单段目录名）
+// Mkdir POST /api/chat-uploads/mkdir — parent （parent chat_uploads ，；name ）
 func (h *ChatUploadsHandler) Mkdir(c *gin.Context) {
 	var body chatUploadMkdirBody
 	if err := c.ShouldBindJSON(&body); err != nil {
@@ -391,7 +391,7 @@ func chatUploadShortRand(n int) string {
 	return string(b)
 }
 
-// Upload POST /api/chat-uploads multipart: file；conversationId 可选；relativeDir 可选（chat_uploads 下目录的相对路径，将文件直接上传至该目录）
+// Upload POST /api/chat-uploads multipart: file；conversationId ；relativeDir （chat_uploads ，）
 func (h *ChatUploadsHandler) Upload(c *gin.Context) {
 	fh, err := c.FormFile("file")
 	if err != nil || fh == nil {

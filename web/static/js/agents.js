@@ -1,4 +1,4 @@
-// 多代理子 Agent Markdown（agents/*.md）管理
+// Multi-agent sub- Agent Markdown（agents/*.md）management
 function _agentsT(key, opts) {
     return typeof window.t === 'function' ? window.t(key, opts) : key;
 }

@@ -1,18 +1,18 @@
-// Skills管理相关功能
+// Skillsmanagementrelatedfunction
 function _t(key, opts) {
     return typeof window.t === 'function' ? window.t(key, opts) : key;
 }
 let skillsList = [];
 let currentEditingSkillName = null;
-let isSavingSkill = false; // 防止重复提交
+let isSavingSkill = false; // prevent duplicate submission
 let skillsSearchKeyword = '';
-let skillsSearchTimeout = null; // 搜索防抖定时器
+let skillsSearchTimeout = null; // search debounce timer
 let skillsAutoRefreshTimer = null;
 let isAutoRefreshingSkills = false;
 const SKILLS_AUTO_REFRESH_INTERVAL_MS = 5000;
 let skillsPagination = {
     currentPage: 1,
-    pageSize: 20, // 每页20条（默认值，实际从localStorage读取）
+ pageSize: 20, // eachpage20record（default，actualfromlocalStorageread）
     total: 0
 };
 let skillsStats = {
@@ -67,7 +67,7 @@ function startSkillsAutoRefresh() {
     }, SKILLS_AUTO_REFRESH_INTERVAL_MS);
 }
 
-// 获取保存的每页显示数量
+// getSave's Per pagecount
 function getSkillsPageSize() {
     try {
         const saved = localStorage.getItem('skillsPageSize');
@@ -78,37 +78,37 @@ function getSkillsPageSize() {
             }
         }
     } catch (e) {
-        console.warn('无法从localStorage读取分页设置:', e);
+        console.warn('cannotfromlocalStoragereadpaginationsettings:', e);
     }
-    return 20; // 默认20
+    return 20; // default20
 }
 
-// 初始化分页设置
+// initializepaginationsettings
 function initSkillsPagination() {
     const savedPageSize = getSkillsPageSize();
     skillsPagination.pageSize = savedPageSize;
 }
 
-// 加载skills列表（支持分页）
+// loadskillslist（supportpagination）
 async function loadSkills(page = 1, pageSize = null) {
     try {
-        // 如果没有指定pageSize，使用保存的值或默认值
+ // ifhasspecifypageSize，useSave's ordefault
         if (pageSize === null) {
             pageSize = getSkillsPageSize();
         }
         
-        // 更新分页状态（确保使用正确的pageSize）
+        // update pagination state（ensureusecorrect's pageSize）
         skillsPagination.currentPage = page;
         skillsPagination.pageSize = pageSize;
         
-        // 清空搜索关键词（正常分页加载时）
+        // clearsearchkeyword（Normalpaginationloadwhen）
         skillsSearchKeyword = '';
         const searchInput = document.getElementById('skills-search');
         if (searchInput) {
             searchInput.value = '';
         }
         
-        // 构建URL（支持分页）
+        // buildURL（supportpagination）
         const offset = (page - 1) * pageSize;
         const url = `/api/skills?limit=${pageSize}&offset=${offset}`;
         
@@ -124,7 +124,7 @@ async function loadSkills(page = 1, pageSize = null) {
         renderSkillsPagination();
         updateSkillsManagementStats();
     } catch (error) {
-        console.error('加载skills列表失败:', error);
+        console.error('loadskillslist failed:', error);
         showNotification(_t('skills.loadListFailed') + ': ' + error.message, 'error');
         const skillsListEl = document.getElementById('skills-list');
         if (skillsListEl) {
@@ -133,19 +133,19 @@ async function loadSkills(page = 1, pageSize = null) {
     }
 }
 
-// 渲染skills列表
+// renderskillslist
 function renderSkillsList() {
     const skillsListEl = document.getElementById('skills-list');
     if (!skillsListEl) return;
 
-    // 后端已经完成搜索过滤，直接使用skillsList
+    // backendalreadycompletesearchfilter，use directlyskillsList
     const filteredSkills = skillsList;
 
     if (filteredSkills.length === 0) {
         skillsListEl.innerHTML = '<div class="empty-state">' + 
             (skillsSearchKeyword ? _t('skills.noMatch') : _t('skills.noSkills')) + 
             '</div>';
-        // 搜索时隐藏分页
+        // hide pagination during search
         const paginationContainer = document.getElementById('skills-pagination');
         if (paginationContainer) {
             paginationContainer.innerHTML = '';
@@ -169,19 +169,19 @@ function renderSkillsList() {
         `;
     }).join('');
     
-    // 确保列表容器可以滚动，分页栏可见
-    // 使用 setTimeout 确保 DOM 更新完成后再检查
+ // ensurelistcontainercantoscroll，paginationcan
+    // use setTimeout ensure DOM updatecompleteafterthencheck
     setTimeout(() => {
         const paginationContainer = document.getElementById('skills-pagination');
         if (paginationContainer && !skillsSearchKeyword) {
-            // 确保分页栏可见
+ // ensurepaginationcan
             paginationContainer.style.display = 'block';
             paginationContainer.style.visibility = 'visible';
         }
     }, 0);
 }
 
-// 渲染分页组件（参考MCP管理页面样式）
+// renderpaginationcomponent（referenceMCPmanagement pagestyle）
 function renderSkillsPagination() {
     const paginationContainer = document.getElementById('skills-pagination');
     if (!paginationContainer) return;
@@ -191,13 +191,13 @@ function renderSkillsPagination() {
     const currentPage = skillsPagination.currentPage;
     const totalPages = Math.ceil(total / pageSize);
     
-    // 即使只有一页也显示分页信息（参考MCP样式）
+ // even ifonlyhaspagealsoShow paginationInfo（referenceMCPstyle）
     if (total === 0) {
         paginationContainer.innerHTML = '';
         return;
     }
     
-    // 计算显示范围
+    // calculateShow range
     const start = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
     const end = total === 0 ? 0 : Math.min(currentPage * pageSize, total);
     
@@ -210,7 +210,7 @@ function renderSkillsPagination() {
     const pageOfText = _t('skillsPage.pageOf', { current: currentPage, total: totalPages || 1 });
     const nextPageText = _t('skillsPage.nextPage');
     const lastPageText = _t('skillsPage.lastPage');
-    // 左侧：显示范围信息和每页数量选择器（参考MCP样式）
+    // left side：Show rangeInfoandeachpagecountselector（referenceMCPstyle）
     paginationHTML += `
         <div class="pagination-info">
             <span>${escapeHtml(paginationShowText)}</span>
@@ -226,7 +226,7 @@ function renderSkillsPagination() {
         </div>
     `;
     
-    // 右侧：分页按钮（参考MCP样式：首页、上一页、第X/Y页、下一页、末页）
+    // right side：paginationbutton（referenceMCPstyle：First、Previous、X/Ypage、Next、Last）
     paginationHTML += `
         <div class="pagination-controls">
             <button class="btn-secondary" onclick="loadSkills(1, ${pageSize})" ${currentPage === 1 || total === 0 ? 'disabled' : ''}>${escapeHtml(firstPageText)}</button>
@@ -241,37 +241,37 @@ function renderSkillsPagination() {
     
     paginationContainer.innerHTML = paginationHTML;
     
-    // 确保分页组件与列表内容区域对齐（不包括滚动条）
+    // ensurepaginationcomponentandlistcontentareaalign（excluding scrollbar）
     function alignPaginationWidth() {
         const skillsList = document.getElementById('skills-list');
         if (skillsList && paginationContainer) {
-            // 确保分页容器始终可见
+ // ensurepaginationcontaineralwayscan
             paginationContainer.style.display = '';
             paginationContainer.style.visibility = 'visible';
             paginationContainer.style.opacity = '1';
             
-            // 获取列表的实际内容宽度（不包括滚动条）
-            const listClientWidth = skillsList.clientWidth; // 可视区域宽度（不包括滚动条）
-            const listScrollHeight = skillsList.scrollHeight; // 内容总高度
-            const listClientHeight = skillsList.clientHeight; // 可视区域高度
+            // getlist's actualcontentwidth（excluding scrollbar）
+            const listClientWidth = skillsList.clientWidth; // visibleareawidth（excluding scrollbar）
+            const listScrollHeight = skillsList.scrollHeight; // contenttotal height
+            const listClientHeight = skillsList.clientHeight; // visibleareaheight
             const hasScrollbar = listScrollHeight > listClientHeight;
             
-            // 如果列表有垂直滚动条，分页组件应该与列表内容区域对齐（clientWidth）
-            // 如果没有滚动条，使用100%宽度
+            // iflisthasverticalscrollrecord，pagination should align with list content area（clientWidth）
+            // if no scrollbar，use100%width
             if (hasScrollbar && listClientWidth > 0) {
-                // 分页组件应该与列表内容区域对齐，不包括滚动条
+                // pagination should align with list content area，excluding scrollbar
                 paginationContainer.style.width = `${listClientWidth}px`;
             } else {
-                // 如果没有滚动条，使用100%宽度
+                // if no scrollbar，use100%width
                 paginationContainer.style.width = '100%';
             }
         }
     }
     
-    // 立即执行一次
+ // immediatelylinetime
     alignPaginationWidth();
     
-    // 监听窗口大小变化和列表内容变化
+    // listenwindowSizechangeandlistcontentchange
     const resizeObserver = new ResizeObserver(() => {
         alignPaginationWidth();
     });
@@ -281,12 +281,12 @@ function renderSkillsPagination() {
         resizeObserver.observe(skillsList);
     }
     
-    // 确保分页容器始终可见（防止被隐藏）
+ // ensurepaginationcontaineralwayscan（preventbyhide）
     paginationContainer.style.display = 'block';
     paginationContainer.style.visibility = 'visible';
 }
 
-// 改变每页显示数量
+// change items per page
 async function changeSkillsPageSize() {
     const pageSizeSelect = document.getElementById('skills-page-size-pagination');
     if (!pageSizeSelect) return;
@@ -294,26 +294,26 @@ async function changeSkillsPageSize() {
     const newPageSize = parseInt(pageSizeSelect.value);
     if (isNaN(newPageSize) || newPageSize <= 0) return;
     
-    // 保存到localStorage
+    // save tolocalStorage
     try {
         localStorage.setItem('skillsPageSize', newPageSize.toString());
     } catch (e) {
-        console.warn('无法保存分页设置到localStorage:', e);
+        console.warn('cannotSavepaginationsettingstolocalStorage:', e);
     }
     
-    // 更新分页状态
+    // update pagination state
     skillsPagination.pageSize = newPageSize;
     
-    // 重新计算当前页（确保不超出范围）
+    // re-calculatecurrentpage（ensurenotexceedoutrange）
     const totalPages = Math.ceil(skillsPagination.total / newPageSize);
     const currentPage = Math.min(skillsPagination.currentPage, totalPages || 1);
     skillsPagination.currentPage = currentPage;
     
-    // 重新加载数据
+    // re-loaddata
     await loadSkills(currentPage, newPageSize);
 }
 
-// 更新skills管理统计信息
+// updateskillsmanagementstatisticsInfo
 function updateSkillsManagementStats() {
     const statsEl = document.getElementById('skills-management-stats');
     if (!statsEl) return;
@@ -324,7 +324,7 @@ function updateSkillsManagementStats() {
     }
 }
 
-// 搜索skills
+// searchskills
 function handleSkillsSearchInput() {
     clearTimeout(skillsSearchTimeout);
     skillsSearchTimeout = setTimeout(() => {
@@ -343,7 +343,7 @@ async function searchSkills() {
     }
     
     if (skillsSearchKeyword) {
-        // 有搜索关键词时，使用后端搜索API（加载所有匹配结果，不分页）
+        // hassearchkeywordwhen，usebackendsearchAPI（loadallmatchresult，notpagination）
         try {
             const response = await apiFetch(`/api/skills?search=${encodeURIComponent(skillsSearchKeyword)}&limit=10000&offset=0`);
             if (!response.ok) {
@@ -353,24 +353,24 @@ async function searchSkills() {
             skillsList = data.skills || [];
             skillsPagination.total = data.total || 0;
             renderSkillsList();
-            // 搜索时隐藏分页
+            // hide pagination during search
             const paginationContainer = document.getElementById('skills-pagination');
             if (paginationContainer) {
                 paginationContainer.innerHTML = '';
             }
-            // 更新统计信息（显示搜索结果数量）
+            // update statistics（Show searchresultcount）
             updateSkillsManagementStats();
         } catch (error) {
-            console.error('搜索skills失败:', error);
+            console.error('searchskillsFailed:', error);
             showNotification(_t('skills.searchFailed') + ': ' + error.message, 'error');
         }
     } else {
-        // 没有搜索关键词时，恢复分页加载
+ // hassearchkeywordwhen，restorepaginationload
         await loadSkills(1, skillsPagination.pageSize);
     }
 }
 
-// 清除skills搜索
+// clearskillssearch
 function clearSkillsSearch() {
     const searchInput = document.getElementById('skills-search');
     if (searchInput) {
@@ -381,17 +381,17 @@ function clearSkillsSearch() {
     if (clearBtn) {
         clearBtn.style.display = 'none';
     }
-    // 恢复分页加载
+    // restorepaginationload
     loadSkills(1, skillsPagination.pageSize);
 }
 
-// 刷新skills
+// Refreshskills
 async function refreshSkills() {
     await loadSkills(skillsPagination.currentPage, skillsPagination.pageSize);
     showNotification(_t('skills.refreshed'), 'success');
 }
 
-// 显示添加skill模态框
+// Show addskillmodal
 function showAddSkillModal() {
     const modal = document.getElementById('skill-modal');
     if (!modal) return;
@@ -405,7 +405,7 @@ function showAddSkillModal() {
     modal.style.display = 'flex';
 }
 
-// 编辑skill
+// Editskill
 async function editSkill(skillName) {
     try {
         const response = await apiFetch(`/api/skills/${encodeURIComponent(skillName)}`);
@@ -420,19 +420,19 @@ async function editSkill(skillName) {
 
         document.getElementById('skill-modal-title').textContent = _t('skills.editSkill');
         document.getElementById('skill-name').value = skill.name;
-        document.getElementById('skill-name').disabled = true; // 编辑时不允许修改名称
+        document.getElementById('skill-name').disabled = true; // Editwhennotallowmodifyname
         document.getElementById('skill-description').value = skill.description || '';
         document.getElementById('skill-content').value = skill.content || '';
         
         currentEditingSkillName = skillName;
         modal.style.display = 'flex';
     } catch (error) {
-        console.error('加载skill详情失败:', error);
+        console.error('loadskilldetailsFailed:', error);
         showNotification(_t('skills.loadDetailFailed') + ': ' + error.message, 'error');
     }
 }
 
-// 查看skill
+// viewskill
 async function viewSkill(skillName) {
     try {
         const response = await apiFetch(`/api/skills/${encodeURIComponent(skillName)}`);
@@ -442,7 +442,7 @@ async function viewSkill(skillName) {
         const data = await response.json();
         const skill = data.skill;
 
-        // 创建查看模态框
+        // createviewmodal
         const modal = document.createElement('div');
         modal.className = 'modal';
         modal.id = 'skill-view-modal';
@@ -475,12 +475,12 @@ async function viewSkill(skillName) {
         document.body.appendChild(modal);
         modal.style.display = 'flex';
     } catch (error) {
-        console.error('查看skill失败:', error);
+        console.error('viewskillFailed:', error);
         showNotification(_t('skills.viewFailed') + ': ' + error.message, 'error');
     }
 }
 
-// 关闭查看模态框
+// Closeviewmodal
 function closeSkillViewModal() {
     const modal = document.getElementById('skill-view-modal');
     if (modal) {
@@ -488,7 +488,7 @@ function closeSkillViewModal() {
     }
 }
 
-// 关闭skill模态框
+// Closeskillmodal
 function closeSkillModal() {
     const modal = document.getElementById('skill-modal');
     if (modal) {
@@ -497,7 +497,7 @@ function closeSkillModal() {
     }
 }
 
-// 保存skill
+// Saveskill
 async function saveSkill() {
     if (isSavingSkill) return;
 
@@ -515,7 +515,7 @@ async function saveSkill() {
         return;
     }
 
-    // 验证skill名称
+    // validateskillname
     if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
         showNotification(_t('skills.nameInvalid'), 'error');
         return;
@@ -554,7 +554,7 @@ async function saveSkill() {
         closeSkillModal();
         await loadSkills(skillsPagination.currentPage, skillsPagination.pageSize);
     } catch (error) {
-        console.error('保存skill失败:', error);
+        console.error('SaveskillFailed:', error);
         showNotification(_t('skills.saveFailed') + ': ' + error.message, 'error');
     } finally {
         isSavingSkill = false;
@@ -565,9 +565,9 @@ async function saveSkill() {
     }
 }
 
-// 删除skill
+// Deleteskill
 async function deleteSkill(skillName) {
-    // 先检查是否有角色绑定了该skill
+ // firstcheckishasrolebindthisskill
     let boundRoles = [];
     try {
         const checkResponse = await apiFetch(`/api/skills/${encodeURIComponent(skillName)}/bound-roles`);
@@ -576,11 +576,11 @@ async function deleteSkill(skillName) {
             boundRoles = checkData.bound_roles || [];
         }
     } catch (error) {
-        console.warn('检查skill绑定失败:', error);
-        // 如果检查失败，继续执行删除流程
+        console.warn('checkskillbindFailed:', error);
+ // ifcheckFailed，ContinuelineDelete
     }
 
-    // 构建确认消息
+    // buildconfirmmessage
     let confirmMessage = _t('skills.deleteConfirm', { name: skillName });
     if (boundRoles.length > 0) {
         const rolesList = boundRoles.join('、');
@@ -609,21 +609,21 @@ async function deleteSkill(skillName) {
         }
         showNotification(successMessage, 'success');
         
-        // 如果当前页没有数据了，回到上一页
+ // ifcurrentpagehasdata，go back toPrevious
         const currentPage = skillsPagination.currentPage;
         const totalAfterDelete = skillsPagination.total - 1;
         const totalPages = Math.ceil(totalAfterDelete / skillsPagination.pageSize);
         const pageToLoad = currentPage > totalPages && totalPages > 0 ? totalPages : currentPage;
         await loadSkills(pageToLoad, skillsPagination.pageSize);
     } catch (error) {
-        console.error('删除skill失败:', error);
+        console.error('DeleteskillFailed:', error);
         showNotification(_t('skills.deleteFailed') + ': ' + error.message, 'error');
     }
 }
 
-// ==================== Skills状态监控相关函数 ====================
+// ==================== SkillsstatusMonitorrelatedfunction ====================
 
-// 加载skills监控数据
+// loadskillsMonitordata
 async function loadSkillsMonitor() {
     try {
         const response = await apiFetch('/api/skills/stats');
@@ -643,7 +643,7 @@ async function loadSkillsMonitor() {
 
         renderSkillsMonitor();
     } catch (error) {
-        console.error('加载skills监控数据失败:', error);
+        console.error('loadskillsMonitordataFailed:', error);
         showNotification(_t('skills.loadStatsFailed') + ': ' + error.message, 'error');
         const statsEl = document.getElementById('skills-stats');
         if (statsEl) {
@@ -656,9 +656,9 @@ async function loadSkillsMonitor() {
     }
 }
 
-// 渲染skills监控页面
+// renderskillsMonitorpage
 function renderSkillsMonitor() {
-    // 渲染总体统计
+ // renderstatistics
     const statsEl = document.getElementById('skills-stats');
     if (statsEl) {
         const successRate = skillsStats.totalCalls > 0 
@@ -689,19 +689,19 @@ function renderSkillsMonitor() {
         `;
     }
 
-    // 渲染调用统计表格
+    // rendercallstatisticstable
     const monitorListEl = document.getElementById('skills-monitor-list');
     if (!monitorListEl) return;
 
     const stats = skillsStats.stats || [];
     
-    // 如果没有统计数据，显示空状态
+ // ifhasstatisticsdata，show empty state
     if (stats.length === 0) {
         monitorListEl.innerHTML = '<div class="monitor-empty">' + _t('skills.noCallRecords') + '</div>';
         return;
     }
 
-    // 按调用次数排序（降序），如果调用次数相同，按名称排序
+ // bycalltimesort（fall），ifcalltimesame，bynamesort
     const sortedStats = [...stats].sort((a, b) => {
         const callsA = b.total_calls || 0;
         const callsB = a.total_calls || 0;
@@ -747,13 +747,13 @@ function renderSkillsMonitor() {
     `;
 }
 
-// 刷新skills监控
+// RefreshskillsMonitor
 async function refreshSkillsMonitor() {
     await loadSkillsMonitor();
     showNotification(_t('skills.refreshed'), 'success');
 }
 
-// 清空skills统计数据
+// clearskillsstatisticsdata
 async function clearSkillsStats() {
     if (!confirm(_t('skills.clearStatsConfirm'))) {
         return;
@@ -770,15 +770,15 @@ async function clearSkillsStats() {
         }
 
         showNotification(_t('skills.statsCleared'), 'success');
-        // 重新加载统计数据
+        // re-loadstatisticsdata
         await loadSkillsMonitor();
     } catch (error) {
-        console.error('清空统计数据失败:', error);
+        console.error('Failed to clear statistics data:', error);
         showNotification(_t('skills.clearStatsFailed') + ': ' + error.message, 'error');
     }
 }
 
-// HTML转义函数
+// HTMLescape function
 function escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
@@ -786,7 +786,7 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// 语言切换时重新渲染当前页（技能列表与分页使用 _t，需随语言更新）
+// languageswitchwhenre-rendercurrentpage（canlistandpaginationuse _t，needlanguageupdate）
 document.addEventListener('languagechange', function () {
     const page = document.getElementById('page-skills-management');
     if (page && page.classList.contains('active')) {

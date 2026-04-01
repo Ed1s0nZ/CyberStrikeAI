@@ -30,7 +30,7 @@ type Config struct {
 	Auth        AuthConfig            `yaml:"auth"`
 	ExternalMCP ExternalMCPConfig     `yaml:"external_mcp,omitempty"`
 	Knowledge   KnowledgeConfig       `yaml:"knowledge,omitempty"`
-	Robots      RobotsConfig          `yaml:"robots,omitempty" json:"robots,omitempty"`         // Bot configuration for Lark/Feishu, etc.
+	Robots      RobotsConfig          `yaml:"robots,omitempty" json:"robots,omitempty"`         // Bot configuration (Telegram)
 	RolesDir    string                `yaml:"roles_dir,omitempty" json:"roles_dir,omitempty"`   // Role configuration file directory (new approach)
 	Roles       map[string]RoleConfig `yaml:"roles,omitempty" json:"roles,omitempty"`           // Backward-compatible: supports defining roles in the main config file
 	SkillsDir   string                `yaml:"skills_dir,omitempty" json:"skills_dir,omitempty"` // Skills configuration file directory
@@ -81,37 +81,9 @@ type MultiAgentAPIUpdate struct {
 	BatchUseMultiAgent bool   `json:"batch_use_multi_agent"`
 }
 
-// RobotsConfig holds bot configuration for Wecom, DingTalk, Lark/Feishu, and Telegram.
+// RobotsConfig holds bot configuration (Telegram only).
 type RobotsConfig struct {
-	Wecom    RobotWecomConfig    `yaml:"wecom,omitempty" json:"wecom,omitempty"`       // WeCom
-	Dingtalk RobotDingtalkConfig `yaml:"dingtalk,omitempty" json:"dingtalk,omitempty"` // DingTalk
-	Lark     RobotLarkConfig     `yaml:"lark,omitempty" json:"lark,omitempty"`         // Lark (Feishu)
 	Telegram RobotTelegramConfig `yaml:"telegram,omitempty" json:"telegram,omitempty"` // Telegram
-}
-
-// RobotWecomConfig holds WeCom robot configuration.
-type RobotWecomConfig struct {
-	Enabled        bool   `yaml:"enabled" json:"enabled"`
-	Token          string `yaml:"token" json:"token"`
-	EncodingAESKey string `yaml:"encoding_aes_key" json:"encoding_aes_key"`
-	CorpID         string `yaml:"corp_id" json:"corp_id"`
-	Secret         string `yaml:"secret" json:"secret"`
-	AgentID        int64  `yaml:"agent_id" json:"agent_id"`
-}
-
-// RobotDingtalkConfig holds DingTalk robot configuration.
-type RobotDingtalkConfig struct {
-	Enabled      bool   `yaml:"enabled" json:"enabled"`
-	ClientID     string `yaml:"client_id" json:"client_id"`
-	ClientSecret string `yaml:"client_secret" json:"client_secret"`
-}
-
-// RobotLarkConfig holds the Lark (Feishu) bot configuration.
-type RobotLarkConfig struct {
-	Enabled     bool   `yaml:"enabled" json:"enabled"`
-	AppID       string `yaml:"app_id" json:"app_id"`
-	AppSecret   string `yaml:"app_secret" json:"app_secret"`
-	VerifyToken string `yaml:"verify_token" json:"verify_token"`
 }
 
 // RobotTelegramConfig holds the Telegram bot configuration.
@@ -140,6 +112,7 @@ type MCPConfig struct {
 }
 
 type OpenAIConfig struct {
+	Provider       string `yaml:"provider,omitempty" json:"provider,omitempty"` // "openai" (default) or "anthropic"
 	APIKey         string `yaml:"api_key" json:"api_key"`
 	BaseURL        string `yaml:"base_url" json:"base_url"`
 	Model          string `yaml:"model" json:"model"`
@@ -149,7 +122,8 @@ type OpenAIConfig struct {
 	SummaryModel   string `yaml:"summary_model,omitempty" json:"summary_model,omitempty"`
 	SummaryBaseURL string `yaml:"summary_base_url,omitempty" json:"summary_base_url,omitempty"`
 	SummaryAPIKey  string `yaml:"summary_api_key,omitempty" json:"summary_api_key,omitempty"`
-	MaxTotalTokens int    `yaml:"max_total_tokens,omitempty" json:"max_total_tokens,omitempty"`
+	MaxTotalTokens   int `yaml:"max_total_tokens,omitempty" json:"max_total_tokens,omitempty"`
+	RateLimitDelayMs int `yaml:"rate_limit_delay_ms,omitempty" json:"rate_limit_delay_ms,omitempty"` // Min ms between API calls (0=no limit for local models, 2000 for Anthropic free tier)
 }
 
 // ApplyModelDefaults normalizes model fields:
@@ -967,15 +941,15 @@ func Default() *Config {
 			},
 			Retrieval: RetrievalConfig{
 				TopK:                5,
-				SimilarityThreshold: 0.65, // 降低阈值到 0.65，减少漏检
+				SimilarityThreshold: 0.65, // lower threshold to 0.65，reduce missed detections
 				HybridWeight:        0.7,
 			},
 			Indexing: IndexingConfig{
-				ChunkSize:        768, // 增加到 768，更好的上下文保持
+				ChunkSize:        768, // increase to 768，better context preservation
 				ChunkOverlap:     50,
-				MaxChunksPerItem: 20,  // 限制单个知识项最多 20 个块，避免消耗过多配额
-				MaxRPM:           100, // 默认 100 RPM，避免 429 错误
-				RateLimitDelayMs: 600, // 600ms 间隔，对应 100 RPM
+				MaxChunksPerItem: 20,  // limit each knowledge item to max 20 chunks, avoid excessive quota consumption
+				MaxRPM: 100, // default 100 RPM， 429 error
+				RateLimitDelayMs: 600, // 600ms interval, corresponding to 100 RPM
 				MaxRetries:       3,
 				RetryDelayMs:     1000,
 			},
@@ -989,26 +963,26 @@ type KnowledgeConfig struct {
 	BasePath  string          `yaml:"base_path" json:"base_path"` // Knowledge base path
 	Embedding EmbeddingConfig `yaml:"embedding" json:"embedding"`
 	Retrieval RetrievalConfig `yaml:"retrieval" json:"retrieval"`
-	Indexing  IndexingConfig  `yaml:"indexing,omitempty" json:"indexing,omitempty"` // 索引构建配置
+	Indexing  IndexingConfig  `yaml:"indexing,omitempty" json:"indexing,omitempty"` // index build config
 }
 
-// IndexingConfig 索引构建配置（用于控制知识库索引构建时的行为）
+// IndexingConfig index build config（knowledge base）
 type IndexingConfig struct {
-	// 分块配置
-	ChunkSize        int `yaml:"chunk_size,omitempty" json:"chunk_size,omitempty"`                   // 每个块的最大 token 数（估算），默认 512
-	ChunkOverlap     int `yaml:"chunk_overlap,omitempty" json:"chunk_overlap,omitempty"`             // 块之间的重叠 token 数，默认 50
-	MaxChunksPerItem int `yaml:"max_chunks_per_item,omitempty" json:"max_chunks_per_item,omitempty"` // 单个知识项的最大块数量，0 表示不限制
+	// chunking config
+	ChunkSize        int `yaml:"chunk_size,omitempty" json:"chunk_size,omitempty"`                   // max tokens per chunk (estimated)，default 512
+	ChunkOverlap     int `yaml:"chunk_overlap,omitempty" json:"chunk_overlap,omitempty"`             // overlap tokens between chunks，default 50
+	MaxChunksPerItem int `yaml:"max_chunks_per_item,omitempty" json:"max_chunks_per_item,omitempty"` // ，0 
 
-	// 速率限制配置（用于避免 API 速率限制）
-	RateLimitDelayMs int `yaml:"rate_limit_delay_ms,omitempty" json:"rate_limit_delay_ms,omitempty"` // 请求间隔时间（毫秒），0 表示不使用固定延迟
-	MaxRPM           int `yaml:"max_rpm,omitempty" json:"max_rpm,omitempty"`                         // 每分钟最大请求数，0 表示不限制
+	// rate limit config（to avoid API rate limits）
+	RateLimitDelayMs int `yaml:"rate_limit_delay_ms,omitempty" json:"rate_limit_delay_ms,omitempty"` // request interval time（），0 
+	MaxRPM int `yaml:"max_rpm,omitempty" json:"max_rpm,omitempty"` // ，0 
 
-	// 重试配置（用于处理临时错误）
-	MaxRetries   int `yaml:"max_retries,omitempty" json:"max_retries,omitempty"`       // 最大重试次数，默认 3
-	RetryDelayMs int `yaml:"retry_delay_ms,omitempty" json:"retry_delay_ms,omitempty"` // 重试间隔（毫秒），默认 1000
+	// retry config（error）
+	MaxRetries   int `yaml:"max_retries,omitempty" json:"max_retries,omitempty"`       // max retry count，default 3
+	RetryDelayMs int `yaml:"retry_delay_ms,omitempty" json:"retry_delay_ms,omitempty"` // retry delay（），default 1000
 
-	// 批处理配置（用于批量嵌入，当前未使用，保留扩展）
-	BatchSize int `yaml:"batch_size,omitempty" json:"batch_size,omitempty"` // 批量处理大小，0 表示逐个处理
+	// batch processing config（，current，）
+	BatchSize int `yaml:"batch_size,omitempty" json:"batch_size,omitempty"` // ，0 
 }
 
 // EmbeddingConfig holds the embedding model configuration.

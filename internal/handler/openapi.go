@@ -1483,9 +1483,9 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 			},
 			"/api/multi-agent": map[string]interface{}{
 				"post": map[string]interface{}{
-					"tags":        []string{"对话交互"},
-					"summary":     "发送消息并获取 AI 回复（Eino DeepAgent，非流式）",
-					"description": "与 `POST /api/agent-loop` 请求体相同，但由 **CloudWeGo Eino DeepAgent** 执行多代理编排。**前提**：`multi_agent.enabled: true`（可在设置页或 `config.yaml` 开启）；未启用时返回 404 JSON。请求体支持 `webshellConnectionId`（与单代理 WebShell 助手一致）。",
+					"tags": []string{"conversation"},
+					"summary": "message AI （Eino DeepAgent，）",
+					"description": " `POST /api/agent-loop` request body， **CloudWeGo Eino DeepAgent** 。****：`multi_agent.enabled: true`（ `config.yaml` ）；returns 404 JSON。request body `webshellConnectionId`（ WebShell ）。",
 					"operationId": "sendMessageMultiAgent",
 					"requestBody": map[string]interface{}{
 						"required": true,
@@ -1496,19 +1496,19 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 									"properties": map[string]interface{}{
 										"message": map[string]interface{}{
 											"type":        "string",
-											"description": "要发送的消息（必需）",
+											"description": "message（）",
 										},
 										"conversationId": map[string]interface{}{
 											"type":        "string",
-											"description": "对话 ID（可选，不提供则新建）",
+											"description": "conversation ID（，）",
 										},
 										"role": map[string]interface{}{
 											"type":        "string",
-											"description": "角色名称（可选）",
+											"description": "role（）",
 										},
 										"webshellConnectionId": map[string]interface{}{
 											"type":        "string",
-											"description": "WebShell 连接 ID（可选，与 agent-loop 行为一致）",
+											"description": "WebShell connection ID（， agent-loop ）",
 										},
 									},
 									"required": []string{"message"},
@@ -1518,20 +1518,20 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 					},
 					"responses": map[string]interface{}{
 						"200": map[string]interface{}{
-							"description": "成功，响应格式同 /api/agent-loop",
+							"description": "，format /api/agent-loop",
 						},
-						"400": map[string]interface{}{"description": "参数错误"},
-						"401": map[string]interface{}{"description": "未授权"},
-						"404": map[string]interface{}{"description": "多代理未启用或对话不存在"},
-						"500": map[string]interface{}{"description": "执行失败"},
+						"400": map[string]interface{}{"description": "error"},
+						"401": map[string]interface{}{"description": "unauthorized"},
+						"404": map[string]interface{}{"description": "multi-agent not enabledconversation"},
+						"500": map[string]interface{}{"description": "execution failed"},
 					},
 				},
 			},
 			"/api/multi-agent/stream": map[string]interface{}{
 				"post": map[string]interface{}{
-					"tags":        []string{"对话交互"},
-					"summary":     "发送消息并获取 AI 回复（Eino DeepAgent，SSE）",
-					"description": "与 `POST /api/agent-loop/stream` 类似，事件类型兼容；由 Eino DeepAgent 执行。**前提**：`multi_agent.enabled: true`；路由常注册，未启用时仍返回 200 SSE，流内首条为 `type: error` 后接 `done`。支持 `webshellConnectionId`。",
+					"tags": []string{"conversation"},
+					"summary": "message AI （Eino DeepAgent，SSE）",
+					"description": " `POST /api/agent-loop/stream` ，type； Eino DeepAgent 。****：`multi_agent.enabled: true`；，returns 200 SSE， `type: error` `done`。 `webshellConnectionId`。",
 					"operationId": "sendMessageMultiAgentStream",
 					"requestBody": map[string]interface{}{
 						"required": true,
@@ -1557,12 +1557,12 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 								"text/event-stream": map[string]interface{}{
 									"schema": map[string]interface{}{
 										"type":        "string",
-										"description": "SSE 流",
+										"description": "SSE ",
 									},
 								},
 							},
 						},
-						"401": map[string]interface{}{"description": "未授权"},
+						"401": map[string]interface{}{"description": "unauthorized"},
 					},
 				},
 			},

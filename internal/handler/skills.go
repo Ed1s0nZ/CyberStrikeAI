@@ -17,16 +17,16 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// SkillsHandler Skills处理器
+// SkillsHandler Skills handler
 type SkillsHandler struct {
 	manager    *skills.Manager
 	config     *config.Config
 	configPath string
 	logger     *zap.Logger
-	db         *database.DB // 数据库连接（用于获取调用统计）
+	db *database.DB // database connection（）
 }
 
-// NewSkillsHandler 创建新的Skills处理器
+// NewSkillsHandler creates a new Skills handler
 func NewSkillsHandler(manager *skills.Manager, cfg *config.Config, configPath string, logger *zap.Logger) *SkillsHandler {
 	return &SkillsHandler{
 		manager:    manager,
@@ -36,36 +36,36 @@ func NewSkillsHandler(manager *skills.Manager, cfg *config.Config, configPath st
 	}
 }
 
-// SetDB 设置数据库连接（用于获取调用统计）
+// SetDB database connection（）
 func (h *SkillsHandler) SetDB(db *database.DB) {
 	h.db = db
 }
 
-// GetSkills 获取所有skills列表（支持分页和搜索）
+// GetSkills skillslist（）
 func (h *SkillsHandler) GetSkills(c *gin.Context) {
 	skillList, err := h.manager.ListSkills()
 	if err != nil {
-		h.logger.Error("获取skills列表失败", zap.Error(err))
+		h.logger.Error("skillstable failed", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// 搜索参数
+	// search params
 	searchKeyword := strings.TrimSpace(c.Query("search"))
 
-	// 先加载所有skills的详细信息用于搜索过滤
+	// loadskills
 	allSkillsInfo := make([]map[string]interface{}, 0, len(skillList))
 	for _, skillName := range skillList {
 		skill, err := h.manager.LoadSkill(skillName)
 		if err != nil {
-			h.logger.Warn("加载skill失败", zap.String("skill", skillName), zap.Error(err))
+			h.logger.Warn("loadskill", zap.String("skill", skillName), zap.Error(err))
 			continue
 		}
 
-		// 获取文件信息
+		// get file info
 		skillPath := skill.Path
 		skillFile := filepath.Join(skillPath, "SKILL.md")
-		// 尝试其他可能的文件名
+		// filename
 		if _, err := os.Stat(skillFile); os.IsNotExist(err) {
 			alternatives := []string{
 				filepath.Join(skillPath, "skill.md"),
@@ -98,7 +98,7 @@ func (h *SkillsHandler) GetSkills(c *gin.Context) {
 		allSkillsInfo = append(allSkillsInfo, skillInfo)
 	}
 
-	// 如果有搜索关键词，进行过滤
+	// if search keyword exists, filter
 	filteredSkillsInfo := allSkillsInfo
 	if searchKeyword != "" {
 		keywordLower := strings.ToLower(searchKeyword)
@@ -116,12 +116,12 @@ func (h *SkillsHandler) GetSkills(c *gin.Context) {
 		}
 	}
 
-	// 分页参数
-	limit := 20 // 默认每页20条
+	// pagination params
+	limit := 20 // default20
 	offset := 0
 	if limitStr := c.Query("limit"); limitStr != "" {
 		if parsed, err := parseInt(limitStr); err == nil && parsed > 0 {
-			// 允许更大的limit用于搜索场景，但设置一个合理的上限（10000）
+			// allow larger limit for search scenarios，set a reasonable upper limit（10000）
 			if parsed <= 10000 {
 				limit = parsed
 			} else {
@@ -135,7 +135,7 @@ func (h *SkillsHandler) GetSkills(c *gin.Context) {
 		}
 	}
 
-	// 计算分页范围
+	// calculate pagination range
 	total := len(filteredSkillsInfo)
 	start := offset
 	end := offset + limit
@@ -146,7 +146,7 @@ func (h *SkillsHandler) GetSkills(c *gin.Context) {
 		end = total
 	}
 
-	// 获取当前页的skill列表
+	// currentskilllist
 	var paginatedSkillsInfo []map[string]interface{}
 	if start < end {
 		paginatedSkillsInfo = filteredSkillsInfo[start:end]
@@ -162,22 +162,22 @@ func (h *SkillsHandler) GetSkills(c *gin.Context) {
 	})
 }
 
-// GetSkill 获取单个skill的详细信息
+// GetSkill get single skill details
 func (h *SkillsHandler) GetSkill(c *gin.Context) {
 	skillName := c.Param("name")
 	if skillName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "skill名称不能为空"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "skill name cannot be empty"})
 		return
 	}
 
 	skill, err := h.manager.LoadSkill(skillName)
 	if err != nil {
-		h.logger.Warn("加载skill失败", zap.String("skill", skillName), zap.Error(err))
-		c.JSON(http.StatusNotFound, gin.H{"error": "skill不存在: " + err.Error()})
+		h.logger.Warn("loadskill", zap.String("skill", skillName), zap.Error(err))
+		c.JSON(http.StatusNotFound, gin.H{"error": "skill not found: " + err.Error()})
 		return
 	}
 
-	// 获取文件信息
+	// get file info
 	skillPath := skill.Path
 	skillFile := filepath.Join(skillPath, "SKILL.md")
 	if _, err := os.Stat(skillFile); os.IsNotExist(err) {
@@ -214,11 +214,11 @@ func (h *SkillsHandler) GetSkill(c *gin.Context) {
 	})
 }
 
-// GetSkillBoundRoles 获取绑定指定skill的角色列表
+// GetSkillBoundRoles skillrolelist
 func (h *SkillsHandler) GetSkillBoundRoles(c *gin.Context) {
 	skillName := c.Param("name")
 	if skillName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "skill名称不能为空"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "skill name cannot be empty"})
 		return
 	}
 
@@ -230,7 +230,7 @@ func (h *SkillsHandler) GetSkillBoundRoles(c *gin.Context) {
 	})
 }
 
-// getRolesBoundToSkill 获取绑定指定skill的角色列表（不修改配置）
+// getRolesBoundToSkill skillrolelist（）
 func (h *SkillsHandler) getRolesBoundToSkill(skillName string) []string {
 	if h.config.Roles == nil {
 		return []string{}
@@ -238,12 +238,12 @@ func (h *SkillsHandler) getRolesBoundToSkill(skillName string) []string {
 
 	boundRoles := make([]string, 0)
 	for roleName, role := range h.config.Roles {
-		// 确保角色名称正确设置
+		// role
 		if role.Name == "" {
 			role.Name = roleName
 		}
 
-		// 检查角色的Skills列表中是否包含该skill
+		// roleSkillslistskill
 		if len(role.Skills) > 0 {
 			for _, skill := range role.Skills {
 				if skill == skillName {
@@ -257,7 +257,7 @@ func (h *SkillsHandler) getRolesBoundToSkill(skillName string) []string {
 	return boundRoles
 }
 
-// CreateSkill 创建新skill
+// CreateSkill create new skill
 func (h *SkillsHandler) CreateSkill(c *gin.Context) {
 	var req struct {
 		Name        string `json:"name" binding:"required"`
@@ -266,17 +266,17 @@ func (h *SkillsHandler) CreateSkill(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的请求参数: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request parameters: " + err.Error()})
 		return
 	}
 
-	// 验证skill名称（只允许字母、数字、连字符和下划线）
+	// skill（only allow letters, numbers, hyphens and underscores）
 	if !isValidSkillName(req.Name) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "skill名称只能包含字母、数字、连字符和下划线"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "skill name can only contain letters, numbers, hyphens and underscores"})
 		return
 	}
 
-	// 获取skills目录
+	// get skills directory
 	skillsDir := h.config.SkillsDir
 	if skillsDir == "" {
 		skillsDir = "skills"
@@ -286,27 +286,27 @@ func (h *SkillsHandler) CreateSkill(c *gin.Context) {
 		skillsDir = filepath.Join(configDir, skillsDir)
 	}
 
-	// 创建skill目录
+	// create skill directory
 	skillDir := filepath.Join(skillsDir, req.Name)
 	if err := os.MkdirAll(skillDir, 0755); err != nil {
-		h.logger.Error("创建skill目录失败", zap.String("skill", req.Name), zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建skill目录失败: " + err.Error()})
+		h.logger.Error("failed to create skill directory", zap.String("skill", req.Name), zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create skill directory: " + err.Error()})
 		return
 	}
 
-	// 检查是否已存在
+	// check if already exists
 	skillFile := filepath.Join(skillDir, "SKILL.md")
 	if _, err := os.Stat(skillFile); err == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "skill已存在"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "skill already exists"})
 		return
 	}
 
-	// 构建SKILL.md内容
+	// build SKILL.md content
 	var content strings.Builder
 	content.WriteString("---\n")
 	content.WriteString(fmt.Sprintf("name: %s\n", req.Name))
 	if req.Description != "" {
-		// 如果描述包含特殊字符，需要加引号
+		// if description contains special chars, needs quoting
 		desc := req.Description
 		if strings.Contains(desc, ":") || strings.Contains(desc, "\n") {
 			desc = fmt.Sprintf(`"%s"`, strings.ReplaceAll(desc, `"`, `\"`))
@@ -317,17 +317,17 @@ func (h *SkillsHandler) CreateSkill(c *gin.Context) {
 	content.WriteString("---\n\n")
 	content.WriteString(req.Content)
 
-	// 写入文件
+	// write file
 	if err := os.WriteFile(skillFile, []byte(content.String()), 0644); err != nil {
-		h.logger.Error("创建skill文件失败", zap.String("skill", req.Name), zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建skill文件失败: " + err.Error()})
+		h.logger.Error("failed to create skill file", zap.String("skill", req.Name), zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create skill file: " + err.Error()})
 		return
 	}
 	h.manager.InvalidateSkill(req.Name)
 
-	h.logger.Info("创建skill成功", zap.String("skill", req.Name))
+	h.logger.Info("skill created successfully", zap.String("skill", req.Name))
 	c.JSON(http.StatusOK, gin.H{
-		"message": "skill已创建",
+		"message": "skillcreated",
 		"skill": map[string]interface{}{
 			"name": req.Name,
 			"path": skillDir,
@@ -335,11 +335,11 @@ func (h *SkillsHandler) CreateSkill(c *gin.Context) {
 	})
 }
 
-// UpdateSkill 更新skill
+// UpdateSkill update skill
 func (h *SkillsHandler) UpdateSkill(c *gin.Context) {
 	skillName := c.Param("name")
 	if skillName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "skill名称不能为空"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "skill name cannot be empty"})
 		return
 	}
 
@@ -349,11 +349,11 @@ func (h *SkillsHandler) UpdateSkill(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的请求参数: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request parameters: " + err.Error()})
 		return
 	}
 
-	// 获取skills目录
+	// get skills directory
 	skillsDir := h.config.SkillsDir
 	if skillsDir == "" {
 		skillsDir = "skills"
@@ -363,7 +363,7 @@ func (h *SkillsHandler) UpdateSkill(c *gin.Context) {
 		skillsDir = filepath.Join(configDir, skillsDir)
 	}
 
-	// 查找skill文件
+	// find skill file
 	skillDir := filepath.Join(skillsDir, skillName)
 	skillFile := filepath.Join(skillDir, "SKILL.md")
 	if _, err := os.Stat(skillFile); os.IsNotExist(err) {
@@ -381,20 +381,20 @@ func (h *SkillsHandler) UpdateSkill(c *gin.Context) {
 			}
 		}
 		if !found {
-			c.JSON(http.StatusNotFound, gin.H{"error": "skill不存在"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "skill not found"})
 			return
 		}
 	}
 
-	// 读取现有文件以保留front matter中的name
+	// read existing file to preserve name in front matter
 	existingContent, err := os.ReadFile(skillFile)
 	if err != nil {
-		h.logger.Error("读取skill文件失败", zap.String("skill", skillName), zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "读取skill文件失败: " + err.Error()})
+		h.logger.Error("failed to read skill file", zap.String("skill", skillName), zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read skill file: " + err.Error()})
 		return
 	}
 
-	// 解析现有内容，提取name
+	// parse，name
 	existingName := skillName
 	contentStr := string(existingContent)
 	if strings.HasPrefix(contentStr, "---") {
@@ -416,12 +416,12 @@ func (h *SkillsHandler) UpdateSkill(c *gin.Context) {
 		}
 	}
 
-	// 构建新的SKILL.md内容
+	// build new SKILL.md content
 	var newContent strings.Builder
 	newContent.WriteString("---\n")
 	newContent.WriteString(fmt.Sprintf("name: %s\n", existingName))
 	if req.Description != "" {
-		// 如果描述包含特殊字符，需要加引号
+		// if description contains special chars, needs quoting
 		desc := req.Description
 		if strings.Contains(desc, ":") || strings.Contains(desc, "\n") {
 			desc = fmt.Sprintf(`"%s"`, strings.ReplaceAll(desc, `"`, `\"`))
@@ -432,43 +432,43 @@ func (h *SkillsHandler) UpdateSkill(c *gin.Context) {
 	newContent.WriteString("---\n\n")
 	newContent.WriteString(req.Content)
 
-	// 写入文件（统一使用SKILL.md）
+	// write file（SKILL.md）
 	targetFile := filepath.Join(skillDir, "SKILL.md")
 	if err := os.WriteFile(targetFile, []byte(newContent.String()), 0644); err != nil {
-		h.logger.Error("更新skill文件失败", zap.String("skill", skillName), zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新skill文件失败: " + err.Error()})
+		h.logger.Error("update skill", zap.String("skill", skillName), zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "update skill: " + err.Error()})
 		return
 	}
 
-	// 如果原文件不是SKILL.md，删除旧文件
+	// SKILL.md，delete
 	if skillFile != targetFile {
 		os.Remove(skillFile)
 	}
 	h.manager.InvalidateSkill(skillName)
 
-	h.logger.Info("更新skill成功", zap.String("skill", skillName))
+	h.logger.Info("update skill", zap.String("skill", skillName))
 	c.JSON(http.StatusOK, gin.H{
-		"message": "skill已更新",
+		"message": "skill updated",
 	})
 }
 
-// DeleteSkill 删除skill
+// DeleteSkill deleteskill
 func (h *SkillsHandler) DeleteSkill(c *gin.Context) {
 	skillName := c.Param("name")
 	if skillName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "skill名称不能为空"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "skill name cannot be empty"})
 		return
 	}
 
-	// 检查是否有角色绑定了该skill，如果有则自动移除绑定
+	// roleskill，if so, auto-remove binding
 	affectedRoles := h.removeSkillFromRoles(skillName)
 	if len(affectedRoles) > 0 {
-		h.logger.Info("从角色中移除skill绑定",
+		h.logger.Info("roleskill",
 			zap.String("skill", skillName),
 			zap.Strings("roles", affectedRoles))
 	}
 
-	// 获取skills目录
+	// get skills directory
 	skillsDir := h.config.SkillsDir
 	if skillsDir == "" {
 		skillsDir = "skills"
@@ -478,38 +478,38 @@ func (h *SkillsHandler) DeleteSkill(c *gin.Context) {
 		skillsDir = filepath.Join(configDir, skillsDir)
 	}
 
-	// 删除skill目录
+	// deleteskill
 	skillDir := filepath.Join(skillsDir, skillName)
 	if err := os.RemoveAll(skillDir); err != nil {
-		h.logger.Error("删除skill失败", zap.String("skill", skillName), zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除skill失败: " + err.Error()})
+		h.logger.Error("deleteskill", zap.String("skill", skillName), zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "deleteskill: " + err.Error()})
 		return
 	}
 	h.manager.InvalidateSkill(skillName)
 
-	responseMsg := "skill已删除"
+	responseMsg := "skilldelete"
 	if len(affectedRoles) > 0 {
-		responseMsg = fmt.Sprintf("skill已删除，已自动从 %d 个角色中移除绑定: %s",
+		responseMsg = fmt.Sprintf("skilldelete，auto-removed from %d role: %s",
 			len(affectedRoles), strings.Join(affectedRoles, ", "))
 	}
 
-	h.logger.Info("删除skill成功", zap.String("skill", skillName))
+	h.logger.Info("deleteskill", zap.String("skill", skillName))
 	c.JSON(http.StatusOK, gin.H{
 		"message":        responseMsg,
 		"affected_roles": affectedRoles,
 	})
 }
 
-// GetSkillStats 获取skills调用统计信息
+// GetSkillStats get skills call statistics
 func (h *SkillsHandler) GetSkillStats(c *gin.Context) {
 	skillList, err := h.manager.ListSkills()
 	if err != nil {
-		h.logger.Error("获取skills列表失败", zap.Error(err))
+		h.logger.Error("skillstable failed", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// 获取skills目录
+	// get skills directory
 	skillsDir := h.config.SkillsDir
 	if skillsDir == "" {
 		skillsDir = "skills"
@@ -519,12 +519,12 @@ func (h *SkillsHandler) GetSkillStats(c *gin.Context) {
 		skillsDir = filepath.Join(configDir, skillsDir)
 	}
 
-	// 从数据库加载调用统计
+	// load
 	var skillStatsMap map[string]*database.SkillStats
 	if h.db != nil {
 		dbStats, err := h.db.LoadSkillStats()
 		if err != nil {
-			h.logger.Warn("从数据库加载Skills统计信息失败", zap.Error(err))
+			h.logger.Warn("loadSkills", zap.Error(err))
 			skillStatsMap = make(map[string]*database.SkillStats)
 		} else {
 			skillStatsMap = dbStats
@@ -533,7 +533,7 @@ func (h *SkillsHandler) GetSkillStats(c *gin.Context) {
 		skillStatsMap = make(map[string]*database.SkillStats)
 	}
 
-	// 构建统计信息（包含所有skills，即使没有调用记录）
+	// （skills，record）
 	statsList := make([]map[string]interface{}, 0, len(skillList))
 	totalCalls := 0
 	totalSuccess := 0
@@ -578,52 +578,52 @@ func (h *SkillsHandler) GetSkillStats(c *gin.Context) {
 	})
 }
 
-// ClearSkillStats 清空所有Skills统计信息
+// ClearSkillStats clearSkills
 func (h *SkillsHandler) ClearSkillStats(c *gin.Context) {
 	if h.db == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "数据库连接未配置"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database connection"})
 		return
 	}
 
 	if err := h.db.ClearSkillStats(); err != nil {
-		h.logger.Error("清空Skills统计信息失败", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "清空统计信息失败: " + err.Error()})
+		h.logger.Error("clearSkills", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "clear: " + err.Error()})
 		return
 	}
 
-	h.logger.Info("已清空所有Skills统计信息")
+	h.logger.Info("clearSkills")
 	c.JSON(http.StatusOK, gin.H{
-		"message": "已清空所有Skills统计信息",
+		"message": "clearSkills",
 	})
 }
 
-// ClearSkillStatsByName 清空指定skill的统计信息
+// ClearSkillStatsByName clearskill
 func (h *SkillsHandler) ClearSkillStatsByName(c *gin.Context) {
 	skillName := c.Param("name")
 	if skillName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "skill名称不能为空"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "skill name cannot be empty"})
 		return
 	}
 
 	if h.db == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "数据库连接未配置"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database connection"})
 		return
 	}
 
 	if err := h.db.ClearSkillStatsByName(skillName); err != nil {
-		h.logger.Error("清空指定skill统计信息失败", zap.String("skill", skillName), zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "清空统计信息失败: " + err.Error()})
+		h.logger.Error("clearskill", zap.String("skill", skillName), zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "clear: " + err.Error()})
 		return
 	}
 
-	h.logger.Info("已清空指定skill统计信息", zap.String("skill", skillName))
+	h.logger.Info("clearskill", zap.String("skill", skillName))
 	c.JSON(http.StatusOK, gin.H{
-		"message": fmt.Sprintf("已清空skill '%s' 的统计信息", skillName),
+		"message": fmt.Sprintf("clearskill '%s' ", skillName),
 	})
 }
 
-// removeSkillFromRoles 从所有角色中移除指定的skill绑定
-// 返回受影响角色名称列表
+// removeSkillFromRoles roleskill
+// returnsrolelist
 func (h *SkillsHandler) removeSkillFromRoles(skillName string) []string {
 	if h.config.Roles == nil {
 		return []string{}
@@ -632,14 +632,14 @@ func (h *SkillsHandler) removeSkillFromRoles(skillName string) []string {
 	affectedRoles := make([]string, 0)
 	rolesToUpdate := make(map[string]config.RoleConfig)
 
-	// 遍历所有角色，查找并移除skill绑定
+	// role，skill
 	for roleName, role := range h.config.Roles {
-		// 确保角色名称正确设置
+		// role
 		if role.Name == "" {
 			role.Name = roleName
 		}
 
-		// 检查角色的Skills列表中是否包含要删除的skill
+		// roleSkillslistdeleteskill
 		if len(role.Skills) > 0 {
 			updated := false
 			newSkills := make([]string, 0, len(role.Skills))
@@ -658,83 +658,83 @@ func (h *SkillsHandler) removeSkillFromRoles(skillName string) []string {
 		}
 	}
 
-	// 如果有角色需要更新，保存到文件
+	// role，
 	if len(rolesToUpdate) > 0 {
-		// 更新内存中的配置
+		// update in-memory config
 		for roleName, role := range rolesToUpdate {
 			h.config.Roles[roleName] = role
 		}
-		// 保存更新后的角色配置到文件
+		// role
 		if err := h.saveRolesConfig(); err != nil {
-			h.logger.Error("保存角色配置失败", zap.Error(err))
+			h.logger.Error("role", zap.Error(err))
 		}
 	}
 
 	return affectedRoles
 }
 
-// saveRolesConfig 保存角色配置到文件（从SkillsHandler调用）
+// saveRolesConfig role（SkillsHandler）
 func (h *SkillsHandler) saveRolesConfig() error {
 	configDir := filepath.Dir(h.configPath)
 	rolesDir := h.config.RolesDir
 	if rolesDir == "" {
-		rolesDir = "roles" // 默认目录
+		rolesDir = "roles" // default directory
 	}
 
-	// 如果是相对路径，相对于配置文件所在目录
+	// if relative path, relative to config file directory
 	if !filepath.IsAbs(rolesDir) {
 		rolesDir = filepath.Join(configDir, rolesDir)
 	}
 
-	// 确保目录存在
+	// ensure directory exists
 	if err := os.MkdirAll(rolesDir, 0755); err != nil {
-		return fmt.Errorf("创建角色目录失败: %w", err)
+		return fmt.Errorf("role: %w", err)
 	}
 
-	// 保存每个角色到独立的文件
+	// role
 	if h.config.Roles != nil {
 		for roleName, role := range h.config.Roles {
-			// 确保角色名称正确设置
+			// role
 			if role.Name == "" {
 				role.Name = roleName
 			}
 
-			// 使用角色名称作为文件名（安全化文件名，避免特殊字符）
+			// rolefilename（filename，）
 			safeFileName := sanitizeRoleFileName(role.Name)
 			roleFile := filepath.Join(rolesDir, safeFileName+".yaml")
 
-			// 将角色配置序列化为YAML
+			// roleYAML
 			roleData, err := yaml.Marshal(&role)
 			if err != nil {
-				h.logger.Error("序列化角色配置失败", zap.String("role", roleName), zap.Error(err))
+				h.logger.Error("role", zap.String("role", roleName), zap.Error(err))
 				continue
 			}
 
-			// 处理icon字段：确保包含\U的icon值被引号包围（YAML需要引号才能正确解析Unicode转义）
+			// process icon field：\Uicon（YAMLparseUnicode）
 			roleDataStr := string(roleData)
 			if role.Icon != "" && strings.HasPrefix(role.Icon, "\\U") {
-				// 匹配 icon: \UXXXXXXXX 格式（没有引号），排除已经有引号的情况
+				// match icon: \UXXXXXXXX format（without quotes），exclude already quoted cases
 				re := regexp.MustCompile(`(?m)^(icon:\s+)(\\U[0-9A-F]{8})(\s*)$`)
 				roleDataStr = re.ReplaceAllString(roleDataStr, `${1}"${2}"${3}`)
 				roleData = []byte(roleDataStr)
 			}
 
-			// 写入文件
+			// write file
 			if err := os.WriteFile(roleFile, roleData, 0644); err != nil {
-				h.logger.Error("保存角色配置文件失败", zap.String("role", roleName), zap.String("file", roleFile), zap.Error(err))
+				h.logger.Error("role", zap.String("role", roleName), zap.String("file", roleFile), zap.Error(err))
 				continue
 			}
 
-			h.logger.Info("角色配置已保存到文件", zap.String("role", roleName), zap.String("file", roleFile))
+			h.logger.Info("roleconfig saved", zap.String("role", roleName), zap.String("file", roleFile))
 		}
 	}
 
 	return nil
 }
 
-// sanitizeRoleFileName 将角色名称转换为安全的文件名
+// sanitizeRoleFileName rolefilename
 func sanitizeRoleFileName(name string) string {
-	// 替换可能不安全的字符
+	// replace potentially unsafe chars
 	replacer := map[rune]string{
 		'/':  "_",
 		'\\': "_",
@@ -758,7 +758,7 @@ func sanitizeRoleFileName(name string) string {
 	}
 
 	fileName := string(result)
-	// 如果文件名为空，使用默认名称
+	// filename，default
 	if fileName == "" {
 		fileName = "role"
 	}
@@ -766,12 +766,12 @@ func sanitizeRoleFileName(name string) string {
 	return fileName
 }
 
-// isValidSkillName 验证skill名称是否有效
+// isValidSkillName validate skill name
 func isValidSkillName(name string) bool {
 	if name == "" || len(name) > 100 {
 		return false
 	}
-	// 只允许字母、数字、连字符和下划线
+	// only allow letters, numbers, hyphens and underscores
 	for _, r := range name {
 		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_') {
 			return false

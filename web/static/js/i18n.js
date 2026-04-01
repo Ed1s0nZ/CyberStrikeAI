@@ -1,4 +1,4 @@
-// 前端国际化初始化（基于 i18next 浏览器版本）
+// beforeInitialize（ i18next BrowserVersion）
 (function () {
     const DEFAULT_LANG = 'zh-CN';
     const STORAGE_KEY = 'csai_lang';
@@ -6,7 +6,7 @@
 
     const loadedLangs = {};
 
-    // 供 bootstrap 等逻辑等待：避免 chat 在 t() 未就绪时用中文硬编码渲染，导致与语言标签不一致
+ // bootstrap ： chat in t() not yetthen middleEncoderender，and languageTagnot 
     let i18nReadyResolve;
     window.i18nReady = new Promise(function (resolve) {
         i18nReadyResolve = resolve;
@@ -19,7 +19,7 @@
                 return stored;
             }
         } catch (e) {
-            console.warn('无法读取语言设置:', e);
+            console.warn('Unable toReadlanguageSet:', e);
         }
 
         const navLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
@@ -41,7 +41,7 @@
                 cache: 'no-cache'
             });
             if (!resp.ok) {
-                console.warn('加载语言包失败:', lang, resp.status);
+                console.warn('Loadlanguage packFailed:', lang, resp.status);
                 return;
             }
             const data = await resp.json();
@@ -50,7 +50,7 @@
             }
             loadedLangs[lang] = true;
         } catch (e) {
-            console.error('加载语言包异常:', lang, e);
+            console.error('Loadlanguage packAbnormal:', lang, e);
         }
     }
 
@@ -67,7 +67,7 @@
             const isFormControl = (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA');
             const attrList = el.getAttribute('data-i18n-attr');
             const text = i18next.t(key);
-            // 仅当元素无子元素（仅文本或空）时才替换文本，避免覆盖卡片内的数字、子节点等；input/textarea 永不设置 textContent
+ // elementNoneelement（textor Empty）only replacetext，inside's 、node；input/textarea not Set textContent
             const hasNoElementChildren = !el.querySelector('*');
             if (!skipText && !isFormControl && hasNoElementChildren && text && typeof text === 'string') {
                 el.textContent = text;
@@ -89,7 +89,7 @@
             }
         });
 
-        // 对话输入框：若 value 与 placeholder 相同，清空 value 以便正确显示占位提示
+ // ConversationInput： value and placeholder same，Clear value ShowplaceholderNotice
         try {
             const chatInput = document.getElementById('chat-input');
             if (chatInput && chatInput.tagName === 'TEXTAREA') {
@@ -100,7 +100,7 @@
             }
         } catch (e) { /* ignore */ }
 
-        // 更新 html lang 属性
+ // Update html lang 
         try {
             if (document && document.documentElement) {
                 document.documentElement.lang = i18next.language || DEFAULT_LANG;
@@ -150,7 +150,7 @@
         try {
             localStorage.setItem(STORAGE_KEY, lang);
         } catch (e) {
-            console.warn('无法保存语言设置:', e);
+            console.warn('Unable toSavelanguageSet:', e);
         }
         applyTranslations(document);
         updateLangLabel();
@@ -164,7 +164,7 @@
 
     async function initI18n() {
         if (typeof i18next === 'undefined') {
-            console.warn('i18next 未加载，跳过前端国际化初始化');
+ console.warn('i18next not yetLoad，beforeInitialize');
             if (typeof i18nReadyResolve === 'function') i18nReadyResolve();
             return;
         }
@@ -184,7 +184,7 @@
             window.__locale = i18next.language || initialLang;
         } catch (e) { /* ignore */ }
 
-        // 导出全局函数供其他脚本调用（支持插值参数，如 _t('key', { count: 2 })）
+ // Exportits Call（Parameter， _t('key', { count: 2 })）
         window.t = function (key, opts) {
             if (typeof i18next === 'undefined') return key;
             return i18next.t(key, opts);
@@ -192,7 +192,7 @@
         window.changeLanguage = changeLanguage;
         window.applyTranslations = applyTranslations;
 
-        // 语言切换下拉支持
+ // languageSwitch
         window.toggleLangDropdown = function () {
             const dropdown = document.getElementById('lang-dropdown');
             if (!dropdown) return;
@@ -209,7 +209,7 @@
 
         document.addEventListener('click', handleGlobalClickForLangDropdown);
 
-        // 若 chat 已在 i18n 完成前用后备中文渲染了系统就绪消息，这里按当前语言纠正一次
+ // chat alreadyin i18n Completebeforeaftermiddlerender systemthen Message，this by Currentlanguagetime
         try {
             if (typeof refreshSystemReadyMessageBubbles === 'function') {
                 refreshSystemReadyMessageBubbles();
@@ -220,9 +220,9 @@
     }
 
     document.addEventListener('DOMContentLoaded', function () {
-        // i18n 初始化在 DOM Ready 后执行
+        // i18n Initializein  DOM Ready afterExecute
         initI18n().catch(function (e) {
-            console.error('初始化国际化失败:', e);
+ console.error('InitializeFailed:', e);
             if (typeof i18nReadyResolve === 'function') i18nReadyResolve();
         });
     });

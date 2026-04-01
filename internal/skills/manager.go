@@ -10,12 +10,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// Manager Skills管理器
+// Manager Skills manager
 type Manager struct {
 	skillsDir string
 	logger    *zap.Logger
-	skills    map[string]*cachedSkill // 缓存已加载的skills（含文件状态）
-	mu        sync.RWMutex            // 保护skills map的并发访问
+	skills map[string]*cachedSkill // loadskills（status）
+	mu        sync.RWMutex            // protects skills map concurrent access
 }
 
 type cachedSkill struct {
@@ -24,15 +24,15 @@ type cachedSkill struct {
 	modTime  int64
 }
 
-// Skill Skill定义
+// Skill Skill definition
 type Skill struct {
-	Name        string // Skill名称
-	Description string // Skill描述
-	Content     string // Skill内容（从SKILL.md中提取）
-	Path        string // Skill路径
+	Name        string // Skill name
+	Description string // Skill description
+	Content     string // Skill content (extracted from SKILL.md)
+	Path        string // Skill path
 }
 
-// NewManager 创建新的Skills管理器
+// NewManager creates a new Skills manager
 func NewManager(skillsDir string, logger *zap.Logger) *Manager {
 	return &Manager{
 		skillsDir: skillsDir,
@@ -41,18 +41,18 @@ func NewManager(skillsDir string, logger *zap.Logger) *Manager {
 	}
 }
 
-// LoadSkill 加载单个skill
+// LoadSkill loadskill
 func (m *Manager) LoadSkill(skillName string) (*Skill, error) {
-	// 构建skill路径
+	// build skill path
 	skillPath := filepath.Join(m.skillsDir, skillName)
 
-	// 检查目录是否存在
+	// check if directory exists
 	if _, err := os.Stat(skillPath); os.IsNotExist(err) {
 		m.InvalidateSkill(skillName)
 		return nil, fmt.Errorf("skill %s not found", skillName)
 	}
 
-	// 查找skill文件并读取文件状态
+	// find skill filestatus
 	skillFile, err := m.resolveSkillFile(skillPath)
 	if err != nil {
 		m.InvalidateSkill(skillName)
@@ -65,7 +65,7 @@ func (m *Manager) LoadSkill(skillName string) (*Skill, error) {
 	}
 	modTime := fileInfo.ModTime().UnixNano()
 
-	// 先尝试读锁命中缓存（文件路径和修改时间都未变化）
+	// first try read lock cache hit（file path）
 	m.mu.RLock()
 	if cached, exists := m.skills[skillName]; exists &&
 		cached.filePath == skillFile &&
@@ -75,16 +75,16 @@ func (m *Manager) LoadSkill(skillName string) (*Skill, error) {
 	}
 	m.mu.RUnlock()
 
-	// 读取skill文件
+	// read skill file
 	content, err := os.ReadFile(skillFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read skill file: %w", err)
 	}
 
-	// 解析skill内容
+	// parseskill
 	skill := m.parseSkillContent(string(content), skillName, skillPath)
 
-	// 使用写锁更新缓存
+	// use write lock to update cache
 	m.mu.Lock()
 	m.skills[skillName] = &cachedSkill{
 		skill:    skill,
@@ -96,7 +96,7 @@ func (m *Manager) LoadSkill(skillName string) (*Skill, error) {
 	return skill, nil
 }
 
-// LoadSkills 批量加载skills
+// LoadSkills loadskills
 func (m *Manager) LoadSkills(skillNames []string) ([]*Skill, error) {
 	var skills []*Skill
 	var errors []string
@@ -105,7 +105,7 @@ func (m *Manager) LoadSkills(skillNames []string) ([]*Skill, error) {
 		skill, err := m.LoadSkill(name)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("failed to load skill %s: %v", name, err))
-			m.logger.Warn("加载skill失败", zap.String("skill", name), zap.Error(err))
+			m.logger.Warn("loadskill", zap.String("skill", name), zap.Error(err))
 			continue
 		}
 		skills = append(skills, skill)
@@ -118,7 +118,7 @@ func (m *Manager) LoadSkills(skillNames []string) ([]*Skill, error) {
 	return skills, nil
 }
 
-// ListSkills 列出所有可用的skills
+// ListSkills list all available skills
 func (m *Manager) ListSkills() ([]string, error) {
 	if _, err := os.Stat(m.skillsDir); os.IsNotExist(err) {
 		return []string{}, nil
@@ -136,14 +136,14 @@ func (m *Manager) ListSkills() ([]string, error) {
 		}
 
 		skillName := entry.Name()
-		// 检查是否有SKILL.md文件
+		// check if SKILL.md file exists
 		skillFile := filepath.Join(m.skillsDir, skillName, "SKILL.md")
 		if _, err := os.Stat(skillFile); err == nil {
 			skills = append(skills, skillName)
 			continue
 		}
 
-		// 尝试其他可能的文件名
+		// filename
 		alternatives := []string{
 			filepath.Join(m.skillsDir, skillName, "skill.md"),
 			filepath.Join(m.skillsDir, skillName, "README.md"),
@@ -161,13 +161,13 @@ func (m *Manager) ListSkills() ([]string, error) {
 }
 
 func (m *Manager) resolveSkillFile(skillPath string) (string, error) {
-	// 优先标准文件名
+	// filename
 	skillFile := filepath.Join(skillPath, "SKILL.md")
 	if _, err := os.Stat(skillFile); err == nil {
 		return skillFile, nil
 	}
 
-	// 兼容历史文件名
+	// filename
 	alternatives := []string{
 		filepath.Join(skillPath, "skill.md"),
 		filepath.Join(skillPath, "README.md"),
@@ -182,33 +182,33 @@ func (m *Manager) resolveSkillFile(skillPath string) (string, error) {
 	return "", fmt.Errorf("skill file not found for %s", filepath.Base(skillPath))
 }
 
-// InvalidateSkill 使指定skill缓存失效
+// InvalidateSkill invalidate specified skill cache
 func (m *Manager) InvalidateSkill(skillName string) {
 	m.mu.Lock()
 	delete(m.skills, skillName)
 	m.mu.Unlock()
 }
 
-// InvalidateAll 清空全部skill缓存
+// InvalidateAll clearskill
 func (m *Manager) InvalidateAll() {
 	m.mu.Lock()
 	m.skills = make(map[string]*cachedSkill)
 	m.mu.Unlock()
 }
 
-// parseSkillContent 解析skill内容
-// 支持YAML front matter格式，类似goskills
+// parseSkillContent parseskill
+// YAML front matterformat，goskills
 func (m *Manager) parseSkillContent(content, skillName, skillPath string) *Skill {
 	skill := &Skill{
 		Name: skillName,
 		Path: skillPath,
 	}
 
-	// 检查是否有YAML front matter
+	// check if has YAML front matter
 	if strings.HasPrefix(content, "---") {
 		parts := strings.SplitN(content, "---", 3)
 		if len(parts) >= 3 {
-			// 解析front matter（简单实现，只提取name和description）
+			// parsefront matter（simple implementation, only extract name and description）
 			frontMatter := parts[1]
 			lines := strings.Split(frontMatter, "\n")
 			for _, line := range lines {
@@ -225,20 +225,20 @@ func (m *Manager) parseSkillContent(content, skillName, skillPath string) *Skill
 					skill.Description = desc
 				}
 			}
-			// 剩余部分是内容
+			// remaining part is content
 			if len(parts) == 3 {
 				skill.Content = strings.TrimSpace(parts[2])
 			}
 		} else {
-			// 没有front matter，整个内容就是skill内容
+			// no front matter, entire content is skill content
 			skill.Content = content
 		}
 	} else {
-		// 没有front matter，整个内容就是skill内容
+		// no front matter, entire content is skill content
 		skill.Content = content
 	}
 
-	// 如果内容为空，使用描述作为内容
+	// if content empty, use description as content
 	if skill.Content == "" {
 		skill.Content = skill.Description
 	}
@@ -246,7 +246,7 @@ func (m *Manager) parseSkillContent(content, skillName, skillPath string) *Skill
 	return skill
 }
 
-// GetSkillContent 获取skill的完整内容（用于注入到系统提示词）
+// GetSkillContent get complete skill content (for injection into system prompt)
 func (m *Manager) GetSkillContent(skillNames []string) (string, error) {
 	skills, err := m.LoadSkills(skillNames)
 	if err != nil {
@@ -258,13 +258,13 @@ func (m *Manager) GetSkillContent(skillNames []string) (string, error) {
 	}
 
 	var builder strings.Builder
-	builder.WriteString("## 可用Skills\n\n")
-	builder.WriteString("在执行任务前，请仔细阅读以下skills内容，这些内容包含了相关的专业知识和方法：\n\n")
+	builder.WriteString("## available Skills\n\n")
+	builder.WriteString("before executing tasks, please read the following skills content, which contains relevant professional knowledge and methods：\n\n")
 
 	for _, skill := range skills {
 		builder.WriteString(fmt.Sprintf("### Skill: %s\n", skill.Name))
 		if skill.Description != "" {
-			builder.WriteString(fmt.Sprintf("**描述**: %s\n\n", skill.Description))
+			builder.WriteString(fmt.Sprintf("**description**: %s\n\n", skill.Description))
 		}
 		builder.WriteString(skill.Content)
 		builder.WriteString("\n\n---\n\n")

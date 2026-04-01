@@ -25,7 +25,7 @@ KNOWLEDGE_BASE_DIR="$ROOT_DIR/knowledge_base"
 
 BACKUP_BASE_DIR="$ROOT_DIR/.upgrade-backup"
 
-GITHUB_REPO="Ed1s0nZ/CyberStrikeAI"
+GITHUB_REPO="cybersecua/CyberStrikeAI"
 
 TAG=""
 PRESERVE_CUSTOM=0

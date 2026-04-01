@@ -1,9 +1,9 @@
-// 页面路由管理
+// pageroutemanagement
 let currentPage = 'dashboard';
 
-// 初始化路由
+// initializeroute
 function initRouter() {
-    // 从URL hash读取页面（如果有）
+    // fromURL hashreadpage（ifhas）
     const hash = window.location.hash.slice(1);
     if (hash) {
         const hashParts = hash.split('?');
@@ -11,13 +11,13 @@ function initRouter() {
         if (pageId && ['dashboard', 'chat', 'info-collect', 'vulnerabilities', 'webshell', 'chat-files', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'roles-management', 'skills-monitor', 'skills-management', 'agents-management', 'settings', 'tasks'].includes(pageId)) {
             switchPage(pageId);
             
-            // 如果是chat页面且带有conversation参数，加载对应对话
+ // if it ischatpageandhasconversationparameter，loadforshouldconversation
             if (pageId === 'chat' && hashParts.length > 1) {
                 const params = new URLSearchParams(hashParts[1]);
                 const conversationId = params.get('conversation');
                 if (conversationId) {
                     setTimeout(() => {
-                        // 尝试多种方式调用loadConversation
+                        // trymultiplemethodcallloadConversation
                         if (typeof loadConversation === 'function') {
                             loadConversation(conversationId);
                         } else if (typeof window.loadConversation === 'function') {
@@ -32,37 +32,37 @@ function initRouter() {
         }
     }
     
-    // 默认显示仪表盘
+    // defaultShow dashboard
     switchPage('dashboard');
 }
 
-// 切换页面
+// switchpage
 function switchPage(pageId) {
-    // 隐藏所有页面
+    // hideallpage
     document.querySelectorAll('.page').forEach(page => {
         page.classList.remove('active');
     });
     
-    // 显示目标页面
+    // Show Targetpage
     const targetPage = document.getElementById(`page-${pageId}`);
     if (targetPage) {
         targetPage.classList.add('active');
         currentPage = pageId;
         
-        // 更新URL hash
+        // updateURL hash
         window.location.hash = pageId;
         
-        // 更新导航状态
+        // updatenavigationstatus
         updateNavState(pageId);
         
-        // 页面特定的初始化
+ // page's initialize
         initPage(pageId);
     }
 }
 
-// 更新导航状态
+// updatenavigationstatus
 function updateNavState(pageId) {
-    // 移除所有活动状态
+    // removeallactivestatus
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.remove('active');
     });
@@ -71,13 +71,13 @@ function updateNavState(pageId) {
         item.classList.remove('active');
     });
     
-    // 设置活动状态
+    // settingsactivestatus
     if (pageId === 'mcp-monitor' || pageId === 'mcp-management') {
-        // MCP子菜单项
+ // MCPmenuitem
         const mcpItem = document.querySelector('.nav-item[data-page="mcp"]');
         if (mcpItem) {
             mcpItem.classList.add('active');
-            // 展开MCP子菜单
+ // expandMCPmenu
             mcpItem.classList.add('expanded');
         }
         
@@ -86,11 +86,11 @@ function updateNavState(pageId) {
             submenuItem.classList.add('active');
         }
     } else if (pageId === 'knowledge-management' || pageId === 'knowledge-retrieval-logs') {
-        // 知识子菜单项
+ // knowledgemenuitem
         const knowledgeItem = document.querySelector('.nav-item[data-page="knowledge"]');
         if (knowledgeItem) {
             knowledgeItem.classList.add('active');
-            // 展开知识子菜单
+ // expandknowledgemenu
             knowledgeItem.classList.add('expanded');
         }
         
@@ -99,11 +99,11 @@ function updateNavState(pageId) {
             submenuItem.classList.add('active');
         }
     } else if (pageId === 'skills-monitor' || pageId === 'skills-management') {
-        // Skills子菜单项
+ // Skillsmenuitem
         const skillsItem = document.querySelector('.nav-item[data-page="skills"]');
         if (skillsItem) {
             skillsItem.classList.add('active');
-            // 展开Skills子菜单
+ // expandSkillsmenu
             skillsItem.classList.add('expanded');
         }
         
@@ -122,11 +122,11 @@ function updateNavState(pageId) {
             submenuItem.classList.add('active');
         }
     } else if (pageId === 'roles-management') {
-        // 角色子菜单项
+ // rolemenuitem
         const rolesItem = document.querySelector('.nav-item[data-page="roles"]');
         if (rolesItem) {
             rolesItem.classList.add('active');
-            // 展开角色子菜单
+ // expandrolemenu
             rolesItem.classList.add('expanded');
         }
         
@@ -135,7 +135,7 @@ function updateNavState(pageId) {
             submenuItem.classList.add('active');
         }
     } else {
-        // 主菜单项
+ // menuitem
         const navItem = document.querySelector(`.nav-item[data-page="${pageId}"]`);
         if (navItem) {
             navItem.classList.add('active');
@@ -143,30 +143,30 @@ function updateNavState(pageId) {
     }
 }
 
-// 切换子菜单
+// switchmenu
 function toggleSubmenu(menuId) {
     const sidebar = document.getElementById('main-sidebar');
     const navItem = document.querySelector(`.nav-item[data-page="${menuId}"]`);
     
     if (!navItem) return;
     
-    // 检查侧边栏是否折叠
+ // checksidebariscollapse
     if (sidebar && sidebar.classList.contains('collapsed')) {
-        // 折叠状态下显示弹出菜单
+        // collapsestatusunderShow popup menu
         showSubmenuPopup(navItem, menuId);
     } else {
-        // 展开状态下正常切换子菜单
+ // expandstatusunderNormalswitchmenu
         navItem.classList.toggle('expanded');
     }
 }
 
-// 显示子菜单弹出框
+// Show menuout
 function showSubmenuPopup(navItem, menuId) {
-    // 移除其他已打开的弹出菜单
+    // removeotheralreadyopen's popup menu
     const existingPopup = document.querySelector('.submenu-popup');
     if (existingPopup) {
         existingPopup.remove();
-        return; // 如果已经打开，点击时关闭
+        return; // ifalreadyopen，clickwhenClose
     }
     
     const navItemContent = navItem.querySelector('.nav-item-content');
@@ -174,10 +174,10 @@ function showSubmenuPopup(navItem, menuId) {
     
     if (!submenu) return;
     
-    // 获取菜单位置
+    // getmenuposition
     const rect = navItemContent.getBoundingClientRect();
     
-    // 创建弹出菜单
+    // createpopup menu
     const popup = document.createElement('div');
     popup.className = 'submenu-popup';
     popup.style.position = 'fixed';
@@ -185,14 +185,14 @@ function showSubmenuPopup(navItem, menuId) {
     popup.style.top = rect.top + 'px';
     popup.style.zIndex = '1000';
     
-    // 复制子菜单项到弹出菜单
+ // Copymenuitemtopopup menu
     const submenuItems = submenu.querySelectorAll('.nav-submenu-item');
     submenuItems.forEach(item => {
         const popupItem = document.createElement('div');
         popupItem.className = 'submenu-popup-item';
         popupItem.textContent = item.textContent.trim();
         
-        // 检查是否是当前激活的页面
+ // check if it iscurrent's page
         const pageId = item.getAttribute('data-page');
         if (pageId && document.querySelector(`.nav-submenu-item[data-page="${pageId}"].active`)) {
             popupItem.classList.add('active');
@@ -202,13 +202,13 @@ function showSubmenuPopup(navItem, menuId) {
             e.stopPropagation();
             e.preventDefault();
             
-            // 获取页面ID并切换
+ // getpageIDswitch
             const pageId = item.getAttribute('data-page');
             if (pageId) {
                 switchPage(pageId);
             }
             
-            // 关闭弹出菜单
+            // Closepopup menu
             popup.remove();
             document.removeEventListener('click', closePopup);
         };
@@ -217,7 +217,7 @@ function showSubmenuPopup(navItem, menuId) {
     
     document.body.appendChild(popup);
     
-    // 点击外部关闭弹出菜单
+    // clickExternalClosepopup menu
     const closePopup = function(e) {
         if (!popup.contains(e.target) && !navItem.contains(e.target)) {
             popup.remove();
@@ -225,13 +225,13 @@ function showSubmenuPopup(navItem, menuId) {
         }
     };
     
-    // 延迟添加事件监听，避免立即触发
+    // delayaddeventlisten，avoidimmediatelytrigger
     setTimeout(() => {
         document.addEventListener('click', closePopup);
     }, 0);
 }
 
-// 初始化页面
+// initializepage
 function initPage(pageId) {
     switch(pageId) {
         case 'dashboard':
@@ -240,58 +240,58 @@ function initPage(pageId) {
             }
             break;
         case 'chat':
-            // 恢复对话列表折叠状态（从其他页返回时保持用户选择）
+ // restoreconversationlistcollapsestatus（fromotherpagereturnwhenmaintainuseselect）
             initConversationSidebarState();
             break;
         case 'info-collect':
-            // 信息收集页面
+            // Infocollectpage
             if (typeof initInfoCollectPage === 'function') {
                 initInfoCollectPage();
             }
             break;
         case 'tasks':
-            // 初始化任务管理页面
+            // initializetaskmanagement page
             if (typeof initTasksPage === 'function') {
                 initTasksPage();
             }
             break;
         case 'mcp-monitor':
-            // 初始化监控面板
+            // initializeMonitorpanel
             if (typeof refreshMonitorPanel === 'function') {
                 refreshMonitorPanel();
             }
             break;
         case 'mcp-management':
-            // 初始化MCP管理
-            // 先加载外部MCP列表（快速），然后加载工具列表
+            // initializeMCPmanagement
+ // firstloadExternalMCPlist（fast），afterloadtoollist
             if (typeof loadExternalMCPs === 'function') {
                 loadExternalMCPs().catch(err => {
-                    console.warn('加载外部MCP列表失败:', err);
+                    console.warn('loadExternalMCPlist failed:', err);
                 });
             }
-            // 加载工具列表（MCP工具配置已移到MCP管理页面）
-            // 使用异步加载，避免阻塞页面渲染
+ // loadtoollist（MCPtoolconfigurationalreadytoMCPmanagement page）
+            // useasyncload，avoidblockpagerender
             if (typeof loadToolsList === 'function') {
-                // 确保工具分页设置已初始化
+                // ensuretoolpaginationsettingsalreadyinitialize
                 if (typeof getToolsPageSize === 'function' && typeof toolsPagination !== 'undefined') {
                     toolsPagination.pageSize = getToolsPageSize();
                 }
-                // 延迟加载，让页面先渲染
+                // delayload，letpagefirstrender
                 setTimeout(() => {
                     loadToolsList(1, '').catch(err => {
-                        console.error('加载工具列表失败:', err);
+                        console.error('Failed to load tool list:', err);
                     });
                 }, 100);
             }
             break;
         case 'vulnerabilities':
-            // 初始化漏洞管理页面
+            // initializevulnerabilitymanagement page
             if (typeof initVulnerabilityPage === 'function') {
                 initVulnerabilityPage();
             }
             break;
         case 'webshell':
-            // 初始化 WebShell 管理页面
+            // initialize WebShell management page
             if (typeof initWebshellPage === 'function') {
                 initWebshellPage();
             }
@@ -302,14 +302,14 @@ function initPage(pageId) {
             }
             break;
         case 'settings':
-            // 初始化设置页面（不需要加载工具列表）
+            // initializesettingspage（notneedloadtoollist）
             if (typeof loadConfig === 'function') {
                 loadConfig(false);
             }
             break;
         case 'roles-management':
-            // 初始化角色管理页面
-            // 重置搜索UI（变量会在下次搜索时自动更新）
+            // initializerolemanagement page
+            // resetsearchUI（variablewillatundertimesearchwhenautoupdate）
             const rolesSearchInput = document.getElementById('roles-search');
             if (rolesSearchInput) {
                 rolesSearchInput.value = '';
@@ -327,14 +327,14 @@ function initPage(pageId) {
             }
             break;
         case 'skills-monitor':
-            // 初始化Skills状态监控页面
+            // initializeSkillsstatusMonitorpage
             if (typeof loadSkillsMonitor === 'function') {
                 loadSkillsMonitor();
             }
             break;
         case 'skills-management':
-            // 初始化Skills管理页面
-            // 重置搜索UI（变量会在下次搜索时自动更新）
+            // initializeSkillsmanagement page
+            // resetsearchUI（variablewillatundertimesearchwhenautoupdate）
             const skillsSearchInput = document.getElementById('skills-search');
             if (skillsSearchInput) {
                 skillsSearchInput.value = '';
@@ -357,34 +357,34 @@ function initPage(pageId) {
             break;
     }
     
-    // 清理其他页面的定时器
+    // cleanupotherpage's timer
     if (pageId !== 'tasks' && typeof cleanupTasksPage === 'function') {
         cleanupTasksPage();
     }
 }
 
-// 页面加载完成后初始化路由
+// pageloadcompleteafterinitializeroute
 document.addEventListener('DOMContentLoaded', function() {
     initRouter();
     initSidebarState();
     
-    // 监听hash变化
+    // listenhashchange
     window.addEventListener('hashchange', function() {
         const hash = window.location.hash.slice(1);
-        // 处理带参数的hash（如 chat?conversation=xxx）
+ // processparameter's hash（like chat?conversation=xxx）
         const hashParts = hash.split('?');
         const pageId = hashParts[0];
         
         if (pageId && ['chat', 'info-collect', 'tasks', 'vulnerabilities', 'webshell', 'chat-files', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'roles-management', 'skills-monitor', 'skills-management', 'agents-management', 'settings'].includes(pageId)) {
             switchPage(pageId);
             
-            // 如果是chat页面且带有conversation参数，加载对应对话
+ // if it ischatpageandhasconversationparameter，loadforshouldconversation
             if (pageId === 'chat' && hashParts.length > 1) {
                 const params = new URLSearchParams(hashParts[1]);
                 const conversationId = params.get('conversation');
                 if (conversationId) {
                     setTimeout(() => {
-                        // 尝试多种方式调用loadConversation
+                        // trymultiplemethodcallloadConversation
                         if (typeof loadConversation === 'function') {
                             loadConversation(conversationId);
                         } else if (typeof window.loadConversation === 'function') {
@@ -398,7 +398,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // 页面加载时也检查hash参数
+    // pageloadwhenalsocheckhashparameter
     const hash = window.location.hash.slice(1);
     if (hash) {
         const hashParts = hash.split('?');
@@ -415,18 +415,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// 切换侧边栏折叠/展开
+// switchsidebarcollapse/expand
 function toggleSidebar() {
     const sidebar = document.getElementById('main-sidebar');
     if (sidebar) {
         sidebar.classList.toggle('collapsed');
-        // 保存折叠状态到localStorage
+        // SavecollapsestatustolocalStorage
         const isCollapsed = sidebar.classList.contains('collapsed');
         localStorage.setItem('sidebarCollapsed', isCollapsed ? 'true' : 'false');
     }
 }
 
-// 初始化侧边栏状态
+// initializesidebarstatus
 function initSidebarState() {
     const sidebar = document.getElementById('main-sidebar');
     if (sidebar) {
@@ -438,7 +438,7 @@ function initSidebarState() {
     initConversationSidebarState();
 }
 
-// 切换对话页左侧列表折叠/展开
+// switchconversationpageleft sidelistcollapse/expand
 function toggleConversationSidebar() {
     const sidebar = document.getElementById('conversation-sidebar');
     if (sidebar) {
@@ -448,7 +448,7 @@ function toggleConversationSidebar() {
     }
 }
 
-// 恢复对话列表折叠状态（进入对话页时生效）
+// restoreconversationlistcollapsestatus（Enterconversationpagewhentake effect）
 function initConversationSidebarState() {
     const sidebar = document.getElementById('conversation-sidebar');
     if (sidebar) {
@@ -461,7 +461,7 @@ function initConversationSidebarState() {
     }
 }
 
-// 导出函数供其他脚本使用
+// exportfunctionforotheruse
 window.switchPage = switchPage;
 window.toggleSubmenu = toggleSubmenu;
 window.toggleSidebar = toggleSidebar;

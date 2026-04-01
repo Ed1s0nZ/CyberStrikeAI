@@ -22,12 +22,12 @@ const (
 	terminalTimeout       = 30 * time.Minute
 )
 
-// TerminalHandler 处理系统设置中的终端命令执行
+// TerminalHandler 
 type TerminalHandler struct {
 	logger *zap.Logger
 }
 
-// maskTerminalCommand 对可能包含敏感信息的终端命令做脱敏，避免在日志中直接记录密码等内容
+// maskTerminalCommand ，record
 func maskTerminalCommand(cmd string) string {
 	trimmed := strings.TrimSpace(cmd)
 	lower := strings.ToLower(trimmed)
@@ -40,19 +40,19 @@ func maskTerminalCommand(cmd string) string {
 	return trimmed
 }
 
-// NewTerminalHandler 创建终端处理器
+// NewTerminalHandler terminal handler
 func NewTerminalHandler(logger *zap.Logger) *TerminalHandler {
 	return &TerminalHandler{logger: logger}
 }
 
-// RunCommandRequest 执行命令请求
+// RunCommandRequest 
 type RunCommandRequest struct {
 	Command string `json:"command"`
 	Shell   string `json:"shell,omitempty"`
 	Cwd     string `json:"cwd,omitempty"`
 }
 
-// RunCommandResponse 执行命令响应
+// RunCommandResponse 
 type RunCommandResponse struct {
 	Stdout   string `json:"stdout"`
 	Stderr   string `json:"stderr"`
@@ -60,21 +60,21 @@ type RunCommandResponse struct {
 	Error    string `json:"error,omitempty"`
 }
 
-// RunCommand 执行终端命令（需登录）
+// RunCommand （）
 func (h *TerminalHandler) RunCommand(c *gin.Context) {
 	var req RunCommandRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请求体无效，需要 command 字段"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body， command "})
 		return
 	}
 
 	cmdStr := strings.TrimSpace(req.Command)
 	if cmdStr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "command 不能为空"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "command "})
 		return
 	}
 	if len(cmdStr) > terminalMaxCommandLen {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "命令过长"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "command too long"})
 		return
 	}
 
@@ -95,21 +95,21 @@ func (h *TerminalHandler) RunCommand(c *gin.Context) {
 		cmd = exec.CommandContext(ctx, "cmd", "/c", cmdStr)
 	} else {
 		cmd = exec.CommandContext(ctx, shell, "-c", cmdStr)
-		// 无 TTY 时设置 COLUMNS/TERM，使 ping 等工具的 usage 排版与真实终端一致
+		// TTY COLUMNS/TERM， ping usage 
 		cmd.Env = append(os.Environ(), "COLUMNS=256", "LINES=40", "TERM=xterm-256color")
 	}
 
 	if req.Cwd != "" {
 		absCwd, err := filepath.Abs(req.Cwd)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "工作目录无效"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid working directory"})
 			return
 		}
 		cur, _ := os.Getwd()
 		curAbs, _ := filepath.Abs(cur)
 		rel, err := filepath.Rel(curAbs, absCwd)
 		if err != nil || strings.HasPrefix(rel, "..") || rel == ".." {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "工作目录必须在当前进程目录下"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "current"})
 			return
 		}
 		cmd.Dir = absCwd
@@ -123,8 +123,8 @@ func (h *TerminalHandler) RunCommand(c *gin.Context) {
 	stdoutBytes := stdout.Bytes()
 	stderrBytes := stderr.Bytes()
 
-	// 限制输出长度，防止内存占用过大（复制后截断，避免修改原 buffer）
-	truncSuffix := []byte("\n...(输出已截断)\n")
+	// ，（， buffer）
+	truncSuffix := []byte("\n...(output truncated)\n")
 	if len(stdoutBytes) > terminalMaxOutputLen {
 		tmp := make([]byte, terminalMaxOutputLen+len(truncSuffix))
 		n := copy(tmp, stdoutBytes[:terminalMaxOutputLen])
@@ -154,15 +154,15 @@ func (h *TerminalHandler) RunCommand(c *gin.Context) {
 				Stdout:   so,
 				Stderr:   se,
 				ExitCode: -1,
-				Error:    "命令执行超时（" + terminalTimeout.String() + "）",
+				Error:    "command execution timed out（" + terminalTimeout.String() + "）",
 			}
 			c.JSON(http.StatusOK, resp)
 			return
 		}
-		h.logger.Debug("终端命令执行异常", zap.String("command", maskTerminalCommand(cmdStr)), zap.Error(err))
+		h.logger.Debug("terminal command execution error", zap.String("command", maskTerminalCommand(cmdStr)), zap.Error(err))
 	}
 
-	// 统一为 \n，避免前端因 \r 出现错位/对角线排版
+	// \n， \r /
 	stdoutStr := strings.ReplaceAll(string(stdoutBytes), "\r\n", "\n")
 	stdoutStr = strings.ReplaceAll(stdoutStr, "\r", "\n")
 	stderrStr := strings.ReplaceAll(string(stderrBytes), "\r\n", "\n")
@@ -179,27 +179,27 @@ func (h *TerminalHandler) RunCommand(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// streamEvent SSE 事件
+// streamEvent SSE 
 type streamEvent struct {
 	T string `json:"t"` // "out" | "err" | "exit"
 	D string `json:"d,omitempty"`
-	C int    `json:"c"` // exit code（不用 omitempty，否则 0 不序列化导致前端显示 [exit undefined]）
+	C int `json:"c"` // exit code（ omitempty， 0 [exit undefined]）
 }
 
-// RunCommandStream 流式执行命令，输出实时推送到前端（SSE）
+// RunCommandStream ，（SSE）
 func (h *TerminalHandler) RunCommandStream(c *gin.Context) {
 	var req RunCommandRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请求体无效，需要 command 字段"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body， command "})
 		return
 	}
 	cmdStr := strings.TrimSpace(req.Command)
 	if cmdStr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "command 不能为空"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "command "})
 		return
 	}
 	if len(cmdStr) > terminalMaxCommandLen {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "命令过长"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "command too long"})
 		return
 	}
 	shell := req.Shell
@@ -223,14 +223,14 @@ func (h *TerminalHandler) RunCommandStream(c *gin.Context) {
 	if req.Cwd != "" {
 		absCwd, err := filepath.Abs(req.Cwd)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "工作目录无效"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid working directory"})
 			return
 		}
 		cur, _ := os.Getwd()
 		curAbs, _ := filepath.Abs(cur)
 		rel, err := filepath.Rel(curAbs, absCwd)
 		if err != nil || strings.HasPrefix(rel, "..") || rel == ".." {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "工作目录必须在当前进程目录下"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "current"})
 			return
 		}
 		cmd.Dir = absCwd

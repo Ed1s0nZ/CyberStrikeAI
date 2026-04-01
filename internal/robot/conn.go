@@ -1,6 +1,6 @@
 package robot
 
-// MessageHandler is the message handling interface called by the Lark long connections (implemented by handler.RobotHandler)
+// MessageHandler is the message handling interface implemented by handler.RobotHandler.
 type MessageHandler interface {
 	HandleMessage(platform, userID, text string) string
 }

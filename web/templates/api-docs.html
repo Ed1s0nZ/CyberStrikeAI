@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title data-i18n="apiDocs.pageTitle">API 文档 - CyberStrikeAI</title>
+    <title data-i18n="apiDocs.pageTitle">API Docs - CyberStrikeAI</title>
     <link rel="icon" type="image/png" href="/static/logo.png">
     <link rel="stylesheet" href="/static/css/style.css">
     <style>
-        /* 覆盖主CSS的overflow限制，允许API文档页面滚动 */
+ /* CSSoverflow，API */
         body {
             overflow: auto !important;
             height: auto !important;
@@ -241,7 +241,7 @@
             margin-bottom: 16px;
         }
         
-        /* 确保表格在移动设备上也能正常显示 */
+ /* */
         @media (max-width: 768px) {
             .api-params-table {
                 font-size: 0.8125rem;
@@ -252,7 +252,7 @@
                 padding: 8px;
             }
             
-            /* 移动设备上描述列可以更宽 */
+ /* */
             .api-params-table th:nth-child(3),
             .api-params-table td:nth-child(3) {
                 min-width: 150px;
@@ -318,7 +318,7 @@
             margin: 4px 0;
         }
         
-        /* Markdown样式 */
+ /* Markdown */
         .api-description-detail .md-h1 {
             font-size: 1.5rem;
             font-weight: 600;
@@ -486,7 +486,7 @@
             vertical-align: top;
         }
         
-        /* 设置列宽 */
+ /* */
         .api-params-table th:nth-child(1),
         .api-params-table td:nth-child(1) {
             width: 15%;
@@ -517,7 +517,7 @@
             min-width: 150px;
         }
         
-        /* 参数名、类型、必需列不换行 */
+ /* 、、 */
         .api-params-table th:nth-child(1),
         .api-params-table td:nth-child(1),
         .api-params-table th:nth-child(2),
@@ -529,7 +529,7 @@
             text-overflow: ellipsis;
         }
         
-        /* 示例列允许换行，完整显示 */
+ /* ， */
         .api-params-table th:nth-child(5),
         .api-params-table td:nth-child(5) {
             white-space: normal;
@@ -538,7 +538,7 @@
             overflow: visible;
         }
         
-        /* 确保示例列中的code标签也能完整显示 */
+ /* code */
         .api-params-table td:nth-child(5) code {
             white-space: normal;
             word-wrap: break-word;
@@ -547,7 +547,7 @@
             max-width: 100%;
         }
         
-        /* 描述列允许换行，但保持水平方向 */
+ /* ， */
         .api-params-table th:nth-child(3),
         .api-params-table td:nth-child(3) {
             white-space: normal;
@@ -561,7 +561,7 @@
             max-width: none;
         }
         
-        /* 确保描述单元格内的内容正常显示 */
+ /* */
         .api-params-table td:nth-child(3) * {
             display: inline;
             writing-mode: horizontal-tb !important;
@@ -691,7 +691,7 @@
             background: var(--bg-secondary);
         }
         
-        /* 复制curl按钮 - 黄色主题 */
+ /* curl - */
         .api-test-btn.copy-curl {
             background: #ffc107;
             color: white;
@@ -710,7 +710,7 @@
             box-shadow: 0 1px 4px rgba(255, 193, 7, 0.2);
         }
         
-        /* 清除结果按钮 - 红色/橙色主题 */
+ /* - / */
         .api-test-btn.clear-result {
             background: #ff6b6b;
             color: white;
@@ -834,18 +834,18 @@
                     <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                <span data-i18n="apiDocs.title">API 文档</span>
+                <span data-i18n="apiDocs.title">API Docs</span>
             </h1>
-            <p data-i18n="apiDocs.subtitle">CyberStrikeAI 平台 API 接口文档，支持在线测试</p>
+            <p data-i18n="apiDocs.subtitle">CyberStrikeAI platform API documentation with online testing</p>
             <div class="api-docs-lang-switcher" style="position: absolute; top: 24px; right: 24px;">
                 <div class="lang-switcher">
-                    <button type="button" class="btn-secondary lang-switcher-btn" onclick="typeof toggleLangDropdown === 'function' && toggleLangDropdown()" title="界面语言">
+                    <button type="button" class="btn-secondary lang-switcher-btn" onclick="typeof toggleLangDropdown === 'function' && toggleLangDropdown()" title="Interface language">
                         <span class="lang-switcher-icon">🌐</span>
-                        <span id="current-lang-label">中文</span>
+                        <span id="current-lang-label">English</span>
                     </button>
                     <div id="lang-dropdown" class="lang-dropdown" style="display: none;">
-                        <div class="lang-option" data-lang="zh-CN" onclick="typeof onLanguageSelect === 'function' && onLanguageSelect('zh-CN')">中文</div>
                         <div class="lang-option" data-lang="en-US" onclick="typeof onLanguageSelect === 'function' && onLanguageSelect('en-US')">English</div>
+                        <div class="lang-option" data-lang="uk-UA" onclick="typeof onLanguageSelect === 'function' && onLanguageSelect('uk-UA')">Українська</div>
                     </div>
                 </div>
             </div>
@@ -859,17 +859,17 @@
                             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                             <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                         </svg>
-                        <h3 style="margin: 0; font-size: 1rem; font-weight: 600; color: var(--text-primary);" data-i18n="apiDocs.authTitle">API 认证说明</h3>
+                        <h3 style="margin: 0; font-size: 1rem; font-weight: 600; color: var(--text-primary);" data-i18n="apiDocs.authTitle">API Authentication</h3>
                     </div>
                     <svg id="auth-info-arrow" class="auth-info-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition: transform 0.2s ease;">
                         <polyline points="6 9 12 15 18 9"/>
                     </svg>
                 </div>
                 <div id="auth-info-body" class="auth-info-body" style="display: none; color: var(--text-secondary); font-size: 0.875rem; line-height: 1.6; margin-top: 16px;">
-                    <p style="margin: 0 0 12px 0;"><strong data-i18n="apiDocs.authAllNeedToken">所有 API 接口都需要 Token 认证。</strong></p>
+                    <p style="margin: 0 0 12px 0;"><strong data-i18n="apiDocs.authAllNeedToken">All API endpoints require Token authentication.</strong></p>
                     <div style="background: var(--bg-secondary); padding: 12px; border-radius: 6px; margin-bottom: 12px;">
-                        <p style="margin: 0 0 8px 0; font-weight: 500;" data-i18n="apiDocs.authGetToken">1. 获取 Token：</p>
-                        <p style="margin: 0 0 8px 0;" data-i18n="apiDocs.authGetTokenDesc">在前端页面登录后，Token 会自动保存。您也可以通过以下方式获取：</p>
+                        <p style="margin: 0 0 8px 0; font-weight: 500;" data-i18n="apiDocs.authGetToken">1. Get Token:</p>
+                        <p style="margin: 0 0 8px 0;" data-i18n="apiDocs.authGetTokenDesc">After logging in on the frontend, the Token is saved automatically. You can also get it via:</p>
                         <pre style="background: var(--bg-primary); padding: 8px; border-radius: 4px; margin: 8px 0; overflow-x: auto; font-size: 0.8125rem;"><code>POST /api/auth/login
 Content-Type: application/json
 
@@ -877,21 +877,21 @@ Content-Type: application/json
   "password": "your_password"
 }
 
-响应: { 
+Response: {
   "token": "eyJhbGc...", 
   "expires_at": "2026-01-27T...",
   "session_duration_hr": 24
 }</code></pre>
                     </div>
                     <div style="background: var(--bg-secondary); padding: 12px; border-radius: 6px; margin-bottom: 12px;">
-                        <p style="margin: 0 0 8px 0; font-weight: 500;" data-i18n="apiDocs.authUseToken">2. 使用 Token：</p>
-                        <p style="margin: 0 0 8px 0;" data-i18n="apiDocs.authUseTokenDesc">在请求头中添加 Authorization 字段：</p>
+                        <p style="margin: 0 0 8px 0; font-weight: 500;" data-i18n="apiDocs.authUseToken">2. Use Token:</p>
+                        <p style="margin: 0 0 8px 0;" data-i18n="apiDocs.authUseTokenDesc">Add the Authorization header:</p>
                         <pre style="background: var(--bg-primary); padding: 8px; border-radius: 4px; margin: 8px 0; overflow-x: auto; font-size: 0.8125rem;"><code>Authorization: Bearer your_token_here</code></pre>
-                        <p style="margin: 8px 0 0 0; font-size: 0.8125rem; color: var(--text-muted);" data-i18n="apiDocs.authTip">💡 提示：本页面会自动使用您已登录的 Token，无需手动填写。</p>
+                        <p style="margin: 8px 0 0 0; font-size: 0.8125rem; color: var(--text-muted);" data-i18n="apiDocs.authTip">This page will use your logged-in Token automatically; no need to fill it manually.</p>
                     </div>
                     <div id="token-status" style="display: none; background: rgba(0, 102, 255, 0.1); padding: 8px 12px; border-radius: 6px; border-left: 3px solid var(--accent-color);">
                         <p style="margin: 0; font-size: 0.8125rem; color: var(--accent-color);" data-i18n="apiDocs.tokenDetected">
-                            <strong>✓ 已检测到 Token</strong> - 您可以直接测试 API 接口
+                            <strong>Token detected</strong> - You can test API endpoints directly
                         </p>
                     </div>
                 </div>
@@ -912,10 +912,10 @@ Content-Type: application/json
         
         <div class="api-docs-content">
             <div class="api-docs-sidebar">
-                <h3 data-i18n="apiDocs.sidebarGroupTitle">API 分组</h3>
+                <h3 data-i18n="apiDocs.sidebarGroupTitle">API Groups</h3>
                 <ul class="api-group-list" id="api-group-list">
                     <li class="api-group-item">
-                        <a href="#" class="api-group-link active" data-group="all" data-i18n="apiDocs.allApis">全部接口</a>
+                        <a href="#" class="api-group-link active" data-group="all" data-i18n="apiDocs.allApis">All APIs</a>
                     </li>
                 </ul>
             </div>
@@ -927,8 +927,8 @@ Content-Type: application/json
                         <line x1="12" y1="8" x2="12" y2="12"/>
                         <line x1="12" y1="16" x2="12.01" y2="16"/>
                     </svg>
-                    <h3 data-i18n="apiDocs.loading">加载中...</h3>
-                    <p data-i18n="apiDocs.loadingDesc">正在加载 API 文档</p>
+                    <h3 data-i18n="apiDocs.loading">Loading...</h3>
+                    <p data-i18n="apiDocs.loadingDesc">Loading API documentation</p>
                 </div>
             </div>
         </div>

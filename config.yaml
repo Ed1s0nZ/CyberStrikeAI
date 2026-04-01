@@ -1,181 +1,171 @@
 # ============================================
-# CyberStrikeAI 配置文件
+# CyberStrikeAI Configuration File
 # ============================================
-# 本配置文件支持通过 Web 界面进行可视化配置
-# 点击右上角"设置"按钮即可修改配置
-# ============================================
-
-# ============================================
-# 系统设置
+# This config file supports visual configuration via the Web UI
+# Click the "Settings" button in the top-right corner to modify settings
 # ============================================
 
-# 前端显示的版本号（可选，不填则显示默认版本）
+# ============================================
+# System Settings
+# ============================================
+
+# Version number displayed in the frontend (optional; defaults to built-in version if empty)
 version: "v1.4.6"
-# 服务器配置
+# Server configuration
 server:
-  host: 0.0.0.0 # 监听地址，0.0.0.0 表示监听所有网络接口
-  port: 8080 # HTTP 服务端口，可通过浏览器访问 http://localhost:8080
-# 认证配置
+  host: 0.0.0.0 # Listen address; 0.0.0.0 means listen on all network interfaces
+  port: 8080 # HTTP service port; access via browser at http://localhost:8080
+# Authentication configuration
 auth:
-  password:  # Web 登录密码，请修改为强密码
-  session_duration_hours: 12 # 登录有效期（小时），超时后需重新登录
-# 日志配置
+  password:  # Web login password; change to a strong password
+  session_duration_hours: 12 # Login session duration (hours); re-login required after expiry
+# Logging configuration
 log:
-  level: info # 日志级别: debug(调试), info(信息), warn(警告), error(错误)
-  output: stdout # 日志输出位置: stdout(标准输出), stderr(标准错误), 或文件路径
+  level: info # Log level: debug, info, warn, error
+  output: stdout # Log output destination: stdout, stderr, or a file path
 # ============================================
-# 对话相关配置
+# Conversation Configuration
 # ============================================
 
-# AI 模型配置（支持 OpenAI 兼容 API）
-# 必填项：api_key, base_url, model 必须填写才能正常运行
-# 支持的 API 服务商：
+# AI model configuration (supports OpenAI-compatible APIs)
+# Required fields: api_key, base_url, model must be set for the system to work
+# Supported API providers:
 #   - OpenAI: https://api.openai.com/v1
 #   - DeepSeek: https://api.deepseek.com/v1
-#   - 其他兼容 OpenAI 协议的 API
-# 常用模型: gpt-4, gpt-3.5-turbo, deepseek-chat, claude-3-opus 等
+#   - Other OpenAI-protocol-compatible APIs
+# Common models: gpt-4, gpt-3.5-turbo, deepseek-chat, claude-3-opus, etc.
 openai:
-  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1 # API 基础 URL（必填）
-  api_key: sk-xxxxxx # API 密钥（必填）
-  model: qwen3-max # 模型名称（必填）
-  max_total_tokens: 120000 # LLM 相关上下文的最大 Token 数限制（内存压缩和攻击链构建会共用此配置）
+  provider: anthropic # "openai" or "anthropic" — native Anthropic Messages API, no proxy needed
+  base_url: https://api.anthropic.com/v1 # Anthropic API endpoint
+  api_key: YOUR_API_KEY_HERE
+  model: claude-haiku-4-5-20251001 # Haiku: higher rate limits, lower cost, faster. Switch to claude-sonnet-4-20250514 when rate limit is increased
+  max_total_tokens: 200000 # Claude supports up to 200k context
+  rate_limit_delay_ms: 0 # Min ms between API calls (0=no limit, 2000 for free tier)
 # ============================================
-# 信息收集（FOFA）配置（可选）
+# Reconnaissance (FOFA) Configuration (optional)
 # ============================================
-# 用于「信息收集」页面调用 FOFA API（后端代理，避免前端暴露 key）
-# 也可通过环境变量配置：FOFA_EMAIL / FOFA_API_KEY（优先级更高）
+# Used by the "Reconnaissance" page to call the FOFA API (backend proxy to avoid exposing the key in the frontend)
+# Can also be configured via environment variables: FOFA_EMAIL / FOFA_API_KEY (higher priority)
 fofa:
-  base_url: https://fofa.info/api/v1/search/all # 可选，留空则使用默认
-  email: "" # FOFA 账号邮箱（可选，建议在系统设置中填写）
-  api_key: "" # FOFA API Key（可选，建议在系统设置中填写）
-# Agent 配置
-# 达到最大迭代次数时，AI 会自动总结测试结果
+  base_url: https://fofa.info/api/v1/search/all # Optional; leave empty to use default
+  email: "" # FOFA account email (optional; recommended to set in System Settings)
+  api_key: "" # FOFA API Key (optional; recommended to set in System Settings)
+# Agent configuration
+# When the maximum iteration count is reached, the AI will automatically summarize test results
 agent:
-  max_iterations: 120 # 最大迭代次数，AI 代理最多执行多少轮工具调用
-  large_result_threshold: 102400 # 大结果阈值（字节），默认50KB，超过此大小会自动保存到存储
-  result_storage_dir: tmp # 结果存储目录，大结果会保存在此目录下
-  tool_timeout_minutes: 30 # 单次工具执行最大时长（分钟），超时自动终止；0 表示不限制（不推荐，易出现长时间挂起）
-# 多代理（CloudWeGo Eino DeepAgent，与上方单 Agent /api/agent-loop 并存）
-# 依赖在 go.mod 中拉取；若下载失败可设置: go env -w GOPROXY=https://goproxy.cn,direct
-# 启用后需重启服务才会注册 /api/multi-agent 与 /api/multi-agent/stream；前端可选「多代理」模式走 stream 接口
+  max_iterations: 120 # Maximum iterations; max number of tool-call rounds the AI agent will execute
+  large_result_threshold: 102400 # Large result threshold (bytes); default 50KB; results exceeding this size are auto-saved to storage
+  result_storage_dir: tmp # Result storage directory; large results are saved here
+  tool_timeout_minutes: 30 # Max duration for a single tool execution (minutes); auto-terminates on timeout; 0 = no limit (not recommended, may hang)
+# Multi-agent (CloudWeGo Eino DeepAgent; coexists with single-agent /api/agent-loop above)
+# Dependencies pulled via go.mod; if download fails, set: go env -w GOPROXY=https://goproxy.cn,direct
+# After enabling, restart the service to register /api/multi-agent and /api/multi-agent/stream; frontend can select "multi-agent" mode to use the stream endpoint
 multi_agent:
   enabled: true
-  default_mode: multi # single | multi（前端默认，仍可用界面切换）
-  robot_use_multi_agent: true # true 时企业微信/钉钉/飞书机器人也走 Eino 多代理（成本更高）
-  batch_use_multi_agent: true # true 时「批量任务」队列中每个子任务也走 Eino 多代理（成本更高）
-  max_iteration: 0 # Deep 主代理最大轮次，0 表示沿用 agent.max_iterations
+  default_mode: multi
+  robot_use_multi_agent: true
+  batch_use_multi_agent: true
+  max_iteration: 0 # Max rounds for the Deep orchestrator agent; 0 = inherit agent.max_iterations
   sub_agent_max_iterations: 120
-  without_general_sub_agent: false # false 时保留 Deep 内置 general-purpose 子代理
+  without_general_sub_agent: false # When false, keep the Deep built-in general-purpose sub-agent
   without_write_todos: false
-  orchestrator_instruction: "" # 非空且未使用 agents/orchestrator.md 正文时作为 Deep 主代理系统提示；若存在 orchestrator.md（或某 .md 含 kind: orchestrator），正文非空则优先用文件，否则仍用此处；留空且无文件正文时用 Eino 默认
-# 数据库配置
+  orchestrator_instruction: "You are CyberStrikeAI orchestrator, coordinating specialist security agents for authorized penetration testing. Decompose tasks into actionable subtasks, delegate to sub-agents, and synthesize results. Always respond in English. Create todo lists and status updates in English only. Never use Chinese or any non-English language in your output."
+# Database configuration
 database:
-  path: data/conversations.db # SQLite 数据库文件路径，用于存储对话历史和消息
-  knowledge_db_path: data/knowledge.db # 知识库数据库文件路径（可选，为空则使用会话数据库），用于存储知识库项和向量嵌入，可独立复制和复用
+  path: data/conversations.db # SQLite database file path; stores conversation history and messages
+  knowledge_db_path: data/knowledge.db # Knowledge base database file path (optional; if empty, uses the conversation database); stores knowledge items and vector embeddings; can be independently copied and reused
 # ============================================
-# 任务管理相关配置
+# Task Management Configuration
 # ============================================
-# （配置项已包含在对话相关配置中）
+# (Settings are included in the Conversation Configuration above)
 
 # ============================================
-# 漏洞管理相关配置
+# Vulnerability Management Configuration
 # ============================================
 
-# 安全工具配置
-# 系统会从该目录加载所有 .yaml 格式的工具配置文件
-# 推荐方式：在 tools/ 目录下为每个工具创建独立的配置文件
+# Security tools configuration
+# The system loads all .yaml tool configuration files from this directory
+# Recommended: create a separate config file for each tool in the tools/ directory
 security:
-  tools_dir: tools # 工具配置文件目录（相对于配置文件所在目录）
-  # 工具描述模式：加载 tools 下工具时，暴露给 AI/API 使用的描述来源
-  #   short - 优先使用 short_description（简短描述，省 token），为空时用 description
-  #   full  - 使用 description（详细描述）
+  tools_dir: tools # Tool configuration file directory (relative to the config file location)
+  # Tool description mode: when loading tools from tools/, which description source is exposed to AI/API
+  #   short - prefer short_description (concise, saves tokens); falls back to description if empty
+  #   full  - use description (detailed)
   tool_description_mode: full
 # ============================================
-# MCP 相关配置
+# MCP Configuration
 # ============================================
 
-# MCP 协议配置
-# MCP (Model Context Protocol) 用于工具注册和调用
+# MCP protocol configuration
+# MCP (Model Context Protocol) is used for tool registration and invocation
 mcp:
-  enabled: false # 是否启用 MCP 服务器（http模式）
-  host: 0.0.0.0 # MCP 服务器监听地址
-  port: 8081 # MCP 服务器端口
-  auth_header: "X-MCP-Token" # 鉴权：请求需携带该 header 且值与 auth_header_value 一致方可调用。留空表示不鉴权
-  auth_header_value: "" # 鉴权密钥值（与 auth_header 配合使用，建议使用随机字符串）
-# 外部 MCP 配置
+  enabled: true # Enable MCP server (HTTP mode)
+  host: 0.0.0.0 # MCP server listen address
+  port: 8081 # MCP server port
+  auth_header: "X-MCP-Token" # Authentication: requests must include this header with a value matching auth_header_value to be authorized. Leave empty to disable auth
+  auth_header_value: "39d3931b43394491ea4a809ecda00e8b287fec7e4817e35860ef156500a3edb3" # Authentication secret value (used with auth_header; recommend a random string)
+# External MCP configuration
 external_mcp:
   servers: {}
 # ============================================
-# 知识库相关配置
+# Knowledge Base Configuration
 # ============================================
 knowledge:
-  enabled: false # 是否启用知识检索功能
-  base_path: knowledge_base # 知识库目录路径（相对于配置文件所在目录）
+  enabled: true # Enable knowledge retrieval feature
+  base_path: knowledge_base # Knowledge base directory path (relative to the config file location)
   embedding:
-    provider: openai # 嵌入模型提供商（目前仅支持openai）
-    model: text-embedding-v4 # 嵌入模型名称
-    base_url: https://api.deepseek.com/v1 # 留空则使用OpenAI配置的base_url
-    api_key: sk-xxxxxx # 留空则使用OpenAI配置的api_key
+    provider: openai # OpenAI-compatible embedding API (vLLM local)
+    model: multilingual-e5-small # Local vLLM embedding model on port 8102
+    base_url: http://127.0.0.1:8102/v1 # Local vLLM embedding server
+    api_key: none # Not needed for local vLLM
   retrieval:
-    top_k: 5 # 检索返回的Top-K结果数量
-    similarity_threshold: 0.7 # 相似度阈值（0-1），低于此值的结果将被过滤
-    hybrid_weight: 0.7 # 混合检索权重（0-1），向量检索的权重，1.0表示纯向量检索，0.0表示纯关键词检索
+    top_k: 5 # Number of Top-K results returned by retrieval
+    similarity_threshold: 0.7 # Similarity threshold (0-1); results below this value are filtered out
+    hybrid_weight: 0.7 # Hybrid retrieval weight (0-1); weight for vector search; 1.0 = pure vector search, 0.0 = pure keyword search
   # ============================================
-  # 索引配置（用于解决 API 限制问题）
+  # Indexing Configuration (for handling API rate limits)
   # ============================================
   indexing:
-    # 分块配置
-    chunk_size: 512 # 每个块的最大 token 数（默认 512），长文本会被分割成多个块
-    chunk_overlap: 50 # 块之间的重叠 token 数（默认 50），保持上下文连贯性
-    max_chunks_per_item: 0 # 单个知识项的最大块数量（0 表示不限制），防止单个文件消耗过多 API 配额
-    # 速率限制配置（解决 429 错误）
-    max_rpm: 0 # 每分钟最大请求数（默认 0 表示不限制），如 OpenAI 默认 200 RPM
-    rate_limit_delay_ms: 300 # 请求间隔毫秒数（默认 300），用于避免 API 速率限制，设为 0 不限制
-    # 建议值：200 次/分钟≈300ms, 100 次/分钟≈600ms
+    # Chunking configuration
+    chunk_size: 512 # Max tokens per chunk (default 512); long texts are split into multiple chunks
+    chunk_overlap: 50 # Overlap tokens between chunks (default 50); maintains context continuity
+    max_chunks_per_item: 0 # Max chunks per knowledge item (0 = no limit); prevents a single file from consuming too much API quota
+    # Rate limit configuration (to avoid 429 errors)
+    max_rpm: 0 # Max requests per minute (default 0 = no limit); e.g., OpenAI default is 200 RPM
+    rate_limit_delay_ms: 300 # Delay between requests in ms (default 300); used to avoid API rate limits; set to 0 to disable
+    # Recommended values: 200 req/min ~ 300ms, 100 req/min ~ 600ms
 
-    # 重试配置
-    max_retries: 3 # 最大重试次数（默认 3），遇到速率限制或服务器错误时自动重试
-    retry_delay_ms: 1000 # 重试间隔毫秒数（默认 1000），每次重试会递增延迟
+    # Retry configuration
+    max_retries: 3 # Max retry attempts (default 3); auto-retries on rate limit or server errors
+    retry_delay_ms: 1000 # Retry delay in ms (default 1000); delay increases with each retry
 # ============================================
-# 机器人配置（企业微信、钉钉、飞书）
+# Robot Configuration (Telegram)
 # ============================================
-# 用于在手机端通过企业微信/钉钉/飞书与 CyberStrikeAI 对话，无需部署在服务器上也可使用
-# 在系统设置 -> 机器人设置 中可配置
+# Chat with CyberStrikeAI via Telegram bot; uses long-polling, no public IP required
+# Configurable in System Settings -> Robot Settings
 robots:
-  wecom: # 企业微信
+  telegram:
     enabled: false
-    token: ""
-    encoding_aes_key: ""
-    corp_id: ""
-    secret: ""
-    agent_id: 0
-  dingtalk: # 钉钉
-    enabled: false
-    client_id: ""
-    client_secret: ""
-  lark: # 飞书
-    enabled: false
-    app_id: ""
-    app_secret: ""
-    verify_token: ""
+    bot_token: ""
+    allowed_user_ids: []
 # ============================================
-# Skills 相关配置
+# Skills Configuration
 # ============================================
 
-# 系统会从该目录加载所有skills，每个skill应是一个目录，包含SKILL.md文件
-# 例如：skills/sql-injection-testing/SKILL.md
-skills_dir: skills # Skills配置文件目录（相对于配置文件所在目录）
+# The system loads all skills from this directory; each skill should be a directory containing a SKILL.md file
+# Example: skills/sql-injection-testing/SKILL.md
+skills_dir: skills # Skills configuration directory (relative to the config file location)
 # ============================================
-# 多代理子 Agent（Markdown，唯一维护处）
+# Multi-Agent Sub-Agents (Markdown, single source of truth)
 # ============================================
-# 每个 .md：YAML front matter（name / id / description / tools / bind_role / max_iterations / 可选 kind: orchestrator）+ 正文为系统提示词
-# 主代理：固定文件名 orchestrator.md，或任意文件名 + front matter kind: orchestrator（全目录仅允许一个）；主代理不参与 task 子代理列表
-# 高级用法：仍可在 multi_agent 块内写 sub_agents，会与本文目录合并且同 id 时 YAML 可被 .md 覆盖
+# Each .md: YAML front matter (name / id / description / tools / bind_role / max_iterations / optional kind: orchestrator) + body as system prompt
+# Orchestrator: fixed filename orchestrator.md, or any filename + front matter kind: orchestrator (only one allowed per directory); the orchestrator is not included in the task sub-agent list
+# Advanced: you can still define sub_agents in the multi_agent block; they will be merged with this directory; same id in .md overrides the YAML definition
 agents_dir: agents
 # ============================================
-# 角色相关配置
+# Roles Configuration
 # ============================================
 
-# 系统会从该目录加载所有 .yaml 格式的角色配置文件
-# 每个角色应创建独立的配置文件，例如：roles/CTF.yaml, roles/默认.yaml 等
-roles_dir: roles # 角色配置文件目录（相对于配置文件所在目录）
+# The system loads all .yaml role configuration files from this directory
+# Each role should have its own config file, e.g.: roles/CTF.yaml, roles/default.yaml, etc.
+roles_dir: roles # Role configuration file directory (relative to the config file location)

@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// Conversation 对话
+// Conversation conversation
 type Conversation struct {
 	ID        string    `json:"id"`
 	Title     string    `json:"title"`
@@ -20,7 +20,7 @@ type Conversation struct {
 	Messages  []Message `json:"messages,omitempty"`
 }
 
-// Message 消息
+// Message message
 type Message struct {
 	ID              string                   `json:"id"`
 	ConversationID  string                   `json:"conversationId"`
@@ -31,12 +31,12 @@ type Message struct {
 	CreatedAt       time.Time                `json:"createdAt"`
 }
 
-// CreateConversation 创建新对话
+// CreateConversation conversation
 func (db *DB) CreateConversation(title string) (*Conversation, error) {
 	return db.CreateConversationWithWebshell("", title)
 }
 
-// CreateConversationWithWebshell 创建新对话，可选绑定 WebShell 连接 ID（为空则普通对话）
+// CreateConversationWithWebshell conversation， WebShell connection ID（conversation）
 func (db *DB) CreateConversationWithWebshell(webshellConnectionID, title string) (*Conversation, error) {
 	id := uuid.New().String()
 	now := time.Now()
@@ -54,7 +54,7 @@ func (db *DB) CreateConversationWithWebshell(webshellConnectionID, title string)
 		)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("创建对话失败: %w", err)
+		return nil, fmt.Errorf("conversation: %w", err)
 	}
 
 	return &Conversation{
@@ -65,7 +65,7 @@ func (db *DB) CreateConversationWithWebshell(webshellConnectionID, title string)
 	}, nil
 }
 
-// GetConversationByWebshellConnectionID 根据 WebShell 连接 ID 获取该连接下最近一条对话（用于 AI 助手持久化）
+// GetConversationByWebshellConnectionID WebShell connection ID conversation（ AI ）
 func (db *DB) GetConversationByWebshellConnectionID(connectionID string) (*Conversation, error) {
 	if connectionID == "" {
 		return nil, fmt.Errorf("connectionID is empty")
@@ -81,7 +81,7 @@ func (db *DB) GetConversationByWebshellConnectionID(connectionID string) (*Conve
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("查询对话失败: %w", err)
+		return nil, fmt.Errorf("conversation: %w", err)
 	}
 	conv.Pinned = pinned != 0
 	if t, e := time.Parse("2006-01-02 15:04:05.999999999-07:00", createdAt); e == nil {
@@ -100,14 +100,14 @@ func (db *DB) GetConversationByWebshellConnectionID(connectionID string) (*Conve
 	}
 	messages, err := db.GetMessages(conv.ID)
 	if err != nil {
-		return nil, fmt.Errorf("加载消息失败: %w", err)
+		return nil, fmt.Errorf("loadmessage: %w", err)
 	}
 	conv.Messages = messages
 
-	// 加载过程详情并附加到对应消息（与 GetConversation 一致，便于刷新后仍可查看执行过程）
+	// loadprocess detailsmessage（ GetConversation ，）
 	processDetailsMap, err := db.GetProcessDetailsByConversation(conv.ID)
 	if err != nil {
-		db.logger.Warn("加载过程详情失败", zap.Error(err))
+		db.logger.Warn("loadprocess details", zap.Error(err))
 		processDetailsMap = make(map[string][]ProcessDetail)
 	}
 	for i := range conv.Messages {
@@ -117,7 +117,7 @@ func (db *DB) GetConversationByWebshellConnectionID(connectionID string) (*Conve
 				var data interface{}
 				if detail.Data != "" {
 					if err := json.Unmarshal([]byte(detail.Data), &data); err != nil {
-						db.logger.Warn("解析过程详情数据失败", zap.Error(err))
+						db.logger.Warn("parseprocess details", zap.Error(err))
 					}
 				}
 				detailsJSON[j] = map[string]interface{}{
@@ -137,14 +137,14 @@ func (db *DB) GetConversationByWebshellConnectionID(connectionID string) (*Conve
 	return &conv, nil
 }
 
-// WebShellConversationItem 用于侧边栏列表，不含消息
+// WebShellConversationItem list，message
 type WebShellConversationItem struct {
 	ID        string    `json:"id"`
 	Title     string    `json:"title"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-// ListConversationsByWebshellConnectionID 列出该 WebShell 连接下的所有对话（按更新时间倒序），供侧边栏展示
+// ListConversationsByWebshellConnectionID WebShell conversation（），
 func (db *DB) ListConversationsByWebshellConnectionID(connectionID string) ([]WebShellConversationItem, error) {
 	if connectionID == "" {
 		return nil, nil
@@ -154,7 +154,7 @@ func (db *DB) ListConversationsByWebshellConnectionID(connectionID string) ([]We
 		connectionID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("查询对话列表失败: %w", err)
+		return nil, fmt.Errorf("conversationtable failed: %w", err)
 	}
 	defer rows.Close()
 	var list []WebShellConversationItem
@@ -176,7 +176,7 @@ func (db *DB) ListConversationsByWebshellConnectionID(connectionID string) ([]We
 	return list, rows.Err()
 }
 
-// GetConversation 获取对话
+// GetConversation conversation
 func (db *DB) GetConversation(id string) (*Conversation, error) {
 	var conv Conversation
 	var createdAt, updatedAt string
@@ -188,12 +188,12 @@ func (db *DB) GetConversation(id string) (*Conversation, error) {
 	).Scan(&conv.ID, &conv.Title, &pinned, &createdAt, &updatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("对话不存在")
+			return nil, fmt.Errorf("conversation")
 		}
-		return nil, fmt.Errorf("查询对话失败: %w", err)
+		return nil, fmt.Errorf("conversation: %w", err)
 	}
 
-	// 尝试多种时间格式解析
+	// time formatparse
 	var err1, err2 error
 	conv.CreatedAt, err1 = time.Parse("2006-01-02 15:04:05.999999999-07:00", createdAt)
 	if err1 != nil {
@@ -213,30 +213,30 @@ func (db *DB) GetConversation(id string) (*Conversation, error) {
 
 	conv.Pinned = pinned != 0
 
-	// 加载消息
+	// loadmessage
 	messages, err := db.GetMessages(id)
 	if err != nil {
-		return nil, fmt.Errorf("加载消息失败: %w", err)
+		return nil, fmt.Errorf("loadmessage: %w", err)
 	}
 	conv.Messages = messages
 
-	// 加载过程详情（按消息ID分组）
+	// loadprocess details（messageID）
 	processDetailsMap, err := db.GetProcessDetailsByConversation(id)
 	if err != nil {
-		db.logger.Warn("加载过程详情失败", zap.Error(err))
+		db.logger.Warn("loadprocess details", zap.Error(err))
 		processDetailsMap = make(map[string][]ProcessDetail)
 	}
 
-	// 将过程详情附加到对应的消息上
+	// process detailsmessage
 	for i := range conv.Messages {
 		if details, ok := processDetailsMap[conv.Messages[i].ID]; ok {
-			// 将ProcessDetail转换为JSON格式，以便前端使用
+			// ProcessDetailJSONformat，
 			detailsJSON := make([]map[string]interface{}, len(details))
 			for j, detail := range details {
 				var data interface{}
 				if detail.Data != "" {
 					if err := json.Unmarshal([]byte(detail.Data), &data); err != nil {
-						db.logger.Warn("解析过程详情数据失败", zap.Error(err))
+						db.logger.Warn("parseprocess details", zap.Error(err))
 					}
 				}
 				detailsJSON[j] = map[string]interface{}{
@@ -256,8 +256,8 @@ func (db *DB) GetConversation(id string) (*Conversation, error) {
 	return &conv, nil
 }
 
-// GetConversationLite 获取对话（轻量版）：包含 messages，但不加载 process_details。
-// 用于历史会话快速切换，避免一次性把大体量过程详情灌到前端导致卡顿。
+// GetConversationLite conversation（lite version）： messages，load process_details。
+// switch，process details。
 func (db *DB) GetConversationLite(id string) (*Conversation, error) {
 	var conv Conversation
 	var createdAt, updatedAt string
@@ -269,12 +269,12 @@ func (db *DB) GetConversationLite(id string) (*Conversation, error) {
 	).Scan(&conv.ID, &conv.Title, &pinned, &createdAt, &updatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("对话不存在")
+			return nil, fmt.Errorf("conversation")
 		}
-		return nil, fmt.Errorf("查询对话失败: %w", err)
+		return nil, fmt.Errorf("conversation: %w", err)
 	}
 
-	// 尝试多种时间格式解析
+	// time formatparse
 	var err1, err2 error
 	conv.CreatedAt, err1 = time.Parse("2006-01-02 15:04:05.999999999-07:00", createdAt)
 	if err1 != nil {
@@ -294,24 +294,24 @@ func (db *DB) GetConversationLite(id string) (*Conversation, error) {
 
 	conv.Pinned = pinned != 0
 
-	// 加载消息（不加载 process_details）
+	// loadmessage（load process_details）
 	messages, err := db.GetMessages(id)
 	if err != nil {
-		return nil, fmt.Errorf("加载消息失败: %w", err)
+		return nil, fmt.Errorf("loadmessage: %w", err)
 	}
 	conv.Messages = messages
 	return &conv, nil
 }
 
-// ListConversations 列出所有对话
+// ListConversations conversation
 func (db *DB) ListConversations(limit, offset int, search string) ([]*Conversation, error) {
 	var rows *sql.Rows
 	var err error
 	
 	if search != "" {
-		// 使用LIKE进行模糊搜索，搜索标题和消息内容
+		// use LIKE for fuzzy search，titlemessage
 		searchPattern := "%" + search + "%"
-		// 使用DISTINCT避免重复，因为一个对话可能有多条消息匹配
+		// use DISTINCT to avoid duplicates，conversationmessagematch
 		rows, err = db.Query(
 			`SELECT DISTINCT c.id, c.title, COALESCE(c.pinned, 0), c.created_at, c.updated_at 
 			 FROM conversations c
@@ -329,7 +329,7 @@ func (db *DB) ListConversations(limit, offset int, search string) ([]*Conversati
 	}
 	
 	if err != nil {
-		return nil, fmt.Errorf("查询对话列表失败: %w", err)
+		return nil, fmt.Errorf("conversationtable failed: %w", err)
 	}
 	defer rows.Close()
 
@@ -340,10 +340,10 @@ func (db *DB) ListConversations(limit, offset int, search string) ([]*Conversati
 		var pinned int
 
 		if err := rows.Scan(&conv.ID, &conv.Title, &pinned, &createdAt, &updatedAt); err != nil {
-			return nil, fmt.Errorf("扫描对话失败: %w", err)
+			return nil, fmt.Errorf("scanconversation: %w", err)
 		}
 
-		// 尝试多种时间格式解析
+		// time formatparse
 		var err1, err2 error
 		conv.CreatedAt, err1 = time.Parse("2006-01-02 15:04:05.999999999-07:00", createdAt)
 		if err1 != nil {
@@ -369,71 +369,71 @@ func (db *DB) ListConversations(limit, offset int, search string) ([]*Conversati
 	return conversations, nil
 }
 
-// UpdateConversationTitle 更新对话标题
+// UpdateConversationTitle conversationtitle
 func (db *DB) UpdateConversationTitle(id, title string) error {
-	// 注意：不更新 updated_at，因为重命名操作不应该改变对话的更新时间
+	// note: do not update updated_at，conversation
 	_, err := db.Exec(
 		"UPDATE conversations SET title = ? WHERE id = ?",
 		title, id,
 	)
 	if err != nil {
-		return fmt.Errorf("更新对话标题失败: %w", err)
+		return fmt.Errorf("conversationtitle: %w", err)
 	}
 	return nil
 }
 
-// UpdateConversationTime 更新对话时间
+// UpdateConversationTime conversation
 func (db *DB) UpdateConversationTime(id string) error {
 	_, err := db.Exec(
 		"UPDATE conversations SET updated_at = ? WHERE id = ?",
 		time.Now(), id,
 	)
 	if err != nil {
-		return fmt.Errorf("更新对话时间失败: %w", err)
+		return fmt.Errorf("conversation: %w", err)
 	}
 	return nil
 }
 
-// DeleteConversation 删除对话及其所有相关数据
-// 由于数据库外键约束设置了 ON DELETE CASCADE，删除对话时会自动删除：
-// - messages（消息）
-// - process_details（过程详情）
-// - attack_chain_nodes（攻击链节点）
-// - attack_chain_edges（攻击链边）
-// - vulnerabilities（漏洞）
-// - conversation_group_mappings（分组映射）
-// 注意：knowledge_retrieval_logs 使用 ON DELETE SET NULL，记录会保留但 conversation_id 会被设为 NULL
+// DeleteConversation deleteconversation
+// since database foreign key constraints are set to ON DELETE CASCADE，deleteconversationdelete：
+// - messages（message）
+// - process_details（process details）
+// - attack_chain_nodes（attack chain）
+// - attack_chain_edges（attack chain）
+// - vulnerabilities（）
+// - conversation_group_mappings（）
+// ：knowledge_retrieval_logs ON DELETE SET NULL，record conversation_id NULL
 func (db *DB) DeleteConversation(id string) error {
-	// 显式删除知识检索日志（虽然外键是SET NULL，但为了彻底清理，我们手动删除）
+	// explicitly delete knowledge retrieval logs（SET NULL，，delete）
 	_, err := db.Exec("DELETE FROM knowledge_retrieval_logs WHERE conversation_id = ?", id)
 	if err != nil {
-		db.logger.Warn("删除知识检索日志失败", zap.String("conversationId", id), zap.Error(err))
-		// 不返回错误，继续删除对话
+		db.logger.Warn("failed to delete knowledge retrieval logs", zap.String("conversationId", id), zap.Error(err))
+		// returnserror，continuedeleteconversation
 	}
 
-	// 删除对话（外键CASCADE会自动删除其他相关数据）
+	// deleteconversation（CASCADEdelete）
 	_, err = db.Exec("DELETE FROM conversations WHERE id = ?", id)
 	if err != nil {
-		return fmt.Errorf("删除对话失败: %w", err)
+		return fmt.Errorf("deleteconversation: %w", err)
 	}
 
-	db.logger.Info("对话及其所有相关数据已删除", zap.String("conversationId", id))
+	db.logger.Info("conversationdelete", zap.String("conversationId", id))
 	return nil
 }
 
-// SaveReActData 保存最后一轮ReAct的输入和输出
+// SaveReActData ReAct
 func (db *DB) SaveReActData(conversationID, reactInput, reactOutput string) error {
 	_, err := db.Exec(
 		"UPDATE conversations SET last_react_input = ?, last_react_output = ?, updated_at = ? WHERE id = ?",
 		reactInput, reactOutput, time.Now(), conversationID,
 	)
 	if err != nil {
-		return fmt.Errorf("保存ReAct数据失败: %w", err)
+		return fmt.Errorf("failed to save ReAct data: %w", err)
 	}
 	return nil
 }
 
-// GetReActData 获取最后一轮ReAct的输入和输出
+// GetReActData ReAct
 func (db *DB) GetReActData(conversationID string) (reactInput, reactOutput string, err error) {
 	var input, output sql.NullString
 	err = db.QueryRow(
@@ -442,9 +442,9 @@ func (db *DB) GetReActData(conversationID string) (reactInput, reactOutput strin
 	).Scan(&input, &output)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return "", "", fmt.Errorf("对话不存在")
+			return "", "", fmt.Errorf("conversation")
 		}
-		return "", "", fmt.Errorf("获取ReAct数据失败: %w", err)
+		return "", "", fmt.Errorf("failed to get ReAct data: %w", err)
 	}
 
 	if input.Valid {
@@ -457,7 +457,7 @@ func (db *DB) GetReActData(conversationID string) (reactInput, reactOutput strin
 	return reactInput, reactOutput, nil
 }
 
-// AddMessage 添加消息
+// AddMessage addmessage
 func (db *DB) AddMessage(conversationID, role, content string, mcpExecutionIDs []string) (*Message, error) {
 	id := uuid.New().String()
 
@@ -465,7 +465,7 @@ func (db *DB) AddMessage(conversationID, role, content string, mcpExecutionIDs [
 	if len(mcpExecutionIDs) > 0 {
 		jsonData, err := json.Marshal(mcpExecutionIDs)
 		if err != nil {
-			db.logger.Warn("序列化MCP执行ID失败", zap.Error(err))
+			db.logger.Warn("failed to serialize MCP execution IDs", zap.Error(err))
 		} else {
 			mcpIDsJSON = string(jsonData)
 		}
@@ -476,12 +476,12 @@ func (db *DB) AddMessage(conversationID, role, content string, mcpExecutionIDs [
 		id, conversationID, role, content, mcpIDsJSON, time.Now(),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("添加消息失败: %w", err)
+		return nil, fmt.Errorf("addmessage: %w", err)
 	}
 
-	// 更新对话时间
+	// conversation
 	if err := db.UpdateConversationTime(conversationID); err != nil {
-		db.logger.Warn("更新对话时间失败", zap.Error(err))
+		db.logger.Warn("conversation", zap.Error(err))
 	}
 
 	message := &Message{
@@ -496,14 +496,14 @@ func (db *DB) AddMessage(conversationID, role, content string, mcpExecutionIDs [
 	return message, nil
 }
 
-// GetMessages 获取对话的所有消息
+// GetMessages conversationmessage
 func (db *DB) GetMessages(conversationID string) ([]Message, error) {
 	rows, err := db.Query(
 		"SELECT id, conversation_id, role, content, mcp_execution_ids, created_at FROM messages WHERE conversation_id = ? ORDER BY created_at ASC",
 		conversationID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("查询消息失败: %w", err)
+		return nil, fmt.Errorf("message: %w", err)
 	}
 	defer rows.Close()
 
@@ -514,10 +514,10 @@ func (db *DB) GetMessages(conversationID string) ([]Message, error) {
 		var createdAt string
 
 		if err := rows.Scan(&msg.ID, &msg.ConversationID, &msg.Role, &msg.Content, &mcpIDsJSON, &createdAt); err != nil {
-			return nil, fmt.Errorf("扫描消息失败: %w", err)
+			return nil, fmt.Errorf("scanmessage: %w", err)
 		}
 
-		// 尝试多种时间格式解析
+		// time formatparse
 		var err error
 		msg.CreatedAt, err = time.Parse("2006-01-02 15:04:05.999999999-07:00", createdAt)
 		if err != nil {
@@ -527,10 +527,10 @@ func (db *DB) GetMessages(conversationID string) ([]Message, error) {
 			msg.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
 		}
 
-		// 解析MCP执行ID
+		// parseMCPID
 		if mcpIDsJSON.Valid && mcpIDsJSON.String != "" {
 			if err := json.Unmarshal([]byte(mcpIDsJSON.String), &msg.MCPExecutionIDs); err != nil {
-				db.logger.Warn("解析MCP执行ID失败", zap.Error(err))
+				db.logger.Warn("parseMCPID", zap.Error(err))
 			}
 		}
 
@@ -540,18 +540,18 @@ func (db *DB) GetMessages(conversationID string) ([]Message, error) {
 	return messages, nil
 }
 
-// ProcessDetail 过程详情事件
+// ProcessDetail process details
 type ProcessDetail struct {
 	ID             string    `json:"id"`
 	MessageID      string    `json:"messageId"`
 	ConversationID string    `json:"conversationId"`
 	EventType      string    `json:"eventType"` // iteration, thinking, tool_calls_detected, tool_call, tool_result, progress, error
 	Message        string    `json:"message"`
-	Data           string    `json:"data"` // JSON格式的数据
+	Data string `json:"data"` // JSONformat
 	CreatedAt      time.Time `json:"createdAt"`
 }
 
-// AddProcessDetail 添加过程详情事件
+// AddProcessDetail addprocess details
 func (db *DB) AddProcessDetail(messageID, conversationID, eventType, message string, data interface{}) error {
 	id := uuid.New().String()
 
@@ -559,7 +559,7 @@ func (db *DB) AddProcessDetail(messageID, conversationID, eventType, message str
 	if data != nil {
 		jsonData, err := json.Marshal(data)
 		if err != nil {
-			db.logger.Warn("序列化过程详情数据失败", zap.Error(err))
+			db.logger.Warn("process details", zap.Error(err))
 		} else {
 			dataJSON = string(jsonData)
 		}
@@ -570,20 +570,20 @@ func (db *DB) AddProcessDetail(messageID, conversationID, eventType, message str
 		id, messageID, conversationID, eventType, message, dataJSON, time.Now(),
 	)
 	if err != nil {
-		return fmt.Errorf("添加过程详情失败: %w", err)
+		return fmt.Errorf("addprocess details: %w", err)
 	}
 
 	return nil
 }
 
-// GetProcessDetails 获取消息的过程详情
+// GetProcessDetails messageprocess details
 func (db *DB) GetProcessDetails(messageID string) ([]ProcessDetail, error) {
 	rows, err := db.Query(
 		"SELECT id, message_id, conversation_id, event_type, message, data, created_at FROM process_details WHERE message_id = ? ORDER BY created_at ASC",
 		messageID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("查询过程详情失败: %w", err)
+		return nil, fmt.Errorf("process details: %w", err)
 	}
 	defer rows.Close()
 
@@ -593,10 +593,10 @@ func (db *DB) GetProcessDetails(messageID string) ([]ProcessDetail, error) {
 		var createdAt string
 
 		if err := rows.Scan(&detail.ID, &detail.MessageID, &detail.ConversationID, &detail.EventType, &detail.Message, &detail.Data, &createdAt); err != nil {
-			return nil, fmt.Errorf("扫描过程详情失败: %w", err)
+			return nil, fmt.Errorf("scanprocess details: %w", err)
 		}
 
-		// 尝试多种时间格式解析
+		// time formatparse
 		var err error
 		detail.CreatedAt, err = time.Parse("2006-01-02 15:04:05.999999999-07:00", createdAt)
 		if err != nil {
@@ -612,14 +612,14 @@ func (db *DB) GetProcessDetails(messageID string) ([]ProcessDetail, error) {
 	return details, nil
 }
 
-// GetProcessDetailsByConversation 获取对话的所有过程详情（按消息分组）
+// GetProcessDetailsByConversation conversationprocess details（message）
 func (db *DB) GetProcessDetailsByConversation(conversationID string) (map[string][]ProcessDetail, error) {
 	rows, err := db.Query(
 		"SELECT id, message_id, conversation_id, event_type, message, data, created_at FROM process_details WHERE conversation_id = ? ORDER BY created_at ASC",
 		conversationID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("查询过程详情失败: %w", err)
+		return nil, fmt.Errorf("process details: %w", err)
 	}
 	defer rows.Close()
 
@@ -629,10 +629,10 @@ func (db *DB) GetProcessDetailsByConversation(conversationID string) (map[string
 		var createdAt string
 
 		if err := rows.Scan(&detail.ID, &detail.MessageID, &detail.ConversationID, &detail.EventType, &detail.Message, &detail.Data, &createdAt); err != nil {
-			return nil, fmt.Errorf("扫描过程详情失败: %w", err)
+			return nil, fmt.Errorf("scanprocess details: %w", err)
 		}
 
-		// 尝试多种时间格式解析
+		// time formatparse
 		var err error
 		detail.CreatedAt, err = time.Parse("2006-01-02 15:04:05.999999999-07:00", createdAt)
 		if err != nil {

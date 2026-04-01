@@ -1,26 +1,26 @@
 package builtin
 
-// 内置工具名称常量
-// 所有代码中使用内置工具名称的地方都应该使用这些常量，而不是硬编码字符串
+// built-in tool name constants
+// all code that uses built-in tool names should use these constants instead of hardcoded strings
 const (
-	// 漏洞管理工具
+	// vulnerability management tool
 	ToolRecordVulnerability = "record_vulnerability"
 
-	// 知识库工具
+	// knowledge base tools
 	ToolListKnowledgeRiskTypes = "list_knowledge_risk_types"
 	ToolSearchKnowledgeBase    = "search_knowledge_base"
 
-	// Skills工具
+	// Skills tools
 	ToolListSkills    = "list_skills"
 	ToolReadSkill     = "read_skill"
 
-	// WebShell 助手工具（AI 在 WebShell 管理 - AI 助手 中使用）
+	// WebShell assistant tools (used by AI in WebShell management - AI assistant)
 	ToolWebshellExec       = "webshell_exec"
 	ToolWebshellFileList   = "webshell_file_list"
 	ToolWebshellFileRead   = "webshell_file_read"
 	ToolWebshellFileWrite  = "webshell_file_write"
 
-	// WebShell 连接管理工具（用于通过 MCP 管理 webshell 连接）
+	// WebShell connection management tools (for managing webshell connections via MCP)
 	ToolManageWebshellList   = "manage_webshell_list"
 	ToolManageWebshellAdd    = "manage_webshell_add"
 	ToolManageWebshellUpdate = "manage_webshell_update"
@@ -28,7 +28,7 @@ const (
 	ToolManageWebshellTest   = "manage_webshell_test"
 )
 
-// IsBuiltinTool 检查工具名称是否是内置工具
+// IsBuiltinTool checks if tool name is a built-in tool
 func IsBuiltinTool(toolName string) bool {
 	switch toolName {
 	case ToolRecordVulnerability,
@@ -51,7 +51,7 @@ func IsBuiltinTool(toolName string) bool {
 	}
 }
 
-// GetAllBuiltinTools 返回所有内置工具名称列表
+// GetAllBuiltinTools returns list of all built-in tool names
 func GetAllBuiltinTools() []string {
 	return []string{
 		ToolRecordVulnerability,
