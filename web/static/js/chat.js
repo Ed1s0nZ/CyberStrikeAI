@@ -1741,6 +1741,9 @@ function renderProcessDetails(messageId, processDetails) {
             itemTitle = agPx + (typeof window.t === 'function' ? window.t('chat.iterationRound', { n: data.iteration || 1 }) : '第 ' + (data.iteration || 1) + ' 轮迭代');
         } else if (eventType === 'thinking') {
             itemTitle = agPx + '🤔 ' + (typeof window.t === 'function' ? window.t('chat.aiThinking') : 'AI思考');
+        } else if (eventType === 'planning') {
+            // 与流式 monitor.js 中 response_start/response_delta 展示的「规划中」一致（落库聚合）
+            itemTitle = agPx + '📝 ' + (typeof window.t === 'function' ? window.t('chat.planning') : '规划中');
         } else if (eventType === 'tool_calls_detected') {
             itemTitle = agPx + '🔧 ' + (typeof window.t === 'function' ? window.t('chat.toolCallsDetected', { count: data.count || 0 }) : '检测到 ' + (data.count || 0) + ' 个工具调用');
         } else if (eventType === 'tool_call') {

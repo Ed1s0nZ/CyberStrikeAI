@@ -1516,7 +1516,7 @@ function addTimelineItem(timeline, type, options) {
     `;
     
     // 根据类型添加详细内容
-    if (type === 'thinking' && options.message) {
+    if ((type === 'thinking' || type === 'planning') && options.message) {
         content += `<div class="timeline-item-content">${formatMarkdown(options.message)}</div>`;
     } else if (type === 'tool_call' && options.data) {
         const data = options.data;
@@ -2390,6 +2390,8 @@ function refreshProgressAndTimelineI18n() {
             }
         } else if (type === 'thinking') {
             titleSpan.textContent = ap + '\uD83E\uDD14 ' + _t('chat.aiThinking');
+        } else if (type === 'planning') {
+            titleSpan.textContent = ap + '\uD83D\uDCDD ' + _t('chat.planning');
         } else if (type === 'tool_calls_detected' && item.dataset.toolCallsCount != null) {
             const count = parseInt(item.dataset.toolCallsCount, 10) || 0;
             titleSpan.textContent = ap + '\uD83D\uDD27 ' + _t('chat.toolCallsDetected', { count: count });
