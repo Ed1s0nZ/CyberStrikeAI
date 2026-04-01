@@ -17,7 +17,7 @@ server:
   port: 8080 # HTTP service port; access via browser at http://localhost:8080
 # Authentication configuration
 auth:
-  password:  # Web login password; change to a strong password
+  password: "" # Auto-generated on first run if empty
   session_duration_hours: 12 # Login session duration (hours); re-login required after expiry
 # Logging configuration
 log:
@@ -37,7 +37,7 @@ log:
 openai:
   provider: anthropic # "openai" or "anthropic" — native Anthropic Messages API, no proxy needed
   base_url: https://api.anthropic.com/v1 # Anthropic API endpoint
-  api_key: YOUR_API_KEY_HERE
+  api_key: YOUR_API_KEY_HERE # Set your Anthropic or OpenAI API key
   model: claude-haiku-4-5-20251001 # Haiku: higher rate limits, lower cost, faster. Switch to claude-sonnet-4-20250514 when rate limit is increased
   max_total_tokens: 200000 # Claude supports up to 200k context
   rate_limit_delay_ms: 0 # Min ms between API calls (0=no limit, 2000 for free tier)
