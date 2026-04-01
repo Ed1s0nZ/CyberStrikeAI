@@ -1,17 +1,21 @@
 package openai
 
 import (
+	"net/http"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
 
-// rateLimiter serializes API requests and enforces a minimum interval between calls.
-// On 429 responses, it backs off exponentially before allowing the next request.
+// rateLimiter serializes API requests and enforces minimum intervals.
+// On 429 responses, it backs off based on the retry-after header.
+// Thread-safe — all API calls go through this single limiter.
 type rateLimiter struct {
 	mu          sync.Mutex
-	minInterval time.Duration // minimum time between requests
+	minInterval time.Duration // minimum time between requests (configurable)
 	lastCall    time.Time     // when the last request was sent
-	backoffEnd  time.Time     // if set, block until this time (429 backoff)
+	backoffEnd  time.Time     // block until this time (429 backoff)
 }
 
 func newRateLimiter(minInterval time.Duration) *rateLimiter {
@@ -19,7 +23,6 @@ func newRateLimiter(minInterval time.Duration) *rateLimiter {
 }
 
 // wait blocks until the rate limiter allows the next request.
-// Returns immediately if enough time has passed since the last call.
 func (rl *rateLimiter) wait() {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
@@ -48,7 +51,6 @@ func (rl *rateLimiter) wait() {
 }
 
 // backoff sets a backoff period after receiving a 429.
-// duration is how long to wait before trying again.
 func (rl *rateLimiter) backoff(duration time.Duration) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
@@ -56,4 +58,69 @@ func (rl *rateLimiter) backoff(duration time.Duration) {
 	if end.After(rl.backoffEnd) {
 		rl.backoffEnd = end
 	}
+}
+
+// parseRetryAfter extracts the retry delay from HTTP response headers.
+// Checks: retry-after (standard), anthropic-ratelimit-*-reset headers.
+// Returns 0 if no retry information found.
+func parseRetryAfter(resp *http.Response) time.Duration {
+	if resp == nil {
+		return 0
+	}
+
+	// Standard retry-after header (seconds or HTTP date)
+	if ra := resp.Header.Get("retry-after"); ra != "" {
+		if secs, err := strconv.ParseFloat(ra, 64); err == nil && secs > 0 {
+			return time.Duration(secs * float64(time.Second))
+		}
+		if t, err := http.ParseTime(ra); err == nil {
+			d := time.Until(t)
+			if d > 0 {
+				return d
+			}
+		}
+	}
+
+	// Anthropic-specific: anthropic-ratelimit-tokens-reset (ISO 8601 timestamp)
+	for _, hdr := range []string{
+		"anthropic-ratelimit-tokens-reset",
+		"anthropic-ratelimit-input-tokens-reset",
+		"anthropic-ratelimit-requests-reset",
+	} {
+		if val := resp.Header.Get(hdr); val != "" {
+			if t, err := time.Parse(time.RFC3339, val); err == nil {
+				d := time.Until(t)
+				if d > 0 {
+					return d + 1*time.Second // add 1s buffer
+				}
+			}
+		}
+	}
+
+	// OpenAI-style: x-ratelimit-reset-tokens (duration like "1s", "30s", "1m")
+	for _, hdr := range []string{
+		"x-ratelimit-reset-tokens",
+		"x-ratelimit-reset-requests",
+	} {
+		if val := resp.Header.Get(hdr); val != "" {
+			if d := parseDurationLoose(val); d > 0 {
+				return d + 1*time.Second
+			}
+		}
+	}
+
+	return 0
+}
+
+// parseDurationLoose parses durations like "1s", "30s", "1m30s", "500ms"
+func parseDurationLoose(s string) time.Duration {
+	s = strings.TrimSpace(s)
+	if d, err := time.ParseDuration(s); err == nil {
+		return d
+	}
+	// Try as plain seconds
+	if secs, err := strconv.ParseFloat(s, 64); err == nil && secs > 0 {
+		return time.Duration(secs * float64(time.Second))
+	}
+	return 0
 }

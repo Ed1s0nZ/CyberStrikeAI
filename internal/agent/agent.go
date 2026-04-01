@@ -36,6 +36,7 @@ type Agent struct {
 	mu                    sync.RWMutex      // mutex to support concurrent updates
 	toolNameMapping       map[string]string // tool name mapping: OpenAI format -> original format (for external MCP tools)
 	currentConversationID string            // current conversation ID (auto-passed to tools)
+	timeAwareness         *TimeAwareness    // temporal context for system prompts
 }
 
 // ResultStorage result storage interface (uses storage package types directly)
@@ -116,6 +117,14 @@ func NewAgent(cfg *config.OpenAIConfig, agentCfg *config.AgentConfig, mcpServer 
 		logger.Warn("OpenAI config is empty, cannot initialize MemoryCompressor")
 	}
 
+	// Initialize time awareness from config
+	var ta *TimeAwareness
+	if agentCfg != nil {
+		ta = NewTimeAwareness(agentCfg.TimeAwareness.Timezone, agentCfg.TimeAwareness.Enabled)
+	} else {
+		ta = NewTimeAwareness("", true) // default: enabled, UTC
+	}
+
 	return &Agent{
 		openAIClient:         llmClient,
 		config:               cfg,
@@ -127,7 +136,8 @@ func NewAgent(cfg *config.OpenAIConfig, agentCfg *config.AgentConfig, mcpServer 
 		maxIterations:        maxIterations,
 		resultStorage:        resultStorage,
 		largeResultThreshold: largeResultThreshold,
-		toolNameMapping:      make(map[string]string), // initialize tool name mapping
+		toolNameMapping:      make(map[string]string),
+		timeAwareness:        ta,
 	}
 }
 
@@ -466,6 +476,13 @@ LANGUAGE: You MUST respond ONLY in English. All output — including todo lists,
 		skillsHint.WriteString(builtin.ToolReadSkill)
 		skillsHint.WriteString("` tool to retrieve them")
 		systemPrompt += skillsHint.String()
+	}
+
+	// Inject time context into system prompt
+	if a.timeAwareness != nil {
+		if timeBlock := a.timeAwareness.BuildContextBlock(); timeBlock != "" {
+			systemPrompt = timeBlock + "\n" + systemPrompt
+		}
 	}
 
 	messages := []ChatMessage{

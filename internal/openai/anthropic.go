@@ -14,6 +14,53 @@ import (
 	"go.uber.org/zap"
 )
 
+// doAnthropicWithRetry sends a request to the Anthropic API with rate limiting
+// and automatic retry on 429. Parses retry-after headers for precise backoff.
+// Returns the HTTP response (caller must close body) or an error.
+const maxAnthropicRetries = 5
+
+func (c *Client) doAnthropicWithRetry(ctx context.Context, endpoint string, body []byte) (*http.Response, error) {
+	for attempt := 0; attempt <= maxAnthropicRetries; attempt++ {
+		c.limiter.wait()
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+		if err != nil {
+			return nil, fmt.Errorf("build anthropic request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("x-api-key", c.config.APIKey)
+		req.Header.Set("anthropic-version", "2023-06-01")
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("call anthropic api: %w", err)
+		}
+
+		if resp.StatusCode != 429 {
+			return resp, nil
+		}
+
+		// 429 — parse retry-after from headers
+		retryAfter := parseRetryAfter(resp)
+		if retryAfter <= 0 {
+			// Fallback: exponential backoff 10s, 20s, 40s, 60s, 60s
+			retryAfter = time.Duration(min(60, 10*(1<<uint(attempt)))) * time.Second
+		}
+		resp.Body.Close()
+
+		if attempt < maxAnthropicRetries {
+			c.limiter.backoff(retryAfter)
+			c.logger.Warn("Anthropic rate limited (429), backing off",
+				zap.Int("attempt", attempt+1),
+				zap.Int("max", maxAnthropicRetries),
+				zap.Duration("backoff", retryAfter),
+			)
+		}
+	}
+
+	return nil, fmt.Errorf("anthropic rate limit: exhausted %d retries", maxAnthropicRetries)
+}
+
 // ---------- Anthropic API types ----------
 
 type anthropicRequest struct {
@@ -409,41 +456,12 @@ func (c *Client) anthropicChatCompletion(ctx context.Context, payload interface{
 		zap.Int("payloadSizeKB", len(body)/1024),
 		zap.String("endpoint", endpoint))
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("build anthropic request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-api-key", c.config.APIKey)
-	req.Header.Set("anthropic-version", "2023-06-01")
-
-	// Rate limit
-	c.limiter.wait()
-
 	requestStart := time.Now()
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.doAnthropicWithRetry(ctx, endpoint, body)
 	if err != nil {
-		return fmt.Errorf("call anthropic api: %w", err)
+		return err
 	}
 	defer resp.Body.Close()
-
-	// Auto-retry on 429
-	if resp.StatusCode == 429 {
-		resp.Body.Close()
-		retryAfter := 30 * time.Second
-		c.limiter.backoff(retryAfter)
-		c.logger.Warn("Anthropic rate limited (429), backing off", zap.Duration("backoff", retryAfter))
-		c.limiter.wait()
-		req2, _ := http.NewRequestWithContext(ctx, http.MethodPost, req.URL.String(), bytes.NewReader(body))
-		req2.Header.Set("Content-Type", "application/json")
-		req2.Header.Set("x-api-key", c.config.APIKey)
-		req2.Header.Set("anthropic-version", "2023-06-01")
-		resp, err = c.httpClient.Do(req2)
-		if err != nil {
-			return fmt.Errorf("call anthropic api (retry): %w", err)
-		}
-		defer resp.Body.Close()
-	}
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -526,41 +544,13 @@ func (c *Client) anthropicChatCompletionStreamWithToolCalls(
 		endpoint = baseURL + "/v1/messages"
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
-	if err != nil {
-		return "", nil, "", fmt.Errorf("build anthropic request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-api-key", c.config.APIKey)
-	req.Header.Set("anthropic-version", "2023-06-01")
-
-	// Rate limit
-	c.limiter.wait()
-
 	requestStart := time.Now()
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.doAnthropicWithRetry(ctx, endpoint, body)
 	if err != nil {
-		return "", nil, "", fmt.Errorf("call anthropic api: %w", err)
+		return "", nil, "", err
 	}
 	defer resp.Body.Close()
-
-	// Auto-retry on 429
-	if resp.StatusCode == 429 {
-		resp.Body.Close()
-		retryAfter := 30 * time.Second
-		c.limiter.backoff(retryAfter)
-		c.logger.Warn("Anthropic stream rate limited (429), backing off", zap.Duration("backoff", retryAfter))
-		c.limiter.wait()
-		req2, _ := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
-		req2.Header.Set("Content-Type", "application/json")
-		req2.Header.Set("x-api-key", c.config.APIKey)
-		req2.Header.Set("anthropic-version", "2023-06-01")
-		resp, err = c.httpClient.Do(req2)
-		if err != nil {
-			return "", nil, "", fmt.Errorf("call anthropic api (retry): %w", err)
-		}
-		defer resp.Body.Close()
-	}
+	_ = requestStart
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)

@@ -17,7 +17,7 @@ server:
   port: 8080 # HTTP service port; access via browser at http://localhost:8080
 # Authentication configuration
 auth:
-  password: "" # Auto-generated on first run if empty
+  password: LpcoZSWGcgoc3oB3RlszUize # Auto-generated on first run if empty
   session_duration_hours: 12 # Login session duration (hours); re-login required after expiry
 # Logging configuration
 log:
@@ -57,7 +57,10 @@ agent:
   large_result_threshold: 102400 # Large result threshold (bytes); default 50KB; results exceeding this size are auto-saved to storage
   result_storage_dir: tmp # Result storage directory; large results are saved here
   tool_timeout_minutes: 30 # Max duration for a single tool execution (minutes); auto-terminates on timeout; 0 = no limit (not recommended, may hang)
-# Multi-agent (CloudWeGo Eino DeepAgent; coexists with single-agent /api/agent-loop above)
+  time_awareness:
+    enabled: true # Inject current timestamp into every system prompt (scheduling, task estimation)
+    timezone: "UTC" # IANA timezone, e.g. "Europe/Kyiv", "America/New_York"
+# Multi-agent orchestrator (native Go; coexists with single-agent /api/agent-loop)
 # Dependencies pulled via go.mod; if download fails, set: go env -w GOPROXY=https://goproxy.cn,direct
 # After enabling, restart the service to register /api/multi-agent and /api/multi-agent/stream; frontend can select "multi-agent" mode to use the stream endpoint
 multi_agent:

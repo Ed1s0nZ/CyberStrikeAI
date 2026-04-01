@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"cyberstrike-ai/internal/agent"
 	"cyberstrike-ai/internal/agents"
@@ -319,9 +320,16 @@ func (o *orchestratorState) run(userMessage string, history []agent.ChatMessage)
 	}
 	allTools = append(allTools, todoTool)
 
+	// Inject time context into orchestrator system prompt.
+	orchPrompt := o.orchInstruction
+	now := time.Now().UTC()
+	timeBlock := fmt.Sprintf("<time_context>\n  Current date and time : %s\n  Day of week           : %s\n  Unix timestamp        : %d\n</time_context>\n",
+		now.Format("2006-01-02 15:04:05 UTC"), now.Weekday().String(), now.Unix())
+	orchPrompt = timeBlock + orchPrompt
+
 	// Build message history.
 	messages := []agent.ChatMessage{
-		{Role: "system", Content: o.orchInstruction},
+		{Role: "system", Content: orchPrompt},
 	}
 
 	const maxHistoryMessages = 300
@@ -597,8 +605,13 @@ func (o *orchestratorState) handleTaskCall(args map[string]interface{}, toolCall
 func (o *orchestratorState) runSubAgent(agentName, instruction, taskDesc string, subRoleTools []string, maxIter int) (string, error) {
 	subTools := o.ag.ToolsForRole(subRoleTools)
 
+	// Time context for sub-agent
+	subNow := time.Now().UTC()
+	subTimeBlock := fmt.Sprintf("<time_context>\n  Current: %s | Unix: %d\n</time_context>\n",
+		subNow.Format("2006-01-02 15:04:05 UTC"), subNow.Unix())
+
 	messages := []agent.ChatMessage{
-		{Role: "system", Content: instruction},
+		{Role: "system", Content: subTimeBlock + instruction},
 		{Role: "user", Content: fmt.Sprintf("[IMPORTANT: Respond ONLY in English.]\n\nComplete this task:\n\n%s\n\nUse available tools. Be thorough. Report results concisely.", taskDesc)},
 	}
 
