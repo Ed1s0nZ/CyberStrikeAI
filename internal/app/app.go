@@ -661,6 +661,12 @@ func setupRoutes(
 
 	// robot callback (Telegram uses long-polling, no webhook routes needed)
 
+	// Plugin static assets (no auth — loaded on page init before login)
+	if pluginsHandler != nil {
+		api.GET("/plugins/:name/i18n/:lang", pluginsHandler.GetPluginI18n)
+		api.GET("/plugins/:name/web/*filepath", pluginsHandler.ServePluginStatic)
+	}
+
 	protected := api.Group("")
 	protected.Use(security.AuthMiddleware(authManager))
 	{

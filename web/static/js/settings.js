@@ -49,6 +49,9 @@ function switchSettingsSection(section) {
     if (section === 'terminal' && typeof initTerminal === 'function') {
         setTimeout(initTerminal, 0);
     }
+    if (section === 'plugins') {
+        loadPlugins();
+    }
 }
 
 // opensettings
@@ -268,6 +271,9 @@ async function loadConfig(loadTools = true) {
             toolsSearchKeyword = '';
             await loadToolsList(1, '');
         }
+
+        // Pre-load plugin list for settings plugins section
+        loadPlugins();
     } catch (error) {
         console.error('Failed to load configuration:', error);
         const baseMsg = (typeof window !== 'undefined' && typeof window.t === 'function')
@@ -1917,3 +1923,148 @@ document.addEventListener('languagechange', function () {
         console.warn('languagechange MCP refresh failed', e);
     }
 });
+
+// ═══════════════════════════════════════════════
+// Plugin Management
+// ═══════════════════════════════════════════════
+
+async function loadPlugins() {
+    const container = document.getElementById('plugins-list');
+    if (!container) return;
+
+    try {
+        const response = await apiFetch('/api/plugins');
+        const data = await response.json();
+
+        if (!data.plugins || data.plugins.length === 0) {
+            container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);">No plugins found. Drop plugin folders into the <code>plugins/</code> directory.</div>';
+            return;
+        }
+
+        container.innerHTML = data.plugins.map(function(p) { return renderPluginCard(p); }).join('');
+    } catch (err) {
+        container.innerHTML = '<div style="color: var(--error-color); padding: 20px;">Failed to load plugins: ' + err.message + '</div>';
+    }
+}
+
+function renderPluginCard(plugin) {
+    var m = plugin.manifest;
+    var badges = [];
+    if (m.provides.tools) badges.push(plugin.tool_count + ' tools');
+    if (m.provides.skills) badges.push(plugin.skill_count + ' skills');
+    if (m.provides.agents) badges.push(plugin.agent_count + ' agents');
+    if (m.provides.knowledge) badges.push('knowledge');
+
+    var configHtml = '';
+    if (m.config && m.config.length > 0) {
+        var configItems = m.config.map(function(c) {
+            return '<div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">' +
+                '<label style="min-width: 140px; font-size: 12px; color: var(--text-muted);">' + c.name + (c.required ? ' *' : '') + '</label>' +
+                '<input type="password" class="plugin-config-input" data-plugin="' + m.name + '" data-key="' + c.name + '" ' +
+                'placeholder="' + c.description + '" style="flex: 1; font-size: 12px;" />' +
+                '<button class="btn-secondary btn-small" onclick="savePluginConfigVar(\'' + m.name + '\', \'' + c.name + '\', this)" style="font-size: 11px;">Set</button>' +
+                '</div>';
+        }).join('');
+        configHtml = '<div class="plugin-config" id="plugin-config-' + m.name + '" style="margin-top: 12px; ' + (plugin.enabled ? '' : 'display:none;') + '">' +
+            configItems + '</div>';
+    }
+
+    var installBtn = '';
+    if (m.requirements) {
+        installBtn = '<button class="btn-secondary btn-small" onclick="installPluginDeps(\'' + m.name + '\', this)" style="font-size: 11px;">' +
+            (plugin.installed ? 'Reinstall Deps' : 'Install Deps') + '</button>';
+    }
+
+    var badgesHtml = badges.map(function(b) {
+        return '<span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: var(--bg-tertiary, #333); color: var(--text-muted);">' + b + '</span>';
+    }).join('');
+
+    var warningHtml = '';
+    if (!plugin.config_set && m.config && m.config.some(function(c) { return c.required; })) {
+        warningHtml = '<div style="margin-top: 8px; font-size: 11px; color: var(--warning-color);">Configure required API keys before enabling</div>';
+    }
+
+    var errorHtml = '';
+    if (plugin.error) {
+        errorHtml = '<div style="margin-top: 8px; font-size: 11px; color: var(--error-color);">' + plugin.error + '</div>';
+    }
+
+    return '<div class="plugin-card" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-bottom: 12px; background: var(--card-bg, var(--bg-secondary));">' +
+        '<div style="display: flex; justify-content: space-between; align-items: flex-start;">' +
+            '<div>' +
+                '<div style="display: flex; align-items: center; gap: 8px;">' +
+                    '<strong style="font-size: 14px;">' + m.name + '</strong>' +
+                    '<span style="font-size: 11px; color: var(--text-muted);">v' + m.version + '</span>' +
+                    badgesHtml +
+                '</div>' +
+                '<p style="font-size: 12px; color: var(--text-muted); margin: 4px 0;">' + m.description + '</p>' +
+                (m.author ? '<span style="font-size: 11px; color: var(--text-muted);">by ' + m.author + '</span>' : '') +
+            '</div>' +
+            '<div style="display: flex; gap: 8px; align-items: center;">' +
+                installBtn +
+                '<label class="toggle-switch" style="margin: 0;">' +
+                    '<input type="checkbox" ' + (plugin.enabled ? 'checked' : '') + ' onchange="togglePlugin(\'' + m.name + '\', this.checked)" />' +
+                    '<span class="toggle-slider"></span>' +
+                '</label>' +
+            '</div>' +
+        '</div>' +
+        warningHtml +
+        errorHtml +
+        configHtml +
+    '</div>';
+}
+
+async function togglePlugin(name, enabled) {
+    try {
+        var action = enabled ? 'enable' : 'disable';
+        await apiFetch('/api/plugins/' + name + '/' + action, { method: 'POST' });
+        showNotification('Plugin ' + name + ' ' + action + 'd', 'success');
+        // Show/hide config section
+        var configEl = document.getElementById('plugin-config-' + name);
+        if (configEl) configEl.style.display = enabled ? '' : 'none';
+    } catch (err) {
+        showNotification('Failed to toggle plugin: ' + err.message, 'error');
+        loadPlugins(); // reload to sync state
+    }
+}
+
+async function savePluginConfigVar(pluginName, key, btn) {
+    var input = btn.parentElement.querySelector('input');
+    var value = input.value.trim();
+    if (!value) return;
+
+    try {
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+        var body = {};
+        body[key] = value;
+        await apiFetch('/api/plugins/' + pluginName + '/config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        });
+        input.value = '';
+        input.placeholder = 'Configured';
+        showNotification(key + ' saved', 'success');
+    } catch (err) {
+        showNotification('Failed to save config: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Set';
+    }
+}
+
+async function installPluginDeps(name, btn) {
+    try {
+        btn.disabled = true;
+        btn.textContent = 'Installing...';
+        await apiFetch('/api/plugins/' + name + '/install', { method: 'POST' });
+        showNotification('Dependencies installed for ' + name, 'success');
+        btn.textContent = 'Reinstall Deps';
+    } catch (err) {
+        showNotification('Install failed: ' + err.message, 'error');
+        btn.textContent = 'Install Deps';
+    } finally {
+        btn.disabled = false;
+    }
+}

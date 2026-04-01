@@ -1344,6 +1344,9 @@
                                 <div class="settings-nav-item" data-section="security" onclick="switchSettingsSection('security')">
  <span data-i18n="settings.nav.security"></span>
                                 </div>
+                                <div class="settings-nav-item" data-section="plugins" onclick="switchSettingsSection('plugins')">
+                                    <span data-i18n="settingsPlugins.title">Plugins</span>
+                                </div>
                             </nav>
                         </aside>
                         
@@ -1650,7 +1653,7 @@
                                 <div class="settings-section-header">
  <h3 data-i18n="settings.nav.security"></h3>
                                 </div>
-                                
+
                                 <div class="settings-subsection">
  <h4 data-i18n="settingsSecurity.changePasswordTitle"></h4>
  <p class="settings-description" data-i18n="settingsSecurity.changePasswordDesc">，。</p>
@@ -1672,6 +1675,16 @@
  <button class="btn-primary change-password-submit" type="button" onclick="changePassword()" data-i18n="settingsSecurity.changePasswordBtn"></button>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+
+                            <div id="settings-section-plugins" class="settings-section-content">
+                                <div class="settings-section-header">
+                                    <h3 data-i18n="settingsPlugins.title">Plugins</h3>
+                                    <p class="settings-section-desc" data-i18n="settingsPlugins.description">Manage plugin extensions — enable/disable, configure API keys</p>
+                                </div>
+                                <div id="plugins-list" class="plugins-container">
+                                    <div style="text-align: center; padding: 20px; color: var(--text-muted);">Loading plugins...</div>
                                 </div>
                             </div>
                         </div>
@@ -2609,6 +2622,7 @@ skill...</small>
     <script src="/static/js/chat-files.js"></script>
     <script src="/static/js/tasks.js"></script>
     <script src="/static/js/roles.js"></script>
+    <script src="/static/js/plugin-loader.js"></script>
 </body>
 </html>
 

@@ -288,6 +288,41 @@ func (h *PluginsHandler) unregisterPluginTools(tools []config.ToolConfig) {
 	h.executor.RebuildToolIndex()
 }
 
+// GetPluginI18n serves a plugin's i18n translation JSON file.
+// GET /api/plugins/:name/i18n/:lang
+func (h *PluginsHandler) GetPluginI18n(c *gin.Context) {
+	name := c.Param("name")
+	lang := c.Param("lang") // "en-US" or "uk-UA"
+
+	filePath := filepath.Join(h.manager.PluginsDir(), name, "i18n", lang+".json")
+	if _, err := os.Stat(filePath); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "translation not found"})
+		return
+	}
+	c.File(filePath)
+}
+
+// ServePluginStatic serves a plugin's static web assets (JS, CSS, HTML pages).
+// GET /api/plugins/:name/web/*filepath
+func (h *PluginsHandler) ServePluginStatic(c *gin.Context) {
+	name := c.Param("name")
+	fp := c.Param("filepath")
+
+	// Security: prevent path traversal
+	clean := filepath.Clean(fp)
+	if strings.Contains(clean, "..") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+
+	fullPath := filepath.Join(h.manager.PluginsDir(), name, "web", clean)
+	if _, err := os.Stat(fullPath); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	c.File(fullPath)
+}
+
 // extractPluginZip extracts a plugin zip to the plugins directory. Returns the
 // plugin name (top-level directory in the zip).
 func (h *PluginsHandler) extractPluginZip(zipPath string) (string, error) {

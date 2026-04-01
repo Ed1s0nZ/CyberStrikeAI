@@ -25,6 +25,23 @@ type PluginManifest struct {
 	Provides     PluginProvides    `yaml:"provides" json:"provides"`
 	Config       []PluginConfigVar `yaml:"config" json:"config"`
 	Requirements string            `yaml:"requirements" json:"requirements"`
+	Frontend     PluginFrontend    `yaml:"frontend" json:"frontend"`
+}
+
+// PluginFrontend describes frontend assets a plugin provides.
+type PluginFrontend struct {
+	NavItems []PluginNavItem `yaml:"nav_items" json:"nav_items"` // sidebar nav items
+	Pages    []string        `yaml:"pages" json:"pages"`         // HTML page files in web/pages/
+	Scripts  []string        `yaml:"scripts" json:"scripts"`     // JS files in web/js/
+	Styles   []string        `yaml:"styles" json:"styles"`       // CSS files in web/css/
+}
+
+// PluginNavItem describes a sidebar navigation item added by a plugin.
+type PluginNavItem struct {
+	ID    string `yaml:"id" json:"id"`       // page ID (e.g. "my-plugin-page")
+	Label string `yaml:"label" json:"label"` // display text
+	Icon  string `yaml:"icon" json:"icon"`   // SVG or emoji
+	I18n  string `yaml:"i18n" json:"i18n"`   // i18n key for label
 }
 
 // PluginProvides declares which resource types a plugin provides.
