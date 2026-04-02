@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -49,11 +50,10 @@ func (e *Executor) SetProxyConfig(proxy *config.ProxyConfig) {
 	e.proxyConfig = proxy
 }
 
-// proxyEnv returns environment variables for proxy routing if proxy is enabled.
-// Returns nil if proxy is disabled.
-func (e *Executor) proxyEnv() []string {
+// proxyURL builds the proxy URL string from config.
+func (e *Executor) proxyURL() string {
 	if e.proxyConfig == nil || !e.proxyConfig.Enabled {
-		return nil
+		return ""
 	}
 	p := e.proxyConfig
 	host := p.Host
@@ -62,34 +62,215 @@ func (e *Executor) proxyEnv() []string {
 	}
 	port := p.Port
 	if port == 0 {
-		port = 1080
+		switch p.Type {
+		case "tor":
+			port = 9050
+		case "http", "https":
+			port = 8080
+		default:
+			port = 1080
+		}
 	}
 
-	var proxyURL string
+	// Auth prefix for user:pass
+	auth := ""
+	if p.Username != "" {
+		auth = p.Username
+		if p.Password != "" {
+			auth += ":" + p.Password
+		}
+		auth += "@"
+	}
+
+	// Build URL based on type
 	switch p.Type {
-	case "http", "https":
-		proxyURL = fmt.Sprintf("%s://%s:%d", p.Type, host, port)
-	case "gsocket", "socks5", "socks5h", "":
-		proxyURL = fmt.Sprintf("socks5h://%s:%d", host, port)
+	case "tor":
+		// Tor is always SOCKS5 with DNS resolution through Tor (socks5h)
+		return fmt.Sprintf("socks5h://%s%s:%d", auth, host, port)
+	case "http":
+		return fmt.Sprintf("http://%s%s:%d", auth, host, port)
+	case "https":
+		return fmt.Sprintf("https://%s%s:%d", auth, host, port)
+	case "socks5":
+		// socks5 = DNS resolved locally, socks5h = DNS through proxy
+		return fmt.Sprintf("socks5://%s%s:%d", auth, host, port)
+	case "socks5h", "":
+		return fmt.Sprintf("socks5h://%s%s:%d", auth, host, port)
 	default:
-		proxyURL = fmt.Sprintf("socks5h://%s:%d", host, port)
+		return fmt.Sprintf("socks5h://%s%s:%d", auth, host, port)
+	}
+}
+
+// proxyEnv returns environment variables for proxy routing if proxy is enabled.
+// Returns nil if proxy is disabled.
+func (e *Executor) proxyEnv() []string {
+	url := e.proxyURL()
+	if url == "" {
+		return nil
 	}
 
-	noProxy := p.NoProxy
+	noProxy := e.proxyConfig.NoProxy
 	if noProxy == "" {
-		noProxy = "localhost,127.0.0.1"
+		noProxy = "localhost,127.0.0.1,*.local"
 	}
 
 	return []string{
-		"HTTP_PROXY=" + proxyURL,
-		"HTTPS_PROXY=" + proxyURL,
-		"ALL_PROXY=" + proxyURL,
-		"http_proxy=" + proxyURL,
-		"https_proxy=" + proxyURL,
-		"all_proxy=" + proxyURL,
+		"HTTP_PROXY=" + url,
+		"HTTPS_PROXY=" + url,
+		"ALL_PROXY=" + url,
+		"http_proxy=" + url,
+		"https_proxy=" + url,
+		"all_proxy=" + url,
 		"NO_PROXY=" + noProxy,
 		"no_proxy=" + noProxy,
 	}
+}
+
+// isToolExemptFromProxy checks if a tool should bypass the proxy.
+func (e *Executor) isToolExemptFromProxy(toolName string) bool {
+	if e.proxyConfig == nil {
+		return false
+	}
+	for _, exempt := range e.proxyConfig.ExemptTools {
+		if exempt == toolName {
+			return true
+		}
+	}
+	return false
+}
+
+// shouldUseProxyChains returns true if the tool should be wrapped with proxychains.
+// Some tools (nmap, masscan) don't respect env proxy vars and need proxychains-ng.
+var proxychainsTools = map[string]bool{
+	"nmap": true, "masscan": true, "rustscan": true,
+	"arp-scan": true, "nbtscan": true, "hping3": true,
+}
+
+func (e *Executor) shouldUseProxyChains(toolName string) bool {
+	if e.proxyConfig == nil || !e.proxyConfig.Enabled || !e.proxyConfig.ProxyChains {
+		return false
+	}
+	if e.isToolExemptFromProxy(toolName) {
+		return false
+	}
+	return proxychainsTools[toolName]
+}
+
+// WriteProxyChainsConf writes a proxychains4 config file for the current proxy settings.
+// Returns the path to the temp config file.
+func (e *Executor) WriteProxyChainsConf() (string, error) {
+	if e.proxyConfig == nil {
+		return "", fmt.Errorf("proxy not configured")
+	}
+	p := e.proxyConfig
+	host := p.Host
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	port := p.Port
+	if port == 0 {
+		if p.Type == "tor" {
+			port = 9050
+		} else {
+			port = 1080
+		}
+	}
+
+	proxyType := "socks5"
+	if p.Type == "http" || p.Type == "https" {
+		proxyType = "http"
+	}
+	if p.Type == "tor" || p.DNSProxy {
+		proxyType = "socks5" // proxychains handles DNS via proxy when using socks5
+	}
+
+	authLine := ""
+	if p.Username != "" {
+		authLine = fmt.Sprintf(" %s %s", p.Username, p.Password)
+	}
+
+	conf := fmt.Sprintf(`# CyberStrikeAI proxychains config (auto-generated)
+strict_chain
+proxy_dns
+tcp_read_time_out 30000
+tcp_connect_time_out 15000
+
+[ProxyList]
+%s %s %d%s
+`, proxyType, host, port, authLine)
+
+	tmpFile := filepath.Join(os.TempDir(), "cyberstrike_proxychains.conf")
+	if err := os.WriteFile(tmpFile, []byte(conf), 0600); err != nil {
+		return "", err
+	}
+	return tmpFile, nil
+}
+
+// CheckProxyHealth tests if the proxy is reachable and working.
+func (e *Executor) CheckProxyHealth() error {
+	if e.proxyConfig == nil || !e.proxyConfig.Enabled {
+		return nil
+	}
+	url := e.proxyURL()
+	if url == "" {
+		return fmt.Errorf("proxy URL is empty")
+	}
+
+	// Quick TCP connect test to proxy host:port
+	p := e.proxyConfig
+	host := p.Host
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	port := p.Port
+	if port == 0 {
+		if p.Type == "tor" {
+			port = 9050
+		} else {
+			port = 1080
+		}
+	}
+
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", host, port), 5*time.Second)
+	if err != nil {
+		return fmt.Errorf("proxy unreachable at %s:%d: %w", host, port, err)
+	}
+	conn.Close()
+	return nil
+}
+
+// StartTorIfNeeded starts the tor service if type=tor and tor_auto_start=true.
+func (e *Executor) StartTorIfNeeded() error {
+	if e.proxyConfig == nil || !e.proxyConfig.Enabled || e.proxyConfig.Type != "tor" || !e.proxyConfig.TorAutoStart {
+		return nil
+	}
+	// Check if tor is already running
+	if err := e.CheckProxyHealth(); err == nil {
+		return nil // already running
+	}
+	// Try to start tor
+	e.logger.Info("starting tor service (tor_auto_start=true)")
+	cmd := exec.Command("tor", "--RunAsDaemon", "1")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		// Fallback: try systemctl
+		cmd2 := exec.Command("systemctl", "start", "tor")
+		if out2, err2 := cmd2.CombinedOutput(); err2 != nil {
+			// Fallback: try service
+			cmd3 := exec.Command("service", "tor", "start")
+			if out3, err3 := cmd3.CombinedOutput(); err3 != nil {
+				return fmt.Errorf("failed to start tor: %s / %s / %s", string(out), string(out2), string(out3))
+			}
+		}
+	}
+	// Wait for tor to come up
+	for i := 0; i < 10; i++ {
+		time.Sleep(time.Second)
+		if err := e.CheckProxyHealth(); err == nil {
+			e.logger.Info("tor started successfully")
+			return nil
+		}
+	}
+	return fmt.Errorf("tor started but not responding after 10s")
 }
 
 // buildCmdEnv returns the environment for a subprocess, injecting proxy vars if enabled.
@@ -104,10 +285,12 @@ func (e *Executor) buildCmdEnv() []string {
 }
 
 // buildCmdEnvForTool returns the environment for a tool subprocess, injecting
-// both proxy vars and plugin-specific env vars. This is the preferred method
-// for tool execution.
+// proxy vars (unless exempt) and plugin-specific env vars.
 func (e *Executor) buildCmdEnvForTool(toolName string) []string {
-	proxyVars := e.proxyEnv()
+	var proxyVars []string
+	if !e.isToolExemptFromProxy(toolName) {
+		proxyVars = e.proxyEnv()
+	}
 	var pluginVars []string
 	if e.pluginEnvProvider != nil {
 		pluginVars = e.pluginEnvProvider(toolName)
@@ -259,8 +442,23 @@ func (e *Executor) ExecuteTool(ctx context.Context, toolName string, args map[st
 		}, nil
 	}
 
-	// execute command
-	cmd := exec.CommandContext(ctx, toolConfig.Command, cmdArgs...)
+	// execute command — wrap with proxychains for tools that don't respect env proxy vars
+	var cmd *exec.Cmd
+	proxied := false
+	if e.shouldUseProxyChains(toolName) {
+		confPath, pcErr := e.WriteProxyChainsConf()
+		if pcErr == nil {
+			// proxychains4 -f <conf> <command> <args...>
+			pcArgs := append([]string{"-f", confPath, toolConfig.Command}, cmdArgs...)
+			cmd = exec.CommandContext(ctx, "proxychains4", pcArgs...)
+			proxied = true
+		} else {
+			e.logger.Warn("proxychains conf write failed, running direct", zap.Error(pcErr))
+			cmd = exec.CommandContext(ctx, toolConfig.Command, cmdArgs...)
+		}
+	} else {
+		cmd = exec.CommandContext(ctx, toolConfig.Command, cmdArgs...)
+	}
 	if workDir := e.resolveToolWorkDir(args); workDir != "" {
 		cmd.Dir = workDir
 	}
@@ -272,7 +470,8 @@ func (e *Executor) ExecuteTool(ctx context.Context, toolName string, args map[st
 		zap.String("tool", toolName),
 		zap.Strings("args", cmdArgs),
 		zap.String("workdir", cmd.Dir),
-		zap.Bool("proxied", e.proxyConfig != nil && e.proxyConfig.Enabled),
+		zap.Bool("proxied", e.proxyConfig != nil && e.proxyConfig.Enabled && !e.isToolExemptFromProxy(toolName)),
+		zap.Bool("proxychains", proxied),
 	)
 
 	var output string

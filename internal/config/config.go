@@ -329,14 +329,21 @@ type SSLStripConfig struct {
 }
 
 // ProxyConfig controls global proxy middleware for all tool executions.
-// Secrets (gsocket secret, proxy auth) are stored in persistent memory, not here.
+// All tools spawned by the executor inherit proxy environment variables.
+// Tools that don't respect env vars (nmap, masscan) use proxychains wrapper.
 type ProxyConfig struct {
-	Enabled   bool   `yaml:"enabled" json:"enabled"`       // Enable proxy middleware (default false)
-	Type      string `yaml:"type" json:"type"`             // Proxy type: socks5, socks5h, http, https, gsocket (default socks5h)
-	Host      string `yaml:"host" json:"host"`             // Proxy host (default 127.0.0.1)
-	Port      int    `yaml:"port" json:"port"`             // Proxy port (default 1080)
-	NoProxy   string `yaml:"no_proxy" json:"no_proxy"`     // Comma-separated bypass list (default: localhost,127.0.0.1)
-	AutoStart bool   `yaml:"auto_start" json:"auto_start"` // Auto-start gsocket SOCKS tunnel on server start (default false)
+	Enabled      bool     `yaml:"enabled" json:"enabled"`                 // Enable proxy middleware (default false)
+	Type         string   `yaml:"type" json:"type"`                       // Proxy type: tor, socks5, socks5h, http, https (default socks5h)
+	Host         string   `yaml:"host" json:"host"`                       // Proxy host (default 127.0.0.1)
+	Port         int      `yaml:"port" json:"port"`                       // Proxy port (default 9050 for tor, 1080 for socks5)
+	Username     string   `yaml:"username,omitempty" json:"username"`     // Auth username (optional, for socks5/http with auth)
+	Password     string   `yaml:"password,omitempty" json:"password"`     // Auth password (optional)
+	NoProxy      string   `yaml:"no_proxy" json:"no_proxy"`               // Comma-separated bypass list (default: localhost,127.0.0.1,*.local)
+	ExemptTools  []string `yaml:"exempt_tools,omitempty" json:"exempt_tools"` // Tools that bypass proxy (e.g. tools that need direct connection)
+	TorAutoStart bool     `yaml:"tor_auto_start" json:"tor_auto_start"`   // Auto-start tor service if type=tor and tor not running (default false)
+	ProxyChains  bool     `yaml:"proxychains" json:"proxychains"`         // Wrap non-env-aware tools (nmap, masscan) with proxychains (default false)
+	DNSProxy     bool     `yaml:"dns_proxy" json:"dns_proxy"`             // Route DNS through proxy (socks5h, tor). True by default for tor. (default true)
+	HealthCheck  bool     `yaml:"health_check" json:"health_check"`       // Verify proxy works at startup (default true)
 }
 
 type AuthConfig struct {

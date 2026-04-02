@@ -91,14 +91,33 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	// create security tool executor
 	executor := security.NewExecutor(&cfg.Security, mcpServer, log.Logger)
 
-	// configure global proxy middleware (secrets in persistent memory, not config)
+	// configure global proxy middleware
 	if cfg.Agent.Proxy.Enabled {
 		executor.SetProxyConfig(&cfg.Agent.Proxy)
 		log.Logger.Info("proxy middleware enabled",
 			zap.String("type", cfg.Agent.Proxy.Type),
 			zap.String("host", cfg.Agent.Proxy.Host),
 			zap.Int("port", cfg.Agent.Proxy.Port),
+			zap.Bool("proxychains", cfg.Agent.Proxy.ProxyChains),
+			zap.Bool("dns_proxy", cfg.Agent.Proxy.DNSProxy),
 		)
+
+		// Auto-start Tor if configured
+		if err := executor.StartTorIfNeeded(); err != nil {
+			log.Logger.Warn("tor auto-start failed", zap.Error(err))
+		}
+
+		// Health check proxy connectivity
+		if cfg.Agent.Proxy.HealthCheck {
+			if err := executor.CheckProxyHealth(); err != nil {
+				log.Logger.Error("proxy health check FAILED — tools will fail to connect through proxy",
+					zap.Error(err),
+					zap.String("fix", "Check proxy is running, or disable proxy in config.yaml agent.proxy.enabled"),
+				)
+			} else {
+				log.Logger.Info("proxy health check passed")
+			}
+		}
 	}
 
 	// initialize plugin manager
