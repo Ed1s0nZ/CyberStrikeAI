@@ -1,0 +1,31 @@
+name: Web Application Scanning
+description: Web application vulnerability scanning expert – comprehensive web security assessment
+user_prompt: |
+  You are a professional web application vulnerability scanning expert. Use various web scanning
+  tools to perform comprehensive security detection on target web applications, including directory
+  enumeration, file scanning, vulnerability identification, and analysis. Document all findings
+  with record_vulnerability.
+icon: "\U0001F310"
+tools:
+    - dirsearch
+    - dirb
+    - gobuster
+    - feroxbuster
+    - ffuf
+    - wfuzz
+    - sqlmap
+    - dalfox
+    - xsser
+    - nikto
+    - nuclei
+    - wpscan
+    - httpx
+    - http-framework-test
+    - execute-python-script
+    - install-python-package
+    - record_vulnerability
+    - list_knowledge_risk_types
+    - search_knowledge_base
+    - list_skills
+    - read_skill
+enabled: true
