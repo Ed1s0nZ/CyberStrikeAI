@@ -24,6 +24,7 @@ import (
 // Agent AI agent
 type Agent struct {
 	openAIClient          *openai.Client
+	toolOpenAIClient      *openai.Client // separate client for tool-calling model (optional)
 	config                *config.OpenAIConfig
 	agentConfig           *config.AgentConfig
 	memoryCompressor      *MemoryCompressor
@@ -103,6 +104,36 @@ func NewAgent(cfg *config.OpenAIConfig, agentCfg *config.AgentConfig, mcpServer 
 	}
 	llmClient := openai.NewClient(cfg, httpClient, logger)
 
+	// Create a separate client for tool-calling model if configured
+	var toolClient *openai.Client
+	if cfg != nil && (cfg.ToolBaseURL != "" || cfg.ToolAPIKey != "" || cfg.ToolModel != "") {
+		toolBaseURL, toolAPIKey := cfg.EffectiveToolConfig()
+		toolCfg := &config.OpenAIConfig{
+			Provider: cfg.Provider,
+			APIKey:   toolAPIKey,
+			BaseURL:  toolBaseURL,
+			Model:    cfg.ToolModel,
+		}
+		toolTransport := &http.Transport{
+			Proxy: nil, // NEVER proxy inference calls
+			DialContext: (&net.Dialer{
+				Timeout:   300 * time.Second,
+				KeepAlive: 300 * time.Second,
+			}).DialContext,
+			MaxIdleConns:          100,
+			MaxIdleConnsPerHost:   10,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   30 * time.Second,
+			ResponseHeaderTimeout: 60 * time.Minute,
+			DisableKeepAlives:     false,
+		}
+		toolHTTPClient := &http.Client{
+			Timeout:   30 * time.Minute,
+			Transport: toolTransport,
+		}
+		toolClient = openai.NewClient(toolCfg, toolHTTPClient, logger)
+	}
+
 	var memoryCompressor *MemoryCompressor
 	if cfg != nil {
 		mc, err := NewMemoryCompressor(MemoryCompressorConfig{
@@ -130,6 +161,7 @@ func NewAgent(cfg *config.OpenAIConfig, agentCfg *config.AgentConfig, mcpServer 
 
 	return &Agent{
 		openAIClient:         llmClient,
+		toolOpenAIClient:     toolClient,
 		config:               cfg,
 		agentConfig:          agentCfg,
 		memoryCompressor:     memoryCompressor,
@@ -1260,8 +1292,12 @@ func (a *Agent) callOpenAI(ctx context.Context, messages []ChatMessage, tools []
 
 // callOpenAISingle OpenAI API（）
 func (a *Agent) callOpenAISingle(ctx context.Context, messages []ChatMessage, tools []Tool) (*OpenAIResponse, error) {
+	model := a.config.Model
+	if len(tools) > 0 && a.config.ToolModel != "" {
+		model = a.config.ToolModel
+	}
 	reqBody := OpenAIRequest{
-		Model:    a.config.Model,
+		Model:    model,
 		Messages: messages,
 	}
 
@@ -1274,11 +1310,15 @@ func (a *Agent) callOpenAISingle(ctx context.Context, messages []ChatMessage, to
 		zap.Int("toolsCount", len(tools)),
 	)
 
+	client := a.openAIClient
+	if len(tools) > 0 && a.toolOpenAIClient != nil {
+		client = a.toolOpenAIClient
+	}
 	var response OpenAIResponse
-	if a.openAIClient == nil {
+	if client == nil {
 		return nil, fmt.Errorf("OpenAI")
 	}
-	if err := a.openAIClient.ChatCompletion(ctx, reqBody, &response); err != nil {
+	if err := client.ChatCompletion(ctx, reqBody, &response); err != nil {
 		return nil, err
 	}
 
@@ -1288,8 +1328,12 @@ func (a *Agent) callOpenAISingle(ctx context.Context, messages []ChatMessage, to
 // callOpenAISingleStreamText OpenAI，"invoke tool"（tools ）。
 // onDelta content delta，； callback returns，returns。
 func (a *Agent) callOpenAISingleStreamText(ctx context.Context, messages []ChatMessage, tools []Tool, onDelta func(delta string) error) (string, error) {
+	model := a.config.Model
+	if len(tools) > 0 && a.config.ToolModel != "" {
+		model = a.config.ToolModel
+	}
 	reqBody := OpenAIRequest{
-		Model:    a.config.Model,
+		Model:    model,
 		Messages: messages,
 		Stream:   true,
 	}
@@ -1297,11 +1341,15 @@ func (a *Agent) callOpenAISingleStreamText(ctx context.Context, messages []ChatM
 		reqBody.Tools = tools
 	}
 
-	if a.openAIClient == nil {
+	client := a.openAIClient
+	if len(tools) > 0 && a.toolOpenAIClient != nil {
+		client = a.toolOpenAIClient
+	}
+	if client == nil {
 		return "", fmt.Errorf("OpenAI")
 	}
 
-	return a.openAIClient.ChatCompletionStream(ctx, reqBody, onDelta)
+	return client.ChatCompletionStream(ctx, reqBody, onDelta)
 }
 
 // callOpenAIStreamText OpenAI（），" delta"，。
@@ -1365,19 +1413,27 @@ func (a *Agent) callOpenAISingleStreamWithToolCalls(
 	tools []Tool,
 	onContentDelta func(delta string) error,
 ) (*OpenAIResponse, error) {
+	model := a.config.Model
+	if len(tools) > 0 && a.config.ToolModel != "" {
+		model = a.config.ToolModel
+	}
 	reqBody := OpenAIRequest{
-		Model:    a.config.Model,
+		Model:    model,
 		Messages: messages,
 		Stream:   true,
 	}
 	if len(tools) > 0 {
 		reqBody.Tools = tools
 	}
-	if a.openAIClient == nil {
+	client := a.openAIClient
+	if len(tools) > 0 && a.toolOpenAIClient != nil {
+		client = a.toolOpenAIClient
+	}
+	if client == nil {
 		return nil, fmt.Errorf("OpenAI")
 	}
 
-	content, streamToolCalls, finishReason, err := a.openAIClient.ChatCompletionStreamWithToolCalls(ctx, reqBody, onContentDelta)
+	content, streamToolCalls, finishReason, err := client.ChatCompletionStreamWithToolCalls(ctx, reqBody, onContentDelta)
 	if err != nil {
 		return nil, err
 	}
@@ -1697,6 +1753,37 @@ func (a *Agent) UpdateConfig(cfg *config.OpenAIConfig) {
 	defer a.mu.Unlock()
 	a.config = cfg
 
+	// Rebuild tool client when config changes
+	if cfg.ToolBaseURL != "" || cfg.ToolAPIKey != "" || cfg.ToolModel != "" {
+		toolBaseURL, toolAPIKey := cfg.EffectiveToolConfig()
+		toolCfg := &config.OpenAIConfig{
+			Provider: cfg.Provider,
+			APIKey:   toolAPIKey,
+			BaseURL:  toolBaseURL,
+			Model:    cfg.ToolModel,
+		}
+		toolTransport := &http.Transport{
+			Proxy: nil, // NEVER proxy inference calls
+			DialContext: (&net.Dialer{
+				Timeout:   300 * time.Second,
+				KeepAlive: 300 * time.Second,
+			}).DialContext,
+			MaxIdleConns:          100,
+			MaxIdleConnsPerHost:   10,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   30 * time.Second,
+			ResponseHeaderTimeout: 60 * time.Minute,
+			DisableKeepAlives:     false,
+		}
+		toolHTTPClient := &http.Client{
+			Timeout:   30 * time.Minute,
+			Transport: toolTransport,
+		}
+		a.toolOpenAIClient = openai.NewClient(toolCfg, toolHTTPClient, a.logger)
+	} else {
+		a.toolOpenAIClient = nil
+	}
+
 	// MemoryCompressor（）
 	if a.memoryCompressor != nil {
 		a.memoryCompressor.UpdateConfig(cfg)
@@ -1705,6 +1792,7 @@ func (a *Agent) UpdateConfig(cfg *config.OpenAIConfig) {
 	a.logger.Info("Agentconfig updated",
 		zap.String("base_url", cfg.BaseURL),
 		zap.String("model", cfg.Model),
+		zap.String("tool_model", cfg.ToolModel),
 	)
 }
 

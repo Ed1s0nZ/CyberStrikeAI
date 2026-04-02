@@ -1308,7 +1308,16 @@
     "maxRetriesHint": "Retries on rate limit or server error",
     "retryDelay": "Retry delay (ms)",
     "retryDelayPlaceholder": "1000",
-    "retryDelayHint": "Delay between retries (ms)"
+    "retryDelayHint": "Delay between retries (ms)",
+    "toolModel": "Tool Model",
+    "toolModelHint": "(optional — leave empty to use main model)",
+    "toolModelPlaceholder": "Leave empty to use main model",
+    "toolBaseUrl": "Tool Base URL",
+    "toolApiKey": "Tool API Key",
+    "summaryModel": "Summary Model",
+    "summaryModelHint": "(optional — leave empty to use main model)",
+    "summaryBaseUrl": "Summary Base URL",
+    "summaryApiKey": "Summary API Key"
   },
   "settingsTerminal": {
     "title": "Terminal",

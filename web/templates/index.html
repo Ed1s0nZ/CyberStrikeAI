@@ -1409,6 +1409,36 @@
                                             <div id="api-test-result" style="margin-top: 8px; font-size: 12px;"></div>
                                             <div id="api-rate-limits" style="margin-top: 4px; font-size: 11px; color: var(--text-muted); display: none;"></div>
                                         </div>
+                                        <div class="settings-subsection-header" style="margin-top: 16px;">
+                                            <h5>Tool Model <span style="color: var(--text-muted); font-weight: normal;" data-i18n="settingsBasic.toolModelHint">(optional — leave empty to use main model)</span></h5>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="openai-tool-model" data-i18n="settingsBasic.toolModel">Model</label>
+                                            <input type="text" id="openai-tool-model" data-i18n="settingsBasic.toolModelPlaceholder" data-i18n-attr="placeholder" placeholder="Leave empty to use main model" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="openai-tool-base-url" data-i18n="settingsBasic.toolBaseUrl">Base URL</label>
+                                            <input type="text" id="openai-tool-base-url" placeholder="Leave empty to use main Base URL" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="openai-tool-api-key" data-i18n="settingsBasic.toolApiKey">API Key</label>
+                                            <input type="password" id="openai-tool-api-key" placeholder="Leave empty to use main API Key" autocomplete="off" />
+                                        </div>
+                                        <div class="settings-subsection-header" style="margin-top: 16px;">
+                                            <h5>Summary Model <span style="color: var(--text-muted); font-weight: normal;" data-i18n="settingsBasic.summaryModelHint">(optional — leave empty to use main model)</span></h5>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="openai-summary-model" data-i18n="settingsBasic.summaryModel">Model</label>
+                                            <input type="text" id="openai-summary-model" placeholder="Leave empty to use main model" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="openai-summary-base-url" data-i18n="settingsBasic.summaryBaseUrl">Base URL</label>
+                                            <input type="text" id="openai-summary-base-url" placeholder="Leave empty to use main Base URL" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="openai-summary-api-key" data-i18n="settingsBasic.summaryApiKey">API Key</label>
+                                            <input type="password" id="openai-summary-api-key" placeholder="Leave empty to use main API Key" autocomplete="off" />
+                                        </div>
                                     </div>
                                 </div>
 

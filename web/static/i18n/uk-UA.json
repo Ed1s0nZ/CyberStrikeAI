@@ -1308,7 +1308,16 @@
     "maxRetriesHint": "Повтори при обмеженні або помилці сервера",
     "retryDelay": "Затримка повтору (мс)",
     "retryDelayPlaceholder": "1000",
-    "retryDelayHint": "Затримка між повторами (мс)"
+    "retryDelayHint": "Затримка між повторами (мс)",
+    "toolModel": "Модель для інструментів",
+    "toolModelHint": "(необов'язково — залиште порожнім для основної моделі)",
+    "toolModelPlaceholder": "Залиште порожнім для основної моделі",
+    "toolBaseUrl": "URL для інструментів",
+    "toolApiKey": "API ключ для інструментів",
+    "summaryModel": "Модель для підсумків",
+    "summaryModelHint": "(необов'язково — залиште порожнім для основної моделі)",
+    "summaryBaseUrl": "URL для підсумків",
+    "summaryApiKey": "API ключ для підсумків"
   },
   "settingsTerminal": {
     "title": "Термінал",

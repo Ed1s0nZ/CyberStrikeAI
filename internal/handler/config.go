@@ -1119,6 +1119,12 @@ func updateOpenAIConfig(doc *yaml.Node, cfg config.OpenAIConfig) {
 	setStringInMap(openaiNode, "api_key", cfg.APIKey)
 	setStringInMap(openaiNode, "base_url", cfg.BaseURL)
 	setStringInMap(openaiNode, "model", cfg.Model)
+	setStringInMap(openaiNode, "tool_model", cfg.ToolModel)
+	setStringInMap(openaiNode, "tool_base_url", cfg.ToolBaseURL)
+	setStringInMap(openaiNode, "tool_api_key", cfg.ToolAPIKey)
+	setStringInMap(openaiNode, "summary_model", cfg.SummaryModel)
+	setStringInMap(openaiNode, "summary_base_url", cfg.SummaryBaseURL)
+	setStringInMap(openaiNode, "summary_api_key", cfg.SummaryAPIKey)
 }
 
 func updateFOFAConfig(doc *yaml.Node, cfg config.FofaConfig) {
