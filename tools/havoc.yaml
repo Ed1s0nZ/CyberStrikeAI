@@ -1,0 +1,75 @@
+name: "havoc"
+command: "havoc"
+enabled: true
+short_description: "Havoc Framework – Modernes C2 mit Demon-Implantaten"
+description: |
+  Havoc ist ein modernes, quelloffenes Command-&-Control-Framework mit fortschrittlichen
+  Umgehungstechniken. Es verwendet sogenannte "Demon"-Implantate und unterstützt
+  Malleable C2 Profiles, Sleep Obfuscation und BOF-Ausführung.
+
+  **Hauptfunktionen:**
+  - Demon-Implantate für Windows (x64/x86)
+  - Sleep Obfuscation (EKKO, Zim)
+  - Indirect Syscalls und Hardware Breakpoints
+  - BOF (Beacon Object Files) Ausführung
+  - Malleable C2 Profiles
+  - HTTPS/SMB/TCP Listener
+  - Pivoting und Port-Forwarding
+  - Token-Manipulation und Impersonation
+  - Kerberos-Integration
+
+  **Teamserver-Konfiguration:**
+  ```yaml
+  # /etc/havoc/teamserver.yaotl
+  Teamserver:
+    Host: 0.0.0.0
+    Port: 40056
+  Operators:
+    - Name: operator1
+      Password: password123
+  Listeners:
+    - Name: HTTPS
+      Protocol: Https
+      Host: attacker.com
+      Port: 443
+  ```
+
+  **Wichtige Demon-Befehle:**
+  - `shell <cmd>` – Shell-Befehl ausführen
+  - `upload` / `download` – Dateien transferieren
+  - `token steal <pid>` – Token stehlen
+  - `inject <pid> <shellcode>` – Process Injection
+  - `jump psexec <target>` – Lateral Movement via PsExec
+  - `pivot smb <target>` – SMB-Pivoting
+  - `socks 5 <port>` – SOCKS5-Proxy starten
+  - `dotnet inline-execute <assembly>` – .NET Assembly ausführen
+  - `bof <path> [args]` – BOF ausführen
+
+  **Verwendungsszenarien:**
+  - Fortgeschrittene Red Team Operations
+  - AV/EDR-Umgehung
+  - Windows Post-Exploitation
+  - Sophisticated Lateral Movement
+
+  **Hinweise:**
+  - Teamserver: `havoc server --profile /etc/havoc/teamserver.yaotl`
+  - Client: `havoc client`
+  - Nur für autorisierte Red Team Engagements
+parameters:
+  - name: "command"
+    type: "string"
+    description: |
+      Havoc-Befehl oder Teamserver-Aktion. Beispiele:
+      - `server --profile /path/to/profile.yaotl` (Server starten)
+      - `client` (Client starten und verbinden)
+      Für Demon-Befehle wird die interaktive Konsole verwendet.
+    required: true
+    position: 0
+    format: "positional"
+  - name: "additional_args"
+    type: "string"
+    description: "Zusätzliche Argumente"
+    required: false
+    default: ""
+    position: 1
+    format: "positional"

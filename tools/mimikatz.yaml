@@ -1,6 +1,6 @@
 name: "mimikatz"
 command: "mimikatz.exe"
-enabled: false
+enabled: true
 short_description: "Windows 凭证提取工具，用于提取内存中的密码和哈希"
 description: |
   Mimikatz 是一个强大的 Windows 凭证提取工具，可以从内存中提取明文密码、哈希值、票据等敏感信息。

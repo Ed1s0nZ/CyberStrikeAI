@@ -1,0 +1,97 @@
+name: "empire"
+command: "python3"
+args:
+  - "-c"
+  - |
+    import subprocess
+    import sys
+    import json
+    import shlex
+
+    if len(sys.argv) < 2:
+        sys.stderr.write("Kein Empire-Befehl angegeben\n")
+        sys.exit(1)
+
+    action = sys.argv[1]
+    args_raw = sys.argv[2] if len(sys.argv) > 2 else ""
+
+    # Empire REST API integration (default port 1337)
+    if action == "api":
+        import urllib.request
+        import urllib.error
+        api_cmd = args_raw
+        try:
+            req = urllib.request.Request(
+                f"http://127.0.0.1:1337/{api_cmd}",
+                headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                sys.stdout.write(resp.read().decode())
+        except Exception as e:
+            sys.stderr.write(f"Empire API error: {e}\n")
+            sys.exit(1)
+    else:
+        cmd = ["powershell-empire", "client", "--exec", action]
+        if args_raw:
+            cmd.extend(shlex.split(args_raw))
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.stdout:
+            sys.stdout.write(proc.stdout)
+        if proc.stderr:
+            sys.stderr.write(proc.stderr)
+        sys.exit(proc.returncode)
+enabled: true
+short_description: "PowerShell Empire C2 Framework – Post-Exploitation & Persistence"
+description: |
+  PowerShell Empire (Starkiller) ist ein post-exploitation C2-Framework mit Fokus auf
+  Windows-Umgebungen. Es bietet PowerShell- und Python-Agenten, umfangreiche Module
+  für Credential Harvesting, Lateral Movement und Persistenz.
+
+  **Hauptfunktionen:**
+  - PowerShell- und Python-Agenten (Stager-Generierung)
+  - Listener-Typen: HTTP, HTTPS, SMB, OneDrive, Dropbox
+  - Module für: Credential Dump, Lateral Movement, Persistenz, Privilege Escalation
+  - Bypass-Techniken für AMSI, ETW, Script Block Logging
+  - Automatisierung über REST API (Port 1337)
+  - Starkiller Web-UI für grafische Verwaltung
+
+  **Wichtige Aktionen:**
+  - `listeners` – Aktive Listener anzeigen/verwalten
+  - `uselistener http` – HTTP-Listener einrichten
+  - `usestager windows/launcher_bat` – Stager generieren
+  - `agents` – Verbundene Agenten verwalten
+  - `usemodule credentials/mimikatz/logonpasswords` – Module nutzen
+  - `usemodule lateral_movement/invoke_psexec` – Lateral Movement
+  - `usemodule persistence/userland/registry` – Persistenz
+
+  **Verwendungsszenarien:**
+  - Windows-spezifische Post-Exploitation
+  - Active Directory Angriffe
+  - PowerShell-basierte Persistence
+  - Credential Harvesting in Windows-Umgebungen
+
+  **Hinweise:**
+  - Empire-Server muss laufen: `powershell-empire server`
+  - Starkiller Web-UI: http://127.0.0.1:1337
+  - Nur für autorisierte Sicherheitstests verwenden
+parameters:
+  - name: "action"
+    type: "string"
+    description: |
+      Empire-Aktion oder -Befehl. Beispiele:
+      - `listeners` (aktive Listener anzeigen)
+      - `uselistener http` (HTTP-Listener konfigurieren)
+      - `agents` (verbundene Agenten auflisten)
+      - `usemodule credentials/mimikatz/logonpasswords`
+      - `usemodule lateral_movement/invoke_psexec`
+      - `api agents/list` (REST API direkt ansprechen)
+    required: true
+    position: 0
+    format: "positional"
+  - name: "args"
+    type: "string"
+    description: "Zusätzliche Parameter für den Empire-Befehl"
+    required: false
+    default: ""
+    position: 1
+    format: "positional"

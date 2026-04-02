@@ -1,0 +1,104 @@
+name: "sshuttle"
+command: "sshuttle"
+enabled: true
+short_description: "sshuttle – SSH-basiertes transparentes VPN / Netzwerk-Pivoting"
+description: |
+  sshuttle erstellt ein transparentes VPN-artiges Tunnel über SSH ohne Root-Rechte auf dem Ziel.
+  Ermöglicht die Weiterleitung von Netzwerk-Traffic durch ein kompromittiertes System ins interne Netz.
+  Ideal für Lateral Movement und Netzwerk-Pivoting ohne Port-Forwarding-Konfiguration.
+
+  **Basis-Nutzung:**
+  ```bash
+  # Gesamten Traffic durch SSH-Tunnel routen
+  sshuttle -r user@pivot.host 0/0
+
+  # Spezifisches Netz tunneln
+  sshuttle -r user@pivot.host 10.10.10.0/24
+
+  # Mehrere Netze
+  sshuttle -r user@pivot.host 10.10.10.0/24 192.168.1.0/24
+
+  # Mit SSH-Key
+  sshuttle -r user@pivot.host --ssh-cmd 'ssh -i /path/to/key' 10.10.10.0/24
+  ```
+
+  **Fortgeschrittene Optionen:**
+  ```bash
+  # DNS auch tunneln
+  sshuttle --dns -r user@pivot.host 10.10.10.0/24
+
+  # Spezifischen Port des SSH-Servers
+  sshuttle -r user@pivot.host:2222 10.10.10.0/24
+
+  # Verbose-Modus
+  sshuttle -v -r user@pivot.host 10.10.10.0/24
+
+  # Ohne Passwort (Key-Auth)
+  sshuttle -r root@10.0.0.1 172.16.0.0/16 --ssh-cmd 'ssh -i pivot_key'
+  ```
+
+  **Pivoting-Kette:**
+  ```bash
+  # Szenario: Angreifer -> Pivot1 -> internes Netz 172.16.0.0/16
+  # 1. SSH-Verbindung zu Pivot1 und internes Netz tunneln
+  sshuttle -r attacker@pivot1.com 172.16.0.0/16
+
+  # 2. Nun direkt auf 172.16.x.x zugreifen
+  nmap -sT 172.16.1.0/24
+  curl http://172.16.1.100/admin
+  ```
+
+  **Mit kompromittierten Credentials:**
+  ```bash
+  # Via sshpass (automatisches Passwort)
+  sshuttle -r admin@pivot.host 10.0.0.0/8 --ssh-cmd 'sshpass -p password ssh'
+
+  # Via ProxyJump (Hop-Chain)
+  sshuttle -r user@final.host 10.10.10.0/24 --ssh-cmd 'ssh -J pivot1.host'
+  ```
+
+  **Verwendungsszenarien:**
+  - Pivot in segmentierte Netzwerke
+  - Zugriff auf interne Web-Services
+  - Transparentes Routing für alle Tools
+  - Lateral Movement ohne Firewall-Anpassungen
+
+  **Hinweise:**
+  - Kein Root auf Ziel erforderlich (nur lokal)
+  - Funktioniert mit allen Netzwerk-Tools transparent
+  - Besser als proxychains für TCP-Tools
+  - DNS-Auflösung intern via --dns
+parameters:
+  - name: "remote"
+    type: "string"
+    description: "SSH-Pivot-Host (user@host oder user@host:port)"
+    required: true
+    flag: "-r"
+    format: "flag"
+  - name: "subnets"
+    type: "string"
+    description: "Zu tunnelnde Netze (z.B. '10.10.10.0/24' oder '0/0' für alles)"
+    required: true
+    position: 0
+    format: "positional"
+  - name: "dns"
+    type: "bool"
+    description: "DNS-Anfragen ebenfalls durch Tunnel routen"
+    required: false
+    default: false
+    flag: "--dns"
+    format: "flag"
+  - name: "ssh_cmd"
+    type: "string"
+    description: "Benutzerdefinierter SSH-Befehl (z.B. 'ssh -i /path/to/key')"
+    required: false
+    default: ""
+    flag: "--ssh-cmd"
+    format: "flag"
+  - name: "additional_args"
+    type: "string"
+    description: "Weitere sshuttle-Argumente (z.B. -v für verbose)"
+    required: false
+    default: ""
+    position: 1
+    format: "positional"

