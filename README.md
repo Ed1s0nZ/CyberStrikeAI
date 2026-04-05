@@ -17,27 +17,46 @@ CyberStrikeAI is an **AI-native security testing platform** built in Go. It orch
 
 Highlights
 🤖 AI decision engine with OpenAI-compatible models (GPT, Claude, DeepSeek, etc.)
+
 🔌 Native MCP implementation with HTTP/stdio/SSE transports and external MCP federation
+
 🧰 100+ prebuilt tool recipes + YAML-based extension system
+
 📄 Large-result pagination, compression, and searchable archives
+
 🔗 Attack-chain graph, risk scoring, and step-by-step replay
+
 🔒 Password-protected web UI, audit logs, and SQLite persistence
+
 📚 Knowledge base with vector search and hybrid retrieval for security expertise
+
 📁 Conversation grouping with pinning, rename, and batch management
+
 🛡️ Vulnerability management with CRUD operations, severity tracking, status workflow, and statistics
+
 📋 Batch task management: create task queues, add multiple tasks, and execute them sequentially
-🎭 Role-based testing: predefined security testing roles (Penetration Testing, CTF, Web App Scanning, etc.) with custom prompts and tool restrictions
-🧩 Multi-agent mode (Eino DeepAgent): optional orchestration where a coordinator delegates work to Markdown-defined sub-agents via the task tool; main agent in agents/orchestrator.md (or kind: orchestrator), sub-agents under agents/*.md; chat mode switch when multi_agent.enabled is true (see Multi-agent doc)
+
+🎭 Role-based testing: predefined security testing roles (Penetration Testing, CTF, Web App Scanning, etc.) with custom prompts 
+and tool restrictions
+
+🧩 Multi-agent mode (Eino DeepAgent): optional orchestration where a coordinator delegates work to Markdown-defined sub-agents 
+via the task tool; main agent in agents/orchestrator.md (or kind: orchestrator), sub-agents under agents/*.md; chat mode switch when multi_agent.enabled is true (see Multi-agent doc)
+
 🎯 Skills system: 20+ predefined security testing skills (SQL injection, XSS, API security, etc.) that can be attached to roles or called on-demand by AI agents
-📱 Chatbot: DingTalk and Lark (Feishu) long-lived connections so you can talk to CyberStrikeAI from mobile (see Robot / Chatbot guide for setup and commands)
+
+📱 Chatbot: Telegram long-lived connections so you can talk to CyberStrikeAI from mobile (see Robot / Chatbot guide for setup and commands)
+
 🐚 WebShell management: Add and manage WebShell connections (e.g. IceSword/AntSword compatible), use a virtual terminal for command execution, a built-in file manager for file operations, and an AI assistant tab that orchestrates tests and keeps per-connection conversation history; supports PHP, ASP, ASPX, JSP and custom shell types with configurable request method and command parameter.
 Plugins
+
 CyberStrikeAI includes optional integrations under plugins/.
 
 Burp Suite extension: plugins/burp-suite/cyberstrikeai-burp-extension/
 Build output: plugins/burp-suite/cyberstrikeai-burp-extension/dist/cyberstrikeai-burp-extension.jar
 Docs: plugins/burp-suite/cyberstrikeai-burp-extension/README.md
+
 Tool Overview
+
 CyberStrikeAI ships with 100+ curated tools covering the whole kill chain:
 
 Network Scanners – nmap, masscan, rustscan, arp-scan, nbtscan
