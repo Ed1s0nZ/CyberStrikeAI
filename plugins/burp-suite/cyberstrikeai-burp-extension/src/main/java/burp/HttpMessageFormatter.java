@@ -5,6 +5,8 @@ import java.util.List;
 
 final class HttpMessageFormatter {
     private HttpMessageFormatter() {}
+    private static final String DEFAULT_INSTRUCTION =
+            "针对该流量做web渗透测试，并输出测试结果，要求：只针对该接口流量做测试，切勿拓展其他接口";
 
     static String getRequestTitle(IExtensionHelpers helpers, IHttpRequestResponse msg) {
         IRequestInfo reqInfo = helpers.analyzeRequest(msg);
@@ -22,7 +24,15 @@ final class HttpMessageFormatter {
         return method + " " + host + shortPath + q;
     }
 
+    static String defaultInstruction() {
+        return DEFAULT_INSTRUCTION;
+    }
+
     static String toPrompt(IExtensionHelpers helpers, IHttpRequestResponse msg) {
+        return toPrompt(helpers, msg, DEFAULT_INSTRUCTION);
+    }
+
+    static String toPrompt(IExtensionHelpers helpers, IHttpRequestResponse msg, String instruction) {
         IRequestInfo reqInfo = helpers.analyzeRequest(msg);
         String method = reqInfo.getMethod();
         String url = reqInfo.getUrl() != null ? reqInfo.getUrl().toString() : "(unknown)";
@@ -53,8 +63,12 @@ final class HttpMessageFormatter {
                     + respBody;
         }
 
+        String prefix = (instruction == null || instruction.trim().isEmpty())
+                ? DEFAULT_INSTRUCTION
+                : instruction.trim();
+
         return ""
-                + "针对该流量做web渗透测试，并输出测试结果，要求：只针对该接口流量做测试，切勿拓展其他接口\n\n"
+                + prefix + "\n\n"
                 + "[Target]\n"
                 + method + " " + url + "\n\n"
                 + "[Request]\n"
