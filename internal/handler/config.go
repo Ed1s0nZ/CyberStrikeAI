@@ -3,7 +3,9 @@ package handler
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -12,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"cyberstrike-ai/internal/agents"
 	"cyberstrike-ai/internal/config"
 	"cyberstrike-ai/internal/knowledge"
 	"cyberstrike-ai/internal/mcp"
@@ -168,13 +171,14 @@ func (h *ConfigHandler) SetRobotRestarter(restarter RobotRestarter) {
 
 // GetConfigResponse 获取配置响应
 type GetConfigResponse struct {
-	OpenAI    config.OpenAIConfig    `json:"openai"`
-	FOFA      config.FofaConfig      `json:"fofa"`
-	MCP       config.MCPConfig       `json:"mcp"`
-	Tools     []ToolConfigInfo       `json:"tools"`
-	Agent     config.AgentConfig     `json:"agent"`
-	Knowledge config.KnowledgeConfig `json:"knowledge"`
-	Robots    config.RobotsConfig     `json:"robots,omitempty"`
+	OpenAI     config.OpenAIConfig     `json:"openai"`
+	FOFA       config.FofaConfig       `json:"fofa"`
+	MCP        config.MCPConfig        `json:"mcp"`
+	Tools      []ToolConfigInfo        `json:"tools"`
+	Agent      config.AgentConfig      `json:"agent"`
+	Knowledge  config.KnowledgeConfig  `json:"knowledge"`
+	Robots     config.RobotsConfig     `json:"robots,omitempty"`
+	MultiAgent config.MultiAgentPublic `json:"multi_agent,omitempty"`
 }
 
 // ToolConfigInfo 工具配置信息
@@ -240,14 +244,37 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 		}
 	}
 
+	subAgentCount := len(h.config.MultiAgent.SubAgents)
+	agentsDir := strings.TrimSpace(h.config.AgentsDir)
+	if agentsDir == "" {
+		agentsDir = "agents"
+	}
+	if !filepath.IsAbs(agentsDir) {
+		agentsDir = filepath.Join(filepath.Dir(h.configPath), agentsDir)
+	}
+	if load, err := agents.LoadMarkdownAgentsDir(agentsDir); err == nil {
+		subAgentCount = len(agents.MergeYAMLAndMarkdown(h.config.MultiAgent.SubAgents, load.SubAgents))
+	}
+	multiPub := config.MultiAgentPublic{
+		Enabled:            h.config.MultiAgent.Enabled,
+		DefaultMode:        h.config.MultiAgent.DefaultMode,
+		RobotUseMultiAgent: h.config.MultiAgent.RobotUseMultiAgent,
+		BatchUseMultiAgent: h.config.MultiAgent.BatchUseMultiAgent,
+		SubAgentCount:      subAgentCount,
+	}
+	if strings.TrimSpace(multiPub.DefaultMode) == "" {
+		multiPub.DefaultMode = "single"
+	}
+
 	c.JSON(http.StatusOK, GetConfigResponse{
-		OpenAI:    h.config.OpenAI,
-		FOFA:      h.config.FOFA,
-		MCP:       h.config.MCP,
-		Tools:     tools,
-		Agent:     h.config.Agent,
-		Knowledge: h.config.Knowledge,
-		Robots:    h.config.Robots,
+		OpenAI:     h.config.OpenAI,
+		FOFA:       h.config.FOFA,
+		MCP:        h.config.MCP,
+		Tools:      tools,
+		Agent:      h.config.Agent,
+		Knowledge:  h.config.Knowledge,
+		Robots:     h.config.Robots,
+		MultiAgent: multiPub,
 	})
 }
 
@@ -499,13 +526,14 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 
 // UpdateConfigRequest 更新配置请求
 type UpdateConfigRequest struct {
-	OpenAI    *config.OpenAIConfig    `json:"openai,omitempty"`
-	FOFA      *config.FofaConfig      `json:"fofa,omitempty"`
-	MCP       *config.MCPConfig       `json:"mcp,omitempty"`
-	Tools     []ToolEnableStatus      `json:"tools,omitempty"`
-	Agent     *config.AgentConfig     `json:"agent,omitempty"`
-	Knowledge *config.KnowledgeConfig `json:"knowledge,omitempty"`
-	Robots    *config.RobotsConfig    `json:"robots,omitempty"`
+	OpenAI     *config.OpenAIConfig        `json:"openai,omitempty"`
+	FOFA       *config.FofaConfig          `json:"fofa,omitempty"`
+	MCP        *config.MCPConfig           `json:"mcp,omitempty"`
+	Tools      []ToolEnableStatus          `json:"tools,omitempty"`
+	Agent      *config.AgentConfig         `json:"agent,omitempty"`
+	Knowledge  *config.KnowledgeConfig     `json:"knowledge,omitempty"`
+	Robots     *config.RobotsConfig        `json:"robots,omitempty"`
+	MultiAgent *config.MultiAgentAPIUpdate `json:"multi_agent,omitempty"`
 }
 
 // ToolEnableStatus 工具启用状态
@@ -589,6 +617,23 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 			zap.Bool("wecom_enabled", h.config.Robots.Wecom.Enabled),
 			zap.Bool("dingtalk_enabled", h.config.Robots.Dingtalk.Enabled),
 			zap.Bool("lark_enabled", h.config.Robots.Lark.Enabled),
+		)
+	}
+
+	// 多代理标量（sub_agents 等仍由 config.yaml 维护）
+	if req.MultiAgent != nil {
+		h.config.MultiAgent.Enabled = req.MultiAgent.Enabled
+		dm := strings.TrimSpace(req.MultiAgent.DefaultMode)
+		if dm == "multi" || dm == "single" {
+			h.config.MultiAgent.DefaultMode = dm
+		}
+		h.config.MultiAgent.RobotUseMultiAgent = req.MultiAgent.RobotUseMultiAgent
+		h.config.MultiAgent.BatchUseMultiAgent = req.MultiAgent.BatchUseMultiAgent
+		h.logger.Info("更新多代理配置",
+			zap.Bool("enabled", h.config.MultiAgent.Enabled),
+			zap.String("default_mode", h.config.MultiAgent.DefaultMode),
+			zap.Bool("robot_use_multi_agent", h.config.MultiAgent.RobotUseMultiAgent),
+			zap.Bool("batch_use_multi_agent", h.config.MultiAgent.BatchUseMultiAgent),
 		)
 	}
 
@@ -709,6 +754,137 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "配置已更新"})
+}
+
+// TestOpenAIRequest 测试OpenAI连接请求
+type TestOpenAIRequest struct {
+	BaseURL string `json:"base_url"`
+	APIKey  string `json:"api_key"`
+	Model   string `json:"model"`
+}
+
+// TestOpenAI 测试OpenAI API连接是否可用
+func (h *ConfigHandler) TestOpenAI(c *gin.Context) {
+	var req TestOpenAIRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的请求参数: " + err.Error()})
+		return
+	}
+
+	if strings.TrimSpace(req.APIKey) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "API Key 不能为空"})
+		return
+	}
+	if strings.TrimSpace(req.Model) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "模型不能为空"})
+		return
+	}
+
+	baseURL := strings.TrimSuffix(strings.TrimSpace(req.BaseURL), "/")
+	if baseURL == "" {
+		baseURL = "https://api.openai.com/v1"
+	}
+
+	// 构造一个最小的 chat completion 请求
+	payload := map[string]interface{}{
+		"model": req.Model,
+		"messages": []map[string]string{
+			{"role": "user", "content": "Hi"},
+		},
+		"max_tokens": 5,
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "构造请求失败"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/chat/completions", bytes.NewReader(body))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "构造HTTP请求失败: " + err.Error()})
+		return
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+strings.TrimSpace(req.APIKey))
+
+	start := time.Now()
+	resp, err := http.DefaultClient.Do(httpReq)
+	latency := time.Since(start)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"error":   "连接失败: " + err.Error(),
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		// 尝试提取错误信息
+		var errResp struct {
+			Error struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		errMsg := string(respBody)
+		if json.Unmarshal(respBody, &errResp) == nil && errResp.Error.Message != "" {
+			errMsg = errResp.Error.Message
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"success":     false,
+			"error":       fmt.Sprintf("API 返回错误 (HTTP %d): %s", resp.StatusCode, errMsg),
+			"status_code": resp.StatusCode,
+		})
+		return
+	}
+
+	// 解析响应并严格验证是否为有效的 chat completion 响应
+	var chatResp struct {
+		ID      string `json:"id"`
+		Object  string `json:"object"`
+		Model   string `json:"model"`
+		Choices []struct {
+			Message struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.Unmarshal(respBody, &chatResp); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"error":   "API 响应不是有效的 JSON，请检查 Base URL 是否正确",
+		})
+		return
+	}
+
+	// 严格校验：必须包含 choices 且有 assistant 回复
+	if len(chatResp.Choices) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"error":   "API 响应缺少 choices 字段，请检查 Base URL 路径是否正确（通常以 /v1 结尾）",
+		})
+		return
+	}
+	if chatResp.ID == "" && chatResp.Model == "" {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"error":   "API 响应格式不符合 OpenAI 规范，请检查 Base URL 是否正确",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":    true,
+		"model":      chatResp.Model,
+		"latency_ms": latency.Milliseconds(),
+	})
 }
 
 // ApplyConfig 应用配置（重新加载并重启相关服务）
@@ -910,6 +1086,7 @@ func (h *ConfigHandler) saveConfig() error {
 	updateFOFAConfig(root, h.config.FOFA)
 	updateKnowledgeConfig(root, h.config.Knowledge)
 	updateRobotsConfig(root, h.config.Robots)
+	updateMultiAgentConfig(root, h.config.MultiAgent)
 	// 更新外部MCP配置（使用external_mcp.go中的函数，同一包中可直接调用）
 	// 读取原始配置以保持向后兼容
 	originalConfigs := make(map[string]map[string]bool)
@@ -1117,6 +1294,15 @@ func updateRobotsConfig(doc *yaml.Node, cfg config.RobotsConfig) {
 	setStringInMap(larkNode, "app_id", cfg.Lark.AppID)
 	setStringInMap(larkNode, "app_secret", cfg.Lark.AppSecret)
 	setStringInMap(larkNode, "verify_token", cfg.Lark.VerifyToken)
+}
+
+func updateMultiAgentConfig(doc *yaml.Node, cfg config.MultiAgentConfig) {
+	root := doc.Content[0]
+	maNode := ensureMap(root, "multi_agent")
+	setBoolInMap(maNode, "enabled", cfg.Enabled)
+	setStringInMap(maNode, "default_mode", cfg.DefaultMode)
+	setBoolInMap(maNode, "robot_use_multi_agent", cfg.RobotUseMultiAgent)
+	setBoolInMap(maNode, "batch_use_multi_agent", cfg.BatchUseMultiAgent)
 }
 
 func ensureMap(parent *yaml.Node, path ...string) *yaml.Node {

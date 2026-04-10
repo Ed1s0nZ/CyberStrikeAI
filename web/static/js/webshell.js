@@ -14,6 +14,11 @@ let webshellTerminalResizeContainer = null;
 let webshellCurrentConn = null;
 let webshellLineBuffer = '';
 let webshellRunning = false;
+let webshellTerminalRunning = false;
+let webshellTerminalLogsByConn = {};
+let webshellTerminalSessionsByConn = {};
+let webshellPersistLoadedByConn = {};
+let webshellPersistSaveTimersByConn = {};
 // 按连接保存命令历史，用于上下键
 let webshellHistoryByConn = {};
 let webshellHistoryIndex = -1;
@@ -23,8 +28,34 @@ let webshellClearInProgress = false;
 // AI 助手：按连接 ID 保存对话 ID，便于多轮对话
 let webshellAiConvMap = {};
 let webshellAiSending = false;
+let webshellDbConfigByConn = {};
+let webshellDirTreeByConn = {};
+let webshellDirExpandedByConn = {};
+let webshellDirLoadedByConn = {};
 // 流式打字机效果：当前会话的 response 序号，用于中止过期的打字
 let webshellStreamingTypingId = 0;
+let webshellProbeStatusById = {};
+let webshellBatchProbeRunning = false;
+
+/** 与主对话页一致：multi_agent.enabled 且本地模式为 multi 时使用 /api/multi-agent/stream */
+function resolveWebshellAiStreamPath() {
+    if (typeof apiFetch === 'undefined') {
+        return Promise.resolve('/api/agent-loop/stream');
+    }
+    return apiFetch('/api/config').then(function (r) {
+        if (!r.ok) return '/api/agent-loop/stream';
+        return r.json();
+    }).then(function (cfg) {
+        if (!cfg || !cfg.multi_agent || !cfg.multi_agent.enabled) return '/api/agent-loop/stream';
+        var mode = localStorage.getItem('cyberstrike-chat-agent-mode');
+        if (mode !== 'single' && mode !== 'multi') {
+            mode = (cfg.multi_agent.default_mode === 'multi') ? 'multi' : 'single';
+        }
+        return mode === 'multi' ? '/api/multi-agent/stream' : '/api/agent-loop/stream';
+    }).catch(function () {
+        return '/api/agent-loop/stream';
+    });
+}
 
 // 从服务端（SQLite）拉取连接列表
 function getWebshellConnections() {
@@ -67,9 +98,53 @@ function wsT(key) {
         'webshell.tabTerminal': '虚拟终端',
         'webshell.tabFileManager': '文件管理',
         'webshell.tabAiAssistant': 'AI 助手',
+        'webshell.tabDbManager': '数据库管理',
+        'webshell.tabMemo': '备忘录',
+        'webshell.dbType': '数据库类型',
+        'webshell.dbHost': '主机',
+        'webshell.dbPort': '端口',
+        'webshell.dbUsername': '用户名',
+        'webshell.dbPassword': '密码',
+        'webshell.dbName': '数据库名',
+        'webshell.dbSqlitePath': 'SQLite 文件路径',
+        'webshell.dbSqlPlaceholder': '输入 SQL，例如：SELECT version();',
+        'webshell.dbRunSql': '执行 SQL',
+        'webshell.dbTest': '测试连接',
+        'webshell.dbOutput': '执行输出',
+        'webshell.dbNoConn': '请先选择 WebShell 连接',
+        'webshell.dbSqlRequired': '请输入 SQL',
+        'webshell.dbRunning': '数据库命令执行中，请稍候',
+        'webshell.dbCliHint': '如果提示命令不存在，请先在目标主机安装对应客户端（mysql/psql/sqlite3/sqlcmd）',
+        'webshell.dbExecFailed': '数据库执行失败',
+        'webshell.dbSchema': '数据库结构',
+        'webshell.dbLoadSchema': '加载结构',
+        'webshell.dbNoSchema': '暂无数据库结构，请先加载',
+        'webshell.dbSelectTableHint': '点击表名可展开列信息并生成查询 SQL',
+        'webshell.dbNoColumns': '暂无列信息',
+        'webshell.dbResultTable': '结果表格',
+        'webshell.dbClearSql': '清空 SQL',
+        'webshell.dbTemplateSql': '示例 SQL',
+        'webshell.dbRows': '行',
+        'webshell.dbColumns': '列',
+        'webshell.dbSchemaFailed': '加载数据库结构失败',
+        'webshell.dbSchemaLoaded': '结构加载完成',
+        'webshell.dbAddProfile': '新增连接',
+        'webshell.dbExecSuccess': 'SQL 执行成功',
+        'webshell.dbNoOutput': '执行完成（无输出）',
+        'webshell.dbRenameProfile': '重命名',
+        'webshell.dbDeleteProfile': '删除连接',
+        'webshell.dbDeleteProfileConfirm': '确定删除该数据库连接配置吗？',
+        'webshell.dbProfileNamePrompt': '请输入连接名称',
+        'webshell.dbProfileName': '连接名称',
+        'webshell.dbProfiles': '数据库连接',
         'webshell.aiSystemReadyMessage': '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。',
         'webshell.aiPlaceholder': '例如：列出当前目录下的文件',
         'webshell.aiSend': '发送',
+        'webshell.aiMemo': '备忘录',
+        'webshell.aiMemoPlaceholder': '记录关键命令、测试思路、复现步骤...',
+        'webshell.aiMemoClear': '清空',
+        'webshell.aiMemoSaving': '保存中...',
+        'webshell.aiMemoSaved': '已保存到本地',
         'webshell.terminalWelcome': 'WebShell 虚拟终端 — 输入命令后按回车执行（Ctrl+L 清屏）',
         'webshell.quickCommands': '快捷命令',
         'webshell.downloadFile': '下载',
@@ -87,6 +162,13 @@ function wsT(key) {
         'webshell.testFailed': '连通性测试失败',
         'webshell.testNoExpectedOutput': 'Shell 返回了响应但未得到预期输出，请检查连接密码与命令参数名',
         'webshell.clearScreen': '清屏',
+        'webshell.copyTerminalLog': '复制日志',
+        'webshell.terminalIdle': '空闲',
+        'webshell.terminalRunning': '执行中',
+        'webshell.terminalCopyOk': '日志已复制',
+        'webshell.terminalCopyFail': '复制失败',
+        'webshell.terminalNewWindow': '新终端',
+        'webshell.terminalWindowPrefix': '终端',
         'webshell.running': '执行中…',
         'webshell.waitFinish': '请等待当前命令执行完成',
         'webshell.newDir': '新建目录',
@@ -96,13 +178,35 @@ function wsT(key) {
         'webshell.filterPlaceholder': '过滤文件名',
         'webshell.batchDelete': '批量删除',
         'webshell.batchDownload': '批量下载',
+        'webshell.moreActions': '更多操作',
         'webshell.refresh': '刷新',
         'webshell.selectAll': '全选',
         'webshell.breadcrumbHome': '根',
+        'webshell.dirTree': '目录列表',
+        'webshell.searchPlaceholder': '搜索连接...',
+        'webshell.noMatchConnections': '暂无匹配连接',
+        'webshell.batchProbe': '一键批量探活',
+        'webshell.probeRunning': '探活中',
+        'webshell.probeOnline': '在线',
+        'webshell.probeOffline': '离线',
+        'webshell.probeNoConnections': '暂无可探活连接',
+        'webshell.back': '返回',
+        'webshell.colModifiedAt': '修改时间',
+        'webshell.colPerms': '权限',
+        'webshell.colOwner': '所有者',
+        'webshell.colGroup': '用户组',
+        'webshell.colType': '类型',
         'common.delete': '删除',
-        'common.refresh': '刷新'
+        'common.refresh': '刷新',
+        'common.actions': '操作'
     };
     return fallback[key] || key;
+}
+
+function wsTOr(key, fallbackText) {
+    var text = wsT(key);
+    if (!text || text === key) return fallbackText;
+    return text;
 }
 
 // 全局只绑定一次：清屏 = 销毁终端并重新创建，保证只出现一个 shell>（不依赖 xterm.clear()，避免某些环境下 clear 不生效或重复写入）
@@ -120,6 +224,10 @@ function bindWebshellClearOnce() {
             destroyWebshellTerminal();
             webshellLineBuffer = '';
             webshellHistoryIndex = -1;
+            if (webshellCurrentConn && webshellCurrentConn.id) {
+                var sid = getActiveWebshellTerminalSessionId(webshellCurrentConn.id);
+                clearWebshellTerminalLog(getWebshellTerminalSessionKey(webshellCurrentConn.id, sid));
+            }
             initWebshellTerminal(webshellCurrentConn);
         } finally {
             setTimeout(function () { webshellClearInProgress = false; }, 100);
@@ -127,9 +235,30 @@ function bindWebshellClearOnce() {
     }, true);
 }
 
+// WebShell 行内/工具栏“操作”下拉：点击菜单外自动收起
+function bindWebshellActionMenusAutoCloseOnce() {
+    if (window._webshellActionMenusAutoCloseBound) return;
+    window._webshellActionMenusAutoCloseBound = true;
+    document.addEventListener('click', function (e) {
+        // 只要点在 details 内部，就让浏览器自行切换（open/close）
+        var clickedInMenu = e.target && e.target.closest && (
+            e.target.closest('details.webshell-conn-actions') ||
+            e.target.closest('details.webshell-row-actions') ||
+            e.target.closest('details.webshell-toolbar-actions')
+        );
+        if (clickedInMenu) return;
+
+        var openDetails = document.querySelectorAll(
+            'details.webshell-conn-actions[open],details.webshell-row-actions[open],details.webshell-toolbar-actions[open]'
+        );
+        openDetails.forEach(function (d) { d.open = false; });
+    }, true);
+}
+
 // 初始化 WebShell 管理页面（从 SQLite 拉取连接列表）
 function initWebshellPage() {
     bindWebshellClearOnce();
+    bindWebshellActionMenusAutoCloseOnce();
     destroyWebshellTerminal();
     webshellCurrentConn = null;
     currentWebshellId = null;
@@ -137,6 +266,16 @@ function initWebshellPage() {
     renderWebshellList();
     applyWebshellSidebarWidth();
     initWebshellSidebarResize();
+
+    // 连接搜索：实时过滤连接列表
+    var searchEl = document.getElementById('webshell-conn-search');
+    if (searchEl && searchEl.dataset.bound !== '1') {
+        searchEl.dataset.bound = '1';
+        searchEl.addEventListener('input', function () {
+            renderWebshellList();
+        });
+    }
+
     const workspace = document.getElementById('webshell-workspace');
     if (workspace) {
         workspace.innerHTML = '<div class="webshell-workspace-placeholder" data-i18n="webshell.selectOrAdd">' + (wsT('webshell.selectOrAdd')) + '</div>';
@@ -145,6 +284,15 @@ function initWebshellPage() {
         webshellConnections = list;
         renderWebshellList();
     });
+
+    var batchProbeBtn = document.getElementById('webshell-batch-probe-btn');
+    if (batchProbeBtn && batchProbeBtn.dataset.bound !== '1') {
+        batchProbeBtn.dataset.bound = '1';
+        batchProbeBtn.addEventListener('click', function () {
+            runBatchProbeWebshellConnections();
+        });
+    }
+    updateWebshellBatchProbeButton();
 }
 
 function getWebshellSidebarWidth() {
@@ -220,6 +368,8 @@ function destroyWebshellTerminal() {
     webshellTerminalFitAddon = null;
     webshellLineBuffer = '';
     webshellRunning = false;
+    webshellTerminalRunning = false;
+    setWebshellTerminalStatus(false);
 }
 
 // 渲染连接列表
@@ -227,24 +377,54 @@ function renderWebshellList() {
     const listEl = document.getElementById('webshell-list');
     if (!listEl) return;
 
+    const searchEl = document.getElementById('webshell-conn-search');
+    const searchTerm = (searchEl && typeof searchEl.value === 'string' ? searchEl.value : '').trim().toLowerCase();
+
     if (!webshellConnections.length) {
         listEl.innerHTML = '<div class="webshell-empty" data-i18n="webshell.noConnections">' + (wsT('webshell.noConnections')) + '</div>';
         return;
     }
 
-    listEl.innerHTML = webshellConnections.map(conn => {
+    const filtered = searchTerm
+        ? webshellConnections.filter(conn => {
+            const id = String(conn.id || '').toLowerCase();
+            const url = String(conn.url || '').toLowerCase();
+            const remark = String(conn.remark || '').toLowerCase();
+            return id.includes(searchTerm) || url.includes(searchTerm) || remark.includes(searchTerm);
+        })
+        : webshellConnections;
+
+    if (filtered.length === 0) {
+        listEl.innerHTML = '<div class="webshell-empty">' + (wsT('webshell.noMatchConnections') || '暂无匹配连接') + '</div>';
+        return;
+    }
+
+    listEl.innerHTML = filtered.map(conn => {
         const remark = (conn.remark || conn.url || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         const url = (conn.url || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         const urlTitle = (conn.url || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
         const active = currentWebshellId === conn.id ? ' active' : '';
         const safeId = escapeHtml(conn.id);
+        const actionsLabel = wsT('common.actions') || '操作';
+        const probe = webshellProbeStatusById[conn.id] || null;
+        var probeHtml = '';
+        if (probe && probe.state === 'probing') {
+            probeHtml = '<span class="webshell-probe-badge probing">' + (wsT('webshell.probeRunning') || '探活中') + '</span>';
+        } else if (probe && probe.state === 'ok') {
+            probeHtml = '<span class="webshell-probe-badge ok">' + (wsT('webshell.probeOnline') || '在线') + '</span>';
+        } else if (probe && probe.state === 'fail') {
+            probeHtml = '<span class="webshell-probe-badge fail" title="' + escapeHtml(probe.message || '') + '">' + (wsT('webshell.probeOffline') || '离线') + '</span>';
+        }
         return (
             '<div class="webshell-item' + active + '" data-id="' + safeId + '">' +
-            '<div class="webshell-item-remark" title="' + urlTitle + '">' + remark + '</div>' +
+            '<div class="webshell-item-remark-row"><div class="webshell-item-remark" title="' + urlTitle + '">' + remark + '</div>' + probeHtml + '</div>' +
             '<div class="webshell-item-url" title="' + urlTitle + '">' + url + '</div>' +
             '<div class="webshell-item-actions">' +
-            '<button type="button" class="btn-ghost btn-sm webshell-edit-conn-btn" data-id="' + safeId + '" title="' + wsT('webshell.editConnection') + '">' + wsT('webshell.editConnection') + '</button> ' +
+            '<details class="webshell-conn-actions"><summary class="btn-ghost btn-sm webshell-conn-actions-btn" title="' + actionsLabel + '">' + actionsLabel + '</summary>' +
+            '<div class="webshell-row-actions-menu">' +
+            '<button type="button" class="btn-ghost btn-sm webshell-edit-conn-btn" data-id="' + safeId + '" title="' + wsT('webshell.editConnection') + '">' + wsT('webshell.editConnection') + '</button>' +
             '<button type="button" class="btn-ghost btn-sm webshell-delete-btn" data-id="' + safeId + '" title="' + wsT('common.delete') + '">' + wsT('common.delete') + '</button>' +
+            '</div></details>' +
             '</div>' +
             '</div>'
         );
@@ -252,7 +432,7 @@ function renderWebshellList() {
 
     listEl.querySelectorAll('.webshell-item').forEach(el => {
         el.addEventListener('click', function (e) {
-            if (e.target.closest('.webshell-delete-btn') || e.target.closest('.webshell-edit-conn-btn')) return;
+            if (e.target.closest('.webshell-delete-btn') || e.target.closest('.webshell-edit-conn-btn') || e.target.closest('.webshell-conn-actions-btn')) return;
             selectWebshell(el.getAttribute('data-id'));
         });
     });
@@ -270,11 +450,822 @@ function renderWebshellList() {
     });
 }
 
+function probeWebshellConnection(conn) {
+    if (!conn || typeof apiFetch === 'undefined') {
+        return Promise.resolve({ ok: false, message: wsT('webshell.testFailed') || '连通性测试失败' });
+    }
+    return apiFetch('/api/webshell/exec', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            url: conn.url,
+            password: conn.password || '',
+            type: conn.type || 'php',
+            method: ((conn.method || 'post').toLowerCase() === 'get') ? 'get' : 'post',
+            cmd_param: conn.cmdParam || '',
+            command: 'echo 1'
+        })
+    })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            var output = (data && data.output != null) ? String(data.output).trim() : '';
+            var ok = !!(data && data.ok && output === '1');
+            if (ok) return { ok: true, message: wsT('webshell.testSuccess') || '连通性正常，Shell 可访问' };
+            var msg = (data && data.error) ? data.error : (wsT('webshell.testFailed') || '连通性测试失败');
+            return { ok: false, message: msg };
+        })
+        .catch(function (e) {
+            return { ok: false, message: (e && e.message) ? e.message : String(e) };
+        });
+}
+
+function updateWebshellBatchProbeButton(done, total, okCount) {
+    var btn = document.getElementById('webshell-batch-probe-btn');
+    if (!btn) return;
+    if (webshellBatchProbeRunning) {
+        var d = typeof done === 'number' ? done : 0;
+        var t = typeof total === 'number' ? total : webshellConnections.length;
+        btn.disabled = true;
+        btn.textContent = (wsT('webshell.probeRunning') || '探活中') + ' ' + d + '/' + t;
+        return;
+    }
+    btn.disabled = false;
+    if (typeof done === 'number' && typeof total === 'number' && total > 0 && typeof okCount === 'number') {
+        btn.textContent = (wsT('webshell.batchProbe') || '一键批量探活') + ' (' + okCount + '/' + total + ')';
+    } else {
+        btn.textContent = wsT('webshell.batchProbe') || '一键批量探活';
+    }
+}
+
+function runBatchProbeWebshellConnections() {
+    if (webshellBatchProbeRunning) return;
+    if (!Array.isArray(webshellConnections) || webshellConnections.length === 0) {
+        alert(wsT('webshell.probeNoConnections') || '暂无可探活连接');
+        return;
+    }
+    webshellBatchProbeRunning = true;
+    var total = webshellConnections.length;
+    var done = 0;
+    var okCount = 0;
+
+    webshellConnections.forEach(function (conn) {
+        if (!conn || !conn.id) return;
+        webshellProbeStatusById[conn.id] = { state: 'probing', message: '' };
+    });
+    renderWebshellList();
+    updateWebshellBatchProbeButton(done, total, okCount);
+
+    var idx = 0;
+    var concurrency = Math.min(4, total);
+
+    function runOne() {
+        if (idx >= total) return Promise.resolve();
+        var conn = webshellConnections[idx++];
+        if (!conn || !conn.id) {
+            done++;
+            updateWebshellBatchProbeButton(done, total, okCount);
+            return runOne();
+        }
+        return probeWebshellConnection(conn).then(function (res) {
+            if (res.ok) okCount++;
+            webshellProbeStatusById[conn.id] = {
+                state: res.ok ? 'ok' : 'fail',
+                message: res.message || ''
+            };
+            done++;
+            renderWebshellList();
+            updateWebshellBatchProbeButton(done, total, okCount);
+        }).then(runOne);
+    }
+
+    var workers = [];
+    for (var i = 0; i < concurrency; i++) workers.push(runOne());
+    Promise.all(workers).finally(function () {
+        webshellBatchProbeRunning = false;
+        updateWebshellBatchProbeButton(done, total, okCount);
+    });
+}
+
 function escapeHtml(s) {
     if (!s) return '';
     const div = document.createElement('div');
     div.textContent = s;
     return div.innerHTML;
+}
+
+function escapeSingleQuotedShellArg(value) {
+    var s = value == null ? '' : String(value);
+    return "'" + s.replace(/'/g, "'\\''") + "'";
+}
+
+function safeConnIdForStorage(conn) {
+    if (!conn || !conn.id) return '';
+    return String(conn.id).replace(/[^\w.-]/g, '_');
+}
+
+function normalizeWebshellPath(path) {
+    var p = path == null ? '.' : String(path).trim();
+    if (!p || p === '/') return '.';
+    p = p.replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+/g, '/');
+    if (!p || p === '.') return '.';
+    if (p.endsWith('/')) p = p.slice(0, -1);
+    return p || '.';
+}
+
+function getWebshellTerminalSessionKey(connId, sessionId) {
+    if (!connId || !sessionId) return '';
+    return String(connId) + '::' + String(sessionId);
+}
+
+function normalizeWebshellTerminalSessions(raw) {
+    var state = raw && typeof raw === 'object' ? raw : {};
+    var list = Array.isArray(state.sessions) ? state.sessions.slice() : [];
+    if (!list.length) {
+        list = [{ id: 't1', name: (wsT('webshell.terminalWindowPrefix') || '终端') + '1' }];
+    }
+    list = list.map(function (s, i) {
+        var id = (s && s.id ? String(s.id) : ('t' + (i + 1)));
+        var name = (s && s.name ? String(s.name) : ((wsT('webshell.terminalWindowPrefix') || '终端') + (i + 1)));
+        return { id: id, name: name };
+    });
+    var activeId = state.activeId;
+    if (!activeId || !list.some(function (s) { return s.id === activeId; })) activeId = list[0].id;
+    return { sessions: list, activeId: activeId };
+}
+
+function getWebshellTerminalSessions(connId) {
+    if (!connId) return normalizeWebshellTerminalSessions(null);
+    if (webshellTerminalSessionsByConn[connId]) return webshellTerminalSessionsByConn[connId];
+    var state = normalizeWebshellTerminalSessions(null);
+    webshellTerminalSessionsByConn[connId] = state;
+    return state;
+}
+
+function saveWebshellTerminalSessions(connId, state) {
+    if (!connId || !state) return;
+    var normalized = normalizeWebshellTerminalSessions(state);
+    webshellTerminalSessionsByConn[connId] = normalized;
+    queueWebshellPersistStateSave(connId);
+}
+
+function getActiveWebshellTerminalSessionId(connId) {
+    return getWebshellTerminalSessions(connId).activeId;
+}
+
+function getWebshellTerminalLog(connId) {
+    if (!connId) return '';
+    if (typeof webshellTerminalLogsByConn[connId] === 'string') return webshellTerminalLogsByConn[connId];
+    webshellTerminalLogsByConn[connId] = '';
+    return '';
+}
+
+function saveWebshellTerminalLog(connId, content) {
+    if (!connId) return;
+    var text = String(content || '');
+    var maxLen = 50000; // keep recent terminal output only
+    if (text.length > maxLen) text = text.slice(text.length - maxLen);
+    webshellTerminalLogsByConn[connId] = text;
+}
+
+function appendWebshellTerminalLog(connId, chunk) {
+    if (!connId || !chunk) return;
+    var current = getWebshellTerminalLog(connId);
+    saveWebshellTerminalLog(connId, current + String(chunk));
+}
+
+function clearWebshellTerminalLog(connId) {
+    if (!connId) return;
+    webshellTerminalLogsByConn[connId] = '';
+}
+
+function buildWebshellPersistState(connId) {
+    var dbState = getWebshellDbState({ id: connId });
+    var terminalSessions = getWebshellTerminalSessions(connId);
+    return {
+        dbState: dbState || null,
+        terminalSessions: terminalSessions || null
+    };
+}
+
+function applyWebshellPersistState(connId, state) {
+    if (!connId || !state || typeof state !== 'object') return;
+    if (state.dbState && typeof state.dbState === 'object') {
+        var key = getWebshellDbStateStorageKey({ id: connId });
+        webshellDbConfigByConn[key] = normalizeWebshellDbState(state.dbState);
+    }
+    if (state.terminalSessions && typeof state.terminalSessions === 'object') {
+        webshellTerminalSessionsByConn[connId] = normalizeWebshellTerminalSessions(state.terminalSessions);
+    }
+}
+
+function queueWebshellPersistStateSave(connId) {
+    if (!connId || typeof apiFetch !== 'function') return;
+    if (webshellPersistSaveTimersByConn[connId]) clearTimeout(webshellPersistSaveTimersByConn[connId]);
+    webshellPersistSaveTimersByConn[connId] = setTimeout(function () {
+        delete webshellPersistSaveTimersByConn[connId];
+        var payload = buildWebshellPersistState(connId);
+        apiFetch('/api/webshell/connections/' + encodeURIComponent(connId) + '/state', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ state: payload })
+        }).catch(function () {});
+    }, 500);
+}
+
+function ensureWebshellPersistStateLoaded(conn) {
+    if (!conn || !conn.id || typeof apiFetch !== 'function') return Promise.resolve();
+    if (webshellPersistLoadedByConn[conn.id]) return Promise.resolve();
+    return apiFetch('/api/webshell/connections/' + encodeURIComponent(conn.id) + '/state', { method: 'GET' })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('load state failed')); })
+        .then(function (data) {
+            applyWebshellPersistState(conn.id, data && data.state ? data.state : {});
+            webshellPersistLoadedByConn[conn.id] = true;
+        })
+        .catch(function () {
+            webshellPersistLoadedByConn[conn.id] = true;
+        });
+}
+
+function setWebshellTerminalStatus(running) {
+    webshellTerminalRunning = !!running;
+    var el = document.getElementById('webshell-terminal-status');
+    if (!el) return;
+    el.classList.toggle('running', !!running);
+    el.classList.toggle('idle', !running);
+    el.textContent = running ? (wsT('webshell.terminalRunning') || '执行中') : (wsT('webshell.terminalIdle') || '空闲');
+}
+
+function renderWebshellTerminalSessions(conn) {
+    if (!conn || !conn.id) return;
+    var tabsEl = document.getElementById('webshell-terminal-sessions');
+    if (!tabsEl) return;
+    var connId = conn.id;
+    var state = getWebshellTerminalSessions(connId);
+    var html = '';
+    state.sessions.forEach(function (s) {
+        var active = s.id === state.activeId;
+        html += '<div class="webshell-terminal-session' + (active ? ' active' : '') + '">' +
+            '<button type="button" class="webshell-terminal-session-main" data-action="switch" data-terminal-id="' + escapeHtml(s.id) + '">' + escapeHtml(s.name) + '</button>' +
+            '<button type="button" class="webshell-terminal-session-close" data-action="close" data-terminal-id="' + escapeHtml(s.id) + '" title="' + escapeHtml(wsT('common.close') || '关闭') + '">×</button>' +
+            '</div>';
+    });
+    html += '<button type="button" class="webshell-terminal-session-add" data-action="add" title="' + escapeHtml(wsT('webshell.terminalNewWindow') || '新终端') + '">+</button>';
+    tabsEl.innerHTML = html;
+    tabsEl.querySelectorAll('[data-action]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var action = btn.getAttribute('data-action') || '';
+            var targetId = btn.getAttribute('data-terminal-id') || '';
+            if (webshellRunning || webshellTerminalRunning) return;
+            if (action === 'add') {
+                var nextState = getWebshellTerminalSessions(connId);
+                var seq = nextState.sessions.length + 1;
+                var nextId = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+                var prefix = wsT('webshell.terminalWindowPrefix') || '终端';
+                nextState.sessions.push({ id: nextId, name: prefix + seq });
+                nextState.activeId = nextId;
+                saveWebshellTerminalSessions(connId, nextState);
+                destroyWebshellTerminal();
+                initWebshellTerminal(conn);
+                renderWebshellTerminalSessions(conn);
+                return;
+            }
+            if (!targetId) return;
+            if (action === 'close') {
+                var curr2 = getWebshellTerminalSessions(connId);
+                if (curr2.sessions.length <= 1) return;
+                var idx2 = curr2.sessions.findIndex(function (s) { return s.id === targetId; });
+                if (idx2 < 0) return;
+                curr2.sessions.splice(idx2, 1);
+                if (curr2.activeId === targetId) {
+                    var fallback = curr2.sessions[Math.max(0, idx2 - 1)] || curr2.sessions[0];
+                    curr2.activeId = fallback.id;
+                }
+                saveWebshellTerminalSessions(connId, curr2);
+                // 清理该终端的日志与历史
+                var terminalKey = getWebshellTerminalSessionKey(connId, targetId);
+                clearWebshellTerminalLog(terminalKey);
+                delete webshellHistoryByConn[terminalKey];
+                destroyWebshellTerminal();
+                initWebshellTerminal(conn);
+                renderWebshellTerminalSessions(conn);
+                return;
+            }
+            if (targetId === getActiveWebshellTerminalSessionId(connId)) return;
+            var curr = getWebshellTerminalSessions(connId);
+            curr.activeId = targetId;
+            saveWebshellTerminalSessions(connId, curr);
+            destroyWebshellTerminal();
+            initWebshellTerminal(conn);
+            renderWebshellTerminalSessions(conn);
+        });
+    });
+}
+
+function getWebshellTreeState(conn) {
+    var key = safeConnIdForStorage(conn);
+    if (!key) return null;
+    if (!webshellDirTreeByConn[key]) webshellDirTreeByConn[key] = { '.': [] };
+    if (!webshellDirExpandedByConn[key]) webshellDirExpandedByConn[key] = { '.': true };
+    if (!webshellDirLoadedByConn[key]) webshellDirLoadedByConn[key] = { '.': false };
+    return {
+        key: key,
+        tree: webshellDirTreeByConn[key],
+        expanded: webshellDirExpandedByConn[key],
+        loaded: webshellDirLoadedByConn[key]
+    };
+}
+
+function newWebshellDbProfile(name) {
+    var now = Date.now().toString(36);
+    var rand = Math.random().toString(36).slice(2, 8);
+    return {
+        id: 'dbp_' + now + rand,
+        name: name || 'DB-1',
+        type: 'mysql',
+        host: '127.0.0.1',
+        port: '3306',
+        username: 'root',
+        password: '',
+        database: '',
+        selectedDatabase: '',
+        sqlitePath: '/tmp/test.db',
+        sql: 'SELECT 1;',
+        output: '',
+        outputIsError: false,
+        schema: {}
+    };
+}
+
+function getWebshellDbStateStorageKey(conn) {
+    return 'webshell_db_state_' + safeConnIdForStorage(conn);
+}
+
+function normalizeWebshellDbState(rawState) {
+    var state = rawState && typeof rawState === 'object' ? rawState : {};
+    var profiles = Array.isArray(state.profiles) ? state.profiles.slice() : [];
+    if (!profiles.length) profiles = [newWebshellDbProfile('DB-1')];
+    profiles = profiles.map(function (p, idx) {
+        var base = newWebshellDbProfile('DB-' + (idx + 1));
+        return Object.assign(base, p || {});
+    });
+    var activeProfileId = state.activeProfileId || '';
+    if (!profiles.some(function (p) { return p.id === activeProfileId; })) {
+        activeProfileId = profiles[0].id;
+    }
+    var aiMemo = typeof state.aiMemo === 'string' ? state.aiMemo : '';
+    if (aiMemo.length > 100000) aiMemo = aiMemo.slice(0, 100000);
+    return { profiles: profiles, activeProfileId: activeProfileId, aiMemo: aiMemo };
+}
+
+function getWebshellDbState(conn) {
+    var key = getWebshellDbStateStorageKey(conn);
+    if (!key) return normalizeWebshellDbState(null);
+    if (webshellDbConfigByConn[key]) return webshellDbConfigByConn[key];
+    var state = normalizeWebshellDbState(null);
+    webshellDbConfigByConn[key] = state;
+    return state;
+}
+
+function saveWebshellDbState(conn, state) {
+    var key = getWebshellDbStateStorageKey(conn);
+    if (!key || !state) return;
+    var normalized = normalizeWebshellDbState(state);
+    webshellDbConfigByConn[key] = normalized;
+    if (conn && conn.id) queueWebshellPersistStateSave(conn.id);
+}
+
+function getWebshellDbConfig(conn) {
+    var state = getWebshellDbState(conn);
+    var active = state.profiles.find(function (p) { return p.id === state.activeProfileId; });
+    return active || state.profiles[0];
+}
+
+function saveWebshellDbConfig(conn, cfg) {
+    if (!cfg) return;
+    var state = getWebshellDbState(conn);
+    var idx = state.profiles.findIndex(function (p) { return p.id === state.activeProfileId; });
+    if (idx < 0) idx = 0;
+    state.profiles[idx] = Object.assign({}, state.profiles[idx], cfg);
+    state.activeProfileId = state.profiles[idx].id;
+    saveWebshellDbState(conn, state);
+}
+
+function getWebshellAiMemo(conn) {
+    var state = getWebshellDbState(conn);
+    return typeof state.aiMemo === 'string' ? state.aiMemo : '';
+}
+
+function saveWebshellAiMemo(conn, text) {
+    var state = getWebshellDbState(conn);
+    state.aiMemo = String(text || '');
+    if (state.aiMemo.length > 100000) state.aiMemo = state.aiMemo.slice(0, 100000);
+    saveWebshellDbState(conn, state);
+}
+
+function webshellDbGetFieldValue(id) {
+    var el = document.getElementById(id);
+    return el && typeof el.value === 'string' ? el.value.trim() : '';
+}
+
+function webshellDbCollectConfig(conn) {
+    var curr = getWebshellDbConfig(conn) || {};
+    var nameVal = webshellDbGetFieldValue('webshell-db-profile-name');
+    var cfg = {
+        name: nameVal || curr.name || 'DB-1',
+        type: webshellDbGetFieldValue('webshell-db-type') || 'mysql',
+        host: webshellDbGetFieldValue('webshell-db-host') || '127.0.0.1',
+        port: webshellDbGetFieldValue('webshell-db-port') || '',
+        username: webshellDbGetFieldValue('webshell-db-user') || '',
+        password: (document.getElementById('webshell-db-pass') || {}).value || '',
+        database: webshellDbGetFieldValue('webshell-db-name') || '',
+        selectedDatabase: curr.selectedDatabase || '',
+        sqlitePath: webshellDbGetFieldValue('webshell-db-sqlite-path') || '/tmp/test.db',
+        sql: (document.getElementById('webshell-db-sql') || {}).value || ''
+    };
+    saveWebshellDbConfig(conn, cfg);
+    return cfg;
+}
+
+function webshellDbUpdateFieldVisibility() {
+    var type = webshellDbGetFieldValue('webshell-db-type') || 'mysql';
+    var isSqlite = type === 'sqlite';
+    var blocks = document.querySelectorAll('.webshell-db-common-field');
+    blocks.forEach(function (el) { el.style.display = isSqlite ? 'none' : ''; });
+    var sqliteBlock = document.getElementById('webshell-db-sqlite-row');
+    if (sqliteBlock) sqliteBlock.style.display = isSqlite ? '' : 'none';
+    var portEl = document.getElementById('webshell-db-port');
+    if (portEl && !String(portEl.value || '').trim()) {
+        if (type === 'mysql') portEl.value = '3306';
+        else if (type === 'pgsql') portEl.value = '5432';
+        else if (type === 'mssql') portEl.value = '1433';
+    }
+}
+
+function webshellDbSetOutput(text, isError) {
+    var outputEl = document.getElementById('webshell-db-output');
+    if (!outputEl) return;
+    outputEl.textContent = text || '';
+    outputEl.classList.toggle('error', !!isError);
+}
+
+function webshellDbRenderTable(rawOutput) {
+    var wrap = document.getElementById('webshell-db-result-table');
+    if (!wrap) return false;
+    var raw = String(rawOutput || '').trim();
+    if (!raw) {
+        wrap.innerHTML = '';
+        return false;
+    }
+    var lines = raw.split(/\r?\n/).filter(function (line) {
+        var t = String(line || '').trim();
+        if (!t) return false;
+        if (/^\(\d+\s+rows?\)$/i.test(t)) return false;
+        if (/^-{3,}$/.test(t)) return false;
+        return true;
+    });
+    if (lines.length < 2) {
+        wrap.innerHTML = '';
+        return false;
+    }
+    var delimiter = lines[0].indexOf('\t') >= 0 ? '\t' : (lines[0].indexOf('|') >= 0 ? '|' : '');
+    if (!delimiter) {
+        wrap.innerHTML = '';
+        return false;
+    }
+    var header = lines[0].split(delimiter).map(function (s) { return String(s || '').trim(); });
+    if (!header.length || (header.length === 1 && !header[0])) {
+        wrap.innerHTML = '';
+        return false;
+    }
+    var rows = [];
+    for (var i = 1; i < lines.length; i++) {
+        var line = lines[i];
+        if (/^[-+\s|]+$/.test(line)) continue;
+        var cols = line.split(delimiter).map(function (s) { return String(s || '').trim(); });
+        if (cols.length !== header.length) continue;
+        rows.push(cols);
+    }
+    if (!rows.length) {
+        wrap.innerHTML = '';
+        return false;
+    }
+    var maxRows = Math.min(rows.length, 200);
+    var html = '<table class="webshell-db-table"><thead><tr>';
+    header.forEach(function (h) { html += '<th>' + escapeHtml(h || '-') + '</th>'; });
+    html += '</tr></thead><tbody>';
+    for (var r = 0; r < maxRows; r++) {
+        html += '<tr>';
+        rows[r].forEach(function (c) { html += '<td>' + escapeHtml(c || '') + '</td>'; });
+        html += '</tr>';
+    }
+    html += '</tbody></table>';
+    if (rows.length > maxRows) {
+        html += '<div class="webshell-db-table-meta">仅展示前 ' + maxRows + ' 行，共 ' + rows.length + ' 行</div>';
+    } else {
+        html += '<div class="webshell-db-table-meta">共 ' + rows.length + ' 行，' + header.length + ' 列</div>';
+    }
+    wrap.innerHTML = html;
+    return true;
+}
+
+function webshellDbQuoteIdentifier(type, name) {
+    var v = String(name || '');
+    if (!v) return '';
+    if (type === 'mysql') return '`' + v.replace(/`/g, '``') + '`';
+    if (type === 'mssql') return '[' + v.replace(/]/g, ']]') + ']';
+    return '"' + v.replace(/"/g, '""') + '"';
+}
+
+function webshellDbQuoteLiteral(value) {
+    return "'" + String(value == null ? '' : value).replace(/'/g, "''") + "'";
+}
+
+function buildWebshellDbCommand(cfg, isTestOnly, options) {
+    options = options || {};
+    var type = cfg.type || 'mysql';
+    var sql = String(isTestOnly ? 'SELECT 1;' : (options.sql || cfg.sql || '')).trim();
+    if (!sql) return { error: wsT('webshell.dbSqlRequired') || '请输入 SQL' };
+
+    var sqlB64 = btoa(unescape(encodeURIComponent(sql)));
+    var sqlB64Arg = escapeSingleQuotedShellArg(sqlB64);
+    var tmpFile = '/tmp/.csai_sql_$$.sql';
+    var decodeToFile = 'printf %s ' + sqlB64Arg + " | base64 -d > " + tmpFile;
+    var cleanup = '; rc=$?; rm -f ' + tmpFile + '; echo "__CSAI_DB_RC__:$rc"; exit $rc';
+    var command = '';
+
+    if (type === 'mysql') {
+        var host = escapeSingleQuotedShellArg(cfg.host || '127.0.0.1');
+        var port = escapeSingleQuotedShellArg(cfg.port || '3306');
+        var user = escapeSingleQuotedShellArg(cfg.username || 'root');
+        var pass = escapeSingleQuotedShellArg(cfg.password || '');
+        var dbName = cfg.selectedDatabase || cfg.database || '';
+        var db = dbName ? (' -D ' + escapeSingleQuotedShellArg(dbName)) : '';
+        command = decodeToFile + '; MYSQL_PWD=' + pass + ' mysql -h ' + host + ' -P ' + port + ' -u ' + user + db + ' --batch --raw < ' + tmpFile + cleanup;
+    } else if (type === 'pgsql') {
+        var pHost = escapeSingleQuotedShellArg(cfg.host || '127.0.0.1');
+        var pPort = escapeSingleQuotedShellArg(cfg.port || '5432');
+        var pUser = escapeSingleQuotedShellArg(cfg.username || 'postgres');
+        var pPass = escapeSingleQuotedShellArg(cfg.password || '');
+        var pDb = escapeSingleQuotedShellArg(cfg.selectedDatabase || cfg.database || 'postgres');
+        command = decodeToFile + '; PGPASSWORD=' + pPass + ' psql -h ' + pHost + ' -p ' + pPort + ' -U ' + pUser + ' -d ' + pDb + ' -v ON_ERROR_STOP=1 -A -F "|" -P footer=off -f ' + tmpFile + cleanup;
+    } else if (type === 'sqlite') {
+        var sqlitePath = escapeSingleQuotedShellArg(cfg.sqlitePath || '/tmp/test.db');
+        command = decodeToFile + '; sqlite3 -header -separator "|" ' + sqlitePath + ' < ' + tmpFile + cleanup;
+    } else if (type === 'mssql') {
+        var sHost = cfg.host || '127.0.0.1';
+        var sPort = cfg.port || '1433';
+        var sUser = escapeSingleQuotedShellArg(cfg.username || 'sa');
+        var sPass = escapeSingleQuotedShellArg(cfg.password || '');
+        var sDb = escapeSingleQuotedShellArg(cfg.selectedDatabase || cfg.database || 'master');
+        var server = escapeSingleQuotedShellArg(sHost + ',' + sPort);
+        command = decodeToFile + '; sqlcmd -S ' + server + ' -U ' + sUser + ' -P ' + sPass + ' -W -s "|" -d ' + sDb + ' -i ' + tmpFile + cleanup;
+    } else {
+        return { error: (wsT('webshell.dbExecFailed') || '数据库执行失败') + ': unsupported type ' + type };
+    }
+
+    return { command: command };
+}
+
+function buildWebshellDbSchemaCommand(cfg) {
+    var type = cfg.type || 'mysql';
+    var schemaSQL = '';
+    if (type === 'mysql') {
+        schemaSQL = "SELECT SCHEMA_NAME AS db_name, '' AS table_name, '' AS column_name FROM INFORMATION_SCHEMA.SCHEMATA UNION ALL SELECT TABLE_SCHEMA AS db_name, TABLE_NAME AS table_name, '' AS column_name FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' UNION ALL SELECT TABLE_SCHEMA AS db_name, TABLE_NAME AS table_name, COLUMN_NAME AS column_name FROM INFORMATION_SCHEMA.COLUMNS ORDER BY db_name, table_name, column_name;";
+    } else if (type === 'pgsql') {
+        schemaSQL = "SELECT table_schema AS db_name, table_name, '' AS column_name FROM information_schema.tables WHERE table_type='BASE TABLE' AND table_schema NOT IN ('pg_catalog','information_schema') UNION ALL SELECT table_schema AS db_name, table_name, column_name FROM information_schema.columns WHERE table_schema NOT IN ('pg_catalog','information_schema') ORDER BY db_name, table_name, column_name;";
+    } else if (type === 'sqlite') {
+        schemaSQL = "SELECT 'main' AS db_name, name AS table_name, '' AS column_name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' UNION ALL SELECT 'main' AS db_name, m.name AS table_name, p.name AS column_name FROM sqlite_master m JOIN pragma_table_info(m.name) p ON 1=1 WHERE m.type='table' AND m.name NOT LIKE 'sqlite_%' ORDER BY db_name, table_name, column_name;";
+    } else if (type === 'mssql') {
+        schemaSQL = "SELECT TABLE_SCHEMA AS db_name, TABLE_NAME AS table_name, '' AS column_name FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' UNION ALL SELECT TABLE_SCHEMA AS db_name, TABLE_NAME AS table_name, COLUMN_NAME AS column_name FROM INFORMATION_SCHEMA.COLUMNS ORDER BY db_name, table_name, column_name;";
+    } else {
+        return { error: (wsT('webshell.dbExecFailed') || '数据库执行失败') + ': unsupported type ' + type };
+    }
+    return buildWebshellDbCommand(cfg, false, { sql: schemaSQL });
+}
+
+function buildWebshellDbColumnsCommand(cfg, dbName, tableName) {
+    var type = cfg.type || 'mysql';
+    var sql = '';
+    if (type === 'mysql') {
+        sql = "SELECT COLUMN_NAME AS column_name FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=" + webshellDbQuoteLiteral(dbName) + " AND TABLE_NAME=" + webshellDbQuoteLiteral(tableName) + " ORDER BY ORDINAL_POSITION;";
+    } else if (type === 'pgsql') {
+        sql = "SELECT column_name FROM information_schema.columns WHERE table_schema=" + webshellDbQuoteLiteral(dbName) + " AND table_name=" + webshellDbQuoteLiteral(tableName) + " ORDER BY ordinal_position;";
+    } else if (type === 'sqlite') {
+        sql = "SELECT name AS column_name FROM pragma_table_info(" + webshellDbQuoteLiteral(tableName) + ") ORDER BY cid;";
+    } else if (type === 'mssql') {
+        sql = "SELECT COLUMN_NAME AS column_name FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=" + webshellDbQuoteLiteral(dbName) + " AND TABLE_NAME=" + webshellDbQuoteLiteral(tableName) + " ORDER BY ORDINAL_POSITION;";
+    } else {
+        return { error: (wsT('webshell.dbExecFailed') || '数据库执行失败') + ': unsupported type ' + type };
+    }
+    return buildWebshellDbCommand(cfg, false, { sql: sql });
+}
+
+function buildWebshellDbColumnsByDatabaseCommand(cfg, dbName) {
+    var type = cfg.type || 'mysql';
+    var sql = '';
+    if (type === 'mysql') {
+        sql = "SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=" + webshellDbQuoteLiteral(dbName) + " ORDER BY TABLE_NAME, ORDINAL_POSITION;";
+    } else if (type === 'pgsql') {
+        sql = "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema=" + webshellDbQuoteLiteral(dbName) + " ORDER BY table_name, ordinal_position;";
+    } else if (type === 'sqlite') {
+        sql = "SELECT m.name AS table_name, p.name AS column_name FROM sqlite_master m JOIN pragma_table_info(m.name) p ON 1=1 WHERE m.type='table' AND m.name NOT LIKE 'sqlite_%' ORDER BY m.name, p.cid;";
+    } else if (type === 'mssql') {
+        sql = "SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=" + webshellDbQuoteLiteral(dbName) + " ORDER BY TABLE_NAME, ORDINAL_POSITION;";
+    } else {
+        return { error: (wsT('webshell.dbExecFailed') || '数据库执行失败') + ': unsupported type ' + type };
+    }
+    return buildWebshellDbCommand(cfg, false, { sql: sql });
+}
+
+function parseWebshellDbExecOutput(rawOutput) {
+    var raw = String(rawOutput || '');
+    var rc = null;
+    var cleaned = raw.replace(/__CSAI_DB_RC__:(\d+)\s*$/m, function (_, code) {
+        rc = parseInt(code, 10);
+        return '';
+    }).trim();
+    return { rc: rc, output: cleaned };
+}
+
+function parseWebshellDbSchema(rawOutput) {
+    var text = String(rawOutput || '').trim();
+    if (!text) return {};
+    var lines = text.split(/\r?\n/).filter(function (line) {
+        return line && line.trim() && !/^\(\d+\s+rows?\)$/i.test(line.trim()) && !/^[-+\s|]+$/.test(line.trim());
+    });
+    if (lines.length < 2) return {};
+    var delimiter = lines[0].indexOf('\t') >= 0 ? '\t' : (lines[0].indexOf('|') >= 0 ? '|' : '');
+    if (!delimiter) return {};
+    var headers = lines[0].split(delimiter).map(function (s) { return String(s || '').trim().toLowerCase(); });
+    var dbIdx = headers.indexOf('db_name');
+    var tableIdx = headers.indexOf('table_name');
+    var columnIdx = headers.indexOf('column_name');
+    if (dbIdx < 0 || tableIdx < 0) return {};
+    var schema = {};
+    for (var i = 1; i < lines.length; i++) {
+        var cols = lines[i].split(delimiter).map(function (s) { return String(s || '').trim(); });
+        if (cols.length !== headers.length) continue;
+        var db = cols[dbIdx] || 'default';
+        var table = cols[tableIdx] || '';
+        var column = columnIdx >= 0 ? (cols[columnIdx] || '') : '';
+        if (!schema[db]) schema[db] = { tables: {} };
+        if (!table) continue;
+        if (!schema[db].tables[table]) schema[db].tables[table] = [];
+        if (column && schema[db].tables[table].indexOf(column) < 0) {
+            schema[db].tables[table].push(column);
+        }
+    }
+    return normalizeWebshellDbSchema(schema);
+}
+
+function parseWebshellDbColumns(rawOutput) {
+    var text = String(rawOutput || '').trim();
+    if (!text) return [];
+    var lines = text.split(/\r?\n/).filter(function (line) {
+        return line && line.trim() && !/^\(\d+\s+rows?\)$/i.test(line.trim()) && !/^[-+\s|]+$/.test(line.trim());
+    });
+    if (lines.length < 2) return [];
+    var delimiter = lines[0].indexOf('\t') >= 0 ? '\t' : (lines[0].indexOf('|') >= 0 ? '|' : '');
+    if (!delimiter) {
+        if (String(lines[0] || '').trim().toLowerCase() !== 'column_name') return [];
+        var plainColumns = [];
+        for (var p = 1; p < lines.length; p++) {
+            var plainName = String(lines[p] || '').trim();
+            if (!plainName || plainColumns.indexOf(plainName) >= 0) continue;
+            plainColumns.push(plainName);
+        }
+        return plainColumns;
+    }
+    var headers = lines[0].split(delimiter).map(function (s) { return String(s || '').trim().toLowerCase(); });
+    var colIdx = headers.indexOf('column_name');
+    if (colIdx < 0) return [];
+    var columns = [];
+    for (var i = 1; i < lines.length; i++) {
+        var cols = lines[i].split(delimiter).map(function (s) { return String(s || '').trim(); });
+        if (cols.length !== headers.length) continue;
+        var name = cols[colIdx] || '';
+        if (!name || columns.indexOf(name) >= 0) continue;
+        columns.push(name);
+    }
+    return columns;
+}
+
+function parseWebshellDbTableColumns(rawOutput) {
+    var text = String(rawOutput || '').trim();
+    if (!text) return {};
+    var lines = text.split(/\r?\n/).filter(function (line) {
+        return line && line.trim() && !/^\(\d+\s+rows?\)$/i.test(line.trim()) && !/^[-+\s|]+$/.test(line.trim());
+    });
+    if (lines.length < 2) return {};
+    var delimiter = lines[0].indexOf('\t') >= 0 ? '\t' : (lines[0].indexOf('|') >= 0 ? '|' : '');
+    if (!delimiter) return {};
+    var headers = lines[0].split(delimiter).map(function (s) { return String(s || '').trim().toLowerCase(); });
+    var tableIdx = headers.indexOf('table_name');
+    var colIdx = headers.indexOf('column_name');
+    if (tableIdx < 0 || colIdx < 0) return {};
+    var tableColumns = {};
+    for (var i = 1; i < lines.length; i++) {
+        var cols = lines[i].split(delimiter).map(function (s) { return String(s || '').trim(); });
+        if (cols.length !== headers.length) continue;
+        var tableName = cols[tableIdx] || '';
+        var colName = cols[colIdx] || '';
+        if (!tableName || !colName) continue;
+        if (!tableColumns[tableName]) tableColumns[tableName] = [];
+        if (tableColumns[tableName].indexOf(colName) >= 0) continue;
+        tableColumns[tableName].push(colName);
+    }
+    return tableColumns;
+}
+
+function normalizeWebshellDbSchema(rawSchema) {
+    if (!rawSchema || typeof rawSchema !== 'object') return {};
+    var normalized = {};
+    Object.keys(rawSchema).forEach(function (dbName) {
+        var dbEntry = rawSchema[dbName];
+        var tableMap = {};
+
+        if (Array.isArray(dbEntry)) {
+            dbEntry.forEach(function (tableName) {
+                var t = String(tableName || '').trim();
+                if (!t) return;
+                if (!tableMap[t]) tableMap[t] = [];
+            });
+        } else if (dbEntry && typeof dbEntry === 'object') {
+            var tablesSource = (dbEntry.tables && typeof dbEntry.tables === 'object') ? dbEntry.tables : dbEntry;
+            Object.keys(tablesSource).forEach(function (tableName) {
+                if (tableName === 'tables') return;
+                var t = String(tableName || '').trim();
+                if (!t) return;
+                var rawColumns = tablesSource[tableName];
+                var columns = Array.isArray(rawColumns) ? rawColumns : [];
+                var uniqColumns = [];
+                columns.forEach(function (colName) {
+                    var c = String(colName || '').trim();
+                    if (!c || uniqColumns.indexOf(c) >= 0) return;
+                    uniqColumns.push(c);
+                });
+                uniqColumns.sort(function (a, b) { return a.localeCompare(b); });
+                tableMap[t] = uniqColumns;
+            });
+        }
+
+        var sortedTables = {};
+        Object.keys(tableMap).sort(function (a, b) { return a.localeCompare(b); }).forEach(function (tableName) {
+            sortedTables[tableName] = tableMap[tableName];
+        });
+        normalized[dbName] = { tables: sortedTables };
+    });
+    return normalized;
+}
+
+function simplifyWebshellAiError(rawMessage) {
+    var msg = String(rawMessage || '').trim();
+    var lower = msg.toLowerCase();
+    if ((lower.indexOf('401') !== -1 || lower.indexOf('unauthorized') !== -1) &&
+        (lower.indexOf('api key') !== -1 || lower.indexOf('apikey') !== -1)) {
+        return '鉴权失败：API Key 未配置或无效（401）';
+    }
+    if (lower.indexOf('timeout') !== -1 || lower.indexOf('timed out') !== -1) {
+        return '请求超时，请稍后重试';
+    }
+    if (lower.indexOf('network') !== -1 || lower.indexOf('failed to fetch') !== -1) {
+        return '网络异常，请检查服务连通性';
+    }
+    return msg || '请求失败';
+}
+
+function renderWebshellAiErrorMessage(targetEl, rawMessage) {
+    if (!targetEl) return;
+    var full = String(rawMessage || '').trim();
+    var shortMsg = simplifyWebshellAiError(full);
+    targetEl.classList.add('webshell-ai-msg-error');
+    targetEl.innerHTML = '';
+    var head = document.createElement('div');
+    head.className = 'webshell-ai-error-head';
+    head.textContent = shortMsg;
+    targetEl.appendChild(head);
+    if (full && full !== shortMsg) {
+        var detail = document.createElement('details');
+        detail.className = 'webshell-ai-error-detail';
+        var summary = document.createElement('summary');
+        summary.textContent = '查看详细错误';
+        var pre = document.createElement('pre');
+        pre.textContent = full;
+        detail.appendChild(summary);
+        detail.appendChild(pre);
+        targetEl.appendChild(detail);
+    }
+}
+
+function isLikelyWebshellAiErrorMessage(content, msg) {
+    var text = String(content || '').trim();
+    if (!text) return false;
+    var lower = text.toLowerCase();
+    if (/^(执行失败|请求失败|请求异常|error)\s*[:：]/i.test(text)) return true;
+    if (/(status code\s*:\s*4\d{2}|unauthorized|forbidden|apikey|api key|invalid api key)/i.test(lower)) return true;
+    if (/(noderunerror|tool[-_ ]?error|agent[-_ ]?error|执行失败)/i.test(lower)) return true;
+    var details = msg && Array.isArray(msg.processDetails) ? msg.processDetails : [];
+    return details.some(function (d) { return String((d && d.eventType) || '').toLowerCase() === 'error'; });
 }
 
 function formatWebshellAiConvDate(updatedAt) {
@@ -287,33 +1278,52 @@ function formatWebshellAiConvDate(updatedAt) {
     return (d.getMonth() + 1) + '/' + d.getDate();
 }
 
+function webshellAgentPx(data) {
+    if (!data || data.einoAgent == null) return '';
+    var s = String(data.einoAgent).trim();
+    return s ? ('[' + s + '] ') : '';
+}
+
 // 根据后端保存的 processDetail 构建一条时间线项的 HTML（与 appendTimelineItem 展示一致）
 function buildWebshellTimelineItemFromDetail(detail) {
     var eventType = detail.eventType || '';
     var title = detail.message || '';
     var data = detail.data || {};
+    var ap = webshellAgentPx(data);
     if (eventType === 'iteration') {
-        title = (typeof window.t === 'function') ? window.t('chat.iterationRound', { n: data.iteration || 1 }) : ('第 ' + (data.iteration || 1) + ' 轮迭代');
+        title = ap + ((typeof window.t === 'function') ? window.t('chat.iterationRound', { n: data.iteration || 1 }) : ('第 ' + (data.iteration || 1) + ' 轮迭代'));
     } else if (eventType === 'thinking') {
-        title = '🤔 ' + ((typeof window.t === 'function') ? window.t('chat.aiThinking') : 'AI 思考');
+        title = ap + '🤔 ' + ((typeof window.t === 'function') ? window.t('chat.aiThinking') : 'AI 思考');
     } else if (eventType === 'tool_calls_detected') {
-        title = '🔧 ' + ((typeof window.t === 'function') ? window.t('chat.toolCallsDetected', { count: data.count || 0 }) : ('检测到 ' + (data.count || 0) + ' 个工具调用'));
+        title = ap + '🔧 ' + ((typeof window.t === 'function') ? window.t('chat.toolCallsDetected', { count: data.count || 0 }) : ('检测到 ' + (data.count || 0) + ' 个工具调用'));
     } else if (eventType === 'tool_call') {
         var tn = data.toolName || ((typeof window.t === 'function') ? window.t('chat.unknownTool') : '未知工具');
         var idx = data.index || 0;
         var total = data.total || 0;
-        title = '🔧 ' + ((typeof window.t === 'function') ? window.t('chat.callTool', { name: tn, index: idx, total: total }) : ('调用: ' + tn + (total ? ' (' + idx + '/' + total + ')' : '')));
+        title = ap + '🔧 ' + ((typeof window.t === 'function') ? window.t('chat.callTool', { name: tn, index: idx, total: total }) : ('调用: ' + tn + (total ? ' (' + idx + '/' + total + ')' : '')));
     } else if (eventType === 'tool_result') {
         var success = data.success !== false;
         var tname = data.toolName || '工具';
-        title = (success ? '✅ ' : '❌ ') + ((typeof window.t === 'function') ? (success ? window.t('chat.toolExecComplete', { name: tname }) : window.t('chat.toolExecFailed', { name: tname })) : (tname + (success ? ' 执行完成' : ' 执行失败')));
+        title = ap + (success ? '✅ ' : '❌ ') + ((typeof window.t === 'function') ? (success ? window.t('chat.toolExecComplete', { name: tname }) : window.t('chat.toolExecFailed', { name: tname })) : (tname + (success ? ' 执行完成' : ' 执行失败')));
+    } else if (eventType === 'eino_agent_reply') {
+        title = ap + '💬 ' + ((typeof window.t === 'function') ? window.t('chat.einoAgentReplyTitle') : '子代理回复');
     } else if (eventType === 'progress') {
         title = (typeof window.translateProgressMessage === 'function') ? window.translateProgressMessage(detail.message || '') : (detail.message || '');
     }
     var html = '<span class="webshell-ai-timeline-title">' + escapeHtml(title || '') + '</span>';
+    if (eventType === 'eino_agent_reply' && detail.message) {
+        html += '<div class="webshell-ai-timeline-msg"><pre style="white-space:pre-wrap;">' + escapeHtml(detail.message) + '</pre></div>';
+    }
     if (eventType === 'tool_call' && data && (data.argumentsObj || data.arguments)) {
         try {
-            var args = data.argumentsObj || (data.arguments ? JSON.parse(data.arguments) : null);
+            var args = data.argumentsObj;
+            if (args == null && data.arguments != null && String(data.arguments).trim() !== '') {
+                try {
+                    args = JSON.parse(String(data.arguments));
+                } catch (e2) {
+                    args = { _raw: String(data.arguments) };
+                }
+            }
             if (args && typeof args === 'object') {
                 var paramsLabel = (typeof window.t === 'function') ? window.t('timeline.params') : '参数:';
                 html += '<div class="webshell-ai-timeline-msg"><div class="tool-arg-section"><strong>' + escapeHtml(paramsLabel) + '</strong><pre class="tool-args">' + escapeHtml(JSON.stringify(args, null, 2)) + '</pre></div></div>';
@@ -432,7 +1442,9 @@ function webshellAiConvListSelect(conn, convId, messagesContainer, listEl) {
                 if (role === 'user') {
                     div.textContent = content;
                 } else {
-                    if (typeof formatMarkdown === 'function') {
+                    if (isLikelyWebshellAiErrorMessage(content, msg)) {
+                        renderWebshellAiErrorMessage(div, content);
+                    } else if (typeof formatMarkdown === 'function') {
                         div.innerHTML = formatMarkdown(content);
                     } else {
                         div.textContent = content;
@@ -457,7 +1469,7 @@ function webshellAiConvListSelect(conn, convId, messagesContainer, listEl) {
 }
 
 // 选择连接：渲染终端 + 文件管理 Tab，并初始化终端
-function selectWebshell(id) {
+function selectWebshell(id, stateReady) {
     currentWebshellId = id;
     renderWebshellList();
     const conn = webshellConnections.find(c => c.id === id);
@@ -465,6 +1477,12 @@ function selectWebshell(id) {
     if (!workspace) return;
     if (!conn) {
         workspace.innerHTML = '<div class="webshell-workspace-placeholder">' + wsT('webshell.selectOrAdd') + '</div>';
+        return;
+    }
+    if (!stateReady) {
+        ensureWebshellPersistStateLoaded(conn).then(function () {
+            if (currentWebshellId === id) selectWebshell(id, true);
+        });
         return;
     }
 
@@ -475,11 +1493,15 @@ function selectWebshell(id) {
         '<div class="webshell-tabs">' +
         '<button type="button" class="webshell-tab active" data-tab="terminal">' + wsT('webshell.tabTerminal') + '</button>' +
         '<button type="button" class="webshell-tab" data-tab="file">' + wsT('webshell.tabFileManager') + '</button>' +
+        '<button type="button" class="webshell-tab" data-tab="db">' + (wsT('webshell.tabDbManager') || '数据库管理') + '</button>' +
         '<button type="button" class="webshell-tab" data-tab="ai">' + (wsT('webshell.tabAiAssistant') || 'AI 助手') + '</button>' +
+        '<button type="button" class="webshell-tab" data-tab="memo">' + (wsT('webshell.tabMemo') || '备忘录') + '</button>' +
         '</div>' +
         '<div id="webshell-pane-terminal" class="webshell-pane active">' +
         '<div class="webshell-terminal-toolbar">' +
         '<button type="button" class="btn-ghost btn-sm" id="webshell-terminal-clear" title="' + (wsT('webshell.clearScreen') || '清屏') + '">' + (wsT('webshell.clearScreen') || '清屏') + '</button> ' +
+        '<button type="button" class="btn-ghost btn-sm" id="webshell-terminal-copy-log" title="' + (wsT('webshell.copyTerminalLog') || '复制日志') + '">' + (wsT('webshell.copyTerminalLog') || '复制日志') + '</button> ' +
+        '<span id="webshell-terminal-status" class="webshell-terminal-status idle">' + (wsT('webshell.terminalIdle') || '空闲') + '</span> ' +
         '<span class="webshell-quick-label">' + (wsT('webshell.quickCommands') || '快捷命令') + ':</span> ' +
         '<button type="button" class="btn-ghost btn-sm webshell-quick-cmd" data-cmd="whoami">whoami</button> ' +
         '<button type="button" class="btn-ghost btn-sm webshell-quick-cmd" data-cmd="id">id</button> ' +
@@ -493,23 +1515,42 @@ function selectWebshell(id) {
         '<button type="button" class="btn-ghost btn-sm webshell-quick-cmd" data-cmd="ps aux">ps aux</button> ' +
         '<button type="button" class="btn-ghost btn-sm webshell-quick-cmd" data-cmd="netstat -tulnp">netstat</button>' +
         '</div>' +
+        '<div class="webshell-terminal-shell">' +
+        '<div id="webshell-terminal-sessions" class="webshell-terminal-sessions"></div>' +
         '<div id="webshell-terminal-container" class="webshell-terminal-container"></div>' +
         '</div>' +
+        '</div>' +
         '<div id="webshell-pane-file" class="webshell-pane">' +
+        '<div class="webshell-file-layout">' +
+        '<aside class="webshell-file-sidebar">' +
+        '<div class="webshell-file-sidebar-title">' + wsTOr('webshell.dirTree', '目录列表') + '</div>' +
+        '<div id="webshell-dir-tree" class="webshell-dir-tree"></div>' +
+        '</aside>' +
+        '<section class="webshell-file-main">' +
         '<div class="webshell-file-toolbar">' +
         '<div class="webshell-file-breadcrumb" id="webshell-file-breadcrumb"></div>' +
-        '<label><span>' + wsT('webshell.filePath') + '</span> <input type="text" id="webshell-file-path" class="form-control" value="." /></label>' +
+        '<div class="webshell-file-toolbar-main">' +
+        '<label class="webshell-file-path-field"><span>' + wsT('webshell.filePath') + '</span> <input type="text" id="webshell-file-path" class="form-control" value="." /></label>' +
         '<input type="text" id="webshell-file-filter" class="form-control webshell-file-filter" placeholder="' + (wsT('webshell.filterPlaceholder') || '过滤文件名') + '" />' +
-        '<button type="button" class="btn-secondary" id="webshell-list-dir">' + wsT('webshell.listDir') + '</button> ' +
-        '<button type="button" class="btn-ghost" id="webshell-parent-dir">' + wsT('webshell.parentDir') + '</button> ' +
-        '<button type="button" class="btn-ghost" id="webshell-file-refresh" title="' + (wsT('webshell.refresh') || '刷新') + '">' + (wsT('webshell.refresh') || '刷新') + '</button> ' +
-        '<button type="button" class="btn-ghost" id="webshell-mkdir-btn">' + (wsT('webshell.newDir') || '新建目录') + '</button> ' +
-        '<button type="button" class="btn-ghost" id="webshell-newfile-btn">' + (wsT('webshell.newFile') || '新建文件') + '</button> ' +
-        '<button type="button" class="btn-ghost" id="webshell-upload-btn">' + (wsT('webshell.upload') || '上传') + '</button> ' +
-        '<button type="button" class="btn-ghost" id="webshell-batch-delete-btn">' + (wsT('webshell.batchDelete') || '批量删除') + '</button> ' +
+        '<button type="button" class="btn-secondary" id="webshell-list-dir">' + wsT('webshell.listDir') + '</button>' +
+        '<button type="button" class="btn-ghost" id="webshell-parent-dir">' + wsT('webshell.parentDir') + '</button>' +
+        '</div>' +
+        '<div class="webshell-file-toolbar-actions">' +
+        '<button type="button" class="btn-ghost" id="webshell-file-refresh" title="' + (wsT('webshell.refresh') || '刷新') + '">' + (wsT('webshell.refresh') || '刷新') + '</button>' +
+        '<details class="webshell-toolbar-actions">' +
+        '<summary class="btn-ghost webshell-toolbar-actions-btn">' + (wsT('webshell.moreActions') || '更多操作') + '</summary>' +
+        '<div class="webshell-row-actions-menu">' +
+        '<button type="button" class="btn-ghost" id="webshell-mkdir-btn">' + (wsT('webshell.newDir') || '新建目录') + '</button>' +
+        '<button type="button" class="btn-ghost" id="webshell-newfile-btn">' + (wsT('webshell.newFile') || '新建文件') + '</button>' +
+        '<button type="button" class="btn-ghost" id="webshell-upload-btn">' + (wsT('webshell.upload') || '上传') + '</button>' +
+        '<button type="button" class="btn-ghost" id="webshell-batch-delete-btn">' + (wsT('webshell.batchDelete') || '批量删除') + '</button>' +
         '<button type="button" class="btn-ghost" id="webshell-batch-download-btn">' + (wsT('webshell.batchDownload') || '批量下载') + '</button>' +
+        '</div></details>' +
+        '</div>' +
         '</div>' +
         '<div id="webshell-file-list" class="webshell-file-list"></div>' +
+        '</section>' +
+        '</div>' +
         '</div>' +
         '<div id="webshell-pane-ai" class="webshell-pane webshell-pane-ai-with-sidebar">' +
         '<div class="webshell-ai-sidebar">' +
@@ -522,6 +1563,50 @@ function selectWebshell(id) {
         '<textarea id="webshell-ai-input" class="webshell-ai-input form-control" rows="2" placeholder="' + (wsT('webshell.aiPlaceholder') || '例如：列出当前目录下的文件') + '"></textarea>' +
         '<button type="button" class="btn-primary" id="webshell-ai-send">' + (wsT('webshell.aiSend') || '发送') + '</button>' +
         '</div>' +
+        '</div>' +
+        '</div>' +
+        '<div id="webshell-pane-memo" class="webshell-pane webshell-pane-memo">' +
+        '<div class="webshell-memo-layout">' +
+        '<div class="webshell-memo-head"><span>' + (wsT('webshell.aiMemo') || '备忘录') + '</span><button type="button" class="btn-ghost btn-sm" id="webshell-ai-memo-clear">' + (wsT('webshell.aiMemoClear') || '清空') + '</button></div>' +
+        '<textarea id="webshell-ai-memo-input" class="webshell-memo-input form-control" rows="18" placeholder="' + (wsT('webshell.aiMemoPlaceholder') || '记录关键命令、测试思路、复现步骤...') + '"></textarea>' +
+        '<div id="webshell-ai-memo-status" class="webshell-memo-status">' + (wsT('webshell.aiMemoSaved') || '已保存到本地') + '</div>' +
+        '</div>' +
+        '</div>' +
+        '<div id="webshell-pane-db" class="webshell-pane webshell-pane-db">' +
+        '<div class="webshell-db-profiles-bar"><div id="webshell-db-profiles" class="webshell-db-profiles"></div><div class="webshell-db-profile-actions"><button type="button" class="btn-ghost btn-sm" id="webshell-db-add-profile-btn">+ ' + (wsT('webshell.dbAddProfile') || '新增连接') + '</button></div></div>' +
+        '<div class="webshell-db-layout">' +
+        '<aside class="webshell-db-sidebar">' +
+        '<div class="webshell-db-sidebar-head"><span>' + (wsT('webshell.dbSchema') || '数据库结构') + '</span><button type="button" class="btn-ghost btn-sm" id="webshell-db-load-schema-btn">' + (wsT('webshell.dbLoadSchema') || '加载结构') + '</button></div>' +
+        '<div id="webshell-db-schema-tree" class="webshell-db-schema-tree"><div class="webshell-empty">' + (wsT('webshell.dbNoSchema') || '暂无数据库结构，请先加载') + '</div></div>' +
+        '<div class="webshell-db-sidebar-hint">' + (wsT('webshell.dbSelectTableHint') || '点击表名可生成查询 SQL') + '</div>' +
+        '</aside>' +
+        '<section class="webshell-db-main">' +
+        '<div class="webshell-db-sql-tools"><button type="button" class="btn-ghost btn-sm" id="webshell-db-template-btn">' + (wsT('webshell.dbTemplateSql') || '示例 SQL') + '</button><button type="button" class="btn-ghost btn-sm" id="webshell-db-clear-btn">' + (wsT('webshell.dbClearSql') || '清空 SQL') + '</button></div>' +
+        '<textarea id="webshell-db-sql" class="webshell-db-sql form-control" rows="8" placeholder="' + (wsT('webshell.dbSqlPlaceholder') || '输入 SQL，例如：SELECT version();') + '"></textarea>' +
+        '<div class="webshell-db-actions">' +
+        '<button type="button" class="btn-ghost" id="webshell-db-test-btn">' + (wsT('webshell.dbTest') || '测试连接') + '</button>' +
+        '<button type="button" class="btn-primary" id="webshell-db-run-btn">' + (wsT('webshell.dbRunSql') || '执行 SQL') + '</button>' +
+        '</div>' +
+        '<div class="webshell-db-output-wrap"><div class="webshell-db-output-title">' + (wsT('webshell.dbOutput') || '执行输出') + '</div><div id="webshell-db-result-table" class="webshell-db-result-table"></div><pre id="webshell-db-output" class="webshell-db-output"></pre><div class="webshell-db-hint">' + (wsT('webshell.dbCliHint') || '如果提示命令不存在，请先在目标主机安装对应客户端（mysql/psql/sqlite3/sqlcmd）') + '</div></div>' +
+        '<div id="webshell-db-profile-modal" class="modal">' +
+        '<div class="modal-content webshell-db-profile-modal-content">' +
+        '<div class="modal-header"><h2 id="webshell-db-profile-modal-title">' + (wsT('webshell.editConnectionTitle') || '编辑连接') + '</h2><span class="modal-close" id="webshell-db-profile-modal-close">&times;</span></div>' +
+        '<div class="modal-body">' +
+        '<div class="webshell-db-toolbar">' +
+        '<label><span>' + (wsT('webshell.dbProfileName') || '连接名称') + '</span><input id="webshell-db-profile-name" class="form-control" type="text" maxlength="30" /></label>' +
+        '<label><span>' + (wsT('webshell.dbType') || '数据库类型') + '</span><select id="webshell-db-type" class="form-control"><option value="mysql">MySQL</option><option value="pgsql">PostgreSQL</option><option value="sqlite">SQLite</option><option value="mssql">SQL Server</option></select></label>' +
+        '<label class="webshell-db-common-field"><span>' + (wsT('webshell.dbHost') || '主机') + '</span><input id="webshell-db-host" class="form-control" type="text" value="127.0.0.1" /></label>' +
+        '<label class="webshell-db-common-field"><span>' + (wsT('webshell.dbPort') || '端口') + '</span><input id="webshell-db-port" class="form-control" type="text" /></label>' +
+        '<label class="webshell-db-common-field"><span>' + (wsT('webshell.dbUsername') || '用户名') + '</span><input id="webshell-db-user" class="form-control" type="text" /></label>' +
+        '<label class="webshell-db-common-field"><span>' + (wsT('webshell.dbPassword') || '密码') + '</span><input id="webshell-db-pass" class="form-control" type="password" /></label>' +
+        '<label class="webshell-db-common-field"><span>' + (wsT('webshell.dbName') || '数据库名') + '</span><input id="webshell-db-name" class="form-control" type="text" /></label>' +
+        '<label id="webshell-db-sqlite-row"><span>' + (wsT('webshell.dbSqlitePath') || 'SQLite 文件路径') + '</span><input id="webshell-db-sqlite-path" class="form-control" type="text" value="/tmp/test.db" /></label>' +
+        '</div>' +
+        '</div>' +
+        '<div class="modal-footer"><button type="button" class="btn-secondary" id="webshell-db-profile-cancel-btn">取消</button><button type="button" class="btn-primary" id="webshell-db-profile-save-btn">保存</button></div>' +
+        '</div>' +
+        '</div>' +
+        '</section>' +
         '</div>' +
         '</div>';
 
@@ -557,6 +1642,34 @@ function selectWebshell(id) {
     });
 
     // 清屏由 bindWebshellClearOnce 统一事件委托处理，此处不再绑定，避免重复绑定导致一次点击出现多个 shell>
+    var terminalCopyLogBtn = document.getElementById('webshell-terminal-copy-log');
+    if (terminalCopyLogBtn) {
+        terminalCopyLogBtn.addEventListener('click', function () {
+            if (!webshellCurrentConn || !webshellCurrentConn.id) return;
+            var activeId = getActiveWebshellTerminalSessionId(webshellCurrentConn.id);
+            var log = getWebshellTerminalLog(getWebshellTerminalSessionKey(webshellCurrentConn.id, activeId)) || '';
+            if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(log).then(function () {
+                    terminalCopyLogBtn.title = wsT('webshell.terminalCopyOk') || '日志已复制';
+                    setTimeout(function () {
+                        terminalCopyLogBtn.title = wsT('webshell.copyTerminalLog') || '复制日志';
+                    }, 1200);
+                }).catch(function () {
+                    terminalCopyLogBtn.title = wsT('webshell.terminalCopyFail') || '复制失败';
+                });
+                return;
+            }
+            try {
+                var ta = document.createElement('textarea');
+                ta.value = log;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            } catch (e) {}
+        });
+    }
+    renderWebshellTerminalSessions(conn);
     // 快捷命令：点击后执行并输出到终端
     workspace.querySelectorAll('.webshell-quick-cmd').forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -584,6 +1697,50 @@ function selectWebshell(id) {
     var aiMessages = document.getElementById('webshell-ai-messages');
     var aiNewConvBtn = document.getElementById('webshell-ai-new-conv');
     var aiConvListEl = document.getElementById('webshell-ai-conv-list');
+    var aiMemoInput = document.getElementById('webshell-ai-memo-input');
+    var aiMemoStatus = document.getElementById('webshell-ai-memo-status');
+    var aiMemoClearBtn = document.getElementById('webshell-ai-memo-clear');
+    var aiMemoSaveTimer = null;
+
+    function setWebshellAiMemoStatus(text, isError) {
+        if (!aiMemoStatus) return;
+        aiMemoStatus.textContent = text || '';
+        aiMemoStatus.classList.toggle('error', !!isError);
+    }
+
+    function flushWebshellAiMemo() {
+        if (!aiMemoInput) return;
+        saveWebshellAiMemo(conn, aiMemoInput.value || '');
+        setWebshellAiMemoStatus(wsT('webshell.aiMemoSaved') || '已保存到本地', false);
+    }
+
+    if (aiMemoInput) {
+        aiMemoInput.value = getWebshellAiMemo(conn);
+        setWebshellAiMemoStatus(wsT('webshell.aiMemoSaved') || '已保存到本地', false);
+        aiMemoInput.addEventListener('input', function () {
+            setWebshellAiMemoStatus(wsT('webshell.aiMemoSaving') || '保存中...', false);
+            if (aiMemoSaveTimer) clearTimeout(aiMemoSaveTimer);
+            aiMemoSaveTimer = setTimeout(function () {
+                aiMemoSaveTimer = null;
+                flushWebshellAiMemo();
+            }, 500);
+        });
+        aiMemoInput.addEventListener('blur', function () {
+            if (aiMemoSaveTimer) {
+                clearTimeout(aiMemoSaveTimer);
+                aiMemoSaveTimer = null;
+            }
+            flushWebshellAiMemo();
+        });
+    }
+
+    if (aiMemoClearBtn && aiMemoInput) {
+        aiMemoClearBtn.addEventListener('click', function () {
+            aiMemoInput.value = '';
+            flushWebshellAiMemo();
+            aiMemoInput.focus();
+        });
+    }
 
     if (aiNewConvBtn) {
         aiNewConvBtn.addEventListener('click', function () {
@@ -618,6 +1775,500 @@ function selectWebshell(id) {
         });
     }
 
+    // 数据库管理：支持多连接工作区（不同数据库类型并存）+ 刷新持久化
+    var dbTypeEl = document.getElementById('webshell-db-type');
+    var dbRunBtn = document.getElementById('webshell-db-run-btn');
+    var dbTestBtn = document.getElementById('webshell-db-test-btn');
+    var dbSqlEl = document.getElementById('webshell-db-sql');
+    var dbLoadSchemaBtn = document.getElementById('webshell-db-load-schema-btn');
+    var dbTemplateBtn = document.getElementById('webshell-db-template-btn');
+    var dbClearBtn = document.getElementById('webshell-db-clear-btn');
+    var dbSchemaTreeEl = document.getElementById('webshell-db-schema-tree');
+    var dbProfilesEl = document.getElementById('webshell-db-profiles');
+    var dbAddProfileBtn = document.getElementById('webshell-db-add-profile-btn');
+    var dbProfileModalEl = document.getElementById('webshell-db-profile-modal');
+    var dbProfileModalTitleEl = document.getElementById('webshell-db-profile-modal-title');
+    var dbProfileModalCloseBtn = document.getElementById('webshell-db-profile-modal-close');
+    var dbProfileModalCancelBtn = document.getElementById('webshell-db-profile-cancel-btn');
+    var dbProfileModalSaveBtn = document.getElementById('webshell-db-profile-save-btn');
+    var dbProfileNameEl = document.getElementById('webshell-db-profile-name');
+    var dbHostEl = document.getElementById('webshell-db-host');
+    var dbPortEl = document.getElementById('webshell-db-port');
+    var dbUserEl = document.getElementById('webshell-db-user');
+    var dbPassEl = document.getElementById('webshell-db-pass');
+    var dbNameEl = document.getElementById('webshell-db-name');
+    var dbSqliteEl = document.getElementById('webshell-db-sqlite-path');
+    var dbColumnsLoading = {};
+    var dbColumnsBatchLoading = {};
+    var dbColumnsBatchLoaded = {};
+
+    function resetDbColumnLoadCache() {
+        dbColumnsLoading = {};
+        dbColumnsBatchLoading = {};
+        dbColumnsBatchLoaded = {};
+    }
+
+    function setDbActionButtonsDisabled(disabled) {
+        if (dbRunBtn) dbRunBtn.disabled = disabled;
+        if (dbTestBtn) dbTestBtn.disabled = disabled;
+        if (dbLoadSchemaBtn) dbLoadSchemaBtn.disabled = disabled;
+        if (dbAddProfileBtn) dbAddProfileBtn.disabled = disabled;
+    }
+
+    function setDbProfileModalVisible(visible, mode) {
+        if (!dbProfileModalEl) return;
+        dbProfileModalEl.style.display = visible ? 'block' : 'none';
+        if (dbProfileModalTitleEl) {
+            if (mode === 'add') dbProfileModalTitleEl.textContent = wsT('webshell.dbAddProfile') || '新增连接';
+            else dbProfileModalTitleEl.textContent = wsT('webshell.editConnectionTitle') || '编辑连接';
+        }
+    }
+
+    function applyActiveDbProfileToForm() {
+        var dbCfg = getWebshellDbConfig(conn);
+        if (!dbCfg) return;
+        if (dbProfileNameEl) dbProfileNameEl.value = dbCfg.name || 'DB-1';
+        if (dbTypeEl) dbTypeEl.value = dbCfg.type || 'mysql';
+        if (dbHostEl) dbHostEl.value = dbCfg.host || '127.0.0.1';
+        if (dbPortEl) dbPortEl.value = dbCfg.port || '';
+        if (dbUserEl) dbUserEl.value = dbCfg.username || '';
+        if (dbPassEl) dbPassEl.value = dbCfg.password || '';
+        if (dbNameEl) dbNameEl.value = dbCfg.database || dbCfg.selectedDatabase || '';
+        if (dbSqliteEl) dbSqliteEl.value = dbCfg.sqlitePath || '/tmp/test.db';
+        if (dbSqlEl) dbSqlEl.value = dbCfg.sql || 'SELECT 1;';
+        webshellDbUpdateFieldVisibility();
+        webshellDbSetOutput(dbCfg.output || '', !!dbCfg.outputIsError);
+        webshellDbRenderTable(dbCfg.output || '');
+    }
+
+    function renderDbProfileTabs() {
+        if (!dbProfilesEl) return;
+        var state = getWebshellDbState(conn);
+        var html = '';
+        state.profiles.forEach(function (p) {
+            var active = p.id === state.activeProfileId;
+            html += '<div class="webshell-db-profile-tab' + (active ? ' active' : '') + '" data-id="' + escapeHtml(p.id) + '">' +
+                '<button type="button" class="webshell-db-profile-main" data-action="switch" data-id="' + escapeHtml(p.id) + '">' + escapeHtml(p.name || 'DB') + '</button>' +
+                '<button type="button" class="webshell-db-profile-menu" data-action="edit" data-id="' + escapeHtml(p.id) + '" title="' + escapeHtml(wsT('webshell.editConnection') || '编辑') + '">⚙</button>' +
+                '<button type="button" class="webshell-db-profile-menu" data-action="delete" data-id="' + escapeHtml(p.id) + '" title="' + escapeHtml(wsT('webshell.dbDeleteProfile') || '删除连接') + '">×</button>' +
+                '</div>';
+        });
+        dbProfilesEl.innerHTML = html;
+        dbProfilesEl.querySelectorAll('[data-action]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var action = btn.getAttribute('data-action');
+                var id = btn.getAttribute('data-id') || '';
+                if (!id) return;
+                var state = getWebshellDbState(conn);
+                var idx = state.profiles.findIndex(function (p) { return p.id === id; });
+                if (idx < 0) return;
+                if (action === 'switch') {
+                    state.activeProfileId = id;
+                    saveWebshellDbState(conn, state);
+                    applyActiveDbProfileToForm();
+                    renderDbProfileTabs();
+                    resetDbColumnLoadCache();
+                    renderDbSchemaTree();
+                    return;
+                }
+                if (action === 'edit') {
+                    state.activeProfileId = id;
+                    saveWebshellDbState(conn, state);
+                    applyActiveDbProfileToForm();
+                    renderDbProfileTabs();
+                    setDbProfileModalVisible(true, 'edit');
+                    return;
+                }
+                if (action === 'delete') {
+                    if (state.profiles.length <= 1) return;
+                    if (!confirm(wsT('webshell.dbDeleteProfileConfirm') || '确定删除该数据库连接配置吗？')) return;
+                    state.profiles.splice(idx, 1);
+                    if (!state.profiles.some(function (p) { return p.id === state.activeProfileId; })) {
+                        state.activeProfileId = state.profiles[0].id;
+                    }
+                    saveWebshellDbState(conn, state);
+                    applyActiveDbProfileToForm();
+                    renderDbProfileTabs();
+                    resetDbColumnLoadCache();
+                    renderDbSchemaTree();
+                }
+            });
+        });
+    }
+
+    function renderDbSchemaTree() {
+        if (!dbSchemaTreeEl) return;
+        var cfg = getWebshellDbConfig(conn);
+        var schema = normalizeWebshellDbSchema((cfg && cfg.schema && typeof cfg.schema === 'object') ? cfg.schema : {});
+        var dbs = Object.keys(schema).sort(function (a, b) { return a.localeCompare(b); });
+        var openTableKeys = {};
+        dbSchemaTreeEl.querySelectorAll('.webshell-db-table-node[open]').forEach(function (node) {
+            var openDb = node.getAttribute('data-db') || '';
+            var openTable = node.getAttribute('data-table') || '';
+            if (!openDb || !openTable) return;
+            openTableKeys[openDb + '::' + openTable] = true;
+        });
+        if (!dbs.length) {
+            dbSchemaTreeEl.innerHTML = '<div class="webshell-empty">' + escapeHtml(wsT('webshell.dbNoSchema') || '暂无数据库结构，请先加载') + '</div>';
+            return;
+        }
+        var selectedDb = (cfg.selectedDatabase || '').trim();
+        var html = '';
+        dbs.forEach(function (dbName) {
+            var tables = (schema[dbName] && schema[dbName].tables) ? schema[dbName].tables : {};
+            var tableNames = Object.keys(tables).sort(function (a, b) { return a.localeCompare(b); });
+            var isActive = selectedDb && selectedDb === dbName;
+            html += '<details class="webshell-db-group"' + (isActive ? ' open' : '') + '>';
+            html += '<summary class="webshell-db-group-title" data-db="' + escapeHtml(dbName) + '" title="' + escapeHtml(dbName) + '"><span class="webshell-db-icon">🗄</span><span class="webshell-db-label">' + escapeHtml(dbName) + '</span><span class="webshell-db-count">' + tableNames.length + '</span></summary>';
+            html += '<div class="webshell-db-group-items">';
+            tableNames.forEach(function (tableName) {
+                var columns = Array.isArray(tables[tableName]) ? tables[tableName] : [];
+                var columnCountText = columns.length > 0 ? String(columns.length) : '-';
+                var tableKey = dbName + '::' + tableName;
+                var tableOpen = !!openTableKeys[tableKey];
+                html += '<details class="webshell-db-table-node" data-db="' + escapeHtml(dbName) + '" data-table="' + escapeHtml(tableName) + '" data-columns-loaded="' + (columns.length ? '1' : '0') + '"' + (tableOpen ? ' open' : '') + '>';
+                html += '<summary class="webshell-db-table-item" data-db="' + escapeHtml(dbName) + '" data-table="' + escapeHtml(tableName) + '" title="' + escapeHtml(tableName) + '"><span class="webshell-db-icon">📄</span><span class="webshell-db-label">' + escapeHtml(tableName) + '</span><span class="webshell-db-count">' + escapeHtml(columnCountText) + '</span></summary>';
+                if (columns.length) {
+                    html += '<div class="webshell-db-column-list">';
+                    columns.forEach(function (columnName) {
+                        html += '<button type="button" class="webshell-db-column-item" data-db="' + escapeHtml(dbName) + '" data-table="' + escapeHtml(tableName) + '" data-column="' + escapeHtml(columnName) + '" title="' + escapeHtml(columnName) + '"><span class="webshell-db-icon">🧱</span><span class="webshell-db-label">' + escapeHtml(columnName) + '</span></button>';
+                    });
+                    html += '</div>';
+                } else {
+                    html += '<div class="webshell-db-column-empty">' + escapeHtml(wsT('webshell.dbNoColumns') || '暂无列信息') + '</div>';
+                }
+                html += '</details>';
+            });
+            html += '</div></details>';
+        });
+        dbSchemaTreeEl.innerHTML = html;
+
+        dbSchemaTreeEl.querySelectorAll('.webshell-db-group-title').forEach(function (el) {
+            el.addEventListener('click', function () {
+                var cfg = webshellDbCollectConfig(conn);
+                cfg.selectedDatabase = el.getAttribute('data-db') || '';
+                saveWebshellDbConfig(conn, cfg);
+                if (dbNameEl && cfg.type !== 'sqlite') dbNameEl.value = cfg.selectedDatabase;
+                ensureDbDatabaseColumns(cfg.selectedDatabase);
+            });
+        });
+        dbSchemaTreeEl.querySelectorAll('.webshell-db-table-item').forEach(function (el) {
+            el.addEventListener('click', function () {
+                var table = el.getAttribute('data-table') || '';
+                var dbName = el.getAttribute('data-db') || '';
+                if (!table) return;
+                var cfg = webshellDbCollectConfig(conn);
+                cfg.selectedDatabase = dbName;
+                if (cfg.type !== 'sqlite') cfg.database = dbName;
+                saveWebshellDbConfig(conn, cfg);
+                if (dbNameEl && cfg.type !== 'sqlite') dbNameEl.value = dbName;
+                var tableRef = cfg.type === 'sqlite'
+                    ? webshellDbQuoteIdentifier(cfg.type, table)
+                    : webshellDbQuoteIdentifier(cfg.type, dbName) + '.' + webshellDbQuoteIdentifier(cfg.type, table);
+                if (dbSqlEl) {
+                    dbSqlEl.value = 'SELECT * FROM ' + tableRef + ' ORDER BY 1 DESC LIMIT 20;';
+                    webshellDbCollectConfig(conn);
+                }
+                ensureDbTableColumns(dbName, table);
+            });
+        });
+        dbSchemaTreeEl.querySelectorAll('.webshell-db-table-node').forEach(function (node) {
+            node.addEventListener('toggle', function () {
+                if (!node.open) return;
+                var dbName = node.getAttribute('data-db') || '';
+                var table = node.getAttribute('data-table') || '';
+                if (!dbName || !table) return;
+                ensureDbTableColumns(dbName, table);
+            });
+        });
+        dbSchemaTreeEl.querySelectorAll('.webshell-db-column-item').forEach(function (el) {
+            el.addEventListener('click', function (evt) {
+                evt.preventDefault();
+                evt.stopPropagation();
+                var table = el.getAttribute('data-table') || '';
+                var column = el.getAttribute('data-column') || '';
+                var dbName = el.getAttribute('data-db') || '';
+                if (!table || !column) return;
+                var cfg = webshellDbCollectConfig(conn);
+                cfg.selectedDatabase = dbName;
+                if (cfg.type !== 'sqlite') cfg.database = dbName;
+                saveWebshellDbConfig(conn, cfg);
+                if (dbNameEl && cfg.type !== 'sqlite') dbNameEl.value = dbName;
+                var tableRef = cfg.type === 'sqlite'
+                    ? webshellDbQuoteIdentifier(cfg.type, table)
+                    : webshellDbQuoteIdentifier(cfg.type, dbName) + '.' + webshellDbQuoteIdentifier(cfg.type, table);
+                if (dbSqlEl) {
+                    dbSqlEl.value = 'SELECT ' + webshellDbQuoteIdentifier(cfg.type, column) + ' FROM ' + tableRef + ' LIMIT 20;';
+                    webshellDbCollectConfig(conn);
+                }
+            });
+        });
+        var autoDb = selectedDb || dbs[0] || '';
+        if (autoDb) ensureDbDatabaseColumns(autoDb);
+    }
+
+    function ensureDbTableColumns(dbName, tableName) {
+        if (!dbName || !tableName || webshellRunning) return;
+        var loadKey = (conn && conn.id ? conn.id : 'local') + '::' + dbName + '::' + tableName;
+        if (dbColumnsLoading[loadKey]) return;
+        webshellDbCollectConfig(conn);
+        var cfg = getWebshellDbConfig(conn);
+        var schema = normalizeWebshellDbSchema((cfg && cfg.schema && typeof cfg.schema === 'object') ? cfg.schema : {});
+        if (!schema[dbName]) return;
+        if (!schema[dbName].tables[tableName]) return;
+        if (Array.isArray(schema[dbName].tables[tableName]) && schema[dbName].tables[tableName].length > 0) return;
+
+        var built = buildWebshellDbColumnsCommand(cfg, dbName, tableName);
+        if (!built.command) return;
+        dbColumnsLoading[loadKey] = true;
+        webshellRunning = true;
+        setDbActionButtonsDisabled(true);
+        execWebshellCommand(conn, built.command).then(function (out) {
+            var parsed = parseWebshellDbExecOutput(out);
+            var success = parsed.rc === 0 || (parsed.rc == null && parsed.output && !/error|failed|denied|unknown|not found|access/i.test(parsed.output));
+            if (!success) return;
+            var columns = parseWebshellDbColumns(parsed.output);
+            if (!columns.length) return;
+            var nextCfg = getWebshellDbConfig(conn);
+            var nextSchema = normalizeWebshellDbSchema((nextCfg && nextCfg.schema && typeof nextCfg.schema === 'object') ? nextCfg.schema : {});
+            if (!nextSchema[dbName]) nextSchema[dbName] = { tables: {} };
+            if (!nextSchema[dbName].tables[tableName]) nextSchema[dbName].tables[tableName] = [];
+            nextSchema[dbName].tables[tableName] = columns;
+            nextCfg.schema = nextSchema;
+            saveWebshellDbConfig(conn, nextCfg);
+            renderDbSchemaTree();
+        }).catch(function () {
+            // ignore single-table column load errors to avoid interrupting main flow
+        }).finally(function () {
+            delete dbColumnsLoading[loadKey];
+            webshellRunning = false;
+            setDbActionButtonsDisabled(false);
+        });
+    }
+
+    function ensureDbDatabaseColumns(dbName) {
+        if (!dbName || webshellRunning) return;
+        webshellDbCollectConfig(conn);
+        var cfg = getWebshellDbConfig(conn);
+        var schema = normalizeWebshellDbSchema((cfg && cfg.schema && typeof cfg.schema === 'object') ? cfg.schema : {});
+        if (!schema[dbName] || !schema[dbName].tables) return;
+        var hasUnknown = Object.keys(schema[dbName].tables).some(function (tableName) {
+            var cols = schema[dbName].tables[tableName];
+            return !Array.isArray(cols) || cols.length === 0;
+        });
+        if (!hasUnknown) return;
+
+        var batchKey = (conn && conn.id ? conn.id : 'local') + '::' + (cfg.type || 'mysql') + '::' + dbName;
+        if (dbColumnsBatchLoading[batchKey] || dbColumnsBatchLoaded[batchKey]) return;
+        var built = buildWebshellDbColumnsByDatabaseCommand(cfg, dbName);
+        if (!built.command) return;
+
+        dbColumnsBatchLoading[batchKey] = true;
+        webshellRunning = true;
+        setDbActionButtonsDisabled(true);
+        execWebshellCommand(conn, built.command).then(function (out) {
+            var parsed = parseWebshellDbExecOutput(out);
+            var success = parsed.rc === 0 || (parsed.rc == null && parsed.output && !/error|failed|denied|unknown|not found|access/i.test(parsed.output));
+            if (!success) return;
+            var tableColumns = parseWebshellDbTableColumns(parsed.output);
+            if (!Object.keys(tableColumns).length) return;
+
+            var nextCfg = getWebshellDbConfig(conn);
+            var nextSchema = normalizeWebshellDbSchema((nextCfg && nextCfg.schema && typeof nextCfg.schema === 'object') ? nextCfg.schema : {});
+            if (!nextSchema[dbName]) nextSchema[dbName] = { tables: {} };
+            Object.keys(tableColumns).forEach(function (tableName) {
+                nextSchema[dbName].tables[tableName] = tableColumns[tableName];
+            });
+            nextCfg.schema = nextSchema;
+            saveWebshellDbConfig(conn, nextCfg);
+            renderDbSchemaTree();
+        }).catch(function () {
+            // ignore batch column load errors to avoid interrupting main flow
+        }).finally(function () {
+            delete dbColumnsBatchLoading[batchKey];
+            dbColumnsBatchLoaded[batchKey] = true;
+            webshellRunning = false;
+            setDbActionButtonsDisabled(false);
+        });
+    }
+
+    function loadDbSchema() {
+        if (!conn || !conn.id) {
+            webshellDbSetOutput(wsT('webshell.dbNoConn') || '请先选择 WebShell 连接', true);
+            return;
+        }
+        if (webshellRunning) {
+            webshellDbSetOutput(wsT('webshell.dbRunning') || '数据库命令执行中，请稍候', true);
+            return;
+        }
+        var cfg = webshellDbCollectConfig(conn);
+        resetDbColumnLoadCache();
+        var built = buildWebshellDbSchemaCommand(cfg);
+        if (!built.command) {
+            webshellDbSetOutput(built.error || (wsT('webshell.dbSchemaFailed') || '加载数据库结构失败'), true);
+            return;
+        }
+        webshellDbSetOutput(wsT('webshell.running') || '执行中…', false);
+        webshellRunning = true;
+        setDbActionButtonsDisabled(true);
+        execWebshellCommand(conn, built.command).then(function (out) {
+            var parsed = parseWebshellDbExecOutput(out);
+            var success = parsed.rc === 0 || (parsed.rc == null && parsed.output && !/error|failed|denied|unknown|not found|access/i.test(parsed.output));
+            if (!success) {
+                webshellDbSetOutput((wsT('webshell.dbSchemaFailed') || '加载数据库结构失败') + ':\n' + (parsed.output || ''), true);
+                return;
+            }
+            cfg.schema = parseWebshellDbSchema(parsed.output);
+            cfg.output = wsT('webshell.dbSchemaLoaded') || '结构加载完成';
+            cfg.outputIsError = false;
+            saveWebshellDbConfig(conn, cfg);
+            renderDbSchemaTree();
+            webshellDbSetOutput(wsT('webshell.dbSchemaLoaded') || '结构加载完成', false);
+        }).catch(function (err) {
+            webshellDbSetOutput((wsT('webshell.dbSchemaFailed') || '加载数据库结构失败') + ': ' + (err && err.message ? err.message : String(err)), true);
+        }).finally(function () {
+            webshellRunning = false;
+            setDbActionButtonsDisabled(false);
+        });
+    }
+
+    function runDbQuery(isTestOnly) {
+        if (!conn || !conn.id) {
+            webshellDbSetOutput(wsT('webshell.dbNoConn') || '请先选择 WebShell 连接', true);
+            return;
+        }
+        if (webshellRunning) {
+            webshellDbSetOutput(wsT('webshell.dbRunning') || '数据库命令执行中，请稍候', true);
+            return;
+        }
+        var cfg = webshellDbCollectConfig(conn);
+        var built = buildWebshellDbCommand(cfg, !!isTestOnly);
+        if (!built.command) {
+            webshellDbSetOutput(built.error || (wsT('webshell.dbExecFailed') || '数据库执行失败'), true);
+            return;
+        }
+        webshellDbSetOutput(wsT('webshell.running') || '执行中…', false);
+        webshellRunning = true;
+        setDbActionButtonsDisabled(true);
+        execWebshellCommand(conn, built.command).then(function (out) {
+            var parsed = parseWebshellDbExecOutput(out);
+            var code = parsed.rc;
+            var content = parsed.output || '';
+            var success = (code === 0) || (code == null && content && !/error|failed|denied|unknown|not found|access/i.test(content));
+            if (isTestOnly) {
+                if (success) {
+                    cfg.output = '连接测试通过';
+                    cfg.outputIsError = false;
+                    saveWebshellDbConfig(conn, cfg);
+                    webshellDbSetOutput(cfg.output, false);
+                } else {
+                    cfg.output = '连接测试失败' + (content ? (':\n' + content) : '');
+                    cfg.outputIsError = true;
+                    saveWebshellDbConfig(conn, cfg);
+                    webshellDbSetOutput(cfg.output, true);
+                }
+                return;
+            }
+            if (!success) {
+                cfg.output = (wsT('webshell.dbExecFailed') || '数据库执行失败') + (content ? (':\n' + content) : '');
+                cfg.outputIsError = true;
+                saveWebshellDbConfig(conn, cfg);
+                webshellDbSetOutput(cfg.output, true);
+                return;
+            }
+            var hasTable = webshellDbRenderTable(content);
+            if (hasTable) {
+                cfg.output = wsT('webshell.dbExecSuccess') || 'SQL 执行成功';
+                cfg.outputIsError = false;
+                saveWebshellDbConfig(conn, cfg);
+                webshellDbSetOutput(cfg.output, false);
+            } else {
+                cfg.output = content || (wsT('webshell.dbNoOutput') || '执行完成（无输出）');
+                cfg.outputIsError = false;
+                saveWebshellDbConfig(conn, cfg);
+                webshellDbSetOutput(cfg.output, false);
+            }
+        }).catch(function (err) {
+            cfg.output = (wsT('webshell.dbExecFailed') || '数据库执行失败') + ': ' + (err && err.message ? err.message : String(err));
+            cfg.outputIsError = true;
+            saveWebshellDbConfig(conn, cfg);
+            webshellDbSetOutput(cfg.output, true);
+        }).finally(function () {
+            webshellRunning = false;
+            setDbActionButtonsDisabled(false);
+        });
+    }
+
+    if (dbTypeEl) dbTypeEl.addEventListener('change', function () {
+        webshellDbUpdateFieldVisibility();
+        var cfg = webshellDbCollectConfig(conn);
+        cfg.selectedDatabase = '';
+        cfg.schema = {};
+        saveWebshellDbConfig(conn, cfg);
+        resetDbColumnLoadCache();
+        renderDbSchemaTree();
+    });
+    ['webshell-db-profile-name', 'webshell-db-host', 'webshell-db-port', 'webshell-db-user', 'webshell-db-pass', 'webshell-db-name', 'webshell-db-sqlite-path'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('change', function () {
+            webshellDbCollectConfig(conn);
+            resetDbColumnLoadCache();
+            renderDbProfileTabs();
+        });
+    });
+    if (dbSqlEl) dbSqlEl.addEventListener('change', function () { webshellDbCollectConfig(conn); });
+    if (dbRunBtn) dbRunBtn.addEventListener('click', function () { runDbQuery(false); });
+    if (dbTestBtn) dbTestBtn.addEventListener('click', function () { runDbQuery(true); });
+    if (dbLoadSchemaBtn) dbLoadSchemaBtn.addEventListener('click', function () { loadDbSchema(); });
+    if (dbTemplateBtn) dbTemplateBtn.addEventListener('click', function () {
+        if (!dbSqlEl) return;
+        var cfg = webshellDbCollectConfig(conn);
+        if (cfg.type === 'mysql') dbSqlEl.value = 'SHOW DATABASES;\nSELECT DATABASE() AS current_db;';
+        else if (cfg.type === 'pgsql') dbSqlEl.value = 'SELECT current_database();\nSELECT schema_name FROM information_schema.schemata ORDER BY schema_name;';
+        else if (cfg.type === 'sqlite') dbSqlEl.value = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;";
+        else dbSqlEl.value = "SELECT name FROM sys.databases ORDER BY name;\nSELECT DB_NAME() AS current_db;";
+        webshellDbCollectConfig(conn);
+    });
+    if (dbClearBtn) dbClearBtn.addEventListener('click', function () {
+        if (dbSqlEl) dbSqlEl.value = '';
+        webshellDbCollectConfig(conn);
+    });
+    if (dbProfileModalCloseBtn) dbProfileModalCloseBtn.addEventListener('click', function () {
+        setDbProfileModalVisible(false);
+    });
+    if (dbProfileModalCancelBtn) dbProfileModalCancelBtn.addEventListener('click', function () {
+        applyActiveDbProfileToForm();
+        setDbProfileModalVisible(false);
+    });
+    if (dbProfileModalSaveBtn) dbProfileModalSaveBtn.addEventListener('click', function () {
+        webshellDbCollectConfig(conn);
+        renderDbProfileTabs();
+        resetDbColumnLoadCache();
+        setDbProfileModalVisible(false);
+    });
+    if (dbProfileModalEl) dbProfileModalEl.addEventListener('click', function (evt) {
+        if (evt.target === dbProfileModalEl) {
+            applyActiveDbProfileToForm();
+            setDbProfileModalVisible(false);
+        }
+    });
+    if (dbAddProfileBtn) dbAddProfileBtn.addEventListener('click', function () {
+        var state = getWebshellDbState(conn);
+        var name = 'DB-' + (state.profiles.length + 1);
+        var p = newWebshellDbProfile(name);
+        state.profiles.push(p);
+        state.activeProfileId = p.id;
+        saveWebshellDbState(conn, state);
+        applyActiveDbProfileToForm();
+        renderDbProfileTabs();
+        renderDbSchemaTree();
+        setDbProfileModalVisible(true, 'add');
+    });
+    renderDbProfileTabs();
+    applyActiveDbProfileToForm();
+    renderDbSchemaTree();
+    setDbProfileModalVisible(false);
+
     initWebshellTerminal(conn);
 }
 
@@ -639,7 +2290,9 @@ function loadWebshellAiHistory(conn, messagesContainer) {
                 if (role === 'user') {
                     div.textContent = content;
                 } else {
-                    if (typeof formatMarkdown === 'function') {
+                    if (isLikelyWebshellAiErrorMessage(content, msg)) {
+                        renderWebshellAiErrorMessage(div, content);
+                    } else if (typeof formatMarkdown === 'function') {
                         div.innerHTML = formatMarkdown(content);
                     } else {
                         div.textContent = content;
@@ -709,7 +2362,14 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
         // 工具调用入参
         if (type === 'tool_call' && data) {
             try {
-                var args = data.argumentsObj || (data.arguments ? JSON.parse(data.arguments) : null);
+                var args = data.argumentsObj;
+                if (args == null && data.arguments != null && String(data.arguments).trim() !== '') {
+                    try {
+                        args = JSON.parse(String(data.arguments));
+                    } catch (e1) {
+                        args = { _raw: String(data.arguments) };
+                    }
+                }
                 if (args && typeof args === 'object') {
                     var paramsLabel = (typeof window.t === 'function') ? window.t('timeline.params') : '参数:';
                     html += '<div class="webshell-ai-timeline-msg"><div class="tool-arg-section"><strong>' +
@@ -721,6 +2381,8 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
             } catch (e) {
                 // JSON 解析失败时忽略参数详情，避免打断主流程
             }
+        } else if (type === 'eino_agent_reply' && message) {
+            html += '<div class="webshell-ai-timeline-msg"><pre style="white-space:pre-wrap;">' + escapeHtml(message) + '</pre></div>';
         } else if (type === 'tool_result' && data) {
             // 工具调用出参
             var isError = data.isError || data.success === false;
@@ -748,7 +2410,10 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
         timelineContainer.appendChild(item);
         timelineContainer.classList.add('has-items');
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        return item;
     }
+
+    var einoSubReplyStreams = new Map();
 
     if (inputEl) inputEl.value = '';
 
@@ -763,13 +2428,15 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
     var streamingTarget = '';  // 当前要打字显示的目标全文（用于打字机效果）
     var streamingTypingId = 0;  // 防重入，每次新 response 自增
 
-    apiFetch('/api/agent-loop/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+    resolveWebshellAiStreamPath().then(function (streamPath) {
+        return apiFetch(streamPath, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
     }).then(function (response) {
         if (!response.ok) {
-            assistantDiv.textContent = '请求失败: ' + response.status;
+            renderWebshellAiErrorMessage(assistantDiv, '请求失败: HTTP ' + response.status);
             return;
         }
         return response.body.getReader();
@@ -797,10 +2464,25 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                                 el.classList.toggle('active', el.dataset.convId === convId);
                             });
                         });
+                    } else if (eventData.type === 'response_start') {
+                        streamingTarget = '';
+                        webshellStreamingTypingId += 1;
+                        streamingTypingId = webshellStreamingTypingId;
+                        assistantDiv.textContent = '…';
+                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    } else if (eventData.type === 'response_delta') {
+                        var deltaText = (eventData.message != null && eventData.message !== '') ? String(eventData.message) : '';
+                        if (deltaText) {
+                            streamingTarget += deltaText;
+                            webshellStreamingTypingId += 1;
+                            streamingTypingId = webshellStreamingTypingId;
+                            runWebshellAiStreamingTyping(assistantDiv, streamingTarget, streamingTypingId, messagesContainer);
+                        }
                     } else if (eventData.type === 'response') {
                         var text = (eventData.message != null && eventData.message !== '') ? eventData.message : (eventData.data && typeof eventData.data === 'string' ? eventData.data : '');
                         if (text) {
-                            streamingTarget += text;
+                            // response 为最终完整内容：避免与增量重复拼接
+                            streamingTarget = String(text);
                             webshellStreamingTypingId += 1;
                             streamingTypingId = webshellStreamingTypingId;
                             runWebshellAiStreamingTyping(assistantDiv, streamingTarget, streamingTypingId, messagesContainer);
@@ -809,7 +2491,7 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                         streamingTypingId += 1;
                         var errLabel = (typeof window.t === 'function') ? window.t('chat.error') : '错误';
                         appendTimelineItem('error', '❌ ' + errLabel, eventData.message, eventData.data);
-                        assistantDiv.textContent = errLabel + ': ' + eventData.message;
+                        renderWebshellAiErrorMessage(assistantDiv, errLabel + ': ' + eventData.message);
                     } else if (eventData.type === 'progress' && eventData.message) {
                         var progressMsg = (typeof window.translateProgressMessage === 'function')
                             ? window.translateProgressMessage(eventData.message)
@@ -829,14 +2511,15 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                         if (!streamingTarget) assistantDiv.textContent = '…';
                     } else if (eventData.type === 'thinking' && eventData.message) {
                         var thinkLabel = (typeof window.t === 'function') ? window.t('chat.aiThinking') : 'AI 思考';
-                        appendTimelineItem('thinking', '🤔 ' + thinkLabel, eventData.message, eventData.data);
+                        var thinkD = eventData.data || {};
+                        appendTimelineItem('thinking', webshellAgentPx(thinkD) + '🤔 ' + thinkLabel, eventData.message, thinkD);
                         if (!streamingTarget) assistantDiv.textContent = '…';
                     } else if (eventData.type === 'tool_calls_detected' && eventData.data) {
                         var count = eventData.data.count || 0;
                         var detectedLabel = (typeof window.t === 'function')
                             ? window.t('chat.toolCallsDetected', { count: count })
                             : ('检测到 ' + count + ' 个工具调用');
-                        appendTimelineItem('tool_calls_detected', '🔧 ' + detectedLabel, eventData.message || '', eventData.data);
+                        appendTimelineItem('tool_calls_detected', webshellAgentPx(eventData.data) + '🔧 ' + detectedLabel, eventData.message || '', eventData.data);
                         if (!streamingTarget) assistantDiv.textContent = '…';
                     } else if (eventData.type === 'tool_call' && eventData.data) {
                         var d = eventData.data;
@@ -846,7 +2529,7 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                         var callTitle = (typeof window.t === 'function')
                             ? window.t('chat.callTool', { name: tn, index: idx, total: total })
                             : ('调用: ' + tn + (total ? ' (' + idx + '/' + total + ')' : ''));
-                        var title = '🔧 ' + callTitle;
+                        var title = webshellAgentPx(d) + '🔧 ' + callTitle;
                         appendTimelineItem('tool_call', title, eventData.message || '', eventData.data);
                         if (!streamingTarget) assistantDiv.textContent = '…';
                     } else if (eventData.type === 'tool_result' && eventData.data) {
@@ -856,9 +2539,58 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                         var titleText = (typeof window.t === 'function')
                             ? (success ? window.t('chat.toolExecComplete', { name: tname }) : window.t('chat.toolExecFailed', { name: tname }))
                             : (tname + (success ? ' 执行完成' : ' 执行失败'));
-                        var title = (success ? '✅ ' : '❌ ') + titleText;
+                        var title = webshellAgentPx(dr) + (success ? '✅ ' : '❌ ') + titleText;
                         var sub = eventData.message || (dr.result ? String(dr.result).slice(0, 300) : '');
                         appendTimelineItem('tool_result', title, sub, eventData.data);
+                        if (!streamingTarget) assistantDiv.textContent = '…';
+                    } else if (eventData.type === 'eino_agent_reply_stream_start' && eventData.data && eventData.data.streamId) {
+                        var rdS = eventData.data;
+                        var repTS = (typeof window.t === 'function') ? window.t('chat.einoAgentReplyTitle') : '子代理回复';
+                        var runTS = (typeof window.t === 'function') ? window.t('timeline.running') : '执行中...';
+                        var itemS = document.createElement('div');
+                        itemS.className = 'webshell-ai-timeline-item webshell-ai-timeline-eino_agent_reply';
+                        itemS.innerHTML = '<span class="webshell-ai-timeline-title">' + escapeHtml(webshellAgentPx(rdS) + '💬 ' + repTS + ' · ' + runTS) + '</span>';
+                        timelineContainer.appendChild(itemS);
+                        timelineContainer.classList.add('has-items');
+                        einoSubReplyStreams.set(rdS.streamId, { el: itemS, buf: '' });
+                        if (!streamingTarget) assistantDiv.textContent = '…';
+                    } else if (eventData.type === 'eino_agent_reply_stream_delta' && eventData.data && eventData.data.streamId) {
+                        var stD = einoSubReplyStreams.get(eventData.data.streamId);
+                        if (stD) {
+                            stD.buf += (eventData.message || '');
+                            var preD = stD.el.querySelector('.webshell-eino-reply-stream-body');
+                            if (!preD) {
+                                preD = document.createElement('pre');
+                                preD.className = 'webshell-ai-timeline-msg webshell-eino-reply-stream-body';
+                                preD.style.whiteSpace = 'pre-wrap';
+                                stD.el.appendChild(preD);
+                            }
+                            preD.textContent = stD.buf;
+                        }
+                        if (!streamingTarget) assistantDiv.textContent = '…';
+                    } else if (eventData.type === 'eino_agent_reply_stream_end' && eventData.data && eventData.data.streamId) {
+                        var stE = einoSubReplyStreams.get(eventData.data.streamId);
+                        if (stE) {
+                            var fullE = (eventData.message != null && eventData.message !== '') ? String(eventData.message) : stE.buf;
+                            stE.buf = fullE;
+                            var repTE = (typeof window.t === 'function') ? window.t('chat.einoAgentReplyTitle') : '子代理回复';
+                            var titE = stE.el.querySelector('.webshell-ai-timeline-title');
+                            if (titE) titE.textContent = webshellAgentPx(eventData.data) + '💬 ' + repTE;
+                            var preE = stE.el.querySelector('.webshell-eino-reply-stream-body');
+                            if (!preE) {
+                                preE = document.createElement('pre');
+                                preE.className = 'webshell-ai-timeline-msg webshell-eino-reply-stream-body';
+                                preE.style.whiteSpace = 'pre-wrap';
+                                stE.el.appendChild(preE);
+                            }
+                            preE.textContent = fullE;
+                            einoSubReplyStreams.delete(eventData.data.streamId);
+                        }
+                        if (!streamingTarget) assistantDiv.textContent = '…';
+                    } else if (eventData.type === 'eino_agent_reply' && eventData.message) {
+                        var rd = eventData.data || {};
+                        var replyT = (typeof window.t === 'function') ? window.t('chat.einoAgentReplyTitle') : '子代理回复';
+                        appendTimelineItem('eino_agent_reply', webshellAgentPx(rd) + '💬 ' + replyT, eventData.message, rd);
                         if (!streamingTarget) assistantDiv.textContent = '…';
                     }
                 } catch (e) { /* ignore parse error */ }
@@ -867,7 +2599,7 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
             return reader.read().then(processChunk);
         });
     }).catch(function (err) {
-        assistantDiv.textContent = '请求异常: ' + (err && err.message ? err.message : String(err));
+        renderWebshellAiErrorMessage(assistantDiv, '请求异常: ' + (err && err.message ? err.message : String(err)));
     }).then(function () {
         webshellAiSending = false;
         if (sendBtn) sendBtn.disabled = false;
@@ -945,19 +2677,31 @@ function pushWebshellHistory(connId, cmd) {
 // 执行快捷命令并将输出写入当前终端
 function runQuickCommand(cmd) {
     if (!webshellCurrentConn || !webshellTerminalInstance) return;
-    if (webshellRunning) return;
+    if (webshellRunning || webshellTerminalRunning) return;
     var term = webshellTerminalInstance;
+    var connId = webshellCurrentConn.id;
+    var sessionId = getActiveWebshellTerminalSessionId(connId);
+    var terminalKey = getWebshellTerminalSessionKey(connId, sessionId);
     term.writeln('');
-    pushWebshellHistory(webshellCurrentConn.id, cmd);
+    pushWebshellHistory(terminalKey, cmd);
+    appendWebshellTerminalLog(terminalKey, '\n$ ' + cmd + '\n');
     webshellRunning = true;
+    setWebshellTerminalStatus(true);
     execWebshellCommand(webshellCurrentConn, cmd).then(function (out) {
         var s = String(out || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         s.split('\n').forEach(function (line) { term.writeln(line.replace(/\r/g, '')); });
+        appendWebshellTerminalLog(terminalKey, s + '\n');
         term.write(WEBSHELL_PROMPT);
     }).catch(function (err) {
-        term.writeln('\x1b[31m' + (err && err.message ? err.message : wsT('webshell.execError')) + '\x1b[0m');
+        var em = (err && err.message ? err.message : wsT('webshell.execError'));
+        term.writeln('\x1b[31m' + em + '\x1b[0m');
+        appendWebshellTerminalLog(terminalKey, em + '\n');
         term.write(WEBSHELL_PROMPT);
-    }).finally(function () { webshellRunning = false; });
+    }).finally(function () {
+        webshellRunning = false;
+        setWebshellTerminalStatus(false);
+        renderWebshellTerminalSessions(webshellCurrentConn);
+    });
 }
 
 // ---------- 虚拟终端（xterm + 按行执行） ----------
@@ -998,7 +2742,15 @@ function initWebshellTerminal(conn) {
     try {
         if (fitAddon) fitAddon.fit();
     } catch (e) {}
-    // 不再输出欢迎行，避免占用空间、挡住输入
+    setWebshellTerminalStatus(false);
+    var connId = conn && conn.id ? conn.id : '';
+    var sessionId = getActiveWebshellTerminalSessionId(connId);
+    var terminalKey = getWebshellTerminalSessionKey(connId, sessionId);
+    var cachedLog = getWebshellTerminalLog(terminalKey);
+    if (cachedLog) {
+        // xterm 恢复内容时统一使用 CRLF，避免切换窗口后出现“斜排”错位
+        term.write(String(cachedLog).replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n/g, '\r\n'));
+    }
     term.write(WEBSHELL_PROMPT);
 
     // 按行写入输出，与系统设置终端 writeOutput 一致，避免 ls 等输出错位
@@ -1022,11 +2774,29 @@ function initWebshellTerminal(conn) {
             webshellLineBuffer = '';
             webshellHistoryIndex = -1;
             term.write(WEBSHELL_PROMPT);
+            clearWebshellTerminalLog(terminalKey);
+            return;
+        }
+        // Ctrl+C：当前实现不支持远程中断，给出提示并回到提示符
+        if (data === '\x03') {
+            if (webshellTerminalRunning) {
+                writeWebshellOutput(term, '^C (当前版本暂不支持中断远程命令)', true);
+                appendWebshellTerminalLog(terminalKey, '^C (当前版本暂不支持中断远程命令)\n');
+            }
+            webshellLineBuffer = '';
+            webshellHistoryIndex = -1;
+            term.write(WEBSHELL_PROMPT);
+            return;
+        }
+        // Ctrl+U：清空当前输入行
+        if (data === '\x15') {
+            webshellLineBuffer = '';
+            term.write('\x1b[2K\r' + WEBSHELL_PROMPT);
             return;
         }
         // 上/下键：命令历史
         if (data === '\x1b[A' || data === '\x1bOA') {
-            var hist = getWebshellHistory(webshellCurrentConn ? webshellCurrentConn.id : '');
+            var hist = getWebshellHistory(terminalKey);
             if (hist.length === 0) return;
             webshellHistoryIndex = webshellHistoryIndex < 0 ? hist.length : Math.max(0, webshellHistoryIndex - 1);
             webshellLineBuffer = hist[webshellHistoryIndex] || '';
@@ -1034,7 +2804,7 @@ function initWebshellTerminal(conn) {
             return;
         }
         if (data === '\x1b[B' || data === '\x1bOB') {
-            var hist2 = getWebshellHistory(webshellCurrentConn ? webshellCurrentConn.id : '');
+            var hist2 = getWebshellHistory(terminalKey);
             if (hist2.length === 0) return;
             webshellHistoryIndex = webshellHistoryIndex < 0 ? -1 : Math.min(hist2.length - 1, webshellHistoryIndex + 1);
             if (webshellHistoryIndex < 0) webshellLineBuffer = '';
@@ -1051,18 +2821,31 @@ function initWebshellTerminal(conn) {
             if (cmd) {
                 if (webshellRunning) {
                     writeWebshellOutput(term, wsT('webshell.waitFinish'), true);
+                    appendWebshellTerminalLog(terminalKey, (wsT('webshell.waitFinish') || '请等待当前命令执行完成') + '\n');
                     term.write(WEBSHELL_PROMPT);
                     return;
                 }
-                pushWebshellHistory(webshellCurrentConn ? webshellCurrentConn.id : '', cmd);
+                pushWebshellHistory(terminalKey, cmd);
+                appendWebshellTerminalLog(terminalKey, '$ ' + cmd + '\n');
                 webshellRunning = true;
+                setWebshellTerminalStatus(true);
+                renderWebshellTerminalSessions(conn);
                 execWebshellCommand(webshellCurrentConn, cmd).then(function (out) {
                     webshellRunning = false;
-                    if (out && out.length) writeWebshellOutput(term, out, false);
+                    setWebshellTerminalStatus(false);
+                    renderWebshellTerminalSessions(conn);
+                    if (out && out.length) {
+                        writeWebshellOutput(term, out, false);
+                        appendWebshellTerminalLog(terminalKey, String(out).replace(/\r\n/g, '\n').replace(/\r/g, '\n') + '\n');
+                    }
                     term.write(WEBSHELL_PROMPT);
                 }).catch(function (err) {
                     webshellRunning = false;
-                    writeWebshellOutput(term, err && err.message ? err.message : wsT('webshell.execError'), true);
+                    setWebshellTerminalStatus(false);
+                    renderWebshellTerminalSessions(conn);
+                    var errMsg = err && err.message ? err.message : wsT('webshell.execError');
+                    writeWebshellOutput(term, errMsg, true);
+                    appendWebshellTerminalLog(terminalKey, String(errMsg || '') + '\n');
                     term.write(WEBSHELL_PROMPT);
                 });
             } else {
@@ -1083,15 +2866,27 @@ function initWebshellTerminal(conn) {
                     }
                     var line = lines[idx].trim();
                     if (!line) { runNext(idx + 1); return; }
-                    pushWebshellHistory(webshellCurrentConn.id, line);
+                    pushWebshellHistory(terminalKey, line);
+                    appendWebshellTerminalLog(terminalKey, '$ ' + line + '\n');
                     webshellRunning = true;
+                    setWebshellTerminalStatus(true);
+                    renderWebshellTerminalSessions(conn);
                     execWebshellCommand(webshellCurrentConn, line).then(function (out) {
-                        if (out && out.length) writeWebshellOutput(term, out, false);
+                        if (out && out.length) {
+                            writeWebshellOutput(term, out, false);
+                            appendWebshellTerminalLog(terminalKey, String(out).replace(/\r\n/g, '\n').replace(/\r/g, '\n') + '\n');
+                        }
                         webshellRunning = false;
+                        setWebshellTerminalStatus(false);
+                        renderWebshellTerminalSessions(conn);
                         runNext(idx + 1);
                     }).catch(function (err) {
-                        writeWebshellOutput(term, err && err.message ? err.message : wsT('webshell.execError'), true);
+                        var em = err && err.message ? err.message : wsT('webshell.execError');
+                        writeWebshellOutput(term, em, true);
+                        appendWebshellTerminalLog(terminalKey, String(em || '') + '\n');
                         webshellRunning = false;
+                        setWebshellTerminalStatus(false);
+                        renderWebshellTerminalSessions(conn);
                         runNext(idx + 1);
                     });
                 };
@@ -1127,6 +2922,7 @@ function initWebshellTerminal(conn) {
         });
         webshellTerminalResizeObserver.observe(container);
     }
+    renderWebshellTerminalSessions(conn);
 }
 
 // 调用后端执行命令
@@ -1195,23 +2991,107 @@ function webshellFileListDir(conn, path) {
         });
 }
 
-function renderFileList(listEl, currentPath, rawOutput, conn, nameFilter) {
-    var lines = rawOutput.split(/\n/).filter(function (l) { return l.trim(); });
+function normalizeLsMtime(month, day, timeOrYear) {
+    if (!month || !day || !timeOrYear) return '';
+    var token = String(timeOrYear).trim();
+    if (/^\d{4}$/.test(token)) return token + ' ' + month + ' ' + day;
+    var now = new Date();
+    var year = now.getFullYear();
+    if (/^\d{1,2}:\d{2}$/.test(token)) {
+        var monthMap = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+        var m = monthMap[month];
+        var d = parseInt(day, 10);
+        if (m != null && !isNaN(d)) {
+            var inferred = new Date(year, m, d);
+            if (inferred.getTime() > now.getTime()) year = year - 1;
+        }
+        return year + ' ' + month + ' ' + day + ' ' + token;
+    }
+    return month + ' ' + day + ' ' + token;
+}
+
+function modeToType(mode) {
+    if (!mode || !mode.length) return '';
+    var c = mode.charAt(0);
+    if (c === 'd') return 'dir';
+    if (c === '-') return 'file';
+    if (c === 'l') return 'link';
+    if (c === 'c') return 'char';
+    if (c === 'b') return 'block';
+    if (c === 's') return 'socket';
+    if (c === 'p') return 'pipe';
+    return c;
+}
+
+function parseWebshellListItems(rawOutput) {
+    var lines = (rawOutput || '').split(/\n/).filter(function (l) { return l.trim(); });
     var items = [];
     for (var i = 0; i < lines.length; i++) {
         var line = lines[i];
-        var m = line.match(/\s*(\S+)\s*$/);
-        var name = m ? m[1].trim() : line.trim();
-        if (name === '.' || name === '..') continue;
-        var isDir = line.startsWith('d') || line.toLowerCase().indexOf('<dir>') !== -1;
+        var trimmedLine = String(line || '').trim();
+        // `ls -la` 首行常见 "total 12"（中文环境为 "总计 12"），不是文件项。
+        if (/^(total|总计)\s+\d+$/i.test(trimmedLine)) continue;
+        var name = '';
+        var isDir = false;
         var size = '';
         var mode = '';
-        if (line.startsWith('-') || line.startsWith('d')) {
-            var parts = line.split(/\s+/);
-            if (parts.length >= 5) { mode = parts[0]; size = parts[4]; }
+        var mtime = '';
+        var owner = '';
+        var group = '';
+        var type = '';
+        var mLs = line.match(/^(\S+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\d+)\s+([A-Za-z]{3})\s+(\d{1,2})\s+(\S+)\s+(.+)$/);
+        if (mLs) {
+            mode = mLs[1];
+            owner = mLs[3];
+            group = mLs[4];
+            size = mLs[5];
+            mtime = normalizeLsMtime(mLs[6], mLs[7], mLs[8]);
+            name = (mLs[9] || '').trim();
+            isDir = mode && mode.startsWith('d');
+            type = modeToType(mode);
+        } else {
+            var mName = line.match(/\s*(\S+)\s*$/);
+            name = mName ? mName[1].trim() : line.trim();
+            if (name === '.' || name === '..') continue;
+            isDir = line.startsWith('d') || line.toLowerCase().indexOf('<dir>') !== -1;
+            if (line.startsWith('-') || line.startsWith('d')) {
+                var parts = line.split(/\s+/);
+                if (parts.length >= 5) { mode = parts[0]; size = parts[4]; }
+                if (parts.length >= 4) { owner = parts[2] || ''; group = parts[3] || ''; }
+                if (parts.length >= 8 && /^[A-Za-z]{3}$/.test(parts[5])) mtime = normalizeLsMtime(parts[5], parts[6], parts[7]);
+                type = modeToType(mode);
+            }
         }
-        items.push({ name: name, isDir: isDir, line: line, size: size, mode: mode });
+        if (name === '.' || name === '..') continue;
+        items.push({ name: name, isDir: isDir, line: line, size: size, mode: mode, mtime: mtime, owner: owner, group: group, type: type });
     }
+    return items;
+}
+
+function fetchWebshellDirectoryItems(conn, path) {
+    if (!conn || typeof apiFetch === 'undefined') return Promise.resolve([]);
+    return apiFetch('/api/webshell/file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            url: conn.url,
+            password: conn.password || '',
+            type: conn.type || 'php',
+            method: (conn.method || 'post').toLowerCase(),
+            cmd_param: conn.cmdParam || '',
+            action: 'list',
+            path: path
+        })
+    }).then(function (r) { return r.json(); }).then(function (data) {
+        if (!data || data.error || !data.ok) return [];
+        return parseWebshellListItems(data.output || '');
+    }).catch(function () {
+        return [];
+    });
+}
+
+function renderFileList(listEl, currentPath, rawOutput, conn, nameFilter) {
+    var items = parseWebshellListItems(rawOutput);
     if (nameFilter && nameFilter.trim()) {
         var f = nameFilter.trim().toLowerCase();
         items = items.filter(function (item) { return item.name.toLowerCase().indexOf(f) !== -1; });
@@ -1226,27 +3106,45 @@ function renderFileList(listEl, currentPath, rawOutput, conn, nameFilter) {
                 return ' / <a href="#" class="webshell-breadcrumb-item" data-path="' + escapeHtml(path) + '">' + escapeHtml(p) + '</a>';
             }).join('');
     }
+    renderDirectoryTree(currentPath, items, conn);
     var html = '';
-    if (items.length === 0 && rawOutput.trim() && !nameFilter) {
-        html = '<pre class="webshell-file-raw">' + escapeHtml(rawOutput) + '</pre>';
+    if (items.length === 0) {
+        // 目录为空/过滤后为空时，给出明确空状态，避免 tbody 留白导致“整块抽象大白屏”
+        if (rawOutput.trim() && !nameFilter) {
+            html = '<pre class="webshell-file-raw">' + escapeHtml(rawOutput) + '</pre>';
+        } else {
+            html = '<table class="webshell-file-table"><thead><tr><th class="webshell-col-check"><input type="checkbox" id="webshell-file-select-all" title="' + (wsT('webshell.selectAll') || '全选') + '" /></th><th>' + wsT('webshell.filePath') + '</th><th class="webshell-col-size">大小</th><th class="webshell-col-mtime">' + (wsT('webshell.colModifiedAt') || '修改时间') + '</th><th class="webshell-col-owner">' + (wsT('webshell.colOwner') || '所有者') + '</th><th class="webshell-col-perms">' + (wsT('webshell.colPerms') || '权限') + '</th><th class="webshell-col-actions"></th></tr></thead><tbody>' +
+                '<tr><td colspan="7" class="webshell-file-empty-state">' + (wsT('common.noData') || '暂无文件') + '</td></tr>' +
+                '</tbody></table>';
+        }
     } else {
-        html = '<table class="webshell-file-table"><thead><tr><th class="webshell-col-check"><input type="checkbox" id="webshell-file-select-all" title="' + (wsT('webshell.selectAll') || '全选') + '" /></th><th>' + wsT('webshell.filePath') + '</th><th class="webshell-col-size">大小</th><th></th></tr></thead><tbody>';
+        html = '<table class="webshell-file-table"><thead><tr><th class="webshell-col-check"><input type="checkbox" id="webshell-file-select-all" title="' + (wsT('webshell.selectAll') || '全选') + '" /></th><th>' + wsT('webshell.filePath') + '</th><th class="webshell-col-size">大小</th><th class="webshell-col-mtime">' + (wsT('webshell.colModifiedAt') || '修改时间') + '</th><th class="webshell-col-owner">' + (wsT('webshell.colOwner') || '所有者') + '</th><th class="webshell-col-perms">' + (wsT('webshell.colPerms') || '权限') + '</th><th class="webshell-col-actions"></th></tr></thead><tbody>';
         if (currentPath !== '.' && currentPath !== '') {
-            html += '<tr><td></td><td><a href="#" class="webshell-file-link" data-path="' + escapeHtml(currentPath.replace(/\/[^/]+$/, '') || '.') + '" data-isdir="1">..</a></td><td></td><td></td></tr>';
+            html += '<tr><td></td><td><a href="#" class="webshell-file-link" data-path="' + escapeHtml(currentPath.replace(/\/[^/]+$/, '') || '.') + '" data-isdir="1">..</a></td><td></td><td></td><td></td><td></td><td></td></tr>';
         }
         items.forEach(function (item) {
             var pathNext = currentPath === '.' ? item.name : currentPath + '/' + item.name;
+            var nameClass = item.isDir ? 'is-dir' : 'is-file';
             html += '<tr><td class="webshell-col-check">';
             if (!item.isDir) html += '<input type="checkbox" class="webshell-file-cb" data-path="' + escapeHtml(pathNext) + '" />';
-            html += '</td><td><a href="#" class="webshell-file-link" data-path="' + escapeHtml(pathNext) + '" data-isdir="' + (item.isDir ? '1' : '0') + '">' + escapeHtml(item.name) + (item.isDir ? '/' : '') + '</a></td><td class="webshell-col-size">' + escapeHtml(item.size) + '</td><td>';
+            html += '</td><td><a href="#" class="webshell-file-link ' + nameClass + '" data-path="' + escapeHtml(pathNext) + '" data-isdir="' + (item.isDir ? '1' : '0') + '">' + escapeHtml(item.name) + (item.isDir ? '/' : '') + '</a></td>';
+            html += '<td class="webshell-col-size">' + escapeHtml(item.size) + '</td>';
+            html += '<td class="webshell-col-mtime">' + escapeHtml(item.mtime || '') + '</td>';
+            html += '<td class="webshell-col-owner">' + escapeHtml(item.owner || '') + '</td>';
+            html += '<td class="webshell-col-perms">' + escapeHtml(item.mode || '') + '</td>';
+            html += '<td class="webshell-col-actions">';
             if (item.isDir) {
                 html += '<button type="button" class="btn-ghost btn-sm webshell-file-rename" data-path="' + escapeHtml(pathNext) + '" data-name="' + escapeHtml(item.name) + '">' + (wsT('webshell.rename') || '重命名') + '</button>';
             } else {
-                html += '<button type="button" class="btn-ghost btn-sm webshell-file-read" data-path="' + escapeHtml(pathNext) + '">' + wsT('webshell.readFile') + '</button> ';
-                html += '<button type="button" class="btn-ghost btn-sm webshell-file-download" data-path="' + escapeHtml(pathNext) + '">' + wsT('webshell.downloadFile') + '</button> ';
-                html += '<button type="button" class="btn-ghost btn-sm webshell-file-edit" data-path="' + escapeHtml(pathNext) + '">' + wsT('webshell.editFile') + '</button> ';
-                html += '<button type="button" class="btn-ghost btn-sm webshell-file-rename" data-path="' + escapeHtml(pathNext) + '" data-name="' + escapeHtml(item.name) + '">' + (wsT('webshell.rename') || '重命名') + '</button> ';
-                html += '<button type="button" class="btn-ghost btn-sm webshell-file-del" data-path="' + escapeHtml(pathNext) + '">' + wsT('webshell.deleteFile') + '</button>';
+                var actionsLabel = wsT('common.actions') || '操作';
+                html += '<details class="webshell-row-actions"><summary class="btn-ghost btn-sm webshell-row-actions-btn" title="' + actionsLabel + '">' + actionsLabel + '</summary>' +
+                    '<div class="webshell-row-actions-menu">' +
+                    '<button type="button" class="btn-ghost btn-sm webshell-file-read" data-path="' + escapeHtml(pathNext) + '">' + wsT('webshell.readFile') + '</button>' +
+                    '<button type="button" class="btn-ghost btn-sm webshell-file-download" data-path="' + escapeHtml(pathNext) + '">' + wsT('webshell.downloadFile') + '</button>' +
+                    '<button type="button" class="btn-ghost btn-sm webshell-file-edit" data-path="' + escapeHtml(pathNext) + '">' + wsT('webshell.editFile') + '</button>' +
+                    '<button type="button" class="btn-ghost btn-sm webshell-file-rename" data-path="' + escapeHtml(pathNext) + '" data-name="' + escapeHtml(item.name) + '">' + (wsT('webshell.rename') || '重命名') + '</button>' +
+                    '<button type="button" class="btn-ghost btn-sm webshell-file-del" data-path="' + escapeHtml(pathNext) + '">' + wsT('webshell.deleteFile') + '</button>' +
+                    '</div></details>';
             }
             html += '</td></tr>';
         });
@@ -1260,15 +3158,19 @@ function renderFileList(listEl, currentPath, rawOutput, conn, nameFilter) {
             const path = a.getAttribute('data-path');
             const isDir = a.getAttribute('data-isdir') === '1';
             const pathInput = document.getElementById('webshell-file-path');
-            if (pathInput) pathInput.value = path;
-            if (isDir) webshellFileListDir(webshellCurrentConn, path);
-            else webshellFileRead(webshellCurrentConn, path, listEl);
+            if (isDir) {
+                if (pathInput) pathInput.value = path;
+                webshellFileListDir(webshellCurrentConn, path);
+            } else {
+                // 打开文件时保留当前“浏览目录”上下文，避免返回时落到单文件视图
+                webshellFileRead(webshellCurrentConn, path, listEl, currentPath);
+            }
         });
     });
     listEl.querySelectorAll('.webshell-file-read').forEach(function (btn) {
         btn.addEventListener('click', function (e) {
             e.preventDefault();
-            webshellFileRead(webshellCurrentConn, btn.getAttribute('data-path'), listEl);
+            webshellFileRead(webshellCurrentConn, btn.getAttribute('data-path'), listEl, currentPath);
         });
     });
     listEl.querySelectorAll('.webshell-file-download').forEach(function (btn) {
@@ -1315,6 +3217,148 @@ function renderFileList(listEl, currentPath, rawOutput, conn, nameFilter) {
             });
         });
     }
+}
+
+function renderDirectoryTree(currentPath, items, conn) {
+    var treeEl = document.getElementById('webshell-dir-tree');
+    if (!treeEl) return;
+    var state = getWebshellTreeState(conn || webshellCurrentConn);
+    var curr = normalizeWebshellPath(currentPath);
+    var dirs = (items || []).filter(function (item) { return item && item.isDir; });
+    if (!state) {
+        treeEl.innerHTML = '<div class="webshell-empty">暂无目录</div>';
+        return;
+    }
+    var tree = state.tree;
+    var expanded = state.expanded;
+    var loaded = state.loaded;
+    if (!tree['.']) tree['.'] = [];
+    if (expanded['.'] !== false) expanded['.'] = true;
+
+    // 把当前目录的子项（目录+文件）同步到树缓存
+    var childNodes = (items || []).map(function (item) {
+        var childPath = curr === '.' ? normalizeWebshellPath(item.name) : normalizeWebshellPath(curr + '/' + item.name);
+        return {
+            path: childPath,
+            name: item.name,
+            isDir: !!item.isDir
+        };
+    }).filter(function (n) { return !!n.path; });
+    childNodes.sort(function (a, b) {
+        // 目录优先，再按名称排序
+        if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+        return (a.name || '').localeCompare(b.name || '');
+    });
+    tree[curr] = childNodes;
+    loaded[curr] = true;
+    childNodes.forEach(function (node) {
+        if (node.isDir && !tree[node.path]) tree[node.path] = [];
+    });
+
+    // 确保当前路径祖先链存在并展开
+    var parts = curr === '.' ? [] : curr.split('/');
+    var parentPath = '.';
+    for (var i = 0; i < parts.length; i++) {
+        var nextPath = parentPath === '.' ? parts[i] : parentPath + '/' + parts[i];
+        if (!tree[parentPath]) tree[parentPath] = [];
+        var parentChildren = tree[parentPath];
+        var hasAncestorNode = parentChildren.some(function (n) { return n && n.path === nextPath; });
+        if (!hasAncestorNode) {
+            parentChildren.push({ path: nextPath, name: parts[i], isDir: true });
+            parentChildren.sort(function (a, b) {
+                if (!!a.isDir !== !!b.isDir) return a.isDir ? -1 : 1;
+                return (a.name || '').localeCompare(b.name || '');
+            });
+        }
+        if (!tree[nextPath]) tree[nextPath] = [];
+        expanded[parentPath] = true;
+        parentPath = nextPath;
+    }
+    expanded[curr] = true;
+
+    function renderNode(node, depth) {
+        var path = node.path;
+        var isDir = !!node.isDir;
+        var children = isDir ? (tree[path] || []).slice() : [];
+        var hasLoadedChildren = isDir ? (loaded[path] === true) : true;
+        var canExpand = isDir && (path === '.' || !hasLoadedChildren || children.length > 0);
+        var hasChildren = children.length > 0;
+        var isExpanded = isDir ? (expanded[path] !== false) : false;
+        var isActive = path === curr;
+        var name = node.name;
+        var icon = isDir ? (path === '.' ? '🗂' : '📁') : '📄';
+        var nodeHtml =
+            '<div class="webshell-tree-node" data-depth="' + depth + '">' +
+            '<div class="webshell-tree-row' + (isActive ? ' active' : '') + '">' +
+            '<button type="button" class="webshell-tree-toggle' + (canExpand ? '' : ' empty') + '" data-path="' + escapeHtml(path) + '">' + (canExpand ? (isExpanded ? '▾' : '▸') : '·') + '</button>' +
+            '<button type="button" class="webshell-dir-item' + (isDir ? ' is-dir' : ' is-file') + '" data-path="' + escapeHtml(path) + '" data-isdir="' + (isDir ? '1' : '0') + '"><span class="webshell-tree-icon">' + icon + '</span><span class="webshell-tree-name">' + escapeHtml(name) + '</span></button>' +
+            '</div>';
+        if (isDir && hasChildren && isExpanded) {
+            nodeHtml += '<div class="webshell-tree-children">';
+            for (var j = 0; j < children.length; j++) {
+                nodeHtml += renderNode(children[j], depth + 1);
+            }
+            nodeHtml += '</div>';
+        }
+        nodeHtml += '</div>';
+        return nodeHtml;
+    }
+
+    treeEl.innerHTML = '<div class="webshell-tree-root">' + renderNode({ path: '.', name: '/', isDir: true }, 0) + '</div>';
+    treeEl.querySelectorAll('.webshell-tree-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var p = normalizeWebshellPath(btn.getAttribute('data-path') || '.');
+            if (expanded[p] !== false) {
+                expanded[p] = false;
+                renderDirectoryTree(curr, items, conn || webshellCurrentConn);
+                return;
+            }
+            if (loaded[p] === true) {
+                expanded[p] = true;
+                renderDirectoryTree(curr, items, conn || webshellCurrentConn);
+                return;
+            }
+            fetchWebshellDirectoryItems(conn || webshellCurrentConn, p).then(function (subItems) {
+                var nextChildren = (subItems || []).map(function (it) {
+                    return {
+                        path: p === '.' ? normalizeWebshellPath(it.name) : normalizeWebshellPath(p + '/' + it.name),
+                        name: it.name,
+                        isDir: !!it.isDir
+                    };
+                }).filter(function (n) { return !!n.path; }).sort(function (a, b) {
+                    if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+                    return (a.name || '').localeCompare(b.name || '');
+                });
+                tree[p] = nextChildren;
+                nextChildren.forEach(function (childNode) {
+                    if (childNode.isDir) {
+                        if (!tree[childNode.path]) tree[childNode.path] = [];
+                        if (loaded[childNode.path] == null) loaded[childNode.path] = false;
+                    }
+                });
+                loaded[p] = true;
+                expanded[p] = true;
+                renderDirectoryTree(curr, items, conn || webshellCurrentConn);
+            });
+        });
+    });
+    treeEl.querySelectorAll('.webshell-dir-item').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var p = normalizeWebshellPath(btn.getAttribute('data-path') || '.');
+            var isDir = btn.getAttribute('data-isdir') === '1';
+            var pathInput = document.getElementById('webshell-file-path');
+            if (isDir) {
+                if (pathInput) pathInput.value = p;
+                webshellFileListDir(webshellCurrentConn, p);
+                return;
+            }
+            var listEl = document.getElementById('webshell-file-list');
+            var browsePath = p.replace(/\/[^/]+$/, '') || '.';
+            if (listEl) webshellFileRead(webshellCurrentConn, p, listEl, browsePath);
+        });
+    });
 }
 
 function webshellFileListApplyFilter() {
@@ -1453,7 +3497,7 @@ function webshellFileDownload(conn, path) {
         .catch(function (err) { alert(wsT('webshell.execError') + ': ' + (err && err.message ? err.message : '')); });
 }
 
-function webshellFileRead(conn, path, listEl) {
+function webshellFileRead(conn, path, listEl, browsePath) {
     if (typeof apiFetch === 'undefined') return;
     listEl.innerHTML = '<div class="webshell-loading">' + wsT('webshell.readFile') + '...</div>';
     apiFetch('/api/webshell/file', {
@@ -1463,7 +3507,19 @@ function webshellFileRead(conn, path, listEl) {
     }).then(function (r) { return r.json(); })
         .then(function (data) {
             const out = (data && data.output) ? data.output : (data.error || '');
-            listEl.innerHTML = '<div class="webshell-file-content"><pre>' + escapeHtml(out) + '</pre><button type="button" class="btn-ghost" onclick="webshellFileListDir(webshellCurrentConn, document.getElementById(\'webshell-file-path\').value.trim() || \'.\')">' + wsT('webshell.listDir') + '</button></div>';
+            var backPath = (browsePath && String(browsePath).trim()) ? String(browsePath).trim() : ((document.getElementById('webshell-file-path') && document.getElementById('webshell-file-path').value.trim()) || '.');
+            if (backPath === path) {
+                // 兜底：若路径被污染成文件路径，回退到父目录
+                backPath = path.replace(/\/[^/]+$/, '') || '.';
+            }
+            listEl.innerHTML = '<div class="webshell-file-content"><pre>' + escapeHtml(out) + '</pre><button type="button" class="btn-ghost" id="webshell-file-back-btn" data-back-path="' + escapeHtml(backPath) + '">' + wsT('webshell.back') + '</button></div>';
+            var backBtn = document.getElementById('webshell-file-back-btn');
+            if (backBtn) {
+                backBtn.addEventListener('click', function () {
+                    var p = backBtn.getAttribute('data-back-path') || '.';
+                    webshellFileListDir(webshellCurrentConn, p);
+                });
+            }
         })
         .catch(function (err) {
             listEl.innerHTML = '<div class="webshell-file-error">' + escapeHtml(err && err.message ? err.message : '') + '</div>';
@@ -1542,6 +3598,21 @@ function deleteWebshell(id) {
     if (!confirm(wsT('webshell.deleteConfirm'))) return;
     if (currentWebshellId === id) destroyWebshellTerminal();
     if (currentWebshellId === id) currentWebshellId = null;
+    // 清理本地缓存（服务端会级联删除 SQLite 里的状态）
+    delete webshellPersistLoadedByConn[id];
+    if (webshellPersistSaveTimersByConn[id]) {
+        clearTimeout(webshellPersistSaveTimersByConn[id]);
+        delete webshellPersistSaveTimersByConn[id];
+    }
+    delete webshellTerminalSessionsByConn[id];
+    var dbStateKey = getWebshellDbStateStorageKey({ id: id });
+    if (dbStateKey) delete webshellDbConfigByConn[dbStateKey];
+    Object.keys(webshellTerminalLogsByConn).forEach(function (k) {
+        if (k === id || k.indexOf(id + '::') === 0) delete webshellTerminalLogsByConn[k];
+    });
+    Object.keys(webshellHistoryByConn).forEach(function (k) {
+        if (k === id || k.indexOf(id + '::') === 0) delete webshellHistoryByConn[k];
+    });
     if (typeof apiFetch === 'undefined') return;
     apiFetch('/api/webshell/connections/' + encodeURIComponent(id), { method: 'DELETE' })
         .then(function () {
@@ -1616,16 +3687,36 @@ function refreshWebshellUIOnLanguageChange() {
             var tabTerminal = workspace.querySelector('.webshell-tab[data-tab="terminal"]');
             var tabFile = workspace.querySelector('.webshell-tab[data-tab="file"]');
             var tabAi = workspace.querySelector('.webshell-tab[data-tab="ai"]');
+            var tabDb = workspace.querySelector('.webshell-tab[data-tab="db"]');
+            var tabMemo = workspace.querySelector('.webshell-tab[data-tab="memo"]');
             if (tabTerminal) tabTerminal.textContent = wsT('webshell.tabTerminal');
             if (tabFile) tabFile.textContent = wsT('webshell.tabFileManager');
             if (tabAi) tabAi.textContent = wsT('webshell.tabAiAssistant') || 'AI 助手';
+            if (tabDb) tabDb.textContent = wsT('webshell.tabDbManager') || '数据库管理';
+            if (tabMemo) tabMemo.textContent = wsT('webshell.tabMemo') || '备忘录';
 
             var quickLabel = workspace.querySelector('.webshell-quick-label');
             if (quickLabel) quickLabel.textContent = (wsT('webshell.quickCommands') || '快捷命令') + ':';
+            var terminalClearBtn = document.getElementById('webshell-terminal-clear');
+            if (terminalClearBtn) {
+                terminalClearBtn.title = wsT('webshell.clearScreen') || '清屏';
+                terminalClearBtn.textContent = wsT('webshell.clearScreen') || '清屏';
+            }
+            var terminalCopyBtn = document.getElementById('webshell-terminal-copy-log');
+            if (terminalCopyBtn) {
+                terminalCopyBtn.title = wsT('webshell.copyTerminalLog') || '复制日志';
+                terminalCopyBtn.textContent = wsT('webshell.copyTerminalLog') || '复制日志';
+            }
+            setWebshellTerminalStatus(webshellTerminalRunning);
+            if (webshellCurrentConn) renderWebshellTerminalSessions(webshellCurrentConn);
             var pathLabel = workspace.querySelector('.webshell-file-toolbar label span');
+            var fileSidebarTitle = workspace.querySelector('.webshell-file-sidebar-title');
+            var fileMoreActionsBtn = workspace.querySelector('.webshell-toolbar-actions-btn');
             var listDirBtn = document.getElementById('webshell-list-dir');
             var parentDirBtn = document.getElementById('webshell-parent-dir');
             if (pathLabel) pathLabel.textContent = wsT('webshell.filePath');
+            if (fileSidebarTitle) fileSidebarTitle.textContent = wsT('webshell.dirTree') || '目录列表';
+            if (fileMoreActionsBtn) fileMoreActionsBtn.textContent = wsT('webshell.moreActions') || '更多操作';
             if (listDirBtn) listDirBtn.textContent = wsT('webshell.listDir');
             if (parentDirBtn) parentDirBtn.textContent = wsT('webshell.parentDir');
             // 文件管理工具栏按钮（红框区域）：切换语言时立即更新
@@ -1651,6 +3742,72 @@ function refreshWebshellUIOnLanguageChange() {
             if (aiInput) aiInput.placeholder = wsT('webshell.aiPlaceholder') || '例如：列出当前目录下的文件';
             var aiSendBtn = document.getElementById('webshell-ai-send');
             if (aiSendBtn) aiSendBtn.textContent = wsT('webshell.aiSend') || '发送';
+            var aiMemoTitle = document.querySelector('.webshell-memo-head span');
+            if (aiMemoTitle) aiMemoTitle.textContent = wsT('webshell.aiMemo') || '备忘录';
+            var aiMemoClearBtn = document.getElementById('webshell-ai-memo-clear');
+            if (aiMemoClearBtn) aiMemoClearBtn.textContent = wsT('webshell.aiMemoClear') || '清空';
+            var aiMemoInput = document.getElementById('webshell-ai-memo-input');
+            if (aiMemoInput) aiMemoInput.placeholder = wsT('webshell.aiMemoPlaceholder') || '记录关键命令、测试思路、复现步骤...';
+            var aiMemoStatus = document.getElementById('webshell-ai-memo-status');
+            if (aiMemoStatus && !aiMemoStatus.classList.contains('error')) {
+                var savingText = wsT('webshell.aiMemoSaving') || '保存中...';
+                var savedText = wsT('webshell.aiMemoSaved') || '已保存到本地';
+                aiMemoStatus.textContent = aiMemoStatus.textContent === savingText ? savingText : savedText;
+            }
+            var dbTypeLabel = document.querySelector('#webshell-db-type') ? document.querySelector('#webshell-db-type').closest('label') : null;
+            if (dbTypeLabel && dbTypeLabel.querySelector('span')) dbTypeLabel.querySelector('span').textContent = wsT('webshell.dbType') || '数据库类型';
+            var dbProfileNameLabel = document.querySelector('#webshell-db-profile-name') ? document.querySelector('#webshell-db-profile-name').closest('label') : null;
+            if (dbProfileNameLabel && dbProfileNameLabel.querySelector('span')) dbProfileNameLabel.querySelector('span').textContent = wsT('webshell.dbProfileName') || '连接名称';
+            var dbHostLabel = document.querySelector('#webshell-db-host') ? document.querySelector('#webshell-db-host').closest('label') : null;
+            if (dbHostLabel && dbHostLabel.querySelector('span')) dbHostLabel.querySelector('span').textContent = wsT('webshell.dbHost') || '主机';
+            var dbPortLabel = document.querySelector('#webshell-db-port') ? document.querySelector('#webshell-db-port').closest('label') : null;
+            if (dbPortLabel && dbPortLabel.querySelector('span')) dbPortLabel.querySelector('span').textContent = wsT('webshell.dbPort') || '端口';
+            var dbUserLabel = document.querySelector('#webshell-db-user') ? document.querySelector('#webshell-db-user').closest('label') : null;
+            if (dbUserLabel && dbUserLabel.querySelector('span')) dbUserLabel.querySelector('span').textContent = wsT('webshell.dbUsername') || '用户名';
+            var dbPassLabel = document.querySelector('#webshell-db-pass') ? document.querySelector('#webshell-db-pass').closest('label') : null;
+            if (dbPassLabel && dbPassLabel.querySelector('span')) dbPassLabel.querySelector('span').textContent = wsT('webshell.dbPassword') || '密码';
+            var dbNameLabel = document.querySelector('#webshell-db-name') ? document.querySelector('#webshell-db-name').closest('label') : null;
+            if (dbNameLabel && dbNameLabel.querySelector('span')) dbNameLabel.querySelector('span').textContent = wsT('webshell.dbName') || '数据库名';
+            var dbSqliteLabel = document.querySelector('#webshell-db-sqlite-path') ? document.querySelector('#webshell-db-sqlite-path').closest('label') : null;
+            if (dbSqliteLabel && dbSqliteLabel.querySelector('span')) dbSqliteLabel.querySelector('span').textContent = wsT('webshell.dbSqlitePath') || 'SQLite 文件路径';
+            var dbSchemaTitle = document.querySelector('.webshell-db-sidebar-head span');
+            if (dbSchemaTitle) dbSchemaTitle.textContent = wsT('webshell.dbSchema') || '数据库结构';
+            var dbLoadSchemaBtn = document.getElementById('webshell-db-load-schema-btn');
+            if (dbLoadSchemaBtn) dbLoadSchemaBtn.textContent = wsT('webshell.dbLoadSchema') || '加载结构';
+            var dbTemplateBtn = document.getElementById('webshell-db-template-btn');
+            if (dbTemplateBtn) dbTemplateBtn.textContent = wsT('webshell.dbTemplateSql') || '示例 SQL';
+            var dbClearBtn = document.getElementById('webshell-db-clear-btn');
+            if (dbClearBtn) dbClearBtn.textContent = wsT('webshell.dbClearSql') || '清空 SQL';
+            var dbRunBtn = document.getElementById('webshell-db-run-btn');
+            if (dbRunBtn) dbRunBtn.textContent = wsT('webshell.dbRunSql') || '执行 SQL';
+            var dbTestBtn = document.getElementById('webshell-db-test-btn');
+            if (dbTestBtn) dbTestBtn.textContent = wsT('webshell.dbTest') || '测试连接';
+            var dbSql = document.getElementById('webshell-db-sql');
+            if (dbSql) dbSql.placeholder = wsT('webshell.dbSqlPlaceholder') || '输入 SQL，例如：SELECT version();';
+            var dbTitle = document.querySelector('.webshell-db-output-title');
+            if (dbTitle) dbTitle.textContent = wsT('webshell.dbOutput') || '执行输出';
+            var dbHint = document.querySelector('.webshell-db-hint');
+            if (dbHint) dbHint.textContent = wsT('webshell.dbCliHint') || '如果提示命令不存在，请先在目标主机安装对应客户端（mysql/psql/sqlite3/sqlcmd）';
+            var dbTreeHint = document.querySelector('.webshell-db-sidebar-hint');
+            if (dbTreeHint) dbTreeHint.textContent = wsT('webshell.dbSelectTableHint') || '点击表名可生成查询 SQL';
+            var dbAddProfileBtn = document.getElementById('webshell-db-add-profile-btn');
+            if (dbAddProfileBtn) dbAddProfileBtn.textContent = '+ ' + (wsT('webshell.dbAddProfile') || '新增连接');
+            var dbProfileModalTitle = document.getElementById('webshell-db-profile-modal-title');
+            if (dbProfileModalTitle) dbProfileModalTitle.textContent = wsT('webshell.editConnectionTitle') || '编辑连接';
+            var dbProfileCancelBtn = document.getElementById('webshell-db-profile-cancel-btn');
+            if (dbProfileCancelBtn) dbProfileCancelBtn.textContent = '取消';
+            var dbProfileSaveBtn = document.getElementById('webshell-db-profile-save-btn');
+            if (dbProfileSaveBtn) dbProfileSaveBtn.textContent = '保存';
+            document.querySelectorAll('.webshell-db-profile-menu[data-action="edit"]').forEach(function (el) {
+                el.title = wsT('webshell.editConnection') || '编辑';
+            });
+            document.querySelectorAll('.webshell-db-profile-menu[data-action="delete"]').forEach(function (el) {
+                el.title = wsT('webshell.dbDeleteProfile') || '删除连接';
+            });
+            var dbTree = document.getElementById('webshell-db-schema-tree');
+            if (dbTree && !dbTree.querySelector('.webshell-db-group')) {
+                dbTree.innerHTML = '<div class="webshell-empty">' + escapeHtml(wsT('webshell.dbNoSchema') || '暂无数据库结构，请先加载') + '</div>';
+            }
 
             // 如果当前 AI 对话区只有系统就绪提示（没有用户消息），用当前语言重置这条提示
             var aiMessages = document.getElementById('webshell-ai-messages');
@@ -1671,6 +3828,14 @@ function refreshWebshellUIOnLanguageChange() {
             var fileListEl = document.getElementById('webshell-file-list');
             if (fileListEl && webshellCurrentConn && pathInput) {
                 webshellFileListDir(webshellCurrentConn, pathInput.value.trim() || '.');
+            }
+
+            // 连接搜索占位符（动态属性：这里手动更新）
+            var connSearchEl = document.getElementById('webshell-conn-search');
+            if (connSearchEl) {
+                var ph = wsT('webshell.searchPlaceholder') || '搜索连接...';
+                connSearchEl.setAttribute('placeholder', ph);
+                connSearchEl.placeholder = ph;
             }
         }
     }

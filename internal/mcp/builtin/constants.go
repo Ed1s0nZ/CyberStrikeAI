@@ -19,6 +19,13 @@ const (
 	ToolWebshellFileList   = "webshell_file_list"
 	ToolWebshellFileRead   = "webshell_file_read"
 	ToolWebshellFileWrite  = "webshell_file_write"
+
+	// WebShell 连接管理工具（用于通过 MCP 管理 webshell 连接）
+	ToolManageWebshellList   = "manage_webshell_list"
+	ToolManageWebshellAdd    = "manage_webshell_add"
+	ToolManageWebshellUpdate = "manage_webshell_update"
+	ToolManageWebshellDelete = "manage_webshell_delete"
+	ToolManageWebshellTest   = "manage_webshell_test"
 )
 
 // IsBuiltinTool 检查工具名称是否是内置工具
@@ -32,7 +39,12 @@ func IsBuiltinTool(toolName string) bool {
 		ToolWebshellExec,
 		ToolWebshellFileList,
 		ToolWebshellFileRead,
-		ToolWebshellFileWrite:
+		ToolWebshellFileWrite,
+		ToolManageWebshellList,
+		ToolManageWebshellAdd,
+		ToolManageWebshellUpdate,
+		ToolManageWebshellDelete,
+		ToolManageWebshellTest:
 		return true
 	default:
 		return false
@@ -51,5 +63,10 @@ func GetAllBuiltinTools() []string {
 		ToolWebshellFileList,
 		ToolWebshellFileRead,
 		ToolWebshellFileWrite,
+		ToolManageWebshellList,
+		ToolManageWebshellAdd,
+		ToolManageWebshellUpdate,
+		ToolManageWebshellDelete,
+		ToolManageWebshellTest,
 	}
 }

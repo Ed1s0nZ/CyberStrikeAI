@@ -7,6 +7,26 @@
 
 [中文](README_CN.md) | [English](README.md)
 
+**Community**: [Join us on Discord](https://discord.gg/8PjVCMu8Zw)
+
+<details>
+<summary><strong>WeChat group</strong> (click to reveal QR code)</summary>
+
+<img src="./images/wechat-group-cyberstrikeai-qr.jpg" alt="CyberStrikeAI WeChat group QR code" width="280">
+
+</details>
+
+<details>
+<summary><strong>Sponsorship</strong> (click to expand)</summary>
+
+If CyberStrikeAI helps you, you can support the project via **WeChat Pay** or **Alipay**:
+
+<div align="center">
+  <img src="./images/sponsor-wechat-alipay-qr.jpg" alt="WeChat Pay and Alipay sponsorship QR codes" width="480">
+</div>
+
+</details>
+
 CyberStrikeAI is an **AI-native security testing platform** built in Go. It integrates 100+ security tools, an intelligent orchestration engine, role-based testing with predefined security roles, a skills system with specialized testing skills, and comprehensive lifecycle management capabilities. Through native MCP protocol and AI agents, it enables end-to-end automation from conversational commands to vulnerability discovery, attack-chain analysis, knowledge retrieval, and result visualization—delivering an auditable, traceable, and collaborative testing environment for security teams.
 
 
@@ -29,36 +49,36 @@ CyberStrikeAI is an **AI-native security testing platform** built in Go. It inte
 <img src="./images/web-console.png" alt="Web Console" width="100%">
 </td>
 <td width="33.33%" align="center">
-<strong>Attack Chain Visualization</strong><br/>
-<img src="./images/attack-chain.png" alt="Attack Chain" width="100%">
-</td>
-<td width="33.33%" align="center">
 <strong>Task Management</strong><br/>
 <img src="./images/task-management.png" alt="Task Management" width="100%">
+</td>
+<td width="33.33%" align="center">
+<strong>Vulnerability Management</strong><br/>
+<img src="./images/vulnerability-management.png" alt="Vulnerability Management" width="100%">
 </td>
 </tr>
 <tr>
 <td width="33.33%" align="center">
-<strong>Vulnerability Management</strong><br/>
-<img src="./images/vulnerability-management.png" alt="Vulnerability Management" width="100%">
+<strong>WebShell Management</strong><br/>
+<img src="./images/webshell-management.png" alt="WebShell Management" width="100%">
 </td>
 <td width="33.33%" align="center">
 <strong>MCP Management</strong><br/>
 <img src="./images/mcp-management.png" alt="MCP management" width="100%">
 </td>
 <td width="33.33%" align="center">
-<strong>MCP stdio Mode</strong><br/>
-<img src="./images/mcp-stdio2.png" alt="MCP stdio mode" width="100%">
+<strong>Knowledge Base</strong><br/>
+<img src="./images/knowledge-base.png" alt="Knowledge Base" width="100%">
 </td>
 </tr>
 <tr>
 <td width="33.33%" align="center">
-<strong>Knowledge Base</strong><br/>
-<img src="./images/knowledge-base.png" alt="Knowledge Base" width="100%">
-</td>
-<td width="33.33%" align="center">
 <strong>Skills Management</strong><br/>
 <img src="./images/skills.png" alt="Skills Management" width="100%">
+</td>
+<td width="33.33%" align="center">
+<strong>Agent Management</strong><br/>
+<img src="./images/agent-management.png" alt="Agent Management" width="100%">
 </td>
 <td width="33.33%" align="center">
 <strong>Role Management</strong><br/>
@@ -67,11 +87,17 @@ CyberStrikeAI is an **AI-native security testing platform** built in Go. It inte
 </tr>
 <tr>
 <td width="33.33%" align="center">
-<strong>WebShell Management</strong><br/>
-<img src="./images/webshell-management.png" alt="WebShell Management" width="100%">
+<strong>System Settings</strong><br/>
+<img src="./images/settings.png" alt="System settings" width="100%">
 </td>
-<td width="33.33%" align="center"></td>
-<td width="33.33%" align="center"></td>
+<td width="33.33%" align="center">
+<strong>MCP stdio Mode</strong><br/>
+<img src="./images/mcp-stdio2.png" alt="MCP stdio mode" width="100%">
+</td>
+<td width="33.33%" align="center">
+<strong>Burp Suite Plugin</strong><br/>
+<img src="./images/plugins.png" alt="Burp Suite plugin" width="100%">
+</td>
 </tr>
 </table>
 
@@ -90,9 +116,18 @@ CyberStrikeAI is an **AI-native security testing platform** built in Go. It inte
 - 🛡️ Vulnerability management with CRUD operations, severity tracking, status workflow, and statistics
 - 📋 Batch task management: create task queues, add multiple tasks, and execute them sequentially
 - 🎭 Role-based testing: predefined security testing roles (Penetration Testing, CTF, Web App Scanning, etc.) with custom prompts and tool restrictions
+- 🧩 **Multi-agent mode (Eino DeepAgent)**: optional orchestration where a coordinator delegates work to Markdown-defined sub-agents via the `task` tool; main agent in `agents/orchestrator.md` (or `kind: orchestrator`), sub-agents under `agents/*.md`; chat mode switch when `multi_agent.enabled` is true (see [Multi-agent doc](docs/MULTI_AGENT_EINO.md))
 - 🎯 Skills system: 20+ predefined security testing skills (SQL injection, XSS, API security, etc.) that can be attached to roles or called on-demand by AI agents
 - 📱 **Chatbot**: DingTalk and Lark (Feishu) long-lived connections so you can talk to CyberStrikeAI from mobile (see [Robot / Chatbot guide](docs/robot_en.md) for setup and commands)
  - 🐚 **WebShell management**: Add and manage WebShell connections (e.g. IceSword/AntSword compatible), use a virtual terminal for command execution, a built-in file manager for file operations, and an AI assistant tab that orchestrates tests and keeps per-connection conversation history; supports PHP, ASP, ASPX, JSP and custom shell types with configurable request method and command parameter.
+
+## Plugins
+
+CyberStrikeAI includes optional integrations under `plugins/`.
+
+- **Burp Suite extension**: `plugins/burp-suite/cyberstrikeai-burp-extension/`  
+  Build output: `plugins/burp-suite/cyberstrikeai-burp-extension/dist/cyberstrikeai-burp-extension.jar`  
+  Docs: `plugins/burp-suite/cyberstrikeai-burp-extension/README.md`
 
 ## Tool Overview
 
@@ -125,7 +160,7 @@ CyberStrikeAI ships with 100+ curated tools covering the whole kill chain:
 **One-Command Deployment:**
 ```bash
 git clone https://github.com/Ed1s0nZ/CyberStrikeAI.git
-cd CyberStrikeAI-main
+cd CyberStrikeAI
 chmod +x run.sh && ./run.sh
 ```
 
@@ -170,8 +205,30 @@ go build -o cyberstrike-ai cmd/server/main.go
 
 **Note:** The Python virtual environment (`venv/`) is automatically created and managed by `run.sh`. Tools that require Python (like `api-fuzzer`, `http-framework-test`, etc.) will automatically use this environment.
 
+### Version Update (No Breaking Changes)
+
+**CyberStrikeAI one-click upgrade (recommended):**
+1. (First time) enable the script: `chmod +x upgrade.sh`
+2. Upgrade with: `./upgrade.sh` (optional flags: `--tag vX.Y.Z`, `--no-venv`, `--preserve-custom`, `--yes`)
+3. The script will back up your `config.yaml` and `data/`, upgrade the code from GitHub Release, update `config.yaml`'s `version`, then restart the server.
+
+Recommended one-liner:
+`chmod +x upgrade.sh && ./upgrade.sh --yes`
+
+If something goes wrong, you can restore from `.upgrade-backup/` (or manually copy `/data` and `config.yaml` back) and run `./run.sh` again.
+
+Requirements / tips:
+* You need `curl` or `wget` for downloading Release packages.
+* `rsync` is recommended/required for the safe code sync.
+* If GitHub API rate-limits you, set `export GITHUB_TOKEN="..."` before running `./upgrade.sh`.
+
+⚠️ **Note:** This procedure only applies to version updates without compatibility or breaking changes. If a release includes compatibility changes, this method may not apply.
+
+**Examples:** No breaking changes — e.g. v1.3.1 → v1.3.2; with breaking changes — e.g. v1.3.1 → v1.4.0. The project follows [Semantic Versioning](https://semver.org/) (SemVer): when only the patch version (third number) changes, this upgrade path is usually safe; when the minor or major version changes, config, data, or APIs may have changed — check the release notes before using this method.
+
 ### Core Workflows
 - **Conversation testing** – Natural-language prompts trigger toolchains with streaming SSE output.
+- **Single vs multi-agent** – With `multi_agent.enabled: true`, the chat UI can switch between **single** (classic ReAct loop) and **multi** (Eino DeepAgent + `task` sub-agents). Multi mode uses `/api/multi-agent/stream`; tools are bridged from the same MCP stack as single-agent.
 - **Role-based testing** – Select from predefined security testing roles (Penetration Testing, CTF, Web App Scanning, API Security Testing, etc.) to customize AI behavior and tool availability. Each role applies custom system prompts and can restrict available tools for focused testing scenarios.
 - **Tool monitor** – Inspect running jobs, execution logs, and large-result attachments.
 - **History & audit** – Every conversation and tool invocation is stored in SQLite with replay.
@@ -215,6 +272,15 @@ go build -o cyberstrike-ai cmd/server/main.go
    ```
 2. Restart the server or reload configuration; the role appears in the role selector dropdown.
 
+### Multi-Agent Mode (Eino DeepAgent)
+- **What it is** – An optional second execution path based on CloudWeGo **Eino** `adk/prebuilt/deep`: a **coordinator** (main agent) calls a **`task`** tool to run ephemeral **sub-agents**, each with its own model loop and tool set derived from the current role.
+- **Markdown agents** – Under `agents_dir` (default `agents/`, relative to `config.yaml`), define:
+  - **Orchestrator**: file name `orchestrator.md` *or* any `.md` with front matter `kind: orchestrator` (only **one** per directory). Sets Deep agent name/id, description, and optional full system prompt (body); if the body is empty, `multi_agent.orchestrator_instruction` and then Eino defaults apply.
+  - **Sub-agents**: other `*.md` files (YAML front matter + body as instruction). They are **not** used as `task` targets if classified as orchestrator.
+- **Management** – Web UI: **Agents → Agent management** for CRUD on Markdown agents; API prefix `/api/multi-agent/markdown-agents`.
+- **Config** – `multi_agent` block in `config.yaml`: `enabled`, `default_mode` (`single` | `multi`), `robot_use_multi_agent`, `batch_use_multi_agent`, `max_iteration`, `orchestrator_instruction`, optional YAML `sub_agents` merged with disk (same `id` → Markdown wins).
+- **Details** – Streaming events, robots, batch queue, and troubleshooting: **[docs/MULTI_AGENT_EINO.md](docs/MULTI_AGENT_EINO.md)**.
+
 ### Skills System
 - **Predefined skills** – System includes 20+ predefined security testing skills (SQL injection, XSS, API security, cloud security, container security, etc.) in the `skills/` directory.
 - **Skill hints in prompts** – When a role is selected, skill names attached to that role are added to the system prompt as recommendations. Skill content is not automatically injected; AI agents must use the `read_skill` tool to access skill details when needed.
@@ -257,6 +323,7 @@ go build -o cyberstrike-ai cmd/server/main.go
 - **Web mode** – ships with HTTP MCP server automatically consumed by the UI.
 - **MCP stdio mode** – `go run cmd/mcp-stdio/main.go` exposes the agent to Cursor/CLI.
 - **External MCP federation** – register third-party MCP servers (HTTP, stdio, or SSE) from the UI, toggle them per engagement, and monitor their health and call volume in real time.
+- **Optional MCP servers** – the [`mcp-servers/`](mcp-servers/README.md) directory provides standalone MCPs (e.g. reverse shell). They speak standard MCP over stdio and work with CyberStrikeAI (Settings → External MCP), Cursor, VS Code, and other MCP clients.
 
 #### MCP stdio quick start
 1. **Build the binary** (run from the project root):
@@ -404,6 +471,7 @@ A test SSE MCP server is available at `cmd/test-sse-mcp-server/` for validation 
 
 ### Automation Hooks
 - **REST APIs** – everything the UI uses (auth, conversations, tool runs, monitor, vulnerabilities, roles) is available over JSON.
+- **Multi-agent APIs** – `POST /api/multi-agent/stream` (SSE, when enabled), `POST /api/multi-agent` (non-streaming), Markdown agents under `/api/multi-agent/markdown-agents` (list/get/create/update/delete).
 - **Role APIs** – manage security testing roles via `/api/roles` endpoints: `GET /api/roles` (list all roles), `GET /api/roles/:name` (get role), `POST /api/roles` (create role), `PUT /api/roles/:name` (update role), `DELETE /api/roles/:name` (delete role). Roles are stored as YAML files in the `roles/` directory and support hot-reload.
 - **Vulnerability APIs** – manage vulnerabilities via `/api/vulnerabilities` endpoints: `GET /api/vulnerabilities` (list with filters), `POST /api/vulnerabilities` (create), `GET /api/vulnerabilities/:id` (get), `PUT /api/vulnerabilities/:id` (update), `DELETE /api/vulnerabilities/:id` (delete), `GET /api/vulnerabilities/stats` (statistics).
 - **Batch Task APIs** – manage batch task queues via `/api/batch-tasks` endpoints: `POST /api/batch-tasks` (create queue), `GET /api/batch-tasks` (list queues), `GET /api/batch-tasks/:queueId` (get queue), `POST /api/batch-tasks/:queueId/start` (start execution), `POST /api/batch-tasks/:queueId/cancel` (cancel), `DELETE /api/batch-tasks/:queueId` (delete), `POST /api/batch-tasks/:queueId/tasks` (add task), `PUT /api/batch-tasks/:queueId/tasks/:taskId` (update task), `DELETE /api/batch-tasks/:queueId/tasks/:taskId` (delete task). Tasks execute sequentially, each creating a separate conversation with full status tracking.
@@ -452,6 +520,13 @@ knowledge:
     hybrid_weight: 0.7  # Weight for vector search (1.0 = pure vector, 0.0 = pure keyword)
 roles_dir: "roles"  # Role configuration directory (relative to config file)
 skills_dir: "skills"  # Skills directory (relative to config file)
+agents_dir: "agents"  # Multi-agent Markdown definitions (orchestrator + sub-agents)
+multi_agent:
+  enabled: false
+  default_mode: "single"   # single | multi (UI default when multi-agent is enabled)
+  robot_use_multi_agent: false
+  batch_use_multi_agent: false
+  orchestrator_instruction: ""  # Optional; used when orchestrator.md body is empty
 ```
 
 ### Tool Definition Example (`tools/nmap.yaml`)
@@ -496,6 +571,7 @@ enabled: true
 
 ## Related documentation
 
+- [Multi-agent mode (Eino)](docs/MULTI_AGENT_EINO.md): DeepAgent orchestration, `agents/*.md`, APIs, and chat/stream behavior.
 - [Robot / Chatbot guide (DingTalk & Lark)](docs/robot_en.md): Full setup, commands, and troubleshooting for using CyberStrikeAI from DingTalk or Lark on your phone. **Follow this doc to avoid common pitfalls.**
 
 ## Project Layout
@@ -508,7 +584,8 @@ CyberStrikeAI/
 ├── tools/               # YAML tool recipes (100+ examples provided)
 ├── roles/               # Role configurations (12+ predefined security testing roles)
 ├── skills/              # Skills directory (20+ predefined security testing skills)
-├── docs/                # Documentation (e.g. robot/chbot guide)
+├── agents/              # Multi-agent Markdown (orchestrator.md + sub-agent *.md)
+├── docs/                # Documentation (e.g. robot/chatbot guide, MULTI_AGENT_EINO.md)
 ├── images/              # Docs screenshots & diagrams
 ├── config.yaml          # Runtime configuration
 ├── run.sh               # Convenience launcher

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -256,21 +257,67 @@ func (db *DB) GetConversation(id string) (*Conversation, error) {
 	return &conv, nil
 }
 
+// GetConversationLite 获取对话（轻量版）：包含 messages，但不加载 process_details。
+// 用于历史会话快速切换，避免一次性把大体量过程详情灌到前端导致卡顿。
+func (db *DB) GetConversationLite(id string) (*Conversation, error) {
+	var conv Conversation
+	var createdAt, updatedAt string
+	var pinned int
+
+	err := db.QueryRow(
+		"SELECT id, title, pinned, created_at, updated_at FROM conversations WHERE id = ?",
+		id,
+	).Scan(&conv.ID, &conv.Title, &pinned, &createdAt, &updatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("对话不存在")
+		}
+		return nil, fmt.Errorf("查询对话失败: %w", err)
+	}
+
+	// 尝试多种时间格式解析
+	var err1, err2 error
+	conv.CreatedAt, err1 = time.Parse("2006-01-02 15:04:05.999999999-07:00", createdAt)
+	if err1 != nil {
+		conv.CreatedAt, err1 = time.Parse("2006-01-02 15:04:05", createdAt)
+	}
+	if err1 != nil {
+		conv.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	}
+
+	conv.UpdatedAt, err2 = time.Parse("2006-01-02 15:04:05.999999999-07:00", updatedAt)
+	if err2 != nil {
+		conv.UpdatedAt, err2 = time.Parse("2006-01-02 15:04:05", updatedAt)
+	}
+	if err2 != nil {
+		conv.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+	}
+
+	conv.Pinned = pinned != 0
+
+	// 加载消息（不加载 process_details）
+	messages, err := db.GetMessages(id)
+	if err != nil {
+		return nil, fmt.Errorf("加载消息失败: %w", err)
+	}
+	conv.Messages = messages
+	return &conv, nil
+}
+
 // ListConversations 列出所有对话
 func (db *DB) ListConversations(limit, offset int, search string) ([]*Conversation, error) {
 	var rows *sql.Rows
 	var err error
 	
 	if search != "" {
-		// 使用LIKE进行模糊搜索，搜索标题和消息内容
+		// 使用 EXISTS 子查询代替 LEFT JOIN + DISTINCT，避免大表笛卡尔积
 		searchPattern := "%" + search + "%"
-		// 使用DISTINCT避免重复，因为一个对话可能有多条消息匹配
 		rows, err = db.Query(
-			`SELECT DISTINCT c.id, c.title, COALESCE(c.pinned, 0), c.created_at, c.updated_at 
+			`SELECT c.id, c.title, COALESCE(c.pinned, 0), c.created_at, c.updated_at
 			 FROM conversations c
-			 LEFT JOIN messages m ON c.id = m.conversation_id
-			 WHERE c.title LIKE ? OR m.content LIKE ?
-			 ORDER BY c.updated_at DESC 
+			 WHERE c.title LIKE ?
+			    OR EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.content LIKE ?)
+			 ORDER BY c.updated_at DESC
 			 LIMIT ? OFFSET ?`,
 			searchPattern, searchPattern, limit, offset,
 		)
@@ -410,6 +457,19 @@ func (db *DB) GetReActData(conversationID string) (reactInput, reactOutput strin
 	return reactInput, reactOutput, nil
 }
 
+// ConversationHasToolProcessDetails 对话是否存在已落库的工具调用/结果（用于多代理等场景下 MCP execution id 未汇总时的攻击链判定）。
+func (db *DB) ConversationHasToolProcessDetails(conversationID string) (bool, error) {
+	var n int
+	err := db.QueryRow(
+		`SELECT COUNT(*) FROM process_details WHERE conversation_id = ? AND event_type IN ('tool_call', 'tool_result')`,
+		conversationID,
+	).Scan(&n)
+	if err != nil {
+		return false, fmt.Errorf("查询过程详情失败: %w", err)
+	}
+	return n > 0, nil
+}
+
 // AddMessage 添加消息
 func (db *DB) AddMessage(conversationID, role, content string, mcpExecutionIDs []string) (*Message, error) {
 	id := uuid.New().String()
@@ -491,6 +551,102 @@ func (db *DB) GetMessages(conversationID string) ([]Message, error) {
 	}
 
 	return messages, nil
+}
+
+// turnSliceRange 根据任意一条消息 ID 定位「一轮对话」在 msgs 中的 [start, end) 下标区间（msgs 须已按时间升序，与 GetMessages 一致）。
+// 一轮 = 从某条 user 消息起，至下一条 user 之前（含中间所有 assistant）。
+func turnSliceRange(msgs []Message, anchorID string) (start, end int, err error) {
+	idx := -1
+	for i := range msgs {
+		if msgs[i].ID == anchorID {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return 0, 0, fmt.Errorf("message not found")
+	}
+	start = idx
+	for start > 0 && msgs[start].Role != "user" {
+		start--
+	}
+	if start < len(msgs) && msgs[start].Role != "user" {
+		start = 0
+	}
+	end = len(msgs)
+	for i := start + 1; i < len(msgs); i++ {
+		if msgs[i].Role == "user" {
+			end = i
+			break
+		}
+	}
+	return start, end, nil
+}
+
+// DeleteConversationTurn 删除锚点所在轮次的全部消息（用户提问 + 该轮助手回复等），并清空 last_react_*，避免与消息表不一致。
+func (db *DB) DeleteConversationTurn(conversationID, anchorMessageID string) (deletedIDs []string, err error) {
+	msgs, err := db.GetMessages(conversationID)
+	if err != nil {
+		return nil, err
+	}
+	start, end, err := turnSliceRange(msgs, anchorMessageID)
+	if err != nil {
+		return nil, err
+	}
+	if start >= end {
+		return nil, fmt.Errorf("empty turn range")
+	}
+	deletedIDs = make([]string, 0, end-start)
+	for i := start; i < end; i++ {
+		deletedIDs = append(deletedIDs, msgs[i].ID)
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	ph := strings.Repeat("?,", len(deletedIDs))
+	ph = ph[:len(ph)-1]
+	args := make([]interface{}, 0, 1+len(deletedIDs))
+	args = append(args, conversationID)
+	for _, id := range deletedIDs {
+		args = append(args, id)
+	}
+	res, err := tx.Exec(
+		"DELETE FROM messages WHERE conversation_id = ? AND id IN ("+ph+")",
+		args...,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("delete messages: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+	if int(n) != len(deletedIDs) {
+		return nil, fmt.Errorf("deleted count mismatch")
+	}
+
+	_, err = tx.Exec(
+		`UPDATE conversations SET last_react_input = NULL, last_react_output = NULL, updated_at = ? WHERE id = ?`,
+		time.Now(), conversationID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("clear react data: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit: %w", err)
+	}
+
+	db.logger.Info("conversation turn deleted",
+		zap.String("conversationId", conversationID),
+		zap.Strings("deletedMessageIds", deletedIDs),
+		zap.Int("count", len(deletedIDs)),
+	)
+	return deletedIDs, nil
 }
 
 // ProcessDetail 过程详情事件

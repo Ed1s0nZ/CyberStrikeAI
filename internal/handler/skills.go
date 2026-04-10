@@ -224,9 +224,9 @@ func (h *SkillsHandler) GetSkillBoundRoles(c *gin.Context) {
 
 	boundRoles := h.getRolesBoundToSkill(skillName)
 	c.JSON(http.StatusOK, gin.H{
-		"skill":        skillName,
-		"bound_roles":  boundRoles,
-		"bound_count":  len(boundRoles),
+		"skill":       skillName,
+		"bound_roles": boundRoles,
+		"bound_count": len(boundRoles),
 	})
 }
 
@@ -323,6 +323,7 @@ func (h *SkillsHandler) CreateSkill(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建skill文件失败: " + err.Error()})
 		return
 	}
+	h.manager.InvalidateSkill(req.Name)
 
 	h.logger.Info("创建skill成功", zap.String("skill", req.Name))
 	c.JSON(http.StatusOK, gin.H{
@@ -443,6 +444,7 @@ func (h *SkillsHandler) UpdateSkill(c *gin.Context) {
 	if skillFile != targetFile {
 		os.Remove(skillFile)
 	}
+	h.manager.InvalidateSkill(skillName)
 
 	h.logger.Info("更新skill成功", zap.String("skill", skillName))
 	c.JSON(http.StatusOK, gin.H{
@@ -461,8 +463,8 @@ func (h *SkillsHandler) DeleteSkill(c *gin.Context) {
 	// 检查是否有角色绑定了该skill，如果有则自动移除绑定
 	affectedRoles := h.removeSkillFromRoles(skillName)
 	if len(affectedRoles) > 0 {
-		h.logger.Info("从角色中移除skill绑定", 
-			zap.String("skill", skillName), 
+		h.logger.Info("从角色中移除skill绑定",
+			zap.String("skill", skillName),
 			zap.Strings("roles", affectedRoles))
 	}
 
@@ -483,10 +485,11 @@ func (h *SkillsHandler) DeleteSkill(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除skill失败: " + err.Error()})
 		return
 	}
+	h.manager.InvalidateSkill(skillName)
 
 	responseMsg := "skill已删除"
 	if len(affectedRoles) > 0 {
-		responseMsg = fmt.Sprintf("skill已删除，已自动从 %d 个角色中移除绑定: %s", 
+		responseMsg = fmt.Sprintf("skill已删除，已自动从 %d 个角色中移除绑定: %s",
 			len(affectedRoles), strings.Join(affectedRoles, ", "))
 	}
 

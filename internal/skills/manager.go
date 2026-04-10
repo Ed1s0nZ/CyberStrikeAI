@@ -14,8 +14,14 @@ import (
 type Manager struct {
 	skillsDir string
 	logger    *zap.Logger
-	skills    map[string]*Skill // 缓存已加载的skills
-	mu        sync.RWMutex      // 保护skills map的并发访问
+	skills    map[string]*cachedSkill // 缓存已加载的skills（含文件状态）
+	mu        sync.RWMutex            // 保护skills map的并发访问
+}
+
+type cachedSkill struct {
+	skill    *Skill
+	filePath string
+	modTime  int64
 }
 
 // Skill Skill定义
@@ -31,49 +37,43 @@ func NewManager(skillsDir string, logger *zap.Logger) *Manager {
 	return &Manager{
 		skillsDir: skillsDir,
 		logger:    logger,
-		skills:    make(map[string]*Skill),
+		skills:    make(map[string]*cachedSkill),
 	}
 }
 
 // LoadSkill 加载单个skill
 func (m *Manager) LoadSkill(skillName string) (*Skill, error) {
-	// 先尝试读锁检查缓存
-	m.mu.RLock()
-	if skill, exists := m.skills[skillName]; exists {
-		m.mu.RUnlock()
-		return skill, nil
-	}
-	m.mu.RUnlock()
-
 	// 构建skill路径
 	skillPath := filepath.Join(m.skillsDir, skillName)
-	
+
 	// 检查目录是否存在
 	if _, err := os.Stat(skillPath); os.IsNotExist(err) {
+		m.InvalidateSkill(skillName)
 		return nil, fmt.Errorf("skill %s not found", skillName)
 	}
 
-	// 查找SKILL.md文件
-	skillFile := filepath.Join(skillPath, "SKILL.md")
-	if _, err := os.Stat(skillFile); os.IsNotExist(err) {
-		// 尝试其他可能的文件名
-		alternatives := []string{
-			filepath.Join(skillPath, "skill.md"),
-			filepath.Join(skillPath, "README.md"),
-			filepath.Join(skillPath, "readme.md"),
-		}
-		found := false
-		for _, alt := range alternatives {
-			if _, err := os.Stat(alt); err == nil {
-				skillFile = alt
-				found = true
-				break
-			}
-		}
-		if !found {
-			return nil, fmt.Errorf("skill file not found for %s", skillName)
-		}
+	// 查找skill文件并读取文件状态
+	skillFile, err := m.resolveSkillFile(skillPath)
+	if err != nil {
+		m.InvalidateSkill(skillName)
+		return nil, err
 	}
+	fileInfo, err := os.Stat(skillFile)
+	if err != nil {
+		m.InvalidateSkill(skillName)
+		return nil, fmt.Errorf("failed to stat skill file: %w", err)
+	}
+	modTime := fileInfo.ModTime().UnixNano()
+
+	// 先尝试读锁命中缓存（文件路径和修改时间都未变化）
+	m.mu.RLock()
+	if cached, exists := m.skills[skillName]; exists &&
+		cached.filePath == skillFile &&
+		cached.modTime == modTime {
+		m.mu.RUnlock()
+		return cached.skill, nil
+	}
+	m.mu.RUnlock()
 
 	// 读取skill文件
 	content, err := os.ReadFile(skillFile)
@@ -83,15 +83,14 @@ func (m *Manager) LoadSkill(skillName string) (*Skill, error) {
 
 	// 解析skill内容
 	skill := m.parseSkillContent(string(content), skillName, skillPath)
-	
-	// 使用写锁缓存skill（双重检查，避免重复加载）
+
+	// 使用写锁更新缓存
 	m.mu.Lock()
-	// 再次检查，可能其他goroutine已经加载了
-	if existing, exists := m.skills[skillName]; exists {
-		m.mu.Unlock()
-		return existing, nil
+	m.skills[skillName] = &cachedSkill{
+		skill:    skill,
+		filePath: skillFile,
+		modTime:  modTime,
 	}
-	m.skills[skillName] = skill
 	m.mu.Unlock()
 
 	return skill, nil
@@ -159,6 +158,42 @@ func (m *Manager) ListSkills() ([]string, error) {
 	}
 
 	return skills, nil
+}
+
+func (m *Manager) resolveSkillFile(skillPath string) (string, error) {
+	// 优先标准文件名
+	skillFile := filepath.Join(skillPath, "SKILL.md")
+	if _, err := os.Stat(skillFile); err == nil {
+		return skillFile, nil
+	}
+
+	// 兼容历史文件名
+	alternatives := []string{
+		filepath.Join(skillPath, "skill.md"),
+		filepath.Join(skillPath, "README.md"),
+		filepath.Join(skillPath, "readme.md"),
+	}
+	for _, alt := range alternatives {
+		if _, err := os.Stat(alt); err == nil {
+			return alt, nil
+		}
+	}
+
+	return "", fmt.Errorf("skill file not found for %s", filepath.Base(skillPath))
+}
+
+// InvalidateSkill 使指定skill缓存失效
+func (m *Manager) InvalidateSkill(skillName string) {
+	m.mu.Lock()
+	delete(m.skills, skillName)
+	m.mu.Unlock()
+}
+
+// InvalidateAll 清空全部skill缓存
+func (m *Manager) InvalidateAll() {
+	m.mu.Lock()
+	m.skills = make(map[string]*cachedSkill)
+	m.mu.Unlock()
 }
 
 // parseSkillContent 解析skill内容

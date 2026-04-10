@@ -117,6 +117,16 @@ async function loadConfig(loadTools = true) {
         
         // 填充Agent配置
         document.getElementById('agent-max-iterations').value = currentConfig.agent.max_iterations || 30;
+
+        const ma = currentConfig.multi_agent || {};
+        const maEn = document.getElementById('multi-agent-enabled');
+        if (maEn) maEn.checked = ma.enabled === true;
+        const maMode = document.getElementById('multi-agent-default-mode');
+        if (maMode) maMode.value = (ma.default_mode === 'multi') ? 'multi' : 'single';
+        const maRobot = document.getElementById('multi-agent-robot-use');
+        if (maRobot) maRobot.checked = ma.robot_use_multi_agent === true;
+        const maBatch = document.getElementById('multi-agent-batch-use');
+        if (maBatch) maBatch.checked = ma.batch_use_multi_agent === true;
         
         // 填充知识库配置
         const knowledgeEnabledCheckbox = document.getElementById('knowledge-enabled');
@@ -806,6 +816,12 @@ async function applySettings() {
             agent: {
                 max_iterations: parseInt(document.getElementById('agent-max-iterations').value) || 30
             },
+            multi_agent: {
+                enabled: document.getElementById('multi-agent-enabled')?.checked === true,
+                default_mode: document.getElementById('multi-agent-default-mode')?.value === 'multi' ? 'multi' : 'single',
+                robot_use_multi_agent: document.getElementById('multi-agent-robot-use')?.checked === true,
+                batch_use_multi_agent: document.getElementById('multi-agent-batch-use')?.checked === true
+            },
             knowledge: knowledgeConfig,
             robots: {
                 wecom: {
@@ -940,6 +956,57 @@ async function applySettings() {
             ? window.t('settings.apply.applyFailed')
             : '应用配置失败';
         alert(baseMsg + ': ' + error.message);
+    }
+}
+
+// 测试OpenAI连接
+async function testOpenAIConnection() {
+    const btn = document.getElementById('test-openai-btn');
+    const resultEl = document.getElementById('test-openai-result');
+
+    const baseUrl = document.getElementById('openai-base-url').value.trim();
+    const apiKey = document.getElementById('openai-api-key').value.trim();
+    const model = document.getElementById('openai-model').value.trim();
+
+    if (!apiKey || !model) {
+        resultEl.style.color = 'var(--danger-color, #e53e3e)';
+        resultEl.textContent = typeof window.t === 'function' ? window.t('settingsBasic.testFillRequired') : '请先填写 API Key 和模型';
+        return;
+    }
+
+    btn.style.pointerEvents = 'none';
+    btn.style.opacity = '0.5';
+    resultEl.style.color = 'var(--text-muted, #888)';
+    resultEl.textContent = typeof window.t === 'function' ? window.t('settingsBasic.testing') : '测试中...';
+
+    try {
+        const response = await apiFetch('/api/config/test-openai', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                base_url: baseUrl,
+                api_key: apiKey,
+                model: model
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            resultEl.style.color = 'var(--success-color, #38a169)';
+            const latency = result.latency_ms ? ` (${result.latency_ms}ms)` : '';
+            const modelInfo = result.model ? ` [${result.model}]` : '';
+            resultEl.textContent = (typeof window.t === 'function' ? window.t('settingsBasic.testSuccess') : '连接成功') + modelInfo + latency;
+        } else {
+            resultEl.style.color = 'var(--danger-color, #e53e3e)';
+            resultEl.textContent = (typeof window.t === 'function' ? window.t('settingsBasic.testFailed') : '连接失败') + ': ' + (result.error || '未知错误');
+        }
+    } catch (error) {
+        resultEl.style.color = 'var(--danger-color, #e53e3e)';
+        resultEl.textContent = (typeof window.t === 'function' ? window.t('settingsBasic.testError') : '测试出错') + ': ' + error.message;
+    } finally {
+        btn.style.pointerEvents = '';
+        btn.style.opacity = '';
     }
 }
 

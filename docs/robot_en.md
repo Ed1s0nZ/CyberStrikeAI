@@ -97,7 +97,25 @@ If you only have a **custom bot** Webhook URL (`oapi.dingtalk.com/robot/send?acc
 | App Secret | From Lark open platform app credentials |
 | Verify Token | Optional; for event subscription |
 
-**Lark setup in short**: Log in to [Lark Open Platform](https://open.feishu.cn) → Create an enterprise app → In “Credentials and basic info” get **App ID** and **App Secret** → In “Application capabilities” enable **Robot** and the right permissions → Publish the app → Enter App ID and App Secret in CyberStrikeAI robot settings → Save and **restart** the app.
+**Lark setup in short**: Log in to [Lark Open Platform](https://open.feishu.cn) → Create an enterprise app → In “Credentials and basic info” get **App ID** and **App Secret** → In “Application capabilities” enable **Robot** and the right permissions → Add **event subscription** and **permissions** below → Publish the app → Enter App ID and App Secret in CyberStrikeAI robot settings → Save and **restart** the app.
+
+**Event subscription**  
+The long-lived connection only receives message events if you subscribe to them. In the app’s **Events and callbacks** (事件与回调) → **Event subscription** (事件订阅), add the event **Receive message** (**im.message.receive_v1**). Without it, the connection succeeds but no message events are delivered (no logs when users send messages).
+
+**Lark permissions (required)**  
+In **Permission management** (权限管理), enable the following (names and identifiers match the Lark console). After changes, **publish a new version** in Version management and release so they take effect.
+
+| Permission name (as shown in console) | Identifier | Notes |
+|--------------------------------------|------------|-------|
+| 获取与发送单聊、群组消息 (Get and send direct & group messages) | `im:message` | Base permission for sending and receiving; **required**. |
+| 接收群聊中@机器人消息事件 (Receive @bot messages in group chat) | `im:message.group_at_msg:readonly` | Required for group chat when users @ the bot. |
+| 读取用户发给机器人的单聊消息 (Read direct messages from users to bot) | `im:message.p2p_msg:readonly` | **Required** for 1:1 chat; otherwise no response in private chat. |
+| 获取单聊、群组消息 (Get direct & group messages) | `im:message:readonly` | **Required** to read message content. |
+
+**Event subscription** (configured separately): In **Event subscription** (事件订阅), add **Receive message** (**im.message.receive_v1**). Without it, the long-lived connection will not receive message events.
+
+- **1:1 chat**: Open the bot’s private chat in Lark and send e.g. “帮助” or “help”; no @ needed.  
+- **Group chat**: Only messages that **@ the bot** are received and replied to.
 
 ---
 

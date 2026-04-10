@@ -52,7 +52,7 @@ body {
     overflow: hidden;
     min-height: 0;
     /* 主侧边栏与右侧内容之间预留水平间距，避免导航项文字贴到内容边框 */
-    column-gap: 12px;
+    column-gap: 0px;
 }
 
 /* 主侧边栏样式 - 紧凑宽度，参考常见后台 200~220px */
@@ -1573,6 +1573,81 @@ header {
     letter-spacing: 0.01em;
 }
 
+/* 时间戳 + 删除本轮（与气泡分离，和「展开详情」同一视觉层级） */
+.message-meta-footer {
+    display: flex;
+    flex-direction: row;
+    align-items: center; /* 与时间戳、删除钮统一垂直居中 */
+    gap: 8px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+    width: 100%;
+    min-height: 28px;
+}
+
+.message.user .message-meta-footer {
+    justify-content: flex-end;
+}
+
+.message.assistant .message-meta-footer {
+    justify-content: flex-start;
+}
+
+.message-delete-turn-btn {
+    position: static;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-secondary, #888);
+    cursor: pointer;
+    opacity: 0.5;
+    flex-shrink: 0;
+    transition: opacity 0.2s ease, color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.message:hover .message-meta-footer .message-delete-turn-btn {
+    opacity: 0.85;
+}
+
+.message-delete-turn-btn:hover {
+    color: #c62828;
+    background: rgba(198, 40, 40, 0.07);
+    border-color: rgba(198, 40, 40, 0.15);
+    opacity: 1;
+}
+
+.message-delete-turn-btn:focus-visible {
+    opacity: 1;
+    outline: 2px solid var(--accent-color, #0066ff);
+    outline-offset: 1px;
+}
+
+/* 与删除钮同一行时：去掉时间戳默认 margin-top，避免文字偏低、图标显「高」 */
+.message-meta-footer .message-time {
+    margin-top: 0;
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    line-height: 1.3;
+}
+
+.message-delete-turn-btn svg {
+    display: block;
+    flex-shrink: 0;
+}
+
+@media (hover: none) {
+    .message-delete-turn-btn {
+        opacity: 0.65;
+    }
+}
+
 /* 用户消息中的表格样式 */
 .message.user .message-bubble .table-wrapper {
     scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
@@ -1801,6 +1876,16 @@ header {
 .chat-file-chip-remove:hover {
     background: rgba(0, 0, 0, 0.12);
     color: var(--text-primary);
+}
+
+.chat-file-chip--uploading {
+    opacity: 0.92;
+    border-style: dashed;
+}
+
+.chat-file-chip--error {
+    border-color: rgba(220, 38, 38, 0.45);
+    background: rgba(220, 38, 38, 0.06);
 }
 
 .chat-file-input-hidden {
@@ -2831,6 +2916,16 @@ header {
     color: var(--text-primary);
 }
 
+/* 详情区底部「收起/展开」，流式输出过长时无需滚回顶部即可折叠 */
+.progress-footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color);
+}
+
 .progress-timeline {
     max-height: 0;
     overflow: hidden;
@@ -2859,6 +2954,24 @@ header {
 .timeline-item-iteration {
     border-left-color: var(--accent-color);
     background: rgba(0, 102, 255, 0.05);
+}
+
+/* Eino 多代理：主编排器 vs 子代理时间线区分 */
+.timeline-eino-role-orchestrator {
+    border-left-color: #5c6bc0 !important;
+    background: rgba(92, 107, 192, 0.09) !important;
+}
+.timeline-eino-role-sub {
+    border-left-color: #00897b !important;
+    background: rgba(0, 137, 123, 0.08) !important;
+}
+.timeline-item-iteration.timeline-eino-scope-main {
+    border-left-color: #3949ab !important;
+    background: rgba(57, 73, 171, 0.1) !important;
+}
+.timeline-item-iteration.timeline-eino-scope-sub {
+    border-left-color: #00695c !important;
+    background: rgba(0, 105, 92, 0.09) !important;
 }
 
 .timeline-item-thinking {
@@ -3447,6 +3560,27 @@ header {
 
 .terminal-container .xterm-viewport {
     border-radius: 0;
+    /* 与 WebShell 终端一致：细窄、深色，避免系统默认浅色粗滚动条 */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(110, 118, 129, 0.5) transparent;
+}
+.terminal-container .xterm-viewport::-webkit-scrollbar {
+    width: 6px;
+}
+.terminal-container .xterm-viewport::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 4px 0;
+    border-radius: 3px;
+}
+.terminal-container .xterm-viewport::-webkit-scrollbar-thumb {
+    background: rgba(110, 118, 129, 0.4);
+    border-radius: 3px;
+}
+.terminal-container .xterm-viewport::-webkit-scrollbar-thumb:hover {
+    background: rgba(110, 118, 129, 0.65);
+}
+.terminal-container .xterm-viewport::-webkit-scrollbar-thumb:active {
+    background: rgba(139, 148, 158, 0.7);
 }
 
 .terminal-error {
@@ -8572,6 +8706,40 @@ header {
     flex-shrink: 0;
 }
 
+.webshell-conn-search {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.4);
+    flex-shrink: 0;
+}
+
+.webshell-sidebar-tools {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.45);
+}
+
+.webshell-sidebar-tools .btn-ghost {
+    width: 100%;
+    border: 1px solid var(--border-color);
+    background: #fff;
+}
+
+.webshell-conn-search-input {
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    font-size: 0.9rem;
+    background: var(--bg-secondary);
+}
+
+.webshell-conn-search-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(0, 102, 255, 0.12);
+}
+
 .webshell-sidebar-header::before {
     content: '';
     display: inline-block;
@@ -8637,6 +8805,41 @@ header {
     white-space: nowrap;
 }
 
+.webshell-item-remark-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.webshell-probe-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border: 1px solid transparent;
+    flex-shrink: 0;
+}
+
+.webshell-probe-badge.probing {
+    color: #a16207;
+    background: #fef3c7;
+    border-color: #fde68a;
+}
+
+.webshell-probe-badge.ok {
+    color: #166534;
+    background: #dcfce7;
+    border-color: #86efac;
+}
+
+.webshell-probe-badge.fail {
+    color: #b91c1c;
+    background: #fee2e2;
+    border-color: #fca5a5;
+}
+
 .webshell-item-url {
     font-size: 0.78rem;
     color: var(--text-secondary);
@@ -8650,6 +8853,8 @@ header {
 .webshell-item-actions {
     margin-top: 6px;
     flex-shrink: 0;
+    display: flex;
+    justify-content: flex-end;
 }
 
 .webshell-delete-btn {
@@ -8678,7 +8883,7 @@ header {
 .webshell-workspace {
     flex: 1;
     overflow: auto;
-    padding: 20px 24px;
+    padding: 16px 18px;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -8768,6 +8973,71 @@ header {
     border-radius: 10px;
     border: 1px solid var(--border-color);
 }
+.webshell-terminal-sessions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 8px;
+    height: 34px;
+    background: #0b0f14;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    overflow-x: auto;
+}
+.webshell-terminal-session {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    height: 30px;
+    color: #c9d1d9;
+}
+.webshell-terminal-session.active {
+    background: #0d1117;
+    border-color: rgba(88, 166, 255, 0.45);
+    color: #e6edf3;
+}
+.webshell-terminal-session-main {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font-size: 12px;
+    height: 100%;
+    padding: 0 10px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.webshell-terminal-session-close {
+    border: 0;
+    background: transparent;
+    color: #8b949e;
+    width: 20px;
+    height: 100%;
+    cursor: pointer;
+    font-size: 12px;
+}
+.webshell-terminal-session-close:hover {
+    color: #f85149;
+    background: rgba(248, 81, 73, 0.08);
+}
+.webshell-terminal-session-add {
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-bottom: none;
+    background: rgba(255, 255, 255, 0.03);
+    color: #8b949e;
+    height: 30px;
+    width: 28px;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.webshell-terminal-session-add:hover {
+    color: #e6edf3;
+    background: rgba(255, 255, 255, 0.08);
+}
 .webshell-quick-label {
     font-size: 12px;
     font-weight: 500;
@@ -8777,20 +9047,48 @@ header {
 .webshell-terminal-toolbar .btn-ghost {
     font-size: 12px;
 }
+.webshell-terminal-status {
+    display: inline-flex;
+    align-items: center;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid transparent;
+}
+.webshell-terminal-status.idle {
+    color: #166534;
+    background: rgba(34, 197, 94, 0.1);
+    border-color: rgba(34, 197, 94, 0.25);
+}
+.webshell-terminal-status.running {
+    color: #9a3412;
+    background: rgba(251, 146, 60, 0.14);
+    border-color: rgba(251, 146, 60, 0.28);
+}
 
 #webshell-pane-terminal {
     flex-direction: column;
 }
 
 /* 仅外框圆角，内部不做额外装饰，避免挡住文字 */
-.webshell-terminal-container {
+.webshell-terminal-shell {
     flex: 1;
     min-height: 360px;
-    padding: 0;
+    display: flex;
+    flex-direction: column;
     background: #0d1117;
     border-radius: 12px;
     overflow: hidden;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.webshell-terminal-container {
+    flex: 1;
+    min-height: 0;
+    padding: 0;
+    background: transparent;
+    overflow: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     transform: translateZ(0);
@@ -8849,19 +9147,150 @@ header {
     background: rgba(139, 148, 158, 0.7);
 }
 
+.webshell-file-layout {
+    display: flex;
+    gap: 12px;
+    min-height: 0;
+    flex: 1;
+}
+
+.webshell-file-sidebar {
+    width: 280px;
+    min-width: 260px;
+    max-width: 320px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    box-shadow: var(--shadow-sm);
+}
+
+.webshell-file-sidebar-title {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-color);
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0.2px;
+}
+
+.webshell-dir-tree {
+    padding: 10px 8px;
+    overflow: auto;
+    min-height: 0;
+}
+
+.webshell-tree-node {
+    position: relative;
+}
+
+.webshell-tree-row {
+    display: flex;
+    align-items: center;
+    border-radius: 8px;
+    margin: 2px 0;
+}
+
+.webshell-tree-row.active {
+    background: rgba(0, 102, 255, 0.11);
+}
+
+.webshell-tree-toggle {
+    width: 18px;
+    min-width: 18px;
+    height: 24px;
+    margin-left: 2px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0;
+    font-size: 12px;
+}
+
+.webshell-tree-toggle.empty {
+    cursor: default;
+    opacity: 0.6;
+}
+
+.webshell-tree-children {
+    margin-left: 14px;
+    border-left: 1px dashed rgba(128, 128, 128, 0.28);
+    padding-left: 6px;
+}
+
+.webshell-dir-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    text-align: left;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    border-radius: 6px;
+    padding: 4px 8px;
+    margin: 0;
+    cursor: pointer;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.webshell-tree-icon {
+    flex: 0 0 auto;
+    font-size: 0.92rem;
+    opacity: 0.92;
+}
+
+.webshell-tree-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.webshell-dir-item:hover {
+    background: rgba(0, 102, 255, 0.08);
+}
+
+.webshell-tree-row.active .webshell-dir-item {
+    color: var(--accent-color);
+    font-weight: 600;
+}
+
+.webshell-file-main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    flex: 1;
+}
+
 .webshell-file-toolbar {
     display: flex;
     align-items: center;
-    gap: 14px;
-    margin-bottom: 16px;
+    gap: 10px;
+    margin-bottom: 12px;
     flex-wrap: wrap;
-    padding: 14px 16px;
-    background: var(--bg-secondary);
+    padding: 12px 14px;
+    background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
     border-radius: 10px;
     border: 1px solid var(--border-color);
     width: 100%;
     min-width: 0;
     box-sizing: border-box;
+}
+
+.webshell-file-toolbar-main {
+    display: flex;
+    flex: 1 1 720px;
+    min-width: 0;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
 }
 
 .webshell-file-toolbar label {
@@ -8888,6 +9317,10 @@ header {
     border: 1px solid var(--border-color);
 }
 
+.webshell-file-path-field {
+    flex: 1 1 260px !important;
+}
+
 .webshell-file-toolbar .btn-secondary,
 .webshell-file-toolbar .btn-ghost {
     padding: 8px 16px;
@@ -8895,6 +9328,13 @@ header {
     font-weight: 500;
     transition: all 0.2s ease;
     flex-shrink: 0;
+}
+
+.webshell-file-toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
 }
 
 .webshell-file-breadcrumb {
@@ -8916,8 +9356,8 @@ header {
 }
 .webshell-file-filter {
     min-width: 0 !important;
-    flex: 0 1 140px;
-    max-width: 200px;
+    flex: 1 1 180px;
+    max-width: 260px;
 }
 .webshell-col-check {
     width: 36px;
@@ -8925,9 +9365,46 @@ header {
     vertical-align: middle;
 }
 .webshell-col-size {
-    width: 80px;
+    width: 90px;
     color: var(--text-secondary);
     font-size: 0.85rem;
+}
+
+.webshell-col-mtime {
+    width: 170px;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    white-space: nowrap;
+}
+
+.webshell-col-owner {
+    width: 150px;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.webshell-col-perms {
+    width: 150px;
+    font-family: ui-monospace, monospace;
+    font-size: 0.82rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-secondary);
+}
+
+.webshell-col-type {
+    width: 72px;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    text-transform: lowercase;
+}
+
+.webshell-col-actions {
+    width: 90px;
 }
 
 .webshell-file-list {
@@ -8943,9 +9420,23 @@ header {
     width: 100%;
 }
 
+@media (max-width: 1200px) {
+    .webshell-file-layout {
+        flex-direction: column;
+    }
+
+    .webshell-file-sidebar {
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+        max-height: 220px;
+    }
+}
+
 .webshell-file-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
     font-size: 0.9rem;
 }
 
@@ -8966,6 +9457,19 @@ header {
     text-align: left;
     border-bottom: 1px solid var(--border-color);
     transition: background 0.15s ease;
+}
+
+.webshell-file-empty-state {
+    padding: 28px 16px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.92rem;
+    background: var(--bg-primary);
+}
+
+.webshell-file-table td:last-child {
+    white-space: nowrap;
+    width: auto;
 }
 
 .webshell-file-table tbody tr:hover {
@@ -8990,6 +9494,22 @@ header {
     color: var(--accent-hover);
 }
 
+.webshell-file-link.is-dir::before,
+.webshell-file-link.is-file::before {
+    display: inline-block;
+    margin-right: 6px;
+    font-size: 0.95rem;
+    opacity: 0.95;
+}
+
+.webshell-file-link.is-dir::before {
+    content: "📁";
+}
+
+.webshell-file-link.is-file::before {
+    content: "📄";
+}
+
 .webshell-file-table .webshell-file-read {
     color: var(--accent-color);
     margin-right: 8px;
@@ -9011,6 +9531,93 @@ header {
 
 .webshell-file-table .webshell-file-del:hover {
     background: rgba(220, 53, 69, 0.08);
+}
+
+/* WebShell 行内“操作”下拉菜单（替代一堆按钮） */
+.webshell-conn-actions,
+.webshell-row-actions {
+    display: inline-block;
+    position: relative;
+}
+
+.webshell-conn-actions summary,
+.webshell-row-actions summary {
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+}
+
+.webshell-conn-actions summary::-webkit-details-marker,
+.webshell-row-actions summary::-webkit-details-marker {
+    display: none;
+}
+
+.webshell-row-actions-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 20;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 6px;
+    box-shadow: var(--shadow-md);
+    min-width: 180px;
+    gap: 6px;
+    flex-direction: column;
+}
+
+.webshell-toolbar-actions {
+    position: relative;
+}
+
+.webshell-toolbar-actions .webshell-row-actions-menu {
+    min-width: 220px;
+}
+
+.webshell-conn-actions[open] .webshell-row-actions-menu,
+.webshell-row-actions[open] .webshell-row-actions-menu,
+.webshell-toolbar-actions[open] .webshell-row-actions-menu {
+    display: flex;
+}
+
+.webshell-row-actions-menu .btn-ghost {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    margin: 0;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    font-size: 0.86rem;
+    white-space: nowrap;
+}
+
+.webshell-row-actions-menu .btn-ghost:hover {
+    background: rgba(0, 102, 255, 0.08);
+    border-color: rgba(0, 102, 255, 0.22);
+}
+
+.webshell-row-actions-menu .webshell-file-del:hover {
+    background: rgba(220, 53, 69, 0.08);
+    border-color: rgba(220, 53, 69, 0.25);
+}
+
+.webshell-conn-actions-btn,
+.webshell-row-actions-btn,
+.webshell-toolbar-actions-btn {
+    min-width: 72px;
+    text-align: center;
+    border: 1px solid var(--border-color);
+    background: #fff;
+}
+
+.webshell-conn-actions-btn:hover,
+.webshell-row-actions-btn:hover,
+.webshell-toolbar-actions-btn:hover {
+    background: var(--bg-secondary);
 }
 
 .webshell-loading {
@@ -9175,6 +9782,112 @@ header {
     flex-direction: column;
     min-height: 0;
 }
+.webshell-pane-memo {
+    padding: 14px;
+    background: linear-gradient(180deg, rgba(248, 250, 252, 0.55) 0%, rgba(241, 245, 249, 0.28) 100%);
+}
+.webshell-memo-layout {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.9) 100%);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    overflow: hidden;
+}
+.webshell-memo-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(6px);
+}
+.webshell-memo-input {
+    flex: 1;
+    min-height: 0;
+    margin: 12px 14px 8px;
+    padding: 12px 13px;
+    border-radius: 10px;
+    border: 1px solid rgba(15, 23, 42, 0.14);
+    background: #fff;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    font-family: "JetBrains Mono", "Fira Code", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    color: var(--text-primary);
+    resize: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.webshell-memo-input:focus {
+    border-color: rgba(37, 99, 235, 0.5);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    outline: none;
+}
+.webshell-memo-status {
+    margin: 0 14px 12px auto;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+    background: rgba(148, 163, 184, 0.14);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+}
+.webshell-memo-status.error {
+    color: #b91c1c;
+    background: rgba(239, 68, 68, 0.14);
+    border-color: rgba(239, 68, 68, 0.28);
+}
+.webshell-ai-memo {
+    flex-shrink: 0;
+    width: 300px;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    min-height: 0;
+}
+.webshell-ai-memo-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+.webshell-ai-memo-input {
+    flex: 1;
+    min-height: 0;
+    margin: 10px 12px 8px;
+    resize: none;
+}
+.webshell-ai-memo-status {
+    padding: 0 12px 10px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+.webshell-ai-memo-status.error {
+    color: #dc2626;
+}
+@media (max-width: 1280px) {
+    .webshell-ai-memo {
+        width: 260px;
+    }
+}
+@media (max-width: 980px) {
+    .webshell-ai-memo {
+        display: none;
+    }
+}
 .webshell-ai-hint {
     flex-shrink: 0;
     padding: 10px 14px;
@@ -9241,16 +9954,26 @@ header {
     margin-top: 8px;
     margin-bottom: 8px;
 }
+.webshell-ai-process-block.process-details-container {
+    /* 让“渗透测试详情”视觉上跟随助手气泡宽度，而不是强行 100% 宽 */
+    width: auto;
+    max-width: 80%;
+    align-self: flex-start;
+    /* 覆盖通用 .process-details-container 的边框/内边距，避免重复一层“边框卡片” */
+    border-top: none;
+    padding-top: 0;
+    margin-top: 10px;
+}
 .webshell-ai-process-toggle {
     display: block;
     width: 100%;
-    padding: 8px 12px;
+    padding: 10px 14px;
     text-align: left;
     font-size: 0.9rem;
     color: var(--text-secondary);
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: 10px;
     cursor: pointer;
 }
 .webshell-ai-process-toggle:hover {
@@ -9262,9 +9985,42 @@ header {
     overflow: hidden;
     transition: max-height 0.3s ease;
 }
+.webshell-ai-process-block .process-details-content .progress-timeline {
+    /* 避免与外层卡片重复背景/边框 */
+    background: transparent;
+    border: none;
+    padding: 0;
+    width: 100%;
+    margin-top: 10px;
+    gap: 0;
+}
+.webshell-ai-process-block .webshell-ai-timeline {
+    background: transparent;
+    border: none;
+    padding: 0;
+    border-radius: 0;
+    margin-bottom: 0;
+    width: 100%;
+}
 .webshell-ai-process-block .process-details-content .progress-timeline.expanded {
     max-height: 2000px;
     overflow-y: auto;
+}
+
+/* 展开后才把宽度撑满；未展开时保持折叠按钮“缩回去”的视觉 */
+.webshell-ai-process-block.process-details-container:has(.progress-timeline.expanded) {
+    width: 100%;
+    max-width: 80%;
+    align-self: flex-start;
+}
+.webshell-ai-process-block.process-details-container:has(.progress-timeline.expanded) .webshell-ai-process-toggle {
+    width: 100%;
+}
+.webshell-ai-process-block.process-details-container:has(.progress-timeline.expanded) .process-details-content .progress-timeline {
+    width: 100%;
+}
+.webshell-ai-process-block.process-details-container:has(.progress-timeline.expanded) .webshell-ai-timeline {
+    width: 100%;
 }
 .webshell-ai-old-conv {
     width: 100%;
@@ -9295,6 +10051,37 @@ header {
     flex-direction: column;
     gap: 12px;
 }
+
+/* 让 timeline item 更“像条目”而不是松散的分隔块 */
+.webshell-ai-process-block .webshell-ai-timeline-item {
+    border-left: 3px solid transparent;
+    padding: 10px 0 10px 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+.webshell-ai-process-block .webshell-ai-timeline-item:last-child {
+    border-bottom: none;
+}
+.webshell-ai-process-block .webshell-ai-timeline-msg {
+    /* 避免每条详情都出现内层滚动条（体验会显得很“碎”） */
+    max-height: none;
+    overflow-y: visible;
+}
+.webshell-ai-process-block .webshell-ai-timeline-iteration {
+    border-left-color: var(--accent-color);
+}
+.webshell-ai-process-block .webshell-ai-timeline-thinking {
+    border-left-color: #9c27b0;
+}
+.webshell-ai-process-block .webshell-ai-timeline-tool_call,
+.webshell-ai-process-block .webshell-ai-timeline-tool_calls_detected {
+    border-left-color: #ff9800;
+}
+.webshell-ai-process-block .webshell-ai-timeline-tool_result {
+    border-left-color: var(--success-color);
+}
+.webshell-ai-process-block .webshell-ai-timeline-error {
+    border-left-color: var(--error-color);
+}
 .webshell-ai-messages {
     flex: 1;
     min-height: 0;
@@ -9320,6 +10107,31 @@ header {
     align-self: flex-start;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
+}
+.webshell-ai-msg.assistant.webshell-ai-msg-error {
+    max-width: 72%;
+    border-color: rgba(220, 53, 69, 0.35);
+    background: rgba(220, 53, 69, 0.06);
+}
+.webshell-ai-error-head {
+    color: var(--error-color);
+    font-weight: 600;
+    line-height: 1.45;
+}
+.webshell-ai-error-detail {
+    margin-top: 6px;
+    font-size: 0.82rem;
+}
+.webshell-ai-error-detail summary {
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+.webshell-ai-error-detail pre {
+    margin-top: 6px;
+    max-height: 140px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 /* AI 助手 markdown 渲染优化：避免行间距离过大和内容横向溢出 */
 .webshell-ai-msg.assistant {
@@ -9430,6 +10242,465 @@ header {
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+/* WebShell 数据库管理 Tab */
+.webshell-pane-db {
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+    overflow: hidden;
+    background: linear-gradient(180deg, rgba(2, 6, 23, 0.015) 0%, rgba(2, 6, 23, 0.03) 100%);
+    border-radius: 10px;
+}
+.webshell-db-profiles-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 10px;
+    padding: 6px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.92) 100%);
+}
+.webshell-db-profiles {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    min-width: 0;
+    flex: 1;
+}
+.webshell-db-profile-actions {
+    flex-shrink: 0;
+}
+.webshell-db-profile-tab {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+}
+.webshell-db-profile-tab.active {
+    border-color: rgba(0, 102, 255, 0.36);
+    box-shadow: 0 0 0 1px rgba(0, 102, 255, 0.12);
+}
+.webshell-db-profile-main,
+.webshell-db-profile-menu {
+    border: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+.webshell-db-profile-main {
+    padding: 5px 10px;
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.8rem;
+}
+.webshell-db-profile-tab.active .webshell-db-profile-main {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+.webshell-db-profile-menu {
+    padding: 5px 7px;
+    border-left: 1px solid rgba(15, 23, 42, 0.1);
+    font-size: 0.78rem;
+}
+.webshell-db-profile-menu:hover {
+    background: rgba(15, 23, 42, 0.06);
+}
+.webshell-db-layout {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr);
+    gap: 12px;
+}
+.webshell-db-sidebar {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.96) 100%);
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+.webshell-db-sidebar-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+.webshell-db-sidebar-head span {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+.webshell-db-schema-tree {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 10px;
+}
+.webshell-db-sidebar-hint {
+    border-top: 1px solid var(--border-color);
+    padding: 8px 12px;
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+    background: rgba(2, 6, 23, 0.02);
+}
+.webshell-db-group {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 8px;
+    background: #fff;
+    margin-bottom: 8px;
+}
+.webshell-db-group-title {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    list-style: none;
+    padding: 8px 10px;
+    font-size: 0.82rem;
+    color: var(--text-primary);
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+}
+.webshell-db-group-title::-webkit-details-marker {
+    display: none;
+}
+.webshell-db-count {
+    margin-left: auto;
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+    flex: 0 0 auto;
+}
+.webshell-db-group-items {
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    max-height: 260px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+.webshell-db-table-node {
+    border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+    min-width: 0;
+}
+.webshell-db-table-node:last-child {
+    border-bottom: 0;
+}
+.webshell-db-table-item {
+    border: 0;
+    background: transparent;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    list-style: none;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+}
+.webshell-db-table-item::-webkit-details-marker {
+    display: none;
+}
+.webshell-db-table-item:hover {
+    background: rgba(0, 102, 255, 0.06);
+    color: var(--text-primary);
+}
+.webshell-db-column-list {
+    display: flex;
+    flex-direction: column;
+    margin: 0 0 4px;
+}
+.webshell-db-column-item {
+    border: 0;
+    background: transparent;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px 6px 24px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+}
+.webshell-db-column-item:hover {
+    background: rgba(0, 102, 255, 0.06);
+    color: var(--text-primary);
+}
+.webshell-db-column-empty {
+    padding: 4px 10px 8px 24px;
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+}
+.webshell-db-icon {
+    opacity: 0.85;
+    flex: 0 0 auto;
+}
+.webshell-db-label {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.webshell-db-main {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.webshell-db-profile-modal-content {
+    max-width: 840px;
+    border-radius: 12px;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    box-shadow: 0 10px 30px rgba(2, 6, 23, 0.18);
+}
+#webshell-db-profile-modal .modal-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    background: #fff;
+    box-shadow: none;
+}
+#webshell-db-profile-modal .modal-header h2 {
+    font-size: 1.08rem;
+    font-weight: 600;
+    background: none;
+    -webkit-text-fill-color: currentColor;
+    color: #0f172a;
+}
+#webshell-db-profile-modal .modal-body {
+    padding: 14px 18px 10px;
+}
+#webshell-db-profile-modal .modal-footer {
+    padding: 10px 18px 14px;
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+    background: #fff;
+}
+#webshell-db-profile-modal .modal-footer .btn-secondary,
+#webshell-db-profile-modal .modal-footer .btn-primary {
+    min-width: 78px;
+    height: 36px;
+    border-radius: 8px;
+}
+.webshell-db-toolbar {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(130px, 1fr));
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 10px;
+    background: #f8fafc;
+    box-shadow: none;
+}
+.webshell-db-toolbar label {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+    padding: 7px 9px;
+    border-radius: 8px;
+    background: #fff;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.webshell-db-toolbar label:focus-within {
+    border-color: rgba(0, 102, 255, 0.32);
+    box-shadow: 0 0 0 2px rgba(0, 102, 255, 0.1);
+}
+.webshell-db-toolbar label span {
+    font-size: 0.72rem;
+    color: #64748b;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-transform: none;
+}
+.webshell-db-toolbar .form-control {
+    height: 34px;
+    border-radius: 7px;
+    border: 1px solid rgba(15, 23, 42, 0.14);
+    background: #fff;
+    font-size: 0.88rem;
+    padding-left: 10px;
+    padding-right: 10px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.webshell-db-toolbar .form-control:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(0, 102, 255, 0.1);
+    background: #fff;
+}
+.webshell-db-toolbar select.form-control {
+    appearance: auto;
+    -webkit-appearance: menulist;
+    -moz-appearance: menulist;
+    padding-right: 8px;
+    background-image: none;
+}
+#webshell-db-sqlite-row {
+    grid-column: 1 / -1;
+}
+.webshell-db-sql-tools {
+    display: flex;
+    gap: 8px;
+}
+.webshell-db-sql {
+    width: 100%;
+    min-height: 140px;
+    resize: vertical;
+    font-family: var(--font-mono, Menlo, Monaco, Consolas, "Courier New", monospace);
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    line-height: 1.45;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+.webshell-db-sql:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(0, 102, 255, 0.12);
+}
+.webshell-db-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.webshell-db-actions .btn-primary,
+.webshell-db-actions .btn-ghost {
+    min-width: 96px;
+    height: 34px;
+    border-radius: 8px;
+}
+.webshell-db-output-wrap {
+    flex: 1;
+    min-height: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-primary);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.webshell-db-output-title {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--text-secondary);
+    background: linear-gradient(180deg, rgba(2, 6, 23, 0.015) 0%, transparent 100%);
+}
+.webshell-db-output {
+    flex: 1;
+    margin: 0;
+    padding: 12px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: var(--font-mono, Menlo, Monaco, Consolas, "Courier New", monospace);
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--text-primary);
+}
+.webshell-db-output.error {
+    color: var(--error-color);
+}
+.webshell-db-result-table {
+    border-bottom: 1px solid var(--border-color);
+    overflow: auto;
+    max-height: 46%;
+}
+.webshell-db-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+.webshell-db-table th,
+.webshell-db-table td {
+    padding: 7px 8px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+    border-right: 1px solid rgba(148, 163, 184, 0.24);
+    white-space: nowrap;
+}
+.webshell-db-table th:last-child,
+.webshell-db-table td:last-child {
+    border-right: none;
+}
+.webshell-db-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: rgba(248, 250, 252, 0.98);
+    font-weight: 700;
+}
+.webshell-db-table-meta {
+    padding: 6px 8px;
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+    border-top: 1px solid var(--border-color);
+    background: rgba(248, 250, 252, 0.9);
+}
+.webshell-db-hint {
+    border-top: 1px solid var(--border-color);
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+    padding: 8px 12px;
+    background: rgba(2, 6, 23, 0.02);
+}
+@media (max-width: 1280px) {
+    .webshell-db-layout {
+        grid-template-columns: 240px minmax(0, 1fr);
+    }
+    .webshell-db-toolbar {
+        grid-template-columns: repeat(3, minmax(120px, 1fr));
+    }
+}
+@media (max-width: 980px) {
+    .webshell-db-layout {
+        grid-template-columns: 1fr;
+    }
+    .webshell-db-sidebar {
+        min-height: 200px;
+    }
+    .webshell-db-toolbar {
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
+    }
+}
+@media (max-width: 700px) {
+    .webshell-db-toolbar {
+        grid-template-columns: 1fr;
+    }
+    #webshell-db-profile-modal .modal-content {
+        width: calc(100% - 24px);
+        margin: 32px auto;
+    }
+    #webshell-db-profile-modal .modal-header,
+    #webshell-db-profile-modal .modal-body,
+    #webshell-db-profile-modal .modal-footer {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
 }
 
 /* 仪表盘页面样式（最佳实践布局 + 视觉增强） */
@@ -10798,6 +12069,75 @@ header {
     flex-shrink: 0;
 }
 
+.agent-mode-wrapper {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* 与角色选择器共用 .role-selector-btn；此处仅包一层用于定位浮层 */
+.agent-mode-inner {
+    position: relative;
+    flex-shrink: 0;
+}
+
+/* 单/多代理面板：与「选择角色」浮层同一视觉语言（白底、圆角、阴影） */
+.agent-mode-panel {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    width: 300px;
+    max-width: calc(100vw - 32px);
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 16px;
+    padding: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 4px 16px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    backdrop-filter: blur(20px);
+    text-align: left;
+}
+
+.agent-mode-panel-header {
+    margin-bottom: 8px;
+    text-align: left;
+}
+
+.agent-mode-panel .role-selection-panel-title {
+    text-align: left;
+}
+
+.agent-mode-options {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* 选项为 <button>，浏览器默认 text-align:center 会继承到文案，强制左对齐与角色列表一致 */
+.agent-mode-option.role-selection-item-main {
+    text-align: left;
+    justify-content: flex-start;
+}
+
+.agent-mode-option .role-selection-item-content-main,
+.agent-mode-option .role-selection-item-name-main,
+.agent-mode-option .role-selection-item-description-main {
+    text-align: left;
+}
+
+
+/* 选项内勾选：未选中时隐藏（与角色列表一致） */
+.agent-mode-option .agent-mode-check {
+    display: none !important;
+}
+
+.agent-mode-option.selected .agent-mode-check {
+    display: flex !important;
+}
+
 /* 主内容区域角色选择面板样式（下拉菜单形式） */
 .role-selection-panel {
     position: absolute;
@@ -11816,7 +13156,8 @@ header {
 
 /* 角色选择面板响应式样式 */
 @media (max-width: 768px) {
-    .role-selection-panel {
+    .role-selection-panel,
+    .agent-mode-panel {
         width: calc(100vw - 16px);
         max-width: calc(100vw - 16px);
         left: -8px;
@@ -11861,7 +13202,8 @@ header {
 }
 
 @media (max-width: 480px) {
-    .role-selection-panel {
+    .role-selection-panel,
+    .agent-mode-panel {
         width: calc(100vw - 8px);
         max-width: calc(100vw - 8px);
         left: -4px;
@@ -12108,6 +13450,21 @@ header {
     color: var(--text-primary);
 }
 
+.agents-page-hint {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    line-height: 1.55;
+    margin: 0 0 12px 0;
+    max-width: 960px;
+}
+
+.agents-dir-label {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    word-break: break-all;
+}
+
 /* 技能列表布局 */
 .skills-grid {
     display: flex;
@@ -12159,6 +13516,38 @@ header {
     line-height: 1.4;
     word-break: break-word;
     overflow-wrap: break-word;
+}
+
+.agent-role-badge {
+    display: inline-block;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+.agent-role-badge--orchestrator {
+    background: rgba(0, 102, 255, 0.12);
+    color: var(--accent-color, #0066ff);
+}
+
+.agent-role-badge--sub {
+    background: var(--bg-tertiary, rgba(0, 0, 0, 0.06));
+    color: var(--text-secondary);
+}
+
+#agent-md-modal .form-select {
+    width: 100%;
+    max-width: 100%;
+    padding: 8px 12px;
+    font-size: 0.9375rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
 }
 
 .skill-card-description {
@@ -13029,4 +14418,602 @@ header {
 .ps-log-iteration { color: #a78bfa; }
 .ps-log-agent_status { color: #34d399; }
 .ps-log-agent_done { color: #10b981; font-weight: 600; }
+
+/* 对话附件文件管理 */
+.chat-files-intro {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 16px;
+    line-height: 1.5;
+}
+
+.chat-files-filters {
+    margin-bottom: 16px;
+}
+
+.chat-files-table-wrap {
+    overflow-x: auto;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+/* 分组视图：外层不再套一层大边框，由各分组卡片承担 */
+.chat-files-table-wrap.chat-files-table-wrap--grouped {
+    border: none;
+    background: transparent;
+    overflow: visible;
+}
+
+/* GitHub 式：单表 + 首列缩进，无嵌套子表、无重复表头 */
+.chat-files-table-wrap.chat-files-table-wrap--tree {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    overflow-x: auto;
+}
+
+.chat-files-browse-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.chat-files-browse-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 16px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary, #f8f9fa);
+}
+
+.chat-files-breadcrumb {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 2px;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    flex: 1;
+    min-width: 0;
+}
+
+.chat-files-breadcrumb-link {
+    border: none;
+    background: none;
+    padding: 2px 4px;
+    margin: 0;
+    font: inherit;
+    color: var(--accent-color);
+    cursor: pointer;
+    border-radius: 4px;
+    max-width: 100%;
+    text-align: left;
+    word-break: break-all;
+}
+
+.chat-files-breadcrumb-link:hover {
+    text-decoration: underline;
+}
+
+.chat-files-breadcrumb-sep {
+    color: var(--text-secondary);
+    user-select: none;
+    padding: 0 2px;
+}
+
+.chat-files-breadcrumb-current {
+    color: var(--text-primary);
+    font-weight: 600;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    word-break: break-all;
+}
+
+.chat-files-browse-up {
+    flex-shrink: 0;
+}
+
+.chat-files-browse-up:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.chat-files-tr-folder--nav {
+    cursor: pointer;
+}
+
+.chat-files-tr-folder--nav:hover {
+    background: rgba(0, 102, 255, 0.06);
+}
+
+.chat-files-folder-empty {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 24px 12px !important;
+}
+
+.chat-files-table--tree-flat {
+    font-size: 0.8125rem;
+}
+
+.chat-files-table--tree-flat thead th {
+    background: var(--bg-secondary, #f8f9fa);
+}
+
+.chat-files-table--tree-flat .chat-files-tr-folder {
+    background: var(--bg-primary);
+}
+
+.chat-files-table--tree-flat .chat-files-tr-folder .chat-files-tree-name-cell--folder {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.chat-files-table--tree-flat .chat-files-tr-file:hover {
+    background: rgba(128, 128, 128, 0.04);
+}
+
+.chat-files-tree-icon {
+    flex-shrink: 0;
+    color: var(--accent-color);
+    opacity: 1;
+}
+
+.chat-files-tree-icon path {
+    fill: var(--bg-primary);
+    stroke: var(--accent-color);
+}
+
+.chat-files-tree-file-icon {
+    flex-shrink: 0;
+    color: var(--text-secondary);
+    opacity: 0.85;
+}
+
+.chat-files-tree-name-cell {
+    max-width: min(100%, 560px);
+    vertical-align: middle;
+}
+
+.chat-files-tree-name-inner {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.chat-files-tree-name-text {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.8125rem;
+    word-break: break-all;
+    line-height: 1.35;
+}
+
+.chat-files-tree-muted {
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+}
+
+.chat-files-path-breadcrumb {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 2px;
+    line-height: 1.45;
+    max-width: 100%;
+}
+
+.chat-files-path-sep {
+    color: var(--text-secondary);
+    font-weight: 500;
+    user-select: none;
+    padding: 0 2px;
+}
+
+.chat-files-path-crumb {
+    color: var(--text-primary);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.8rem;
+}
+
+.chat-files-path-root {
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+}
+
+.chat-files-grouped {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.chat-files-group {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    overflow: hidden;
+}
+
+.chat-files-group > summary.chat-files-group-summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--bg-secondary, #f8f9fa);
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    user-select: none;
+}
+
+.chat-files-group > summary.chat-files-group-summary::-webkit-details-marker {
+    display: none;
+}
+
+.chat-files-group > summary.chat-files-group-summary::before {
+    content: '';
+    display: inline-block;
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid var(--text-secondary);
+    margin-right: 2px;
+    transform: rotate(-90deg);
+    transition: transform 0.15s ease;
+    flex-shrink: 0;
+}
+
+.chat-files-group[open] > summary.chat-files-group-summary::before {
+    transform: rotate(0deg);
+}
+
+.chat-files-group-title {
+    flex: 1;
+    min-width: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.8125rem;
+}
+
+.chat-files-group-count {
+    flex-shrink: 0;
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+}
+
+.chat-files-group-body {
+    overflow-x: auto;
+    border-top: 1px solid var(--border-color);
+}
+
+.chat-files-group-body .chat-files-table {
+    border-radius: 0;
+}
+
+.chat-files-group-body .chat-files-table th {
+    background: var(--bg-primary);
+}
+
+.chat-files-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.chat-files-table th,
+.chat-files-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-color);
+    text-align: left;
+    vertical-align: middle;
+}
+
+.chat-files-table th {
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--bg-secondary, #f8f9fa);
+}
+
+.chat-files-table tr:last-child td {
+    border-bottom: none;
+}
+
+.chat-files-cell-name {
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-files-cell-conv code {
+    font-size: 0.8rem;
+    max-width: 160px;
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+}
+
+.chat-files-cell-subpath {
+    max-width: 280px;
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    vertical-align: middle;
+}
+
+.chat-files-group-title--folder {
+    white-space: normal;
+    word-break: break-all;
+    line-height: 1.35;
+}
+
+.chat-files-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    align-items: center;
+    overflow: visible;
+    position: relative;
+    vertical-align: middle;
+}
+
+.chat-files-action-bar {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.chat-files-action-bar .btn-icon {
+    min-width: 34px;
+    min-height: 34px;
+    padding: 6px;
+    flex-shrink: 0;
+}
+
+.chat-files-dropdown-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.chat-files-dropdown {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    min-width: 220px;
+    padding: 8px 0;
+    margin: 0;
+    list-style: none;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: var(--shadow-lg);
+    z-index: 400;
+}
+
+/* JS 使用 fixed 定位时覆盖 absolute，避免被表格区域 overflow 裁切 */
+.chat-files-dropdown.chat-files-dropdown-fixed {
+    position: fixed;
+    right: auto;
+}
+
+.chat-files-dropdown-item {
+    display: block;
+    width: 100%;
+    min-height: 40px;
+    padding: 10px 16px;
+    box-sizing: border-box;
+    border: none;
+    background: none;
+    text-align: left;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background 0.15s ease;
+    white-space: nowrap;
+}
+
+button.chat-files-dropdown-item:hover:not(:disabled) {
+    background: var(--bg-secondary);
+}
+
+.chat-files-dropdown-item.is-danger {
+    color: #dc3545;
+}
+
+.chat-files-dropdown-item.is-danger:hover:not(:disabled) {
+    background: rgba(220, 53, 69, 0.08);
+}
+
+.chat-files-dropdown-item.is-disabled {
+    color: var(--text-secondary);
+    cursor: not-allowed;
+    font-size: 0.8125rem;
+}
+
+.chat-files-no-edit {
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+    cursor: help;
+    user-select: none;
+    padding: 0 4px;
+}
+
+.chat-files-modal-path {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    word-break: break-all;
+}
+
+.chat-files-edit-textarea {
+    width: 100%;
+    min-height: 240px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.875rem;
+    line-height: 1.45;
+}
+
+.chat-files-rename-label {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+/* 新建文件夹弹窗：层次清晰、留白舒适，无强装饰 */
+.chat-files-mkdir-modal-content {
+    max-width: 480px;
+}
+
+.chat-files-mkdir-body {
+    padding: 26px 28px 28px;
+}
+
+.chat-files-mkdir-location {
+    margin: 0 0 22px;
+}
+
+.chat-files-mkdir-location-caption {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    letter-spacing: 0.01em;
+}
+
+.chat-files-mkdir-path-box {
+    padding: 11px 14px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.chat-files-mkdir-path {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    color: var(--text-primary);
+    word-break: break-all;
+    background: transparent;
+    border: none;
+}
+
+.chat-files-mkdir-label {
+    gap: 10px;
+}
+
+.chat-files-mkdir-field-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.chat-files-mkdir-field-icon {
+    flex-shrink: 0;
+    color: var(--text-secondary);
+    opacity: 0.9;
+}
+
+.chat-files-mkdir-input {
+    min-height: 40px;
+    padding: 9px 12px;
+    font-size: 0.875rem;
+    border-radius: 8px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.chat-files-mkdir-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(0, 102, 255, 0.14);
+}
+
+.chat-files-mkdir-footer {
+    padding: 18px 28px 22px;
+    gap: 12px;
+}
+
+.chat-files-toast {
+    position: fixed;
+    z-index: 1100;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(12px);
+    max-width: min(520px, calc(100vw - 32px));
+    padding: 12px 18px;
+    background: var(--text-primary, #1a1a1a);
+    color: #fff;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    line-height: 1.45;
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    pointer-events: none;
+    text-align: center;
+}
+
+.chat-files-toast.chat-files-toast-visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* 对话附件读取 / 文件管理上传 进度条 */
+/* [hidden] 默认会被本类的 display:flex 覆盖，须显式隐藏否则空闲时仍露出灰条 */
+.chat-upload-progress-row[hidden] {
+    display: none !important;
+}
+
+.chat-upload-progress-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 8px 0 4px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--bg-secondary, rgba(0, 0, 0, 0.04));
+    border: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
+}
+
+.chat-upload-progress-row--files {
+    margin-top: 12px;
+    margin-bottom: 0;
+}
+
+.chat-upload-progress-track {
+    height: 6px;
+    border-radius: 4px;
+    background: var(--border-color, rgba(0, 0, 0, 0.1));
+    overflow: hidden;
+}
+
+.chat-upload-progress-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 4px;
+    background: var(--accent-primary, #2563eb);
+    transition: width 0.12s ease-out;
+}
+
+.chat-upload-progress-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary, #666);
+    line-height: 1.35;
+    word-break: break-all;
+}
 

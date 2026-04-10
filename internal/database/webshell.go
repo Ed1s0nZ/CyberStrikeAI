@@ -19,6 +19,42 @@ type WebShellConnection struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
+// GetWebshellConnectionState 获取连接关联的持久化状态 JSON，不存在时返回 "{}"
+func (db *DB) GetWebshellConnectionState(connectionID string) (string, error) {
+	var stateJSON string
+	err := db.QueryRow(`SELECT state_json FROM webshell_connection_states WHERE connection_id = ?`, connectionID).Scan(&stateJSON)
+	if err == sql.ErrNoRows {
+		return "{}", nil
+	}
+	if err != nil {
+		db.logger.Error("查询 WebShell 连接状态失败", zap.Error(err), zap.String("connectionID", connectionID))
+		return "", err
+	}
+	if stateJSON == "" {
+		stateJSON = "{}"
+	}
+	return stateJSON, nil
+}
+
+// UpsertWebshellConnectionState 保存连接关联的持久化状态 JSON
+func (db *DB) UpsertWebshellConnectionState(connectionID, stateJSON string) error {
+	if stateJSON == "" {
+		stateJSON = "{}"
+	}
+	query := `
+		INSERT INTO webshell_connection_states (connection_id, state_json, updated_at)
+		VALUES (?, ?, ?)
+		ON CONFLICT(connection_id) DO UPDATE SET
+			state_json = excluded.state_json,
+			updated_at = excluded.updated_at
+	`
+	if _, err := db.Exec(query, connectionID, stateJSON, time.Now()); err != nil {
+		db.logger.Error("保存 WebShell 连接状态失败", zap.Error(err), zap.String("connectionID", connectionID))
+		return err
+	}
+	return nil
+}
+
 // ListWebshellConnections 列出所有 WebShell 连接，按创建时间倒序
 func (db *DB) ListWebshellConnections() ([]WebShellConnection, error) {
 	query := `

@@ -7,6 +7,9 @@ let currentEditingSkillName = null;
 let isSavingSkill = false; // 防止重复提交
 let skillsSearchKeyword = '';
 let skillsSearchTimeout = null; // 搜索防抖定时器
+let skillsAutoRefreshTimer = null;
+let isAutoRefreshingSkills = false;
+const SKILLS_AUTO_REFRESH_INTERVAL_MS = 5000;
 let skillsPagination = {
     currentPage: 1,
     pageSize: 20, // 每页20条（默认值，实际从localStorage读取）
@@ -20,6 +23,49 @@ let skillsStats = {
     skillsDir: '',
     stats: []
 };
+
+function isSkillsManagementPageActive() {
+    const page = document.getElementById('page-skills-management');
+    return !!(page && page.classList.contains('active'));
+}
+
+function shouldSkipSkillsAutoRefresh() {
+    if (isSavingSkill || currentEditingSkillName) {
+        return true;
+    }
+
+    const modal = document.getElementById('skill-modal');
+    if (modal && modal.style.display === 'flex') {
+        return true;
+    }
+
+    const searchInput = document.getElementById('skills-search');
+    if (skillsSearchKeyword || (searchInput && searchInput.value.trim())) {
+        return true;
+    }
+
+    return false;
+}
+
+function startSkillsAutoRefresh() {
+    if (skillsAutoRefreshTimer) return;
+
+    skillsAutoRefreshTimer = setInterval(async () => {
+        if (!isSkillsManagementPageActive() || shouldSkipSkillsAutoRefresh()) {
+            return;
+        }
+        if (isAutoRefreshingSkills) {
+            return;
+        }
+
+        isAutoRefreshingSkills = true;
+        try {
+            await loadSkills(skillsPagination.currentPage, skillsPagination.pageSize);
+        } finally {
+            isAutoRefreshingSkills = false;
+        }
+    }, SKILLS_AUTO_REFRESH_INTERVAL_MS);
+}
 
 // 获取保存的每页显示数量
 function getSkillsPageSize() {
@@ -749,4 +795,8 @@ document.addEventListener('languagechange', function () {
             renderSkillsPagination();
         }
     }
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+    startSkillsAutoRefresh();
 });

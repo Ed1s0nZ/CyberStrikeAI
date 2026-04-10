@@ -8,7 +8,7 @@ function initRouter() {
     if (hash) {
         const hashParts = hash.split('?');
         const pageId = hashParts[0];
-        if (pageId && ['dashboard', 'chat', 'info-collect', 'vulnerabilities', 'webshell', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'roles-management', 'skills-monitor', 'skills-management', 'settings', 'tasks'].includes(pageId)) {
+        if (pageId && ['dashboard', 'chat', 'info-collect', 'vulnerabilities', 'webshell', 'chat-files', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'roles-management', 'skills-monitor', 'skills-management', 'agents-management', 'settings', 'tasks'].includes(pageId)) {
             switchPage(pageId);
             
             // 如果是chat页面且带有conversation参数，加载对应对话
@@ -111,6 +111,16 @@ function updateNavState(pageId) {
         if (submenuItem) {
             submenuItem.classList.add('active');
         }
+    } else if (pageId === 'agents-management') {
+        const agentsItem = document.querySelector('.nav-item[data-page="agents"]');
+        if (agentsItem) {
+            agentsItem.classList.add('active');
+            agentsItem.classList.add('expanded');
+        }
+        const submenuItem = document.querySelector(`.nav-submenu-item[data-page="${pageId}"]`);
+        if (submenuItem) {
+            submenuItem.classList.add('active');
+        }
     } else if (pageId === 'roles-management') {
         // 角色子菜单项
         const rolesItem = document.querySelector('.nav-item[data-page="roles"]');
@@ -118,19 +128,6 @@ function updateNavState(pageId) {
             rolesItem.classList.add('active');
             // 展开角色子菜单
             rolesItem.classList.add('expanded');
-        }
-        
-        const submenuItem = document.querySelector(`.nav-submenu-item[data-page="${pageId}"]`);
-        if (submenuItem) {
-            submenuItem.classList.add('active');
-        }
-    } else if (pageId === 'skills-monitor' || pageId === 'skills-management') {
-        // Skills子菜单项
-        const skillsItem = document.querySelector('.nav-item[data-page="skills"]');
-        if (skillsItem) {
-            skillsItem.classList.add('active');
-            // 展开Skills子菜单
-            skillsItem.classList.add('expanded');
         }
         
         const submenuItem = document.querySelector(`.nav-submenu-item[data-page="${pageId}"]`);
@@ -299,6 +296,11 @@ function initPage(pageId) {
                 initWebshellPage();
             }
             break;
+        case 'chat-files':
+            if (typeof initChatFilesPage === 'function') {
+                initChatFilesPage();
+            }
+            break;
         case 'settings':
             // 初始化设置页面（不需要加载工具列表）
             if (typeof loadConfig === 'function') {
@@ -348,6 +350,11 @@ function initPage(pageId) {
                 loadSkills();
             }
             break;
+        case 'agents-management':
+            if (typeof loadMarkdownAgents === 'function') {
+                loadMarkdownAgents();
+            }
+            break;
     }
     
     // 清理其他页面的定时器
@@ -368,7 +375,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const hashParts = hash.split('?');
         const pageId = hashParts[0];
         
-        if (pageId && ['chat', 'info-collect', 'tasks', 'vulnerabilities', 'webshell', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'roles-management', 'skills-monitor', 'skills-management', 'settings'].includes(pageId)) {
+        if (pageId && ['chat', 'info-collect', 'tasks', 'vulnerabilities', 'webshell', 'chat-files', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'roles-management', 'skills-monitor', 'skills-management', 'agents-management', 'settings'].includes(pageId)) {
             switchPage(pageId);
             
             // 如果是chat页面且带有conversation参数，加载对应对话

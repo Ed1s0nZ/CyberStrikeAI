@@ -19,7 +19,7 @@ import (
 const (
 	terminalMaxCommandLen = 4096
 	terminalMaxOutputLen  = 256 * 1024 // 256KB
-	terminalTimeout       = 120 * time.Second
+	terminalTimeout       = 30 * time.Minute
 )
 
 // TerminalHandler 处理系统设置中的终端命令执行

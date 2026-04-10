@@ -3,6 +3,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 	"os/exec"
@@ -12,6 +13,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
+
+// terminalResize is sent by the frontend when the xterm.js terminal is resized.
+type terminalResize struct {
+	Type string `json:"type"`
+	Cols uint16 `json:"cols"`
+	Rows uint16 `json:"rows"`
+}
 
 // wsUpgrader 仅用于系统设置中的终端 WebSocket，会复用已有的登录保护（JWT 中间件在上层路由组）
 var wsUpgrader = websocket.Upgrader{
@@ -37,12 +45,13 @@ func (h *TerminalHandler) RunCommandWS(c *gin.Context) {
 	}
 	cmd := exec.Command(shell)
 	cmd.Env = append(os.Environ(),
-		"COLUMNS=256",
-		"LINES=40",
+		"COLUMNS=80",
+		"LINES=24",
 		"TERM=xterm-256color",
 	)
 
-	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Cols: ptyCols, Rows: ptyRows})
+	// Use 80x24 as a safe default; the frontend will send the actual size immediately after connecting.
+	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Cols: 80, Rows: 24})
 	if err != nil {
 		return
 	}
@@ -83,6 +92,14 @@ func (h *TerminalHandler) RunCommandWS(c *gin.Context) {
 		}
 		if len(data) == 0 {
 			continue
+		}
+		// Check if this is a resize message (JSON with type:"resize")
+		if msgType == websocket.TextMessage && len(data) > 0 && data[0] == '{' {
+			var resize terminalResize
+			if json.Unmarshal(data, &resize) == nil && resize.Type == "resize" && resize.Cols > 0 && resize.Rows > 0 {
+				_ = pty.Setsize(ptmx, &pty.Winsize{Cols: resize.Cols, Rows: resize.Rows})
+				continue
+			}
 		}
 		if _, err := ptmx.Write(data); err != nil {
 			_ = cmd.Process.Kill()

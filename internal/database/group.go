@@ -403,6 +403,35 @@ func (db *DB) UpdateGroupPinned(id string, pinned bool) error {
 	return nil
 }
 
+// GroupMapping 分组映射关系
+type GroupMapping struct {
+	ConversationID string `json:"conversationId"`
+	GroupID        string `json:"groupId"`
+}
+
+// GetAllGroupMappings 批量获取所有分组映射（消除 N+1 查询）
+func (db *DB) GetAllGroupMappings() ([]GroupMapping, error) {
+	rows, err := db.Query("SELECT conversation_id, group_id FROM conversation_group_mappings")
+	if err != nil {
+		return nil, fmt.Errorf("查询分组映射失败: %w", err)
+	}
+	defer rows.Close()
+
+	var mappings []GroupMapping
+	for rows.Next() {
+		var m GroupMapping
+		if err := rows.Scan(&m.ConversationID, &m.GroupID); err != nil {
+			return nil, fmt.Errorf("扫描分组映射失败: %w", err)
+		}
+		mappings = append(mappings, m)
+	}
+
+	if mappings == nil {
+		mappings = []GroupMapping{}
+	}
+	return mappings, nil
+}
+
 // UpdateConversationPinnedInGroup 更新对话在分组中的置顶状态
 func (db *DB) UpdateConversationPinnedInGroup(conversationID, groupID string, pinned bool) error {
 	pinnedValue := 0

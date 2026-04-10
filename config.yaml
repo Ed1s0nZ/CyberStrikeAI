@@ -10,23 +10,19 @@
 # ============================================
 
 # 前端显示的版本号（可选，不填则显示默认版本）
-version: "v1.3.25"
-
+version: "v1.4.13"
 # 服务器配置
 server:
   host: 0.0.0.0 # 监听地址，0.0.0.0 表示监听所有网络接口
-  port: 8080     # HTTP 服务端口，可通过浏览器访问 http://localhost:8080
-
+  port: 8080 # HTTP 服务端口，可通过浏览器访问 http://localhost:8080
 # 认证配置
 auth:
   password:  # Web 登录密码，请修改为强密码
-  session_duration_hours: 12          # 登录有效期（小时），超时后需重新登录
-
+  session_duration_hours: 12 # 登录有效期（小时），超时后需重新登录
 # 日志配置
 log:
-  level: info   # 日志级别: debug(调试), info(信息), warn(警告), error(错误)
+  level: info # 日志级别: debug(调试), info(信息), warn(警告), error(错误)
   output: stdout # 日志输出位置: stdout(标准输出), stderr(标准错误), 或文件路径
-
 # ============================================
 # 对话相关配置
 # ============================================
@@ -39,34 +35,43 @@ log:
 #   - 其他兼容 OpenAI 协议的 API
 # 常用模型: gpt-4, gpt-3.5-turbo, deepseek-chat, claude-3-opus 等
 openai:
-  base_url: https://api.deepseek.com/v1 # API 基础 URL（必填）
-  api_key: sk-xxxx                       # API 密钥（必填）
-  model: deepseek-chat                   # 模型名称（必填）
-  max_total_tokens: 120000              # LLM 相关上下文的最大 Token 数限制（内存压缩和攻击链构建会共用此配置）
-
+  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1 # API 基础 URL（必填）
+  api_key: sk-xxxxxx # API 密钥（必填）
+  model: qwen3-max # 模型名称（必填）
+  max_total_tokens: 120000 # LLM 相关上下文的最大 Token 数限制（内存压缩和攻击链构建会共用此配置）
 # ============================================
 # 信息收集（FOFA）配置（可选）
 # ============================================
 # 用于「信息收集」页面调用 FOFA API（后端代理，避免前端暴露 key）
 # 也可通过环境变量配置：FOFA_EMAIL / FOFA_API_KEY（优先级更高）
 fofa:
-  base_url: "https://fofa.info/api/v1/search/all" # 可选，留空则使用默认
-  email: ""   # FOFA 账号邮箱（可选，建议在系统设置中填写）
+  base_url: https://fofa.info/api/v1/search/all # 可选，留空则使用默认
+  email: "" # FOFA 账号邮箱（可选，建议在系统设置中填写）
   api_key: "" # FOFA API Key（可选，建议在系统设置中填写）
-
 # Agent 配置
 # 达到最大迭代次数时，AI 会自动总结测试结果
 agent:
-  max_iterations: 120           # 最大迭代次数，AI 代理最多执行多少轮工具调用
+  max_iterations: 120 # 最大迭代次数，AI 代理最多执行多少轮工具调用
   large_result_threshold: 102400 # 大结果阈值（字节），默认50KB，超过此大小会自动保存到存储
   result_storage_dir: tmp # 结果存储目录，大结果会保存在此目录下
   tool_timeout_minutes: 30 # 单次工具执行最大时长（分钟），超时自动终止；0 表示不限制（不推荐，易出现长时间挂起）
-  
+# 多代理（CloudWeGo Eino DeepAgent，与上方单 Agent /api/agent-loop 并存）
+# 依赖在 go.mod 中拉取；若下载失败可设置: go env -w GOPROXY=https://goproxy.cn,direct
+# 启用后需重启服务才会注册 /api/multi-agent 与 /api/multi-agent/stream；前端可选「多代理」模式走 stream 接口
+multi_agent:
+  enabled: true
+  default_mode: multi # single | multi（前端默认，仍可用界面切换）
+  robot_use_multi_agent: true # true 时企业微信/钉钉/飞书机器人也走 Eino 多代理（成本更高）
+  batch_use_multi_agent: true # true 时「批量任务」队列中每个子任务也走 Eino 多代理（成本更高）
+  max_iteration: 0 # Deep 主代理最大轮次，0 表示沿用 agent.max_iterations
+  sub_agent_max_iterations: 120
+  without_general_sub_agent: false # false 时保留 Deep 内置 general-purpose 子代理
+  without_write_todos: false
+  orchestrator_instruction: "" # 非空且未使用 agents/orchestrator.md 正文时作为 Deep 主代理系统提示；若存在 orchestrator.md（或某 .md 含 kind: orchestrator），正文非空则优先用文件，否则仍用此处；留空且无文件正文时用 Eino 默认
 # 数据库配置
 database:
-  path: data/conversations.db    # SQLite 数据库文件路径，用于存储对话历史和消息
+  path: data/conversations.db # SQLite 数据库文件路径，用于存储对话历史和消息
   knowledge_db_path: data/knowledge.db # 知识库数据库文件路径（可选，为空则使用会话数据库），用于存储知识库项和向量嵌入，可独立复制和复用
-
 # ============================================
 # 任务管理相关配置
 # ============================================
@@ -85,7 +90,6 @@ security:
   #   short - 优先使用 short_description（简短描述，省 token），为空时用 description
   #   full  - 使用 description（详细描述）
   tool_description_mode: full
-
 # ============================================
 # MCP 相关配置
 # ============================================
@@ -98,27 +102,24 @@ mcp:
   port: 8081 # MCP 服务器端口
   auth_header: "X-MCP-Token" # 鉴权：请求需携带该 header 且值与 auth_header_value 一致方可调用。留空表示不鉴权
   auth_header_value: "" # 鉴权密钥值（与 auth_header 配合使用，建议使用随机字符串）
-
 # 外部 MCP 配置
 external_mcp:
   servers: {}
-
 # ============================================
 # 知识库相关配置
 # ============================================
-
 knowledge:
-  enabled: false                    # 是否启用知识检索功能
-  base_path: knowledge_base         # 知识库目录路径（相对于配置文件所在目录）
+  enabled: false # 是否启用知识检索功能
+  base_path: knowledge_base # 知识库目录路径（相对于配置文件所在目录）
   embedding:
-    provider: openai                # 嵌入模型提供商（目前仅支持openai）
-    model: text-embedding-v4        # 嵌入模型名称
+    provider: openai # 嵌入模型提供商（目前仅支持openai）
+    model: text-embedding-v4 # 嵌入模型名称
     base_url: https://api.deepseek.com/v1 # 留空则使用OpenAI配置的base_url
-    api_key: sk-xxxxxx              # 留空则使用OpenAI配置的api_key
+    api_key: sk-xxxxxx # 留空则使用OpenAI配置的api_key
   retrieval:
-    top_k: 5                        # 检索返回的Top-K结果数量
-    similarity_threshold: 0.7       # 相似度阈值（0-1），低于此值的结果将被过滤
-    hybrid_weight: 0.7              # 混合检索权重（0-1），向量检索的权重，1.0表示纯向量检索，0.0表示纯关键词检索
+    top_k: 5 # 检索返回的Top-K结果数量
+    similarity_threshold: 0.7 # 相似度阈值（0-1），低于此值的结果将被过滤
+    hybrid_weight: 0.7 # 混合检索权重（0-1），向量检索的权重，1.0表示纯向量检索，0.0表示纯关键词检索
   # ============================================
   # 索引配置（用于解决 API 限制问题）
   # ============================================
@@ -135,7 +136,6 @@ knowledge:
     # 重试配置
     max_retries: 3 # 最大重试次数（默认 3），遇到速率限制或服务器错误时自动重试
     retry_delay_ms: 1000 # 重试间隔毫秒数（默认 1000），每次重试会递增延迟
-
 # ============================================
 # 机器人配置（企业微信、钉钉、飞书）
 # ============================================
@@ -151,14 +151,13 @@ robots:
     agent_id: 0
   dingtalk: # 钉钉
     enabled: false
-    client_id: 
-    client_secret: 
+    client_id: ""
+    client_secret: ""
   lark: # 飞书
     enabled: false
     app_id: ""
     app_secret: ""
     verify_token: ""
-
 # ============================================
 # Skills 相关配置
 # ============================================
@@ -166,7 +165,13 @@ robots:
 # 系统会从该目录加载所有skills，每个skill应是一个目录，包含SKILL.md文件
 # 例如：skills/sql-injection-testing/SKILL.md
 skills_dir: skills # Skills配置文件目录（相对于配置文件所在目录）
-
+# ============================================
+# 多代理子 Agent（Markdown，唯一维护处）
+# ============================================
+# 每个 .md：YAML front matter（name / id / description / tools / bind_role / max_iterations / 可选 kind: orchestrator）+ 正文为系统提示词
+# 主代理：固定文件名 orchestrator.md，或任意文件名 + front matter kind: orchestrator（全目录仅允许一个）；主代理不参与 task 子代理列表
+# 高级用法：仍可在 multi_agent 块内写 sub_agents，会与本文目录合并且同 id 时 YAML 可被 .md 覆盖
+agents_dir: agents
 # ============================================
 # 角色相关配置
 # ============================================

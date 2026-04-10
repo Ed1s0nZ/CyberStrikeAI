@@ -115,11 +115,15 @@ function updateRoleSelectorDisplay() {
             }
         }
         roleSelectorIcon.textContent = icon;
-        const displayName = (selectedRole.name === '默认' || !selectedRole.name) && typeof window.t === 'function'
+        const isDefaultRole = selectedRole.name === '默认' || !selectedRole.name;
+        const displayName = isDefaultRole && typeof window.t === 'function'
             ? window.t('chat.defaultRole') : (selectedRole.name || (typeof window.t === 'function' ? window.t('chat.defaultRole') : '默认'));
+        // 非默认角色时避免被 i18n 的 data-i18n 覆盖成“默认”
+        roleSelectorText.setAttribute('data-i18n-skip-text', isDefaultRole ? 'false' : 'true');
         roleSelectorText.textContent = displayName;
     } else {
         // 默认角色
+        roleSelectorText.setAttribute('data-i18n-skip-text', 'false');
         roleSelectorIcon.textContent = '🔵';
         roleSelectorText.textContent = typeof window.t === 'function' ? window.t('chat.defaultRole') : '默认';
     }
@@ -210,6 +214,9 @@ function toggleRoleSelectionPanel() {
     const isHidden = panel.style.display === 'none' || !panel.style.display;
     
     if (isHidden) {
+        if (typeof closeAgentModePanel === 'function') {
+            closeAgentModePanel();
+        }
         panel.style.display = 'flex'; // 使用flex布局
         // 添加打开状态的视觉反馈
         if (roleSelectorBtn) {

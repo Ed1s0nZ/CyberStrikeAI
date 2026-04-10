@@ -6,16 +6,30 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"cyberstrike-ai/internal/config"
 	"cyberstrike-ai/internal/mcp"
 	"cyberstrike-ai/internal/storage"
 
+	"github.com/creack/pty"
 	"go.uber.org/zap"
 )
+
+// ToolOutputCallback 用于在工具执行过程中把 stdout/stderr 增量推给上层（SSE）。
+// 通过 context 传递，避免修改 MCP ToolHandler 签名导致的“写死工具”问题。
+type ToolOutputCallback func(chunk string)
+
+type toolOutputCallbackCtxKey struct{}
+
+// ToolOutputCallbackCtxKey 是 context 中的 key，供 Agent 写入回调，Executor 读取并流式回调。
+var ToolOutputCallbackCtxKey = toolOutputCallbackCtxKey{}
 
 // Executor 安全工具执行器
 type Executor struct {
@@ -138,13 +152,39 @@ func (e *Executor) ExecuteTool(ctx context.Context, toolName string, args map[st
 
 	// 执行命令
 	cmd := exec.CommandContext(ctx, toolConfig.Command, cmdArgs...)
+	applyDefaultTerminalEnv(cmd)
 
 	e.logger.Info("执行安全工具",
 		zap.String("tool", toolName),
 		zap.Strings("args", cmdArgs),
 	)
 
-	output, err := cmd.CombinedOutput()
+	var output string
+	var err error
+	// 如果上层提供了 stdout/stderr 增量回调，则边执行边读取并回调。
+	if cb, ok := ctx.Value(ToolOutputCallbackCtxKey).(ToolOutputCallback); ok && cb != nil {
+		output, err = streamCommandOutput(cmd, cb)
+		if err != nil && shouldRetryWithPTY(output) {
+			e.logger.Info("检测到工具需要 TTY，使用 PTY 重试",
+				zap.String("tool", toolName),
+			)
+			cmd2 := exec.CommandContext(ctx, toolConfig.Command, cmdArgs...)
+			applyDefaultTerminalEnv(cmd2)
+			output, err = runCommandWithPTY(ctx, cmd2, cb)
+		}
+	} else {
+		outputBytes, err2 := cmd.CombinedOutput()
+		output = string(outputBytes)
+		err = err2
+		if err != nil && shouldRetryWithPTY(output) {
+			e.logger.Info("检测到工具需要 TTY，使用 PTY 重试",
+				zap.String("tool", toolName),
+			)
+			cmd2 := exec.CommandContext(ctx, toolConfig.Command, cmdArgs...)
+			applyDefaultTerminalEnv(cmd2)
+			output, err = runCommandWithPTY(ctx, cmd2, nil)
+		}
+	}
 	if err != nil {
 		// 检查退出码是否在允许列表中
 		exitCode := getExitCode(err)
@@ -931,7 +971,34 @@ func (e *Executor) executeSystemCommand(ctx context.Context, args map[string]int
 	}
 
 	// 非后台命令：等待输出
-	output, err := cmd.CombinedOutput()
+	var output string
+	var err error
+	// 若上层提供工具输出增量回调，则边执行边流式读取。
+	if cb, ok := ctx.Value(ToolOutputCallbackCtxKey).(ToolOutputCallback); ok && cb != nil {
+		output, err = streamCommandOutput(cmd, cb)
+		if err != nil && shouldRetryWithPTY(output) {
+			e.logger.Info("检测到系统命令需要 TTY，使用 PTY 重试")
+			cmd2 := exec.CommandContext(ctx, shell, "-c", command)
+			if workDir != "" {
+				cmd2.Dir = workDir
+			}
+			applyDefaultTerminalEnv(cmd2)
+			output, err = runCommandWithPTY(ctx, cmd2, cb)
+		}
+	} else {
+		outputBytes, err2 := cmd.CombinedOutput()
+		output = string(outputBytes)
+		err = err2
+		if err != nil && shouldRetryWithPTY(output) {
+			e.logger.Info("检测到系统命令需要 TTY，使用 PTY 重试")
+			cmd2 := exec.CommandContext(ctx, shell, "-c", command)
+			if workDir != "" {
+				cmd2.Dir = workDir
+			}
+			applyDefaultTerminalEnv(cmd2)
+			output, err = runCommandWithPTY(ctx, cmd2, nil)
+		}
+	}
 	if err != nil {
 		e.logger.Error("系统命令执行失败",
 			zap.String("command", command),
@@ -963,6 +1030,195 @@ func (e *Executor) executeSystemCommand(ctx context.Context, args map[string]int
 		},
 		IsError: false,
 	}, nil
+}
+
+// streamCommandOutput 以“边读边回调”的方式读取命令 stdout/stderr。
+// 保持输出内容完整拼接返回，并用 cb(chunk) 向上层持续推送。
+func streamCommandOutput(cmd *exec.Cmd, cb ToolOutputCallback) (string, error) {
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", err
+	}
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		_ = stdoutPipe.Close()
+		return "", err
+	}
+	if err := cmd.Start(); err != nil {
+		_ = stdoutPipe.Close()
+		_ = stderrPipe.Close()
+		return "", err
+	}
+
+	chunks := make(chan string, 64)
+	var wg sync.WaitGroup
+	readFn := func(r io.Reader) {
+		defer wg.Done()
+		br := bufio.NewReader(r)
+		for {
+			s, readErr := br.ReadString('\n')
+			if s != "" {
+				chunks <- s
+			}
+			if readErr != nil {
+				// EOF 正常结束
+				return
+			}
+		}
+	}
+
+	wg.Add(2)
+	go readFn(stdoutPipe)
+	go readFn(stderrPipe)
+
+	go func() {
+		wg.Wait()
+		close(chunks)
+	}()
+
+	var outBuilder strings.Builder
+	var deltaBuilder strings.Builder
+	lastFlush := time.Now()
+
+	flush := func() {
+		if deltaBuilder.Len() == 0 {
+			return
+		}
+		cb(deltaBuilder.String())
+		deltaBuilder.Reset()
+		lastFlush = time.Now()
+	}
+
+	for chunk := range chunks {
+		outBuilder.WriteString(chunk)
+		deltaBuilder.WriteString(chunk)
+		// 简单节流：buffer 大于 2KB 或 200ms 就刷新一次
+		if deltaBuilder.Len() >= 2048 || time.Since(lastFlush) >= 200*time.Millisecond {
+			flush()
+		}
+	}
+	flush()
+
+	// 等待命令结束，返回最终退出状态
+	waitErr := cmd.Wait()
+	return outBuilder.String(), waitErr
+}
+
+// applyDefaultTerminalEnv 为外部工具补齐常见的终端环境变量。
+// 注意：这不会创建 TTY，只是减少某些工具在非交互环境下的“奇怪排版/检测失败”。
+func applyDefaultTerminalEnv(cmd *exec.Cmd) {
+	if cmd == nil {
+		return
+	}
+	// 仅在未显式设置 Env 时，继承当前进程环境
+	if cmd.Env == nil {
+		cmd.Env = os.Environ()
+	}
+	// 如果用户已设置 TERM/COLUMNS/LINES，则不覆盖
+	has := func(k string) bool {
+		prefix := k + "="
+		for _, e := range cmd.Env {
+			if strings.HasPrefix(e, prefix) {
+				return true
+			}
+		}
+		return false
+	}
+	if !has("TERM") {
+		cmd.Env = append(cmd.Env, "TERM=xterm-256color")
+	}
+	if !has("COLUMNS") {
+		cmd.Env = append(cmd.Env, "COLUMNS=256")
+	}
+	if !has("LINES") {
+		cmd.Env = append(cmd.Env, "LINES=40")
+	}
+}
+
+func shouldRetryWithPTY(output string) bool {
+	o := strings.ToLower(output)
+	// autorecon / python termios 常见报错
+	if strings.Contains(o, "inappropriate ioctl for device") {
+		return true
+	}
+	if strings.Contains(o, "termios.error") {
+		return true
+	}
+	// 兜底：stdin 不是 tty
+	if strings.Contains(o, "not a tty") {
+		return true
+	}
+	return false
+}
+
+// runCommandWithPTY 为子进程分配 PTY，适配需要交互式终端的工具（如 autorecon）。
+// 若 cb != nil，将持续回调增量输出（用于 SSE）。
+func runCommandWithPTY(ctx context.Context, cmd *exec.Cmd, cb ToolOutputCallback) (string, error) {
+	if runtime.GOOS == "windows" {
+		// PTY 方案为类 Unix；Windows 走原逻辑
+		if cb != nil {
+			return streamCommandOutput(cmd, cb)
+		}
+		out, err := cmd.CombinedOutput()
+		return string(out), err
+	}
+
+	ptmx, err := pty.Start(cmd)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = ptmx.Close() }()
+
+	// ctx 取消时尽快终止子进程
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = ptmx.Close() // 触发读退出
+			if cmd.Process != nil {
+				_ = cmd.Process.Kill()
+			}
+		case <-done:
+		}
+	}()
+	defer close(done)
+
+	var outBuilder strings.Builder
+	var deltaBuilder strings.Builder
+	lastFlush := time.Now()
+	flush := func() {
+		if cb == nil || deltaBuilder.Len() == 0 {
+			deltaBuilder.Reset()
+			lastFlush = time.Now()
+			return
+		}
+		cb(deltaBuilder.String())
+		deltaBuilder.Reset()
+		lastFlush = time.Now()
+	}
+
+	buf := make([]byte, 4096)
+	for {
+		n, readErr := ptmx.Read(buf)
+		if n > 0 {
+			chunk := string(buf[:n])
+			// 统一换行为 \n，避免前端错位
+			chunk = strings.ReplaceAll(chunk, "\r\n", "\n")
+			chunk = strings.ReplaceAll(chunk, "\r", "\n")
+			outBuilder.WriteString(chunk)
+			deltaBuilder.WriteString(chunk)
+			if deltaBuilder.Len() >= 2048 || time.Since(lastFlush) >= 200*time.Millisecond {
+				flush()
+			}
+		}
+		if readErr != nil {
+			break
+		}
+	}
+	flush()
+
+	waitErr := cmd.Wait()
+	return outBuilder.String(), waitErr
 }
 
 // executeInternalTool 执行内部工具（不执行外部命令）

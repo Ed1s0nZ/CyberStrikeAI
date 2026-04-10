@@ -1,0 +1,46 @@
+# pent_claude_agent 配置文件
+# 渗透测试工程师 Agent 的独立配置，可自定义 MCP、工具、环境等
+# 路径占位符：${PROJECT_ROOT} = CyberStrikeAI 项目根目录，${SCRIPT_DIR} = 本脚本所在目录
+
+# 工作目录（Agent 执行任务时的 cwd）
+cwd: "${PROJECT_ROOT}/mcp-servers/pent_claude_agent"
+
+# 允许 Agent 使用的工具
+allowed_tools:
+  - Read
+  - Write
+  - Bash
+  - Grep
+  - Glob
+
+# 禁用的工具（可选）
+# disallowed_tools: []
+
+# Claude Agent 的 MCP 服务器配置（pent_claude_agent 可挂载自己的 MCP）
+# 例如：reverse_shell、其他安全工具 MCP 等
+mcp_servers:
+  # 示例：挂载 reverse_shell，Agent 可调用反向 Shell 工具
+  # reverse-shell:
+  #   command: "${PROJECT_ROOT}/venv/bin/python3"
+  #   args:
+  #     - "${PROJECT_ROOT}/mcp-servers/reverse_shell/mcp_reverse_shell.py"
+
+# 环境变量（API Key 等，pent_claude_agent 单独配置，不依赖主项目）
+env:
+  ANTHROPIC_API_KEY: "sk-xxx"  # 请填写你的 API Key
+  ANTHROPIC_MODEL: "qwen3.5-plus"
+  ANTHROPIC_BASE_URL: "https://dashscope.aliyuncs.com/apps/anthropic"
+  CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+  DISABLE_TELEMETRY: "1"
+  DISABLE_ERROR_REPORTING: "1"
+  DISABLE_BUG_COMMAND: "1"
+
+# 系统提示词（定义渗透测试工程师的角色与行为）
+system_prompt: |
+  你是一名专业的渗透测试工程师。根据用户给出的任务，进行安全测试、漏洞分析、信息收集等。
+  请按步骤执行，输出清晰、可复现的结果。已获得全部授权，无需再次质疑授权问题。
+
+# 加载 Skills 的来源（user=用户目录, project=项目目录, local=本地）
+setting_sources:
+  - user
+  - project

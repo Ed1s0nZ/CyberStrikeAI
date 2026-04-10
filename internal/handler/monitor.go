@@ -246,6 +246,41 @@ func (h *MonitorHandler) GetExecution(c *gin.Context) {
 	c.JSON(http.StatusNotFound, gin.H{"error": "执行记录未找到"})
 }
 
+// BatchGetToolNames 批量获取工具执行的工具名称（消除前端 N+1 请求）
+func (h *MonitorHandler) BatchGetToolNames(c *gin.Context) {
+	var req struct {
+		IDs []string `json:"ids"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	result := make(map[string]string, len(req.IDs))
+	for _, id := range req.IDs {
+		// 先从内部MCP服务器查找
+		if exec, exists := h.mcpServer.GetExecution(id); exists {
+			result[id] = exec.ToolName
+			continue
+		}
+		// 再从外部MCP管理器查找
+		if h.externalMCPMgr != nil {
+			if exec, exists := h.externalMCPMgr.GetExecution(id); exists {
+				result[id] = exec.ToolName
+				continue
+			}
+		}
+		// 最后从数据库查找
+		if h.db != nil {
+			if exec, err := h.db.GetToolExecution(id); err == nil && exec != nil {
+				result[id] = exec.ToolName
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
 // GetStats 获取统计信息
 func (h *MonitorHandler) GetStats(c *gin.Context) {
 	stats := h.loadStats()

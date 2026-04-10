@@ -33,23 +33,68 @@ type Config struct {
 	RolesDir    string                `yaml:"roles_dir,omitempty" json:"roles_dir,omitempty"`   // 角色配置文件目录（新方式）
 	Roles       map[string]RoleConfig `yaml:"roles,omitempty" json:"roles,omitempty"`           // 向后兼容：支持在主配置文件中定义角色
 	SkillsDir   string                `yaml:"skills_dir,omitempty" json:"skills_dir,omitempty"` // Skills配置文件目录
+	AgentsDir   string                `yaml:"agents_dir,omitempty" json:"agents_dir,omitempty"` // 多代理子 Agent Markdown 定义目录（*.md，YAML front matter）
+	MultiAgent  MultiAgentConfig      `yaml:"multi_agent,omitempty" json:"multi_agent,omitempty"`
+}
+
+// MultiAgentConfig 基于 CloudWeGo Eino DeepAgent 的多代理编排（与单 Agent /agent-loop 并存）。
+type MultiAgentConfig struct {
+	Enabled                 bool                  `yaml:"enabled" json:"enabled"`
+	DefaultMode             string                `yaml:"default_mode" json:"default_mode"`                   // single | multi，供前端默认展示
+	RobotUseMultiAgent      bool                  `yaml:"robot_use_multi_agent" json:"robot_use_multi_agent"` // 为 true 时钉钉/飞书/企微机器人走 Eino 多代理
+	BatchUseMultiAgent      bool                  `yaml:"batch_use_multi_agent" json:"batch_use_multi_agent"` // 为 true 时批量任务队列中每子任务走 Eino 多代理
+	MaxIteration            int                   `yaml:"max_iteration" json:"max_iteration"`                 // Deep 主代理最大推理轮次
+	SubAgentMaxIterations   int                   `yaml:"sub_agent_max_iterations" json:"sub_agent_max_iterations"`
+	WithoutGeneralSubAgent  bool                  `yaml:"without_general_sub_agent" json:"without_general_sub_agent"`
+	WithoutWriteTodos       bool                  `yaml:"without_write_todos" json:"without_write_todos"`
+	OrchestratorInstruction string                `yaml:"orchestrator_instruction" json:"orchestrator_instruction"`
+	SubAgents               []MultiAgentSubConfig `yaml:"sub_agents" json:"sub_agents"`
+}
+
+// MultiAgentSubConfig 子代理（Eino ChatModelAgent），由 DeepAgent 通过 task 工具调度。
+type MultiAgentSubConfig struct {
+	ID            string   `yaml:"id" json:"id"`
+	Name          string   `yaml:"name" json:"name"`
+	Description   string   `yaml:"description" json:"description"`
+	Instruction   string   `yaml:"instruction" json:"instruction"`
+	BindRole      string   `yaml:"bind_role,omitempty" json:"bind_role,omitempty"` // 可选：关联主配置 roles 中的角色名；未配 role_tools 时沿用该角色的 tools，并把 skills 写入指令提示
+	RoleTools     []string `yaml:"role_tools" json:"role_tools"`                   // 与单 Agent 角色工具相同 key；空表示全部工具（bind_role 可补全 tools）
+	MaxIterations int      `yaml:"max_iterations" json:"max_iterations"`
+	Kind          string   `yaml:"kind,omitempty" json:"kind,omitempty"` // 仅 Markdown：kind=orchestrator 表示 Deep 主代理（与 orchestrator.md 二选一约定）
+}
+
+// MultiAgentPublic 返回给前端的精简信息（不含子代理指令全文）。
+type MultiAgentPublic struct {
+	Enabled            bool   `json:"enabled"`
+	DefaultMode        string `json:"default_mode"`
+	RobotUseMultiAgent bool   `json:"robot_use_multi_agent"`
+	BatchUseMultiAgent bool   `json:"batch_use_multi_agent"`
+	SubAgentCount      int    `json:"sub_agent_count"`
+}
+
+// MultiAgentAPIUpdate 设置页/API 仅更新多代理标量字段；写入 YAML 时不覆盖 sub_agents 等块。
+type MultiAgentAPIUpdate struct {
+	Enabled            bool   `json:"enabled"`
+	DefaultMode        string `json:"default_mode"`
+	RobotUseMultiAgent bool   `json:"robot_use_multi_agent"`
+	BatchUseMultiAgent bool   `json:"batch_use_multi_agent"`
 }
 
 // RobotsConfig 机器人配置（企业微信、钉钉、飞书等）
 type RobotsConfig struct {
-	Wecom   RobotWecomConfig   `yaml:"wecom,omitempty" json:"wecom,omitempty"`     // 企业微信
+	Wecom    RobotWecomConfig    `yaml:"wecom,omitempty" json:"wecom,omitempty"`       // 企业微信
 	Dingtalk RobotDingtalkConfig `yaml:"dingtalk,omitempty" json:"dingtalk,omitempty"` // 钉钉
-	Lark    RobotLarkConfig    `yaml:"lark,omitempty" json:"lark,omitempty"`     // 飞书
+	Lark     RobotLarkConfig     `yaml:"lark,omitempty" json:"lark,omitempty"`         // 飞书
 }
 
 // RobotWecomConfig 企业微信机器人配置
 type RobotWecomConfig struct {
-	Enabled       bool   `yaml:"enabled" json:"enabled"`
-	Token         string `yaml:"token" json:"token"`                     // 回调 URL 校验 Token
+	Enabled        bool   `yaml:"enabled" json:"enabled"`
+	Token          string `yaml:"token" json:"token"`                       // 回调 URL 校验 Token
 	EncodingAESKey string `yaml:"encoding_aes_key" json:"encoding_aes_key"` // EncodingAESKey
-	CorpID        string `yaml:"corp_id" json:"corp_id"`               // 企业 ID
-	Secret        string `yaml:"secret" json:"secret"`                  // 应用 Secret
-	AgentID       int64  `yaml:"agent_id" json:"agent_id"`              // 应用 AgentId
+	CorpID         string `yaml:"corp_id" json:"corp_id"`                   // 企业 ID
+	Secret         string `yaml:"secret" json:"secret"`                     // 应用 Secret
+	AgentID        int64  `yaml:"agent_id" json:"agent_id"`                 // 应用 AgentId
 }
 
 // RobotDingtalkConfig 钉钉机器人配置
@@ -61,9 +106,9 @@ type RobotDingtalkConfig struct {
 
 // RobotLarkConfig 飞书机器人配置
 type RobotLarkConfig struct {
-	Enabled   bool   `yaml:"enabled" json:"enabled"`
-	AppID     string `yaml:"app_id" json:"app_id"`         // 应用 App ID
-	AppSecret string `yaml:"app_secret" json:"app_secret"` // 应用 App Secret
+	Enabled     bool   `yaml:"enabled" json:"enabled"`
+	AppID       string `yaml:"app_id" json:"app_id"`             // 应用 App ID
+	AppSecret   string `yaml:"app_secret" json:"app_secret"`     // 应用 App Secret
 	VerifyToken string `yaml:"verify_token" json:"verify_token"` // 事件订阅 Verification Token（可选）
 }
 
@@ -81,7 +126,7 @@ type MCPConfig struct {
 	Enabled         bool   `yaml:"enabled"`
 	Host            string `yaml:"host"`
 	Port            int    `yaml:"port"`
-	AuthHeader      string `yaml:"auth_header,omitempty"`      // 鉴权 header 名，留空表示不鉴权
+	AuthHeader      string `yaml:"auth_header,omitempty"`       // 鉴权 header 名，留空表示不鉴权
 	AuthHeaderValue string `yaml:"auth_header_value,omitempty"` // 鉴权 header 值，需与请求中该 header 一致
 }
 
@@ -168,17 +213,17 @@ type ToolConfig struct {
 
 // ParameterConfig 参数配置
 type ParameterConfig struct {
-	Name        string      `yaml:"name"`                  // 参数名称
-	Type        string      `yaml:"type"`                  // 参数类型: string, int, bool, array
-	Description string      `yaml:"description"`           // 参数描述
-	Required    bool        `yaml:"required,omitempty"`    // 是否必需
-	Default     interface{} `yaml:"default,omitempty"`      // 默认值
-	ItemType    string      `yaml:"item_type,omitempty"`    // 当 type 为 array 时，数组元素类型，如 string, number, object
-	Flag        string      `yaml:"flag,omitempty"`         // 命令行标志，如 "-u", "--url", "-p"
-	Position    *int        `yaml:"position,omitempty"`     // 位置参数的位置（从0开始）
-	Format      string      `yaml:"format,omitempty"`      // 参数格式: "flag", "positional", "combined" (flag=value), "template"
-	Template    string      `yaml:"template,omitempty"`    // 模板字符串，如 "{flag} {value}" 或 "{value}"
-	Options     []string    `yaml:"options,omitempty"`     // 可选值列表（用于枚举）
+	Name        string      `yaml:"name"`                // 参数名称
+	Type        string      `yaml:"type"`                // 参数类型: string, int, bool, array
+	Description string      `yaml:"description"`         // 参数描述
+	Required    bool        `yaml:"required,omitempty"`  // 是否必需
+	Default     interface{} `yaml:"default,omitempty"`   // 默认值
+	ItemType    string      `yaml:"item_type,omitempty"` // 当 type 为 array 时，数组元素类型，如 string, number, object
+	Flag        string      `yaml:"flag,omitempty"`      // 命令行标志，如 "-u", "--url", "-p"
+	Position    *int        `yaml:"position,omitempty"`  // 位置参数的位置（从0开始）
+	Format      string      `yaml:"format,omitempty"`    // 参数格式: "flag", "positional", "combined" (flag=value), "template"
+	Template    string      `yaml:"template,omitempty"`  // 模板字符串，如 "{flag} {value}" 或 "{value}"
+	Options     []string    `yaml:"options,omitempty"`   // 可选值列表（用于枚举）
 }
 
 func Load(path string) (*Config, error) {
@@ -696,8 +741,8 @@ func Default() *Config {
 			MaxTotalTokens: 120000,
 		},
 		Agent: AgentConfig{
-			MaxIterations:      30,  // 默认最大迭代次数
-			ToolTimeoutMinutes: 10,  // 单次工具执行默认最多 10 分钟，避免异常长时间占用
+			MaxIterations:      30, // 默认最大迭代次数
+			ToolTimeoutMinutes: 10, // 单次工具执行默认最多 10 分钟，避免异常长时间占用
 		},
 		Security: SecurityConfig{
 			Tools:    []ToolConfig{}, // 工具配置应该从 config.yaml 或 tools/ 目录加载
@@ -724,11 +769,11 @@ func Default() *Config {
 				HybridWeight:        0.7,
 			},
 			Indexing: IndexingConfig{
-				ChunkSize:        768,   // 增加到 768，更好的上下文保持
+				ChunkSize:        768, // 增加到 768，更好的上下文保持
 				ChunkOverlap:     50,
-				MaxChunksPerItem: 20,    // 限制单个知识项最多 20 个块，避免消耗过多配额
-				MaxRPM:           100,   // 默认 100 RPM，避免 429 错误
-				RateLimitDelayMs: 600,   // 600ms 间隔，对应 100 RPM
+				MaxChunksPerItem: 20,  // 限制单个知识项最多 20 个块，避免消耗过多配额
+				MaxRPM:           100, // 默认 100 RPM，避免 429 错误
+				RateLimitDelayMs: 600, // 600ms 间隔，对应 100 RPM
 				MaxRetries:       3,
 				RetryDelayMs:     1000,
 			},
@@ -748,20 +793,20 @@ type KnowledgeConfig struct {
 // IndexingConfig 索引构建配置（用于控制知识库索引构建时的行为）
 type IndexingConfig struct {
 	// 分块配置
-	ChunkSize       int `yaml:"chunk_size,omitempty" json:"chunk_size,omitempty"`           // 每个块的最大 token 数（估算），默认 512
-	ChunkOverlap    int `yaml:"chunk_overlap,omitempty" json:"chunk_overlap,omitempty"`     // 块之间的重叠 token 数，默认 50
+	ChunkSize        int `yaml:"chunk_size,omitempty" json:"chunk_size,omitempty"`                   // 每个块的最大 token 数（估算），默认 512
+	ChunkOverlap     int `yaml:"chunk_overlap,omitempty" json:"chunk_overlap,omitempty"`             // 块之间的重叠 token 数，默认 50
 	MaxChunksPerItem int `yaml:"max_chunks_per_item,omitempty" json:"max_chunks_per_item,omitempty"` // 单个知识项的最大块数量，0 表示不限制
 
 	// 速率限制配置（用于避免 API 速率限制）
 	RateLimitDelayMs int `yaml:"rate_limit_delay_ms,omitempty" json:"rate_limit_delay_ms,omitempty"` // 请求间隔时间（毫秒），0 表示不使用固定延迟
-	MaxRPM          int `yaml:"max_rpm,omitempty" json:"max_rpm,omitempty"`                         // 每分钟最大请求数，0 表示不限制
+	MaxRPM           int `yaml:"max_rpm,omitempty" json:"max_rpm,omitempty"`                         // 每分钟最大请求数，0 表示不限制
 
 	// 重试配置（用于处理临时错误）
-	MaxRetries     int `yaml:"max_retries,omitempty" json:"max_retries,omitempty"`       // 最大重试次数，默认 3
-	RetryDelayMs   int `yaml:"retry_delay_ms,omitempty" json:"retry_delay_ms,omitempty"` // 重试间隔（毫秒），默认 1000
+	MaxRetries   int `yaml:"max_retries,omitempty" json:"max_retries,omitempty"`       // 最大重试次数，默认 3
+	RetryDelayMs int `yaml:"retry_delay_ms,omitempty" json:"retry_delay_ms,omitempty"` // 重试间隔（毫秒），默认 1000
 
 	// 批处理配置（用于批量嵌入，当前未使用，保留扩展）
-	BatchSize      int `yaml:"batch_size,omitempty" json:"batch_size,omitempty"`         // 批量处理大小，0 表示逐个处理
+	BatchSize int `yaml:"batch_size,omitempty" json:"batch_size,omitempty"` // 批量处理大小，0 表示逐个处理
 }
 
 // EmbeddingConfig 嵌入配置

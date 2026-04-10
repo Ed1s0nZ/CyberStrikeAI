@@ -1,0 +1,45 @@
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+group = 'ai.cyberstrike'
+version = '1.0.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(11)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Burp Extender API (legacy). Burp will provide the interfaces at runtime, but we compile against it.
+    implementation 'net.portswigger.burp.extender:burp-extender-api:2.3'
+
+    // JSON parsing for SSE payloads.
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.2'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 11
+}
+
+jar {
+    manifest {
+        attributes(
+                'Main-Class': 'burp.BurpExtender'
+        )
+    }
+}
+
+shadowJar {
+    archiveBaseName.set('cyberstrikeai-burp-extension')
+    archiveClassifier.set('all')
+    archiveVersion.set('')
+}
+

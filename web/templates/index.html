@@ -47,6 +47,12 @@
                             </svg>
                             <span data-i18n="header.apiDocs">API 文档</span>
                         </button>
+                                        <button class="openapi-doc-btn" onclick="window.open('https://github.com/Ed1s0nZ/CyberStrikeAI', '_blank')" data-i18n="header.github" data-i18n-attr="title" data-i18n-skip-text="true" title="GitHub">
+                                            <svg width="16" height="16" viewBox="0 0 98 96" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M48.854 0C21.839 0 0 22 0 49.217c0 21.756 13.993 40.172 33.405 46.69 2.427.49 3.316-1.059 3.316-2.362 0-1.141-.08-5.052-.08-9.127-13.59 2.934-16.42-5.867-16.42-5.867-2.184-5.704-5.42-7.17-5.42-7.17-4.448-3.015.324-3.015.324-3.015 4.934.326 7.523 5.052 7.523 5.052 4.367 7.496 11.404 5.378 14.235 4.074.404-3.178 1.699-5.378 3.074-6.6-10.839-1.141-22.243-5.378-22.243-24.283 0-5.378 1.94-9.778 5.014-13.2-.485-1.222-2.184-6.275.486-13.038 0 0 4.125-1.304 13.426 5.052a46.97 46.97 0 0 1 12.214-1.63c4.125 0 8.33.571 12.213 1.63 9.302-6.356 13.427-5.052 13.427-5.052 2.67 6.763.97 11.816.485 13.038 3.155 3.422 5.015 7.822 5.015 13.2 0 18.905-11.404 23.06-22.324 24.283 1.78 1.548 3.316 4.481 3.316 9.126 0 6.6-.08 11.897-.08 13.526 0 1.304.89 2.853 3.316 2.364 19.412-6.52 33.405-24.935 33.405-46.691C97.707 22 75.788 0 48.854 0z"/>
+                                            </svg>
+                                            <span data-i18n="header.github">GitHub</span>
+                                        </button>
                         <div class="lang-switcher">
                             <button class="btn-secondary lang-switcher-btn" onclick="toggleLangDropdown()" data-i18n="header.language" data-i18n-attr="title" data-i18n-skip-text="true" title="界面语言">
                                 <span class="lang-switcher-icon">🌐</span>
@@ -144,6 +150,14 @@
                             <span data-i18n="nav.webshell">WebShell管理</span>
                         </div>
                     </div>
+                    <div class="nav-item" data-page="chat-files">
+                        <div class="nav-item-content" data-title="文件管理" onclick="switchPage('chat-files')" data-i18n="nav.chatFiles" data-i18n-attr="data-title" data-i18n-skip-text="true">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                            <span data-i18n="nav.chatFiles">文件管理</span>
+                        </div>
+                    </div>
                     <div class="nav-item nav-item-has-submenu" data-page="mcp">
                         <div class="nav-item-content" data-title="MCP" onclick="toggleSubmenu('mcp')" data-i18n="nav.mcp" data-i18n-attr="data-title" data-i18n-skip-text="true">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -203,6 +217,24 @@
                             </div>
                             <div class="nav-submenu-item" data-page="skills-management" onclick="switchPage('skills-management')">
                                 <span data-i18n="nav.skillsManagement">Skills管理</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="nav-item nav-item-has-submenu" data-page="agents">
+                        <div class="nav-item-content" data-title="Agents" onclick="toggleSubmenu('agents')" data-i18n="nav.agents" data-i18n-attr="data-title" data-i18n-skip-text="true">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                                <polyline points="2 17 12 22 22 17"></polyline>
+                                <polyline points="2 12 12 17 22 12"></polyline>
+                            </svg>
+                            <span data-i18n="nav.agents">Agents</span>
+                            <svg class="submenu-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <div class="nav-submenu">
+                            <div class="nav-submenu-item" data-page="agents-management" onclick="switchPage('agents-management')">
+                                <span data-i18n="nav.agentsManagement">Agent管理</span>
                             </div>
                         </div>
                     </div>
@@ -565,8 +597,52 @@
                                         <div id="role-selection-list" class="role-selection-list-main"></div>
                                     </div>
                                 </div>
+                                <div id="agent-mode-wrapper" class="agent-mode-wrapper" style="display: none;">
+                                    <div class="agent-mode-inner">
+                                        <button type="button" id="agent-mode-btn" class="role-selector-btn agent-mode-btn" onclick="toggleAgentModePanel()" data-i18n="chat.agentModeSelectAria" data-i18n-attr="aria-label,title" data-i18n-skip-text="true" aria-label="选择单代理或多代理" aria-haspopup="listbox" aria-expanded="false" title="选择单代理或多代理">
+                                            <span id="agent-mode-icon" class="role-selector-icon" aria-hidden="true">🤖</span>
+                                            <span id="agent-mode-text" class="role-selector-text">单代理</span>
+                                            <svg class="role-selector-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                                <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                            </svg>
+                                        </button>
+                                        <div id="agent-mode-panel" class="agent-mode-panel" style="display: none;" role="listbox" aria-labelledby="agent-mode-panel-title">
+                                            <div class="role-selection-panel-header agent-mode-panel-header">
+                                                <h3 id="agent-mode-panel-title" class="role-selection-panel-title" data-i18n="chat.agentModePanelTitle">对话模式</h3>
+                                                <button type="button" class="role-selection-panel-close" onclick="closeAgentModePanel()" data-i18n="common.close" data-i18n-attr="title" title="关闭">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            <div class="agent-mode-options">
+                                                <button type="button" class="role-selection-item-main agent-mode-option" data-value="single" role="option" onclick="selectAgentMode('single')">
+                                                    <div class="role-selection-item-icon-main" aria-hidden="true">🤖</div>
+                                                    <div class="role-selection-item-content-main">
+                                                        <div class="role-selection-item-name-main" data-i18n="chat.agentModeSingle">单代理</div>
+                                                        <div class="role-selection-item-description-main" data-i18n="chat.agentModeSingleHint">单模型 ReAct 循环，适合常规对话与工具调用</div>
+                                                    </div>
+                                                    <div class="role-selection-checkmark-main agent-mode-check" data-agent-mode-check="single">✓</div>
+                                                </button>
+                                                <button type="button" class="role-selection-item-main agent-mode-option" data-value="multi" role="option" onclick="selectAgentMode('multi')">
+                                                    <div class="role-selection-item-icon-main" aria-hidden="true">🧩</div>
+                                                    <div class="role-selection-item-content-main">
+                                                        <div class="role-selection-item-name-main" data-i18n="chat.agentModeMulti">多代理</div>
+                                                        <div class="role-selection-item-description-main" data-i18n="chat.agentModeMultiHint">Eino DeepAgent 编排子代理，适合复杂任务</div>
+                                                    </div>
+                                                    <div class="role-selection-checkmark-main agent-mode-check" data-agent-mode-check="multi">✓</div>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" id="agent-mode-select" value="single" autocomplete="off">
+                                </div>
                                 <div class="chat-input-with-files">
                                     <div id="chat-file-list" class="chat-file-list" aria-label="已选文件列表"></div>
+                                    <div id="chat-attachment-progress" class="chat-upload-progress-row" hidden role="status" aria-live="polite">
+                                        <div class="chat-upload-progress-track" aria-hidden="true"><div class="chat-upload-progress-fill" id="chat-attachment-progress-fill"></div></div>
+                                        <span class="chat-upload-progress-label" id="chat-attachment-progress-label"></span>
+                                    </div>
                                     <div class="chat-input-field">
                                         <textarea id="chat-input" data-i18n="chat.inputPlaceholder" data-i18n-attr="placeholder" data-i18n-skip-text="true" placeholder="输入测试目标或命令... (输入 @ 选择工具 | Shift+Enter 换行，Enter 发送)" rows="1"></textarea>
                                         <div id="mention-suggestions" class="mention-suggestions" role="listbox" aria-label="工具提及候选"></div>
@@ -578,12 +654,12 @@
                                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                     </svg>
                                 </button>
-                                <button class="parallel-scan-trigger" onclick="toggleScanMode('parallel')" title="Parallel Scan">
+                                <button type="button" class="parallel-scan-trigger" onclick="toggleScanMode('parallel')" title="Parallel Scan">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                         <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                     </svg>
                                 </button>
-                                <button class="send-btn" onclick="sendMessage()">
+                                <button type="button" class="send-btn" id="chat-send-btn" onclick="sendMessage()">
                                     <span data-i18n="chat.send">发送</span>
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                         <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -990,6 +1066,17 @@
                         <div class="webshell-layout">
                             <div id="webshell-sidebar" class="webshell-sidebar">
                                 <div class="webshell-sidebar-header" data-i18n="webshell.connections">连接列表</div>
+                                <div class="webshell-conn-search">
+                                    <input type="text"
+                                           id="webshell-conn-search"
+                                           class="form-control webshell-conn-search-input"
+                                           data-i18n="webshell.searchPlaceholder"
+                                           data-i18n-attr="placeholder"
+                                           placeholder="搜索连接..." />
+                                </div>
+                                <div class="webshell-sidebar-tools">
+                                    <button type="button" class="btn-ghost btn-sm" id="webshell-batch-probe-btn" data-i18n="webshell.batchProbe">一键批量探活</button>
+                                </div>
                                 <div id="webshell-list" class="webshell-list">
                                     <div class="webshell-empty" data-i18n="webshell.noConnections">暂无连接，请点击「添加连接」</div>
                                 </div>
@@ -1000,6 +1087,48 @@
                                     <div class="webshell-workspace-placeholder" data-i18n="webshell.selectOrAdd">请从左侧选择连接，或添加新的 WebShell 连接</div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 对话附件 / 文件管理 -->
+                <div id="page-chat-files" class="page">
+                    <div class="page-header">
+                        <h2 data-i18n="chatFilesPage.title">文件管理</h2>
+                        <div class="page-header-actions">
+                            <button type="button" class="btn-primary" id="chat-files-header-upload-btn" onclick="chatFilesOpenUploadPicker()" data-i18n="chatFilesPage.upload">上传文件</button>
+                            <input type="file" id="chat-files-upload-input" style="display:none" onchange="onChatFilesUploadPick(event)" />
+                            <button type="button" class="btn-secondary" id="chat-files-refresh-btn" onclick="loadChatFilesPage()" data-i18n="common.refresh">刷新</button>
+                        </div>
+                    </div>
+                    <div class="page-content">
+                        <p class="chat-files-intro" data-i18n="chatFilesPage.intro">管理在对话中上传的文件。需要让 AI 引用某文件时，在列表中点击「复制路径」，到对话里粘贴即可。</p>
+                        <div class="tasks-filters chat-files-filters">
+                            <label>
+                                <span data-i18n="chatFilesPage.conversationFilter">会话 ID</span>
+                                <input type="text" id="chat-files-filter-conv" class="form-control" data-i18n="chatFilesPage.conversationPlaceholder" data-i18n-attr="placeholder" placeholder="留空表示全部" onkeydown="if(event.key==='Enter') loadChatFilesPage()" />
+                            </label>
+                            <label style="flex:1;min-width:180px;max-width:360px;">
+                                <span data-i18n="chatFilesPage.searchName">文件名</span>
+                                <input type="text" id="chat-files-filter-name" class="form-control" data-i18n="chatFilesPage.searchNamePlaceholder" data-i18n-attr="placeholder" placeholder="筛选文件名" oninput="chatFilesFilterNameOnInput()" onkeydown="if(event.key==='Enter') loadChatFilesPage()" />
+                            </label>
+                            <label>
+                                <span data-i18n="chatFilesPage.groupBy">分组</span>
+                                <select id="chat-files-group-by" class="form-control" onchange="chatFilesGroupByChange()">
+                                    <option value="none" data-i18n="chatFilesPage.groupNone">不分组</option>
+                                    <option value="date" data-i18n="chatFilesPage.groupByDate">按日期</option>
+                                    <option value="conversation" data-i18n="chatFilesPage.groupByConversation">按会话</option>
+                                    <option value="folder" data-i18n="chatFilesPage.groupByFolder">按文件夹</option>
+                                </select>
+                            </label>
+                            <button class="btn-secondary" type="button" onclick="loadChatFilesPage()" data-i18n="common.search">搜索</button>
+                        </div>
+                        <div id="chat-files-upload-progress" class="chat-upload-progress-row chat-upload-progress-row--files" hidden role="status" aria-live="polite">
+                            <div class="chat-upload-progress-track" aria-hidden="true"><div class="chat-upload-progress-fill" id="chat-files-upload-progress-fill"></div></div>
+                            <span class="chat-upload-progress-label" id="chat-files-upload-progress-label"></span>
+                        </div>
+                        <div id="chat-files-list-wrap" class="chat-files-table-wrap">
+                            <div class="loading-spinner" data-i18n="common.loading">加载中…</div>
                         </div>
                     </div>
                 </div>
@@ -1134,6 +1263,81 @@
                     </div>
                 </div>
 
+                <!-- 多代理子 Agent（Markdown）管理 -->
+                <div id="page-agents-management" class="page">
+                    <div class="page-header">
+                        <h2 data-i18n="agentsPage.title">Agent 管理</h2>
+                        <div class="page-header-actions">
+                            <button type="button" class="btn-secondary" onclick="loadMarkdownAgents()" data-i18n="common.refresh">刷新</button>
+                            <button type="button" class="btn-primary" onclick="showAddMarkdownAgentModal()" data-i18n="agentsPage.create">新建 Agent</button>
+                        </div>
+                    </div>
+                    <div class="page-content">
+                        <p class="agents-page-hint" data-i18n="agentsPage.hint">子 Agent 仅在 agents 目录下 .md 维护。</p>
+                        <div id="agents-md-dir" class="agents-dir-label"></div>
+                        <div id="agents-md-list" class="skills-grid">
+                            <div class="loading-spinner" data-i18n="agentsPage.loading">加载中...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Agent Markdown 编辑弹窗 -->
+                <div id="agent-md-modal" class="modal" style="display: none;">
+                    <div class="modal-content" style="max-width: 720px; max-height: 92vh;">
+                        <div class="modal-header">
+                            <h2 id="agent-md-modal-title" data-i18n="agentsPage.editTitle">编辑 Agent</h2>
+                            <span class="modal-close" onclick="closeMarkdownAgentModal()">&times;</span>
+                        </div>
+                        <div class="modal-body" style="overflow-y: auto; max-height: calc(92vh - 130px);">
+                            <input type="hidden" id="agent-md-filename-current" value="">
+                            <div class="form-group" id="agent-md-filename-row">
+                                <label data-i18n="agentsPage.filename">文件名（.md）</label>
+                                <input type="text" id="agent-md-filename" data-i18n="agentsPage.filenamePlaceholder" data-i18n-attr="placeholder" placeholder="例如 code-reviewer.md" autocomplete="off" />
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="agentsPage.fieldRole">类型</label>
+                                <select id="agent-md-role" class="form-select">
+                                    <option value="sub" data-i18n="agentsPage.roleSub">子代理</option>
+                                    <option value="orchestrator" data-i18n="agentsPage.roleOrchestrator">主代理（Deep 协调者）</option>
+                                </select>
+                                <p class="form-hint muted" data-i18n="agentsPage.roleHint">主代理也可使用固定文件名 orchestrator.md；全目录仅允许一个主代理。</p>
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="agentsPage.fieldId">Agent ID（留空则从名称生成）</label>
+                                <input type="text" id="agent-md-id" placeholder="code-reviewer" autocomplete="off" />
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="agentsPage.fieldName">显示名称</label>
+                                <input type="text" id="agent-md-name" data-i18n="agentsPage.namePlaceholder" data-i18n-attr="placeholder" placeholder="Code Reviewer" autocomplete="off" />
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="agentsPage.fieldDesc">描述</label>
+                                <textarea id="agent-md-description" rows="2" data-i18n="agentsPage.descPlaceholder" data-i18n-attr="placeholder" placeholder="何时调用该子代理"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="agentsPage.fieldTools">可用工具（逗号分隔，与角色工具 key 一致）</label>
+                                <input type="text" id="agent-md-tools" placeholder="tool_a, tool_b" autocomplete="off" />
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="agentsPage.fieldBindRole">绑定角色（可选）</label>
+                                <input type="text" id="agent-md-bind-role" placeholder="" autocomplete="off" />
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="agentsPage.fieldMaxIter">子代理最大迭代（0=使用全局默认）</label>
+                                <input type="number" id="agent-md-max-iter" min="0" value="0" />
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="agentsPage.fieldInstruction">系统提示词（Markdown 正文）</label>
+                                <textarea id="agent-md-instruction" rows="14" data-i18n="agentsPage.instructionPlaceholder" data-i18n-attr="placeholder" placeholder="You are a specialist agent..."></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn-secondary" onclick="closeMarkdownAgentModal()" data-i18n="common.cancel">取消</button>
+                            <button type="button" class="btn-primary" onclick="saveMarkdownAgent()" data-i18n="common.save">保存</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 系统设置页面 -->
                 <div id="page-settings" class="page">
                     <div class="page-header">
@@ -1145,6 +1349,9 @@
                             <nav class="settings-nav">
                                 <div class="settings-nav-item active" data-section="basic" onclick="switchSettingsSection('basic')">
                                     <span data-i18n="settings.nav.basic">基本设置</span>
+                                </div>
+                                <div class="settings-nav-item" data-section="knowledge" onclick="switchSettingsSection('knowledge')">
+                                    <span data-i18n="settings.nav.knowledge">知识库</span>
                                 </div>
                                 <div class="settings-nav-item" data-section="robots" onclick="switchSettingsSection('robots')">
                                     <span data-i18n="settings.nav.robots">机器人设置</span>
@@ -1182,6 +1389,10 @@
                                             <label for="openai-model"><span data-i18n="settingsBasic.model">模型</span> <span style="color: red;">*</span></label>
                                             <input type="text" id="openai-model" data-i18n="settingsBasic.modelPlaceholder" data-i18n-attr="placeholder" placeholder="gpt-4" required />
                                         </div>
+                                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 2px;">
+                                            <a href="javascript:void(0)" id="test-openai-btn" onclick="testOpenAIConnection()" style="font-size: 0.8125rem; color: var(--accent-color, #3182ce); text-decoration: none; cursor: pointer; user-select: none;" data-i18n="settingsBasic.testConnection">测试连接</a>
+                                            <span id="test-openai-result" style="font-size: 0.8125rem;"></span>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -1214,10 +1425,51 @@
                                             <label for="agent-max-iterations" data-i18n="settingsBasic.maxIterations">最大迭代次数</label>
                                             <input type="number" id="agent-max-iterations" min="1" max="100" data-i18n="settingsBasic.iterationsPlaceholder" data-i18n-attr="placeholder" placeholder="30" />
                                         </div>
+                                        <div class="form-group">
+                                            <label class="checkbox-label">
+                                                <input type="checkbox" id="multi-agent-enabled" class="modern-checkbox" />
+                                                <span class="checkbox-custom"></span>
+                                                <span class="checkbox-text" data-i18n="settingsBasic.enableMultiAgent">启用 Eino 多代理（DeepAgent）</span>
+                                            </label>
+                                            <small class="form-hint" data-i18n="settingsBasic.enableMultiAgentHint">开启后对话页可选「多代理」模式；子代理在 config.yaml 的 multi_agent.sub_agents 中配置。</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="multi-agent-default-mode" data-i18n="settingsBasic.multiAgentDefaultMode">对话页默认模式</label>
+                                            <select id="multi-agent-default-mode">
+                                                <option value="single" data-i18n="settingsBasic.multiAgentModeSingle">单代理（ReAct）</option>
+                                                <option value="multi" data-i18n="settingsBasic.multiAgentModeMulti">多代理（Eino）</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="checkbox-label">
+                                                <input type="checkbox" id="multi-agent-robot-use" class="modern-checkbox" />
+                                                <span class="checkbox-custom"></span>
+                                                <span class="checkbox-text" data-i18n="settingsBasic.multiAgentRobotUse">企业微信 / 钉钉 / 飞书机器人也使用多代理</span>
+                                            </label>
+                                            <small class="form-hint" data-i18n="settingsBasic.multiAgentRobotUseHint">需同时勾选「启用多代理」；调用量与成本更高。</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="checkbox-label">
+                                                <input type="checkbox" id="multi-agent-batch-use" class="modern-checkbox" />
+                                                <span class="checkbox-custom"></span>
+                                                <span class="checkbox-text" data-i18n="settingsBasic.multiAgentBatchUse">批量任务队列也使用多代理</span>
+                                            </label>
+                                            <small class="form-hint" data-i18n="settingsBasic.multiAgentBatchUseHint">开启后，任务管理中按队列执行的每个子任务将走 Eino DeepAgent（需启用多代理）。</small>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <!-- 知识库配置 -->
+                                <div class="settings-actions">
+                                    <button class="btn-primary" onclick="applySettings()" data-i18n="settings.apply.button">应用配置</button>
+                                </div>
+                            </div>
+
+                            <!-- 知识库设置 -->
+                            <div id="settings-section-knowledge" class="settings-section-content">
+                                <div class="settings-section-header">
+                                    <h3 data-i18n="settings.knowledge.title">知识库设置</h3>
+                                </div>
+
                                 <div class="settings-subsection">
                                     <h4 data-i18n="settingsBasic.knowledgeConfig">知识库配置</h4>
                                     <div class="settings-form">
@@ -1233,7 +1485,7 @@
                                             <input type="text" id="knowledge-base-path" data-i18n="settingsBasic.knowledgeBasePathPlaceholder" data-i18n-attr="placeholder" placeholder="knowledge_base" />
                                             <small class="form-hint" data-i18n="settingsBasic.knowledgeBasePathHint">相对于配置文件所在目录的路径</small>
                                         </div>
-                                        
+
                                         <div class="settings-subsection-header">
                                             <h5 data-i18n="settingsBasic.embeddingConfig">嵌入模型配置</h5>
                                         </div>
@@ -1257,7 +1509,7 @@
                                             <label for="knowledge-embedding-model" data-i18n="settingsBasic.modelName">模型名称</label>
                                             <input type="text" id="knowledge-embedding-model" data-i18n="settingsBasic.embeddingModelPlaceholder" data-i18n-attr="placeholder" placeholder="text-embedding-v4" />
                                         </div>
-                                        
+
                                         <div class="settings-subsection-header">
                                             <h5 data-i18n="settingsBasic.retrievalConfig">检索配置</h5>
                                         </div>
@@ -1276,7 +1528,7 @@
                                             <input type="number" id="knowledge-retrieval-hybrid-weight" min="0" max="1" step="0.1" data-i18n="settingsBasic.hybridPlaceholder" data-i18n-attr="placeholder" placeholder="0.7" />
                                             <small class="form-hint" data-i18n="settingsBasic.hybridHint">向量检索的权重（0-1），1.0表示纯向量检索，0.0表示纯关键词检索</small>
                                         </div>
-                                    </div>
+
                                         <div class="settings-subsection-header">
                                             <h5 data-i18n="settingsBasic.indexConfig">索引配置</h5>
                                         </div>
@@ -1314,7 +1566,9 @@
                                             <label for="knowledge-indexing-retry-delay-ms" data-i18n="settingsBasic.retryDelay">重试间隔（毫秒）</label>
                                             <input type="number" id="knowledge-indexing-retry-delay-ms" min="0" max="10000" data-i18n="settingsBasic.retryDelayPlaceholder" data-i18n-attr="placeholder" placeholder="1000" />
                                             <small class="form-hint" data-i18n="settingsBasic.retryDelayHint">重试间隔毫秒数（默认 1000），每次重试会递增延迟</small>
-                                        </div>                                </div>
+                                        </div>
+                                    </div>
+                                </div>
 
                                 <div class="settings-actions">
                                     <button class="btn-primary" onclick="applySettings()" data-i18n="settings.apply.button">应用配置</button>
@@ -1725,6 +1979,70 @@
         </div>
     </div>
 
+    <div id="chat-files-edit-modal" class="modal">
+        <div class="modal-content" style="max-width: 720px;">
+            <div class="modal-header">
+                <h2 data-i18n="chatFilesPage.editTitle">编辑文件</h2>
+                <span class="modal-close" onclick="closeChatFilesEditModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p class="chat-files-modal-path"><code id="chat-files-edit-path"></code></p>
+                <textarea id="chat-files-edit-textarea" class="form-control chat-files-edit-textarea" rows="18"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="closeChatFilesEditModal()" data-i18n="common.cancel">取消</button>
+                <button type="button" class="btn-primary" onclick="saveChatFilesEdit()" data-i18n="common.save">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="chat-files-rename-modal" class="modal">
+        <div class="modal-content" style="max-width: 480px;">
+            <div class="modal-header">
+                <h2 data-i18n="chatFilesPage.renameTitle">重命名</h2>
+                <span class="modal-close" onclick="closeChatFilesRenameModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <label class="chat-files-rename-label">
+                    <span data-i18n="chatFilesPage.newFileName">新文件名</span>
+                    <input type="text" id="chat-files-rename-input" class="form-control" />
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="closeChatFilesRenameModal()" data-i18n="common.cancel">取消</button>
+                <button type="button" class="btn-primary" onclick="submitChatFilesRename()" data-i18n="common.ok">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="chat-files-mkdir-modal" class="modal">
+        <div class="modal-content chat-files-mkdir-modal-content">
+            <div class="modal-header">
+                <h2 data-i18n="chatFilesPage.newFolderTitle">新建文件夹</h2>
+                <span class="modal-close" onclick="closeChatFilesMkdirModal()">&times;</span>
+            </div>
+            <div class="modal-body chat-files-mkdir-body">
+                <div class="chat-files-mkdir-location" aria-live="polite">
+                    <div class="chat-files-mkdir-location-caption" data-i18n="chatFilesPage.newFolderLocation">位置</div>
+                    <div class="chat-files-mkdir-path-box">
+                        <code class="chat-files-mkdir-path" id="chat-files-mkdir-parent-hint">chat_uploads</code>
+                    </div>
+                </div>
+                <label class="chat-files-rename-label chat-files-mkdir-label">
+                    <span class="chat-files-mkdir-field-name">
+                        <svg class="chat-files-mkdir-field-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                        <span data-i18n="chatFilesPage.newFolderNameLabel">文件夹名称</span>
+                    </span>
+                    <input type="text" id="chat-files-mkdir-input" class="form-control chat-files-mkdir-input" data-i18n="chatFilesPage.newFolderNamePlaceholder" data-i18n-attr="placeholder" placeholder="仅名称，不含 /" autocomplete="off" />
+                </label>
+            </div>
+            <div class="modal-footer chat-files-mkdir-footer">
+                <button type="button" class="btn-secondary chat-files-mkdir-btn-cancel" onclick="closeChatFilesMkdirModal()" data-i18n="common.cancel">取消</button>
+                <button type="button" class="btn-primary chat-files-mkdir-btn-submit" onclick="submitChatFilesMkdir()" data-i18n="common.ok">确定</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Marked.js for Markdown parsing -->
     <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
     <!-- DOMPurify for HTML sanitization to prevent XSS -->
@@ -1916,6 +2234,24 @@ version: 1.0.0<br>
                 <path d="M10.5 13.5l3-3M8 8H5a4 4 0 1 0 0 8h3m8-8h3a4 4 0 0 1 0 8h-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
             <span data-i18n="contextMenu.viewAttackChain">查看攻击链</span>
+        </div>
+        <div class="context-menu-item context-menu-item-has-submenu" onmouseenter="handleDownloadMarkdownSubmenuEnter()" onmouseleave="handleDownloadMarkdownSubmenuLeave(event)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 3v12m0 0l-4-4m4 4l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span data-i18n="contextMenu.downloadMarkdown">下载 Markdown</span>
+            <svg class="submenu-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div id="download-markdown-submenu" class="context-submenu" style="display: none;" onmouseenter="clearDownloadMarkdownSubmenuHideTimeout()" onmouseleave="hideDownloadMarkdownSubmenu()">
+                <div class="context-submenu-item" onclick="downloadConversationMarkdownFromContext(false)">
+                    <span data-i18n="contextMenu.downloadMarkdownSummary">简版</span>
+                </div>
+                <div class="context-submenu-item" onclick="downloadConversationMarkdownFromContext(true)">
+                    <span data-i18n="contextMenu.downloadMarkdownFull">完整版</span>
+                </div>
+            </div>
         </div>
         <div class="context-menu-divider"></div>
         <div class="context-menu-item" onclick="renameConversation()">
@@ -2321,6 +2657,7 @@ version: 1.0.0<br>
     <script src="/static/js/auth.js"></script>
     <script src="/static/js/info-collect.js"></script>
     <script src="/static/js/router.js"></script>
+    <script src="/static/js/agents.js"></script>
     <script src="/static/js/dashboard.js"></script>
     <script src="/static/js/monitor.js"></script>
     <script src="/static/js/chat.js"></script>
@@ -2332,6 +2669,7 @@ version: 1.0.0<br>
     <script src="/static/js/skills.js"></script>
     <script src="/static/js/vulnerability.js?v=4"></script>
     <script src="/static/js/webshell.js"></script>
+    <script src="/static/js/chat-files.js"></script>
     <script src="/static/js/tasks.js"></script>
     <script src="/static/js/roles.js"></script>
     <script src="/static/js/parallel-scan.js"></script>

@@ -121,6 +121,13 @@
             ws.onopen = function () {
                 if (tab.term) {
                     tab.term.focus();
+                    // Send the actual terminal dimensions to the backend immediately
+                    // so the PTY size matches what xterm.js is displaying.
+                    if (tab.term.cols && tab.term.rows) {
+                        try {
+                            ws.send(JSON.stringify({ type: 'resize', cols: tab.term.cols, rows: tab.term.rows }));
+                        } catch (e) {}
+                    }
                 }
             };
 
@@ -225,6 +232,14 @@
             }
         }
 
+        function sendResize() {
+            if (tab.ws && tab.ws.readyState === WebSocket.OPEN && term.cols && term.rows) {
+                try {
+                    tab.ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+                } catch (e) {}
+            }
+        }
+
         term.onData(function (data) {
             // Ctrl+L：本地清屏，同时把 ^L 也发给后端
             if (data === '\x0c') {
@@ -233,6 +248,12 @@
                 return;
             }
             sendToWS(data);
+        });
+
+        // Notify backend when the terminal is resized so the PTY dimensions stay in sync.
+        // This is critical for full-screen programs like vi/vim/less to render correctly.
+        term.onResize(function (size) {
+            sendResize();
         });
 
         tab.term = term;

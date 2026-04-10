@@ -234,6 +234,18 @@ func (h *GroupHandler) GetGroupConversations(c *gin.Context) {
 	c.JSON(http.StatusOK, groupConvs)
 }
 
+// GetAllMappings 批量获取所有分组映射（消除前端 N+1 请求）
+func (h *GroupHandler) GetAllMappings(c *gin.Context) {
+	mappings, err := h.db.GetAllGroupMappings()
+	if err != nil {
+		h.logger.Error("获取分组映射失败", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, mappings)
+}
+
 // UpdateConversationPinnedRequest 更新对话置顶状态请求
 type UpdateConversationPinnedRequest struct {
 	Pinned bool `json:"pinned"`

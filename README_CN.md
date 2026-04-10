@@ -6,6 +6,26 @@
 
 [中文](README_CN.md) | [English](README.md)
 
+**社区**：[加入 Discord](https://discord.gg/8PjVCMu8Zw)
+
+<details>
+<summary><strong>微信群</strong>（点击展开二维码）</summary>
+
+<img src="./images/wechat-group-cyberstrikeai-qr.jpg" alt="CyberStrikeAI 微信群二维码" width="280">
+
+</details>
+
+<details>
+<summary><strong>赞助</strong>（点击展开）</summary>
+
+若 CyberStrikeAI 对您有帮助，可通过 **微信支付** 或 **支付宝** 赞助项目：
+
+<div align="center">
+  <img src="./images/sponsor-wechat-alipay-qr.jpg" alt="微信与支付宝赞助二维码" width="480">
+</div>
+
+</details>
+
 CyberStrikeAI 是一款 **AI 原生安全测试平台**，基于 Go 构建，集成了 100+ 安全工具、智能编排引擎、角色化测试与预设安全测试角色、Skills 技能系统与专业测试技能，以及完整的测试生命周期管理能力。通过原生 MCP 协议与 AI 智能体，支持从对话指令到漏洞发现、攻击链分析、知识检索与结果可视化的全流程自动化，为安全团队提供可审计、可追溯、可协作的专业测试环境。
 
 
@@ -28,36 +48,36 @@ CyberStrikeAI 是一款 **AI 原生安全测试平台**，基于 Go 构建，集
 <img src="./images/web-console.png" alt="Web 控制台" width="100%">
 </td>
 <td width="33.33%" align="center">
-<strong>攻击链可视化</strong><br/>
-<img src="./images/attack-chain.png" alt="攻击链" width="100%">
-</td>
-<td width="33.33%" align="center">
 <strong>任务管理</strong><br/>
 <img src="./images/task-management.png" alt="任务管理" width="100%">
+</td>
+<td width="33.33%" align="center">
+<strong>漏洞管理</strong><br/>
+<img src="./images/vulnerability-management.png" alt="漏洞管理" width="100%">
 </td>
 </tr>
 <tr>
 <td width="33.33%" align="center">
-<strong>漏洞管理</strong><br/>
-<img src="./images/vulnerability-management.png" alt="漏洞管理" width="100%">
+<strong>WebShell 管理</strong><br/>
+<img src="./images/webshell-management.png" alt="WebShell 管理" width="100%">
 </td>
 <td width="33.33%" align="center">
 <strong>MCP 管理</strong><br/>
 <img src="./images/mcp-management.png" alt="MCP 管理" width="100%">
 </td>
 <td width="33.33%" align="center">
-<strong>MCP stdio 模式</strong><br/>
-<img src="./images/mcp-stdio2.png" alt="MCP stdio 模式" width="100%">
+<strong>知识库</strong><br/>
+<img src="./images/knowledge-base.png" alt="知识库" width="100%">
 </td>
 </tr>
 <tr>
 <td width="33.33%" align="center">
-<strong>知识库</strong><br/>
-<img src="./images/knowledge-base.png" alt="知识库" width="100%">
-</td>
-<td width="33.33%" align="center">
 <strong>Skills 管理</strong><br/>
 <img src="./images/skills.png" alt="Skills 管理" width="100%">
+</td>
+<td width="33.33%" align="center">
+<strong>Agent 管理</strong><br/>
+<img src="./images/agent-management.png" alt="Agent 管理" width="100%">
 </td>
 <td width="33.33%" align="center">
 <strong>角色管理</strong><br/>
@@ -66,11 +86,17 @@ CyberStrikeAI 是一款 **AI 原生安全测试平台**，基于 Go 构建，集
 </tr>
 <tr>
 <td width="33.33%" align="center">
-<strong>WebShell 管理</strong><br/>
-<img src="./images/webshell-management.png" alt="WebShell 管理" width="100%">
+<strong>系统设置</strong><br/>
+<img src="./images/settings.png" alt="系统设置" width="100%">
 </td>
-<td width="33.33%" align="center"></td>
-<td width="33.33%" align="center"></td>
+<td width="33.33%" align="center">
+<strong>MCP stdio 模式</strong><br/>
+<img src="./images/mcp-stdio2.png" alt="MCP stdio 模式" width="100%">
+</td>
+<td width="33.33%" align="center">
+<strong>Burp Suite 插件</strong><br/>
+<img src="./images/plugins.png" alt="Burp Suite 插件" width="100%">
+</td>
 </tr>
 </table>
 
@@ -89,9 +115,18 @@ CyberStrikeAI 是一款 **AI 原生安全测试平台**，基于 Go 构建，集
 - 🛡️ 漏洞管理功能：完整的漏洞 CRUD 操作，支持严重程度分级、状态流转、按对话/严重程度/状态过滤，以及统计看板
 - 📋 批量任务管理：创建任务队列，批量添加任务，依次顺序执行，支持任务编辑与状态跟踪
 - 🎭 角色化测试：预设安全测试角色（渗透测试、CTF、Web 应用扫描等），支持自定义提示词和工具限制
+- 🧩 **多代理模式（Eino DeepAgent）**：可选编排——协调主代理通过 `task` 调度 Markdown 定义的子代理；主代理见 `agents/orchestrator.md` 或 front matter `kind: orchestrator`，子代理为 `agents/*.md`；开启 `multi_agent.enabled` 后聊天可切换单代理/多代理（详见 [多代理说明](docs/MULTI_AGENT_EINO.md)）
 - 🎯 Skills 技能系统：20+ 预设安全测试技能（SQL 注入、XSS、API 安全等），可附加到角色或由 AI 按需调用
 - 📱 **机器人**：支持钉钉、飞书长连接，在手机端与 CyberStrikeAI 对话（配置与命令详见 [机器人使用说明](docs/robot.md)）
 - 🐚 **WebShell 管理**：添加与管理 WebShell 连接（兼容冰蝎/蚁剑等），通过虚拟终端执行命令、内置文件管理进行文件操作，并提供按连接维度保存历史的 AI 助手标签页；支持 PHP/ASP/ASPX/JSP 及自定义类型，可配置请求方法与命令参数。
+
+## 插件（Plugins）
+
+可选集成在 `plugins/` 目录下。
+
+- **Burp Suite 插件**：`plugins/burp-suite/cyberstrikeai-burp-extension/`  
+  构建产物：`plugins/burp-suite/cyberstrikeai-burp-extension/dist/cyberstrikeai-burp-extension.jar`  
+  说明文档：`plugins/burp-suite/cyberstrikeai-burp-extension/README.zh-CN.md`
 
 ## 工具概览
 
@@ -124,7 +159,7 @@ CyberStrikeAI 是一款 **AI 原生安全测试平台**，基于 Go 构建，集
 **一条命令部署：**
 ```bash
 git clone https://github.com/Ed1s0nZ/CyberStrikeAI.git
-cd CyberStrikeAI-main
+cd CyberStrikeAI
 chmod +x run.sh && ./run.sh
 ```
 
@@ -169,8 +204,29 @@ go build -o cyberstrike-ai cmd/server/main.go
 
 **说明：** Python 虚拟环境（`venv/`）由 `run.sh` 自动创建和管理。需要 Python 的工具（如 `api-fuzzer`、`http-framework-test` 等）会自动使用该环境。
 
+### CyberStrikeAI 版本更新（无兼容性问题）
+
+1. （首次使用）启用脚本：`chmod +x upgrade.sh`
+2. 一键升级：`./upgrade.sh`（可选参数：`--tag vX.Y.Z`、`--no-venv`、`--preserve-custom`、`--yes`）
+3. 脚本会备份你的 `config.yaml` 和 `data/`，从 GitHub Release 升级代码，更新 `config.yaml` 的 `version` 字段后重启服务。
+
+推荐的一键指令：
+`chmod +x upgrade.sh && ./upgrade.sh --yes`
+
+如果升级失败，可以从 `.upgrade-backup/` 恢复，或按旧方式手动拷贝 `/data` 和 `config.yaml` 后再运行 `./run.sh`。
+
+依赖/提示：
+* 需要 `curl` 或 `wget` 用于下载 GitHub Release 包。
+* 建议/需要 `rsync` 用于安全同步代码。
+* 如果遇到 GitHub API 限流，运行前设置 `export GITHUB_TOKEN="..."` 再执行 `./upgrade.sh`。
+
+⚠️ **注意：** 仅适用于无兼容性变更的版本更新。若版本存在兼容性调整，此方法不适用。
+
+**举例：** 无兼容性变更如 v1.3.1 → v1.3.2；有兼容性变更如 v1.3.1 → v1.4.0。项目采用语义化版本（SemVer）：仅第三位（补丁号）变更时通常可安全按上述步骤升级；次版本号或主版本号变更时可能涉及配置、数据或接口调整，需查阅 release notes 再决定是否适用本方法。
+
 ### 常用流程
 - **对话测试**：自然语言触发多步工具编排，SSE 实时输出。
+- **单代理 / 多代理**：配置 `multi_agent.enabled: true` 后，聊天界面可切换 **单代理**（原有 ReAct 循环）与 **多代理**（Eino DeepAgent + `task` 子代理）。多代理走 `/api/multi-agent/stream`，MCP 工具与单代理同源桥接。
 - **角色化测试**：从预设的安全测试角色（渗透测试、CTF、Web 应用扫描、API 安全测试等）中选择，自定义 AI 行为和可用工具。每个角色可应用自定义系统提示词，并可限制可用工具列表，实现聚焦的测试场景。
 - **工具监控**：查看任务队列、执行日志、大文件附件。
 - **会话历史**：所有对话与工具调用保存在 SQLite，可随时重放。
@@ -214,6 +270,15 @@ go build -o cyberstrike-ai cmd/server/main.go
    ```
 2. 重启服务或重新加载配置，角色会出现在角色选择下拉菜单中。
 
+### 多代理模式（Eino DeepAgent）
+- **能力说明**：基于 CloudWeGo **Eino** `adk/prebuilt/deep` 的可选路径：**协调主代理**通过内置 **`task`** 工具启动短时**子代理**，各子代理独立推理，工具集来自当前聊天所选角色（与单代理一致来源）。
+- **Markdown 定义**：在 `agents_dir`（默认 `agents/`，相对 `config.yaml` 所在目录）维护：
+  - **主代理**：固定文件名 `orchestrator.md`，或任意 `.md` 且在 front matter 写 `kind: orchestrator`（**同一目录仅允许一个**主代理）。配置 Deep 的 name/id、description 与可选完整系统提示（正文）；正文为空时依次使用 `multi_agent.orchestrator_instruction`、Eino 内置默认提示。
+  - **子代理**：其余 `*.md`（YAML front matter + 正文作 instruction），不参与主代理定义的文件才会进入 `task` 可选列表。
+- **界面管理**：**Agents → Agent 管理** 对 Markdown 增删改查；HTTP API 前缀 `/api/multi-agent/markdown-agents`。
+- **配置项**：`config.yaml` 中 `multi_agent`：`enabled`、`default_mode`（`single` | `multi`）、`robot_use_multi_agent`、`batch_use_multi_agent`、`max_iteration`、`orchestrator_instruction` 等；可选在 YAML 写 `sub_agents` 与目录合并（同 `id` 时以 Markdown 为准）。
+- **更多细节**：流式事件、机器人与批量任务、排障等见 **[docs/MULTI_AGENT_EINO.md](docs/MULTI_AGENT_EINO.md)**。
+
 ### Skills 技能系统
 - **预设技能**：系统内置 20+ 个预设的安全测试技能（SQL 注入、XSS、API 安全、云安全、容器安全等），位于 `skills/` 目录。
 - **提示词中的技能提示**：当选择某个角色时，该角色附加的技能名称会作为推荐添加到系统提示词中。技能内容不会自动注入，AI 智能体需要时需使用 `read_skill` 工具获取技能详情。
@@ -255,6 +320,7 @@ go build -o cyberstrike-ai cmd/server/main.go
 - **Web 模式**：自带 HTTP MCP 服务供前端调用。
 - **MCP stdio 模式**：`go run cmd/mcp-stdio/main.go` 可接入 Cursor/命令行。
 - **外部 MCP 联邦**：在设置中注册第三方 MCP（HTTP/stdio/SSE），按需启停并实时查看调用统计与健康度。
+- **可选 MCP 服务**：项目中的 [`mcp-servers/`](mcp-servers/README_CN.md) 目录提供独立 MCP（如反向 Shell），采用标准 MCP stdio，可在 CyberStrikeAI（设置 → 外部 MCP）、Cursor、VS Code 等任意支持 MCP 的客户端中使用。
 
 #### MCP stdio 快速集成
 1. **编译可执行文件**（在项目根目录执行）：
@@ -403,6 +469,7 @@ CyberStrikeAI 支持通过三种传输模式连接外部 MCP 服务器：
 
 ### 自动化与安全
 - **REST API**：认证、会话、任务、监控、漏洞管理、角色管理等接口全部开放，可与 CI/CD 集成。
+- **多代理 API**：`POST /api/multi-agent/stream`（SSE，需启用多代理）、`POST /api/multi-agent`（非流式）；Markdown 子代理/主代理管理见 `/api/multi-agent/markdown-agents`（列表/读写/增删）。
 - **角色管理 API**：通过 `/api/roles` 端点管理安全测试角色：`GET /api/roles`（列表）、`GET /api/roles/:name`（获取角色）、`POST /api/roles`（创建角色）、`PUT /api/roles/:name`（更新角色）、`DELETE /api/roles/:name`（删除角色）。角色以 YAML 文件形式存储在 `roles/` 目录，支持热加载。
 - **漏洞管理 API**：通过 `/api/vulnerabilities` 端点管理漏洞：`GET /api/vulnerabilities`（列表，支持过滤）、`POST /api/vulnerabilities`（创建）、`GET /api/vulnerabilities/:id`（获取）、`PUT /api/vulnerabilities/:id`（更新）、`DELETE /api/vulnerabilities/:id`（删除）、`GET /api/vulnerabilities/stats`（统计）。
 - **批量任务 API**：通过 `/api/batch-tasks` 端点管理批量任务队列：`POST /api/batch-tasks`（创建队列）、`GET /api/batch-tasks`（列表）、`GET /api/batch-tasks/:queueId`（获取队列）、`POST /api/batch-tasks/:queueId/start`（开始执行）、`POST /api/batch-tasks/:queueId/cancel`（取消）、`DELETE /api/batch-tasks/:queueId`（删除队列）、`POST /api/batch-tasks/:queueId/tasks`（添加任务）、`PUT /api/batch-tasks/:queueId/tasks/:taskId`（更新任务）、`DELETE /api/batch-tasks/:queueId/tasks/:taskId`（删除任务）。任务依次顺序执行，每个任务创建独立对话，支持完整状态跟踪。
@@ -451,6 +518,13 @@ knowledge:
     hybrid_weight: 0.7  # 混合检索权重（0-1），向量检索的权重，1.0 表示纯向量检索，0.0 表示纯关键词检索
 roles_dir: "roles"  # 角色配置文件目录（相对于配置文件所在目录）
 skills_dir: "skills"  # Skills 目录（相对于配置文件所在目录）
+agents_dir: "agents"  # 多代理 Markdown（主代理 orchestrator.md + 子代理 *.md）
+multi_agent:
+  enabled: false
+  default_mode: "single"   # single | multi（开启多代理时的界面默认模式）
+  robot_use_multi_agent: false
+  batch_use_multi_agent: false
+  orchestrator_instruction: ""  # 可选；orchestrator.md 正文为空时使用
 ```
 
 ### 工具模版示例（`tools/nmap.yaml`）
@@ -495,6 +569,7 @@ enabled: true
 
 ## 相关文档
 
+- [多代理模式（Eino）](docs/MULTI_AGENT_EINO.md)：DeepAgent 编排、`agents/*.md`、接口与流式说明。
 - [机器人使用说明（钉钉 / 飞书）](docs/robot.md)：在手机端通过钉钉、飞书与 CyberStrikeAI 对话的完整配置步骤、命令与排查说明，**建议按该文档操作以避免走弯路**。
 
 ## 项目结构
@@ -507,7 +582,8 @@ CyberStrikeAI/
 ├── tools/               # YAML 工具目录（含 100+ 示例）
 ├── roles/               # 角色配置文件目录（含 12+ 预设安全测试角色）
 ├── skills/              # Skills 目录（含 20+ 预设安全测试技能）
-├── docs/                # 说明文档（如机器人使用说明）
+├── agents/              # 多代理 Markdown（orchestrator.md + 子代理 *.md）
+├── docs/                # 说明文档（如机器人使用说明、MULTI_AGENT_EINO.md）
 ├── images/              # 文档配图
 ├── config.yaml          # 运行配置
 ├── run.sh               # 启动脚本

@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"database/sql"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
@@ -104,10 +105,10 @@ func (h *WebShellHandler) CreateConnection(c *gin.Context) {
 		ID:        "ws_" + strings.ReplaceAll(uuid.New().String(), "-", "")[:12],
 		URL:       req.URL,
 		Password:  strings.TrimSpace(req.Password),
-		Type:     shellType,
-		Method:   method,
+		Type:      shellType,
+		Method:    method,
 		CmdParam:  strings.TrimSpace(req.CmdParam),
-		Remark:   strings.TrimSpace(req.Remark),
+		Remark:    strings.TrimSpace(req.Remark),
 		CreatedAt: time.Now(),
 	}
 	if err := h.db.CreateWebshellConnection(conn); err != nil {
@@ -197,6 +198,85 @@ func (h *WebShellHandler) DeleteConnection(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
+// GetConnectionState 获取 WebShell 连接关联的前端持久化状态（GET /api/webshell/connections/:id/state）
+func (h *WebShellHandler) GetConnectionState(c *gin.Context) {
+	if h.db == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "database not available"})
+		return
+	}
+	id := strings.TrimSpace(c.Param("id"))
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id is required"})
+		return
+	}
+	conn, err := h.db.GetWebshellConnection(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if conn == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "connection not found"})
+		return
+	}
+	stateJSON, err := h.db.GetWebshellConnectionState(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	var state interface{}
+	if err := json.Unmarshal([]byte(stateJSON), &state); err != nil {
+		state = map[string]interface{}{}
+	}
+	c.JSON(http.StatusOK, gin.H{"state": state})
+}
+
+// SaveConnectionState 保存 WebShell 连接关联的前端持久化状态（PUT /api/webshell/connections/:id/state）
+func (h *WebShellHandler) SaveConnectionState(c *gin.Context) {
+	if h.db == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "database not available"})
+		return
+	}
+	id := strings.TrimSpace(c.Param("id"))
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id is required"})
+		return
+	}
+	conn, err := h.db.GetWebshellConnection(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if conn == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "connection not found"})
+		return
+	}
+	var req struct {
+		State json.RawMessage `json:"state"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	raw := req.State
+	if len(raw) == 0 {
+		raw = json.RawMessage(`{}`)
+	}
+	if len(raw) > 2*1024*1024 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "state payload too large (max 2MB)"})
+		return
+	}
+	var anyJSON interface{}
+	if err := json.Unmarshal(raw, &anyJSON); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "state must be valid json"})
+		return
+	}
+	if err := h.db.UpsertWebshellConnectionState(id, string(raw)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
 // GetAIHistory 获取指定 WebShell 连接的 AI 助手对话历史（GET /api/webshell/connections/:id/ai-history）
 func (h *WebShellHandler) GetAIHistory(c *gin.Context) {
 	if h.db == nil {
@@ -267,8 +347,8 @@ type FileOpRequest struct {
 	URL        string `json:"url" binding:"required"`
 	Password   string `json:"password"`
 	Type       string `json:"type"`
-	Method     string `json:"method"`     // GET 或 POST，空则默认 POST
-	CmdParam   string `json:"cmd_param"` // 命令参数名，如 cmd/xxx，空则默认 cmd
+	Method     string `json:"method"`                    // GET 或 POST，空则默认 POST
+	CmdParam   string `json:"cmd_param"`                 // 命令参数名，如 cmd/xxx，空则默认 cmd
 	Action     string `json:"action" binding:"required"` // list, read, delete, write, mkdir, rename, upload, upload_chunk
 	Path       string `json:"path"`
 	TargetPath string `json:"target_path"` // rename 时目标路径

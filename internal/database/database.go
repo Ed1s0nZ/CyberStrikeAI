@@ -240,6 +240,15 @@ func (db *DB) initTables() error {
 		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);`
 
+	// 创建 WebShell 连接扩展状态表（前端工作区/终端状态持久化）
+	createWebshellConnectionStatesTable := `
+	CREATE TABLE IF NOT EXISTS webshell_connection_states (
+		connection_id TEXT PRIMARY KEY,
+		state_json TEXT NOT NULL DEFAULT '{}',
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (connection_id) REFERENCES webshell_connections(id) ON DELETE CASCADE
+	);`
+
 	// 创建索引
 	createIndexes := `
 	CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
@@ -267,6 +276,7 @@ func (db *DB) initTables() error {
 	CREATE INDEX IF NOT EXISTS idx_batch_task_queues_created_at ON batch_task_queues(created_at);
 	CREATE INDEX IF NOT EXISTS idx_batch_task_queues_title ON batch_task_queues(title);
 	CREATE INDEX IF NOT EXISTS idx_webshell_connections_created_at ON webshell_connections(created_at);
+	CREATE INDEX IF NOT EXISTS idx_webshell_connection_states_updated_at ON webshell_connection_states(updated_at);
 	`
 
 	if _, err := db.Exec(createConversationsTable); err != nil {
@@ -327,6 +337,10 @@ func (db *DB) initTables() error {
 
 	if _, err := db.Exec(createWebshellConnectionsTable); err != nil {
 		return fmt.Errorf("创建webshell_connections表失败: %w", err)
+	}
+
+	if _, err := db.Exec(createWebshellConnectionStatesTable); err != nil {
+		return fmt.Errorf("创建webshell_connection_states表失败: %w", err)
 	}
 
 	// 为已有表添加新字段（如果不存在）- 必须在创建索引之前
