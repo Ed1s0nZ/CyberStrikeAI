@@ -18,6 +18,34 @@ The system SHALL provide indexed retrieval over discovered knowledge items.
 - **WHEN** a caller issues a retrieval request against indexed knowledge
 - **THEN** the system returns results from the retrieval layer and may log the retrieval context for audit
 
+### Requirement: Incremental index maintenance
+The system SHALL prefer incremental indexing when a valid index already exists.
+
+#### Scenario: Existing corpus item changes
+- **WHEN** a previously discovered Markdown item changes content
+- **THEN** the item is marked for reindex rather than forcing a full corpus rebuild
+
+### Requirement: Full rebuild fallback
+The system SHALL support full rebuild when no valid index exists.
+
+#### Scenario: Knowledge index is absent
+- **WHEN** the system determines that no valid retrieval index exists
+- **THEN** the subsystem performs or offers a full rebuild path for searchable readiness
+
+### Requirement: Retrieval audit logging
+The system SHALL record retrieval logs when conversation/message context is available.
+
+#### Scenario: Agent performs a knowledge search during conversation
+- **WHEN** retrieval is executed in a conversation-aware context
+- **THEN** the system records the query and retrieved item references for later audit
+
+### Requirement: Failure isolation during scan and index
+Single-file or repeated index failures SHALL not silently corrupt the whole corpus state.
+
+#### Scenario: One Markdown file cannot be read
+- **WHEN** the scanner encounters an unreadable knowledge file
+- **THEN** that file is skipped with visible failure while the remainder of the corpus continues processing
+
 ## Overview
 The knowledge base domain converts a filesystem-backed Markdown corpus into a searchable retrieval service for operators and agents. It supports corpus scanning, indexing, retrieval, statistics, and retrieval audit logging, with optional separation of the knowledge database from the primary conversation database.
 

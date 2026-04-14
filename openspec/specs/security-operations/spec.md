@@ -18,6 +18,38 @@ Security findings and derived graphs SHALL remain linked to the originating conv
 - **WHEN** the system records a vulnerability or generates an attack chain
 - **THEN** the artifact remains addressable through its conversation linkage and durable evidence model
 
+### Requirement: FOFA prerequisite validation
+FOFA parsing and FOFA search SHALL validate their own upstream prerequisites.
+
+#### Scenario: Natural-language FOFA parse is requested without model config
+- **WHEN** a caller requests FOFA natural-language parsing and the required model configuration is unavailable
+- **THEN** the request is rejected with an explicit prerequisite error
+
+#### Scenario: FOFA search is requested without FOFA credentials
+- **WHEN** a caller requests FOFA search and required FOFA credentials are unavailable
+- **THEN** the request is rejected with an explicit credential/configuration error
+
+### Requirement: Managed WebShell connections
+The system SHALL persist reusable WebShell connection metadata and per-connection state independently from transient command output.
+
+#### Scenario: Operator updates WebShell connection state
+- **WHEN** a caller writes UI state for a known WebShell connection
+- **THEN** the state blob is persisted and later readable by connection identifier
+
+### Requirement: Vulnerability lifecycle management
+The system SHALL support durable vulnerability creation, update, listing, and deletion with stable severity and status fields.
+
+#### Scenario: Vulnerability status changes
+- **WHEN** an operator updates an existing vulnerability
+- **THEN** the updated severity/status/evidence fields are persisted without changing its identity
+
+### Requirement: Single-flight attack-chain generation
+Attack-chain generation for a conversation SHALL avoid conflicting concurrent builds.
+
+#### Scenario: Duplicate generation is requested for the same conversation
+- **WHEN** an attack chain for a conversation is already being generated
+- **THEN** a concurrent regenerate/get request is rejected with an explicit conflict outcome
+
 ## Overview
 This domain captures the security-facing workflows that the platform orchestrates: reconnaissance query generation, FOFA search, WebShell connection management and proxy execution, vulnerability tracking, and attack-chain synthesis from conversation evidence.
 

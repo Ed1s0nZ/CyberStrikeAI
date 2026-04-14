@@ -18,6 +18,42 @@ Cron-enabled queues SHALL compute a next run and reset for the next cycle withou
 - **WHEN** a cron-enabled queue completes its current round
 - **THEN** the system computes the next due time and prepares the queue for the next scheduled run
 
+### Requirement: Queue creation validation
+The system SHALL validate queue scheduling mode and task content before creating a durable queue.
+
+#### Scenario: Invalid cron queue is submitted
+- **WHEN** a queue is created with `scheduleMode=cron` and an invalid or missing cron expression
+- **THEN** queue creation is rejected
+
+#### Scenario: Queue contains empty tasks
+- **WHEN** the submitted queue contains blank task entries
+- **THEN** only valid task entries become durable queue tasks
+
+### Requirement: Sequential task progression
+Tasks within a queue SHALL execute one at a time in queue order.
+
+#### Scenario: Queue runner processes tasks
+- **WHEN** a queue enters running state
+- **THEN** the runner executes the current task, persists its outcome, advances the current index, and only then proceeds to the next task
+
+### Requirement: Operator queue control
+Operators SHALL be able to pause or cancel a queue without losing already persisted outcomes.
+
+#### Scenario: Queue is paused during execution
+- **WHEN** an operator pauses a running queue
+- **THEN** the queue enters paused state and completed task outcomes remain durable
+
+#### Scenario: Queue is cancelled during execution
+- **WHEN** an operator cancels a running queue
+- **THEN** the current task is cancelled and the queue reaches a terminal cancelled state
+
+### Requirement: Task failure isolation
+Failure of one task SHALL be recorded without corrupting other queue tasks.
+
+#### Scenario: One task fails
+- **WHEN** a task execution ends in failure
+- **THEN** that task is marked failed with error detail and the queue may continue according to its sequential runner semantics
+
 ## Overview
 Batch task automation allows operators to submit multiple prompts as a durable queue for sequential execution under a chosen role and execution mode. Queues may be started manually or scheduled on a cron cadence, and each task retains its own conversation linkage and terminal outcome.
 

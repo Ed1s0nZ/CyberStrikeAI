@@ -11,12 +11,45 @@ The system SHALL persist ordered conversation history under a stable conversatio
 - **WHEN** an operator reopens an existing conversation
 - **THEN** the system returns the persisted message history in durable order
 
+#### Scenario: First message creates a conversation
+- **WHEN** executable user input is submitted without a conversation identifier
+- **THEN** the system creates a new conversation and stores subsequent messages under that identifier
+
 ### Requirement: Managed attachment workspace
 Conversation attachments SHALL be stored under a controlled server-side root and remain referenceable by durable path.
 
 #### Scenario: Uploaded file is attached to a conversation
 - **WHEN** a user uploads a file for conversation use
 - **THEN** the file is stored under the managed attachment root and can be referenced by server path
+
+#### Scenario: Path traversal is attempted
+- **WHEN** a file operation references a path outside the managed attachment root
+- **THEN** the operation is rejected and no out-of-root mutation occurs
+
+### Requirement: Process-detail evidence
+Assistant-side execution traces SHALL be storable and retrievable as structured process details.
+
+#### Scenario: Agent emits execution progress
+- **WHEN** an assistant response produces intermediate execution events
+- **THEN** the system stores those events as process details linked to the assistant message
+
+#### Scenario: Conversation is retrieved in lightweight mode
+- **WHEN** a caller requests a lightweight conversation view
+- **THEN** durable messages remain available even if detailed process traces are omitted for performance
+
+### Requirement: Workspace organization
+The system SHALL support grouping and pinning as organizational metadata independent of message content.
+
+#### Scenario: Conversation is pinned inside a group
+- **WHEN** an operator updates pin state for a conversation within a group
+- **THEN** the group-local pin metadata changes without rewriting conversation messages
+
+### Requirement: Selective deletion semantics
+The system SHALL support deleting a whole conversation or deleting a single turn without corrupting unrelated history.
+
+#### Scenario: Single turn is deleted
+- **WHEN** an operator deletes a conversation turn
+- **THEN** only the addressed turn is removed and remaining conversation history stays intact
 
 ## Overview
 The conversation workspace is the durable operator workspace for prompts, replies, file attachments, process timelines, grouping, and message history. It is the primary human-facing record of intent and outcome across chat, WebShell assistant sessions, and robot-initiated executions.

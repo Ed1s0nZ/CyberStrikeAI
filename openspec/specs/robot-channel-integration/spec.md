@@ -18,6 +18,34 @@ Robot users SHALL be able to manage their active conversation context through co
 - **WHEN** a robot user issues a valid switch command
 - **THEN** the user's future robot messages bind to the selected conversation
 
+### Requirement: Channel-specific ingress validation
+Supported robot channels SHALL honor their callback and handshake rules where applicable.
+
+#### Scenario: Channel requires callback verification
+- **WHEN** a supported robot platform sends a verification or signed callback request
+- **THEN** the platform validates and answers according to that channel's callback contract
+
+### Requirement: Command-first interpretation
+Robot input SHALL be interpreted as a workspace command before it is treated as agent text.
+
+#### Scenario: User sends a stop command
+- **WHEN** a robot user sends the stop command while a task is running for that user/session key
+- **THEN** the running task is cancelled instead of forwarding the text to the agent as normal conversation input
+
+### Requirement: Per-user role affinity
+Robot users SHALL be able to keep and change an active role independently of other users.
+
+#### Scenario: Robot user changes role
+- **WHEN** a robot user switches to a valid role
+- **THEN** subsequent non-command robot messages execute under that user's selected role until changed again
+
+### Requirement: Local robot validation
+The platform SHALL expose a local validation path for robot behavior without requiring live external delivery.
+
+#### Scenario: Operator uses local robot test endpoint
+- **WHEN** a caller invokes the local robot test API with platform, user, and text
+- **THEN** the platform returns the same logical reply path that a live robot message would produce
+
 ## Overview
 Robot channel integration exposes the platform through enterprise messaging systems. It maps robot users to platform conversations, supports a command vocabulary for workspace control, and reuses the same agent execution pipeline as the Web experience.
 

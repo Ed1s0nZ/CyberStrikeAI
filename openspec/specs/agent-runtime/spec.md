@@ -11,12 +11,60 @@ The runtime SHALL execute prompts through the default single-agent flow when mul
 - **WHEN** a valid chat request is submitted without selecting multi-agent mode
 - **THEN** the request executes through the single-agent runtime and returns a durable conversation outcome
 
+#### Scenario: Conversation ID is omitted
+- **WHEN** a valid request arrives without a conversation identifier
+- **THEN** the runtime creates a new conversation before continuing execution
+
 ### Requirement: Observable long-running execution
 The runtime SHALL expose progress and terminal state for long-running agent work.
 
 #### Scenario: Execution is cancelled
 - **WHEN** an in-flight agent task is explicitly cancelled
 - **THEN** the runtime records a terminal cancelled outcome instead of an ambiguous generic failure
+
+#### Scenario: Concurrent task is attempted on the same conversation
+- **WHEN** a second active task is started for a conversation that already has a running task
+- **THEN** the runtime rejects the second task explicitly
+
+### Requirement: Context recovery fallback
+The runtime SHALL recover prior context from ReAct traces when possible and fall back to durable message history otherwise.
+
+#### Scenario: ReAct trace is available
+- **WHEN** prior ReAct input/output exists for the conversation
+- **THEN** the runtime reconstructs history from that trace for future execution
+
+#### Scenario: ReAct trace is unavailable or invalid
+- **WHEN** prior ReAct data cannot be used
+- **THEN** the runtime reconstructs history from persisted conversation messages
+
+### Requirement: Role-scoped execution policy
+The runtime SHALL apply role-derived prompt and tool policy to the current execution without rewriting the raw stored user message.
+
+#### Scenario: Role defines extra prompt guidance
+- **WHEN** a request specifies an enabled role with user prompt guidance
+- **THEN** the runtime injects that guidance into execution context while preserving the original user message in storage
+
+#### Scenario: Role limits available tools
+- **WHEN** a request specifies an enabled role with a tool allowlist
+- **THEN** the runtime restricts the effective tool surface for that execution accordingly
+
+### Requirement: WebShell assistant binding
+WebShell assistant mode SHALL bind execution to a selected connection and tool-restricted context.
+
+#### Scenario: WebShell assistant request references a valid connection
+- **WHEN** a request is submitted with a valid WebShell connection identifier
+- **THEN** the runtime injects the connection context and limits tool access to the approved WebShell-safe subset
+
+#### Scenario: WebShell assistant request references an invalid connection
+- **WHEN** a request is submitted with an unknown WebShell connection identifier
+- **THEN** the request is rejected before model execution begins
+
+### Requirement: Final execution evidence persistence
+The runtime SHALL persist the final assistant output, tool execution references, and last ReAct trace when execution reaches a terminal state.
+
+#### Scenario: Execution completes successfully
+- **WHEN** the runtime reaches a successful terminal response
+- **THEN** the final assistant content, execution references, and last ReAct data are persisted for future recovery and audit
 
 ## Overview
 The agent runtime executes single-agent security conversations backed by an LLM, role-aware tool access, persistent context, and tool-mediated evidence capture. It is the default execution path for interactive chat, API-driven prompting, WebShell assistant mode, and robot-originated work when multi-agent orchestration is not selected.

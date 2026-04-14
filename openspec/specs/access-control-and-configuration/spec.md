@@ -11,12 +11,53 @@ Protected operational interfaces SHALL require valid authentication.
 - **WHEN** a caller invokes a protected API without a valid bearer session
 - **THEN** the request is rejected as unauthorized
 
+#### Scenario: Protected request with valid session
+- **WHEN** a caller invokes a protected API with a valid unexpired bearer session
+- **THEN** the request is authorized to continue into the target domain handler
+
 ### Requirement: Durable configuration changes
 Accepted configuration edits SHALL be persisted before they become long-lived platform intent.
 
 #### Scenario: Operator updates runtime settings
 - **WHEN** a configuration update is accepted
 - **THEN** the canonical config file is updated before the change is treated as durable intent
+
+#### Scenario: Config save fails
+- **WHEN** a configuration change cannot be written to the canonical config file
+- **THEN** the platform reports the save failure and does not claim the new settings are durably accepted
+
+### Requirement: Session lifecycle enforcement
+The platform SHALL enforce session expiry and revocation semantics for operator sessions.
+
+#### Scenario: Session expires
+- **WHEN** a previously issued session token is validated after its expiry time
+- **THEN** the token is treated as invalid and is no longer accepted
+
+#### Scenario: Password changes invalidate sessions
+- **WHEN** the platform password is updated successfully
+- **THEN** previously issued sessions are revoked and must not remain usable
+
+### Requirement: Safe runtime apply
+Runtime configuration apply SHALL update supported subsystems explicitly and surface any apply failure.
+
+#### Scenario: Apply succeeds
+- **WHEN** an operator applies a valid saved configuration
+- **THEN** supported runtime subsystems reload their effective settings without requiring full process restart
+
+#### Scenario: Apply fails during optional subsystem reload
+- **WHEN** runtime apply cannot reinitialize or refresh a supported subsystem
+- **THEN** the platform reports the apply failure and leaves the degradation visible rather than silently masking it
+
+### Requirement: Conditional MCP header authentication
+MCP HTTP requests SHALL honor configured header-based authentication when MCP auth headers are enabled.
+
+#### Scenario: MCP request without required header
+- **WHEN** MCP header authentication is configured and the request omits the required header or value
+- **THEN** the request is rejected as unauthorized
+
+#### Scenario: MCP request with required header
+- **WHEN** MCP header authentication is configured and the request supplies the required header and value
+- **THEN** the request is forwarded to the MCP handler
 
 ## Overview
 This domain governs who may operate the platform and how runtime behavior is changed safely. It covers password-based authentication, session lifecycle, protected API access, configuration persistence, hot-apply semantics, and feature-level runtime reconfiguration.

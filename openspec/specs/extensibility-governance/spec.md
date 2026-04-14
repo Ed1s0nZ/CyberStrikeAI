@@ -18,6 +18,38 @@ The platform SHALL compute a deterministic effective runtime view from config-ba
 - **WHEN** a request depends on roles, skills, or Markdown agents
 - **THEN** the system resolves a deterministic effective artifact set for that request
 
+### Requirement: Role identity governance
+Role definitions SHALL use stable unique names for runtime selection and persistence.
+
+#### Scenario: Duplicate role name is created
+- **WHEN** an operator attempts to create a role whose name already exists
+- **THEN** the request is rejected and the existing role identity remains unchanged
+
+### Requirement: Skill corpus governance
+Skills SHALL remain loadable from authoritative filesystem artifacts and observable through governance APIs and MCP tools.
+
+#### Scenario: Skill is requested for agent use
+- **WHEN** a role, operator, or MCP caller requests a skill by name
+- **THEN** the platform resolves the skill content from its authoritative filesystem-backed artifact or returns a visible load error
+
+#### Scenario: Skill usage is recorded
+- **WHEN** a skill is read through the supported skill-reading path
+- **THEN** the platform updates skill usage statistics for governance and debugging
+
+### Requirement: Markdown agent validation
+Markdown-defined agents SHALL be structurally valid before becoming effective runtime intent.
+
+#### Scenario: Malformed Markdown agent is submitted
+- **WHEN** an operator creates or updates a Markdown agent with invalid structure
+- **THEN** the artifact is rejected or left non-loadable rather than silently joining the effective agent set
+
+### Requirement: Forward-only governance effect
+Governance changes SHALL affect future executions without rewriting historical execution evidence.
+
+#### Scenario: Role or skill changes after prior conversations exist
+- **WHEN** an operator updates a role, skill, or Markdown agent after prior conversations already completed
+- **THEN** the updated governance artifact applies only to future executions and historical records remain unchanged
+
 ## Overview
 This domain governs operator-managed extension artifacts: roles, skills, and Markdown-defined agents. These artifacts let the platform change prompt policy, tool policy, and orchestration behavior without rewriting application code.
 

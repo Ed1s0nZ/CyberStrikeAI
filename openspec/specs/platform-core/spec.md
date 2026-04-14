@@ -11,12 +11,34 @@ The platform SHALL expose one coherent service surface for human operators and p
 - **WHEN** mandatory platform dependencies initialize successfully
 - **THEN** the platform exposes its Web, API, and MCP entrypoints under one runtime
 
+#### Scenario: Multiple client types use the same platform
+- **WHEN** a browser client, API client, and MCP client access the system concurrently
+- **THEN** each client observes the same underlying platform state through its interface-specific contract
+
 ### Requirement: Durable operational evidence
 The platform SHALL preserve durable records for user-visible work products and execution evidence.
 
 #### Scenario: Client reconnects after prior work
 - **WHEN** a client reloads or reconnects after prior activity was persisted
 - **THEN** the platform reconstructs visible history from durable records rather than ephemeral UI state
+
+#### Scenario: Derived views are rebuilt
+- **WHEN** a dashboard, conversation view, or attack-chain view needs to be reconstructed
+- **THEN** the platform rebuilds the view from authoritative persisted artifacts
+
+### Requirement: Optional domain isolation
+Optional subsystems SHALL fail independently whenever possible.
+
+#### Scenario: Optional subsystem is unavailable
+- **WHEN** an optional domain such as knowledge retrieval, external MCP, or robot connectivity is unavailable
+- **THEN** the platform remains operational for unaffected domains and surfaces the degraded capability explicitly
+
+### Requirement: Auditable execution path
+The platform SHALL retain enough evidence to explain how a user-visible outcome was produced.
+
+#### Scenario: Operator audits a prior result
+- **WHEN** an operator inspects a prior response that involved tools or derived artifacts
+- **THEN** the platform can correlate the visible result with stored messages, execution details, and related records
 
 ## Overview
 CyberStrikeAI is a single-process security operations platform that exposes one coherent system through Web UI, REST API, SSE streams, MCP endpoints, and robot channels. The platform's primary responsibility is to turn operator intent into durable, auditable security workflows that combine LLM reasoning, tool execution, knowledge retrieval, and evidence persistence.

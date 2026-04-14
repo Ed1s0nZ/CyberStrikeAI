@@ -18,6 +18,38 @@ Tool invocation SHALL produce monitorable execution records and retrievable resu
 - **WHEN** a tool returns output too large for inline handling
 - **THEN** the system stores the output durably and preserves a retrievable execution reference
 
+### Requirement: Built-in tool survival
+Built-in tools required by higher-level domains SHALL survive config apply and tool reload operations.
+
+#### Scenario: Runtime apply reloads tools
+- **WHEN** configuration apply clears and rebuilds the effective tool registry
+- **THEN** required built-in tools are re-registered alongside configured tools
+
+### Requirement: TTY-aware command execution
+The executor SHALL detect and retry tool execution with PTY semantics when a command path requires a terminal.
+
+#### Scenario: Command fails because it needs a TTY
+- **WHEN** the initial execution path indicates a terminal requirement
+- **THEN** the executor retries with PTY semantics before declaring terminal failure
+
+### Requirement: Namespaced external federation
+External MCP tools SHALL be incorporated without colliding with internal tool names.
+
+#### Scenario: External server exposes a tool name already used elsewhere
+- **WHEN** an external MCP server exposes a tool whose raw name overlaps another registry name
+- **THEN** the effective external tool is exposed through a namespaced identifier
+
+#### Scenario: External server becomes temporarily unavailable
+- **WHEN** an external MCP server disconnects after prior successful discovery
+- **THEN** cached metadata may remain visible while new invocations reflect current availability
+
+### Requirement: Monitorable execution history
+Operators SHALL be able to inspect execution records and tool statistics through monitor APIs.
+
+#### Scenario: Operator inspects a prior execution
+- **WHEN** a caller queries execution detail by execution identifier
+- **THEN** the system returns the stored execution record or an explicit not-found outcome
+
 ## Overview
 This domain provides the tool execution fabric for the platform. It includes the internal MCP server, built-in and configured tools, external MCP client federation, execution monitoring, terminal command execution, and durable result storage for large outputs.
 

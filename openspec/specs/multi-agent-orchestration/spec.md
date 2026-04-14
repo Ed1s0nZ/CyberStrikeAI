@@ -18,6 +18,31 @@ Orchestrated and delegated work SHALL remain inside the same conversation and ev
 - **WHEN** a delegated sub-agent contributes to a parent request
 - **THEN** the resulting tool evidence and final synthesis are persisted under the same conversation record
 
+### Requirement: Effective agent composition
+The runtime SHALL resolve an effective orchestrator and sub-agent set from configured and Markdown-defined artifacts.
+
+#### Scenario: Markdown and config sub-agents both exist
+- **WHEN** multi-agent execution begins and both config-backed and Markdown-backed agent definitions are present
+- **THEN** the runtime computes one effective sub-agent set for that request
+
+#### Scenario: Explicit sub-agents are required but missing
+- **WHEN** the platform is configured to require explicit sub-agents and no effective sub-agent exists
+- **THEN** execution is rejected before orchestration begins
+
+### Requirement: Policy-aware delegation
+Delegated agents SHALL honor role-derived tool policy and guidance where configured.
+
+#### Scenario: Bound role supplies tool policy
+- **WHEN** a sub-agent resolves to a role with explicit tool constraints
+- **THEN** the delegated execution uses that constrained effective tool surface
+
+### Requirement: Normalized external behavior
+Multi-agent execution SHALL normalize internal orchestration events into a stable external progress model.
+
+#### Scenario: Delegated work emits internal events
+- **WHEN** the orchestration framework emits internal tool or planning events
+- **THEN** the user-facing stream remains normalized into the platform's external event contract
+
 ## Overview
 This domain defines the optional deep orchestration mode in which a coordinating agent delegates work to specialist sub-agents while sharing the same conversation, tool fabric, and persistence model as the single-agent runtime. It is intended for tasks that benefit from decomposition without breaking the platform's observable behavior.
 
