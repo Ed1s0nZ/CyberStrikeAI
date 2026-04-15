@@ -373,3 +373,57 @@ func TestUpdateWebUserPasswordByID_MissingUser(t *testing.T) {
 		t.Fatalf("expected sql.ErrNoRows for missing user id, got %v", err)
 	}
 }
+
+func TestRoleIDsGrantPermission_LegacySuperAdminMatchesCanonicalGrant(t *testing.T) {
+	db := openTestWebAuthDB(t)
+
+	roleID, err := db.CreateWebAccessRole(CreateWebAccessRoleInput{
+		Name:        "canonical-super-admin-role",
+		Description: "canonical super admin role",
+		Permissions: []string{"system.super_admin.grant"},
+		IsSystem:    false,
+	})
+	if err != nil {
+		t.Fatalf("CreateWebAccessRole() error = %v", err)
+	}
+
+	granted, err := db.RoleIDsGrantPermission([]string{roleID}, "system.super_admin")
+	if err != nil {
+		t.Fatalf("RoleIDsGrantPermission() error = %v", err)
+	}
+	if !granted {
+		t.Fatal("expected canonical system.super_admin.grant to satisfy legacy system.super_admin check")
+	}
+}
+
+func TestCountEnabledUsersWithPermission_LegacySuperAdminCountsCanonicalGrant(t *testing.T) {
+	db := openTestWebAuthDB(t)
+
+	roleID, err := db.CreateWebAccessRole(CreateWebAccessRoleInput{
+		Name:        "canonical-super-admin-count-role",
+		Description: "canonical super admin count role",
+		Permissions: []string{"system.super_admin.grant"},
+		IsSystem:    false,
+	})
+	if err != nil {
+		t.Fatalf("CreateWebAccessRole() error = %v", err)
+	}
+
+	if _, err := db.CreateWebUser(CreateWebUserInput{
+		Username:     "canonical-super-admin-user",
+		DisplayName:  "Canonical Super Admin User",
+		PasswordHash: "hash",
+		Enabled:      true,
+		RoleIDs:      []string{roleID},
+	}); err != nil {
+		t.Fatalf("CreateWebUser() error = %v", err)
+	}
+
+	count, err := db.CountEnabledUsersWithPermission("system.super_admin")
+	if err != nil {
+		t.Fatalf("CountEnabledUsersWithPermission() error = %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected canonical system.super_admin.grant user to count as legacy super admin, got %d", count)
+	}
+}

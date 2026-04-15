@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -238,13 +239,30 @@ func (db *DB) UpdateWebUserPasswordByID(userID, passwordHash string, mustChangeP
 
 // CountEnabledUsersWithPermission returns the number of enabled users that have the given permission.
 func (db *DB) CountEnabledUsersWithPermission(permission string) (int, error) {
+	return db.CountEnabledUsersWithAnyPermission([]string{permission})
+}
+
+// CountEnabledUsersWithAnyPermission returns the number of enabled users that have any candidate permission.
+func (db *DB) CountEnabledUsersWithAnyPermission(permissions []string) (int, error) {
+	permissions = expandEquivalentPermissions(permissions)
+	if len(permissions) == 0 {
+		return 0, nil
+	}
+
+	placeholders := make([]string, 0, len(permissions))
+	args := make([]any, 0, len(permissions))
+	for _, permission := range permissions {
+		placeholders = append(placeholders, "?")
+		args = append(args, permission)
+	}
+
 	row := db.QueryRow(`
 		SELECT COUNT(DISTINCT u.id)
 		  FROM web_users u
 		  JOIN web_user_role_bindings b ON b.user_id = u.id
 		  JOIN web_access_role_permissions p ON p.role_id = b.role_id
-		 WHERE u.enabled = 1 AND p.permission = ?`,
-		permission,
+		 WHERE u.enabled = 1 AND p.permission IN (`+strings.Join(placeholders, ",")+`)`,
+		args...,
 	)
 
 	var count int

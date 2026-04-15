@@ -31,6 +31,11 @@ type resetWebUserPasswordRequest struct {
 	Password string `json:"password"`
 }
 
+var superAdminPermissionCandidates = []string{
+	security.PermissionSuperAdminLegacy,
+	security.PermissionSuperAdminGrant,
+}
+
 // WebUsersHandler manages Web user CRUD APIs.
 type WebUsersHandler struct {
 	db     *database.DB
@@ -140,12 +145,12 @@ func (h *WebUsersHandler) UpdateWebUser(c *gin.Context) {
 		return
 	}
 
-	nextHasSuperAdmin, err := h.db.RoleIDsGrantPermission(req.RoleIDs, security.PermissionSuperAdmin)
+	nextHasSuperAdmin, err := h.db.RoleIDsGrantAnyPermission(req.RoleIDs, superAdminPermissionCandidates)
 	if err != nil {
 		h.writeServerError(c, "校验 Web 访问角色失败", err)
 		return
 	}
-	superAdminCount, err := h.db.CountEnabledUsersWithPermission(security.PermissionSuperAdmin)
+	superAdminCount, err := h.db.CountEnabledUsersWithAnyPermission(superAdminPermissionCandidates)
 	if err != nil {
 		h.writeServerError(c, "校验超级管理员失败", err)
 		return
@@ -225,7 +230,7 @@ func (h *WebUsersHandler) DeleteWebUser(c *gin.Context) {
 		h.writeServerError(c, "获取 Web 用户失败", err)
 		return
 	}
-	superAdminCount, err := h.db.CountEnabledUsersWithPermission(security.PermissionSuperAdmin)
+	superAdminCount, err := h.db.CountEnabledUsersWithAnyPermission(superAdminPermissionCandidates)
 	if err != nil {
 		h.writeServerError(c, "校验超级管理员失败", err)
 		return
@@ -261,12 +266,19 @@ func wouldRemoveLastSuperAdmin(existing *database.WebUserWithPermissions, nextEn
 }
 
 func hasPermission(permissions []string, required string) bool {
+	return security.HasPermission(permissionMap(permissions), required)
+}
+
+func permissionMap(permissions []string) map[string]struct{} {
+	set := make(map[string]struct{}, len(permissions))
 	for _, permission := range permissions {
-		if permission == required {
-			return true
+		permission = strings.TrimSpace(permission)
+		if permission == "" {
+			continue
 		}
+		set[permission] = struct{}{}
 	}
-	return false
+	return set
 }
 
 func webUserResponse(user *database.WebUserWithPermissions) gin.H {

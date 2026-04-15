@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+const (
+	legacySuperAdminPermission    = "system.super_admin"
+	canonicalSuperAdminPermission = "system.super_admin.grant"
+)
+
 // WebAccessRole represents a durable Web RBAC role and its permissions.
 type WebAccessRole struct {
 	ID          string
@@ -302,13 +307,25 @@ func (db *DB) ListWebUserIDsByRoleIDs(roleIDs []string) ([]string, error) {
 
 // RoleIDsGrantPermission reports whether any of the given roles grants the permission.
 func (db *DB) RoleIDsGrantPermission(roleIDs []string, permission string) (bool, error) {
-	if len(roleIDs) == 0 {
+	return db.RoleIDsGrantAnyPermission(roleIDs, []string{permission})
+}
+
+// RoleIDsGrantAnyPermission reports whether any of the given roles grants any candidate permission.
+func (db *DB) RoleIDsGrantAnyPermission(roleIDs []string, permissions []string) (bool, error) {
+	roleIDs = nonEmptyTrimmedTokens(roleIDs)
+	permissions = expandEquivalentPermissions(permissions)
+	if len(roleIDs) == 0 || len(permissions) == 0 {
 		return false, nil
 	}
 
 	placeholders := make([]string, 0, len(roleIDs))
-	args := make([]any, 0, len(roleIDs)+1)
-	args = append(args, permission)
+	args := make([]any, 0, len(roleIDs)+len(permissions))
+	permissionPlaceholders := make([]string, 0, len(permissions))
+	for _, permission := range permissions {
+		permissionPlaceholders = append(permissionPlaceholders, "?")
+		args = append(args, permission)
+	}
+
 	for _, roleID := range roleIDs {
 		placeholders = append(placeholders, "?")
 		args = append(args, roleID)
@@ -317,7 +334,7 @@ func (db *DB) RoleIDsGrantPermission(roleIDs []string, permission string) (bool,
 	query := `
 		SELECT COUNT(*)
 		  FROM web_access_role_permissions
-		 WHERE permission = ?
+		 WHERE permission IN (` + strings.Join(permissionPlaceholders, ",") + `)
 		   AND role_id IN (` + strings.Join(placeholders, ",") + `)`
 
 	var count int
@@ -325,4 +342,45 @@ func (db *DB) RoleIDsGrantPermission(roleIDs []string, permission string) (bool,
 		return false, err
 	}
 	return count > 0, nil
+}
+
+func nonEmptyTrimmedTokens(tokens []string) []string {
+	normalized := make([]string, 0, len(tokens))
+	for _, token := range tokens {
+		token = strings.TrimSpace(token)
+		if token == "" {
+			continue
+		}
+		normalized = append(normalized, token)
+	}
+	return normalized
+}
+
+func expandEquivalentPermissions(permissions []string) []string {
+	permissions = nonEmptyTrimmedTokens(permissions)
+	expanded := make([]string, 0, len(permissions)+1)
+	seen := make(map[string]struct{}, len(permissions)+1)
+
+	add := func(permission string) {
+		if permission == "" {
+			return
+		}
+		if _, ok := seen[permission]; ok {
+			return
+		}
+		seen[permission] = struct{}{}
+		expanded = append(expanded, permission)
+	}
+
+	for _, permission := range permissions {
+		add(permission)
+		switch permission {
+		case legacySuperAdminPermission:
+			add(canonicalSuperAdminPermission)
+		case canonicalSuperAdminPermission:
+			add(legacySuperAdminPermission)
+		}
+	}
+
+	return expanded
 }

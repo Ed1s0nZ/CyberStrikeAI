@@ -245,6 +245,52 @@ func TestWebUsersHandler_DisableLastSuperAdminRejected(t *testing.T) {
 	}
 }
 
+func TestWebUsersHandler_DisableLastSuperAdminRejected_WhenRolePermissionIsCanonicalGrant(t *testing.T) {
+	router, db, _ := setupWebAuthRouter(t)
+	adminToken := mustLoginToken(t, router, "admin", "LegacyPass123!")
+
+	roles, err := db.ListWebAccessRoles()
+	if err != nil {
+		t.Fatalf("ListWebAccessRoles() error = %v", err)
+	}
+
+	var superAdminRole *database.WebAccessRole
+	for _, role := range roles {
+		if role.Name == "super-admin" {
+			superAdminRole = role
+			break
+		}
+	}
+	if superAdminRole == nil {
+		t.Fatal("expected bootstrap super-admin role to exist")
+	}
+
+	if _, err := db.UpdateWebAccessRole(database.UpdateWebAccessRoleInput{
+		ID:          superAdminRole.ID,
+		Name:        superAdminRole.Name,
+		Description: superAdminRole.Description,
+		Permissions: []string{security.PermissionSuperAdminGrant},
+	}); err != nil {
+		t.Fatalf("UpdateWebAccessRole() error = %v", err)
+	}
+
+	admin, err := db.GetWebUserWithPermissionsByUsername("admin")
+	if err != nil {
+		t.Fatalf("GetWebUserWithPermissionsByUsername(admin) error = %v", err)
+	}
+
+	w := doJSONRequest(t, router, http.MethodPut, "/api/security/web-users/"+admin.ID, map[string]any{
+		"username":    admin.Username,
+		"displayName": admin.DisplayName,
+		"enabled":     false,
+		"roleIds":     admin.RoleIDs,
+	}, adminToken)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 when disabling canonical-grant last super admin, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestWebAccessRolesHandler_CreateRole_DuplicateRejected(t *testing.T) {
 	router, _, _ := setupWebAuthRouter(t)
 	adminToken := mustLoginToken(t, router, "admin", "LegacyPass123!")
