@@ -25,10 +25,17 @@ The system SHALL provide the canonical Web access role permission catalog as the
 #### Scenario: Backend publishes grouped canonical catalog for the permission picker
 - **WHEN** an authorized administrator requests the available Web access role permissions
 - **THEN** the backend response MUST expose the approved canonical permission catalog as the only source for business-domain, resource, and action grouping used by the UI
+- **AND** the response structure MUST identify each permission by backend-returned `domain`、`resource` and `action` semantics so the UI groups and renders permissions from that structure instead of inferring groups client-side from raw identifier strings
 
 #### Scenario: Approved permission catalog exposes platform-wide business domains
 - **WHEN** an authorized administrator inspects the available Web access role permission grants
 - **THEN** the catalog MUST cover only the approved business domains `intel`、`task`、`vulnerability`、`webshell`、`file`、`mcp`、`knowledge`、`skill`、`agent`、`role` and `system`
+
+#### Scenario: Approved resource families expose only their approved action subsets
+- **WHEN** an authorized administrator inspects the canonical permission catalog returned by the backend
+- **THEN** the catalog MUST include the approved resource families for those domains
+- **AND** each resource family MUST expose only its approved action subset, including `intel.fofa_query{execute}`; `task.batch_queue{read,create,update,delete}`、`task.batch_task{read,create,update,delete}`、`task.conversation{read,create,update,delete}`、`task.group{read,create,update,delete}`、`task.execution{read,start,stop}`、`task.attack_chain{read,create,update,delete,regenerate}`、`task.conversation_result{read}`; `vulnerability.record{read,create,update,delete}`、`vulnerability.stats{read}`; `webshell.connection{read,create,update,delete}`、`webshell.session{read,create,update,delete}`、`webshell.command{execute}`、`webshell.file{execute}`; `file.workspace_entry{read,create,update,delete}`、`file.workspace_content{read,create,update,delete}`; `mcp.gateway{execute}`、`mcp.external_server{read,create,update,delete,test}`; `knowledge.category{read}`、`knowledge.item{read,create,update,delete}`、`knowledge.index{read,create,update,delete}`、`knowledge.retrieval_log{read,delete}`、`knowledge.search{execute}`、`knowledge.stats{read}`; `skill.definition{read,create,update,delete}`、`skill.binding{read}`、`skill.stats{read}`; `agent.run{read,create,update,delete,execute}`、`agent.multi_run{read,create,update,delete,execute}`、`agent.markdown_agent{read,create,update,delete}`、`agent.robot_test{execute}`; `role.agent_role{read,create,update,delete}`; `system.config_settings{read,update}`、`system.runtime_config{apply}`、`system.model_connectivity{test}`、`system.web_user{read,create,update,delete}`、`system.web_user_credential{reset}`、`system.web_access_role{read,create,update,delete}`、`system.terminal{execute}`、`system.api_spec{read}` and `system.super_admin{grant}`
+- **AND** the response MUST NOT invent additional actions for an approved resource family beyond that approved subset
 
 ## MODIFIED Requirements
 
@@ -73,3 +80,5 @@ The system SHALL expose the current session's canonical effective permissions so
 #### Scenario: `/api/auth/validate` returns current-session canonical effective permissions
 - **WHEN** an authenticated Web user calls `/api/auth/validate`
 - **THEN** the response MUST include the current session's canonical effective permission identifiers after assigned-role union and legacy-grant normalization have been applied
+- **AND** each returned identifier MUST belong to the approved canonical permission catalog
+- **AND** the returned permission set MUST NOT contain retired permission identifiers or unapproved canonical-looking identifiers
