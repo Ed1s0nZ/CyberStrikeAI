@@ -79,6 +79,7 @@ The system SHALL expose the current session's canonical effective permissions so
 
 #### Scenario: `/api/auth/validate` returns current-session canonical effective permissions
 - **WHEN** an authenticated Web user calls `/api/auth/validate`
-- **THEN** the response MUST include the current session's canonical effective permission identifiers after assigned-role union and legacy-grant normalization have been applied
+- **THEN** the response MUST return the canonical effective permission identifiers that are exactly equal to the current session's effective permission set after assigned-role union and legacy-grant normalization have been applied
 - **AND** each returned identifier MUST belong to the approved canonical permission catalog
+- **AND** the response MUST NOT include additional approved canonical permission identifiers beyond that exact current session effective permission set
 - **AND** the returned permission set MUST NOT contain retired permission identifiers or unapproved canonical-looking identifiers
