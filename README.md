@@ -1,8 +1,8 @@
 <div align="center">
-  <img src="web/static/logo.png" alt="CyberStrikeAI Logo" width="200">
+  <img src="web/static/logo.png" alt="能盾智御 Logo" width="200">
 </div>
 
-# CyberStrikeAI
+# 能盾智御
 
 
 [中文](README_CN.md) | [English](README.md)
@@ -12,14 +12,14 @@
 <details>
 <summary><strong>WeChat group</strong> (click to reveal QR code)</summary>
 
-<img src="./images/wechat-group-cyberstrikeai-qr.jpg" alt="CyberStrikeAI WeChat group QR code" width="280">
+<img src="./images/wechat-group-cyberstrikeai-qr.jpg" alt="能盾智御 WeChat group QR code" width="280">
 
 </details>
 
 <details>
 <summary><strong>Sponsorship</strong> (click to expand)</summary>
 
-If CyberStrikeAI helps you, you can support the project via **WeChat Pay** or **Alipay**:
+If 能盾智御 helps you, you can support the project via **WeChat Pay** or **Alipay**:
 
 <div align="center">
   <img src="./images/sponsor-wechat-alipay-qr.jpg" alt="WeChat Pay and Alipay sponsorship QR codes" width="480">
@@ -27,7 +27,7 @@ If CyberStrikeAI helps you, you can support the project via **WeChat Pay** or **
 
 </details>
 
-CyberStrikeAI is an **AI-native security testing platform** built in Go. It integrates 100+ security tools, an intelligent orchestration engine, role-based testing with predefined security roles, a skills system with specialized testing skills, and comprehensive lifecycle management capabilities. Through native MCP protocol and AI agents, it enables end-to-end automation from conversational commands to vulnerability discovery, attack-chain analysis, knowledge retrieval, and result visualization—delivering an auditable, traceable, and collaborative testing environment for security teams.
+能盾智御 is an **AI-native security testing platform** built in Go. It integrates 100+ security tools, an intelligent orchestration engine, role-based testing with predefined security roles, a skills system with specialized testing skills, and comprehensive lifecycle management capabilities. Through native MCP protocol and AI agents, it enables end-to-end automation from conversational commands to vulnerability discovery, attack-chain analysis, knowledge retrieval, and result visualization, delivering an auditable, traceable, and collaborative testing environment for security teams.
 
 
 ## Interface & Integration Preview
@@ -118,12 +118,12 @@ CyberStrikeAI is an **AI-native security testing platform** built in Go. It inte
 - 🎭 Role-based testing: predefined security testing roles (Penetration Testing, CTF, Web App Scanning, etc.) with custom prompts and tool restrictions
 - 🧩 **Multi-agent mode (Eino DeepAgent)**: optional orchestration where a coordinator delegates work to Markdown-defined sub-agents via the `task` tool; main agent in `agents/orchestrator.md` (or `kind: orchestrator`), sub-agents under `agents/*.md`; chat mode switch when `multi_agent.enabled` is true (see [Multi-agent doc](docs/MULTI_AGENT_EINO.md))
 - 🎯 Skills system: 20+ predefined security testing skills (SQL injection, XSS, API security, etc.) that can be attached to roles or called on-demand by AI agents
-- 📱 **Chatbot**: DingTalk and Lark (Feishu) long-lived connections so you can talk to CyberStrikeAI from mobile (see [Robot / Chatbot guide](docs/robot_en.md) for setup and commands)
+- 📱 **Chatbot**: DingTalk and Lark (Feishu) long-lived connections so you can talk to 能盾智御 from mobile (see [Robot / Chatbot guide](docs/robot_en.md) for setup and commands)
  - 🐚 **WebShell management**: Add and manage WebShell connections (e.g. IceSword/AntSword compatible), use a virtual terminal for command execution, a built-in file manager for file operations, and an AI assistant tab that orchestrates tests and keeps per-connection conversation history; supports PHP, ASP, ASPX, JSP and custom shell types with configurable request method and command parameter.
 
 ## Plugins
 
-CyberStrikeAI includes optional integrations under `plugins/`.
+能盾智御 includes optional integrations under `plugins/`.
 
 - **Burp Suite extension**: `plugins/burp-suite/cyberstrikeai-burp-extension/`  
   Build output: `plugins/burp-suite/cyberstrikeai-burp-extension/dist/cyberstrikeai-burp-extension.jar`  
@@ -131,7 +131,7 @@ CyberStrikeAI includes optional integrations under `plugins/`.
 
 ## Tool Overview
 
-CyberStrikeAI ships with 100+ curated tools covering the whole kill chain:
+能盾智御 ships with 100+ curated tools covering the whole kill chain:
 
 - **Network Scanners** – nmap, masscan, rustscan, arp-scan, nbtscan
 - **Web & App Scanners** – sqlmap, nikto, dirb, gobuster, feroxbuster, ffuf, httpx
@@ -209,7 +209,7 @@ go build -o cyberstrike-ai cmd/server/main.go
 
 ### Version Update (No Breaking Changes)
 
-**CyberStrikeAI one-click upgrade (recommended):**
+**能盾智御 one-click upgrade (recommended):**
 1. (First time) enable the script: `chmod +x upgrade.sh`
 2. Upgrade with: `./upgrade.sh` (optional flags: `--tag vX.Y.Z`, `--no-venv`, `--preserve-custom`, `--yes`)
 3. The script will back up your `config.yaml` and `data/`, upgrade the code from GitHub Release, update `config.yaml`'s `version`, then restart the server.
@@ -332,7 +332,7 @@ Requirements / tips:
 - **Web mode** – ships with HTTP MCP server automatically consumed by the UI.
 - **MCP stdio mode** – `go run cmd/mcp-stdio/main.go` exposes the agent to Cursor/CLI.
 - **External MCP federation** – register third-party MCP servers (HTTP, stdio, or SSE) from the UI, toggle them per engagement, and monitor their health and call volume in real time.
-- **Optional MCP servers** – the [`mcp-servers/`](mcp-servers/README.md) directory provides standalone MCPs (e.g. reverse shell). They speak standard MCP over stdio and work with CyberStrikeAI (Settings → External MCP), Cursor, VS Code, and other MCP clients.
+- **Optional MCP servers** – the [`mcp-servers/`](mcp-servers/README.md) directory provides standalone MCPs (e.g. reverse shell). They speak standard MCP over stdio and work with 能盾智御 (Settings → External MCP), Cursor, VS Code, and other MCP clients.
 
 #### MCP stdio quick start
 1. **Build the binary** (run from the project root):
@@ -385,7 +385,7 @@ Example of what the terminal prints (with auth enabled):
 If you do not set `auth_header` / `auth_header_value`, the endpoint accepts requests without authentication (suitable only for localhost or trusted networks).
 
 #### External MCP federation (HTTP/stdio/SSE)
-CyberStrikeAI supports connecting to external MCP servers via three transport modes:
+能盾智御 supports connecting to external MCP servers via three transport modes:
 - **HTTP mode** – traditional request/response over HTTP POST
 - **stdio mode** – process-based communication via standard input/output
 - **SSE mode** – Server-Sent Events for real-time streaming communication
@@ -450,7 +450,7 @@ A test SSE MCP server is available at `cmd/test-sse-mcp-server/` for validation 
 **Quick Start (Using Pre-built Knowledge Base):**
 1. **Download the knowledge database** – Download the pre-built knowledge database file from [GitHub Releases](https://github.com/Ed1s0nZ/CyberStrikeAI/releases).
 2. **Extract and place** – Extract the downloaded knowledge database file (`knowledge.db`) and place it in the project's `data/` directory.
-3. **Restart the service** – Restart the CyberStrikeAI service, and the knowledge base will be ready to use immediately without rebuilding the index.
+3. **Restart the service** – Restart the 能盾智御 service, and the knowledge base will be ready to use immediately without rebuilding the index.
 
 **Setting up the knowledge base:**
 1. **Enable in config** – set `knowledge.enabled: true` in `config.yaml`:
@@ -581,7 +581,7 @@ enabled: true
 ## Related documentation
 
 - [Multi-agent mode (Eino)](docs/MULTI_AGENT_EINO.md): DeepAgent orchestration, `agents/*.md`, APIs, and chat/stream behavior.
-- [Robot / Chatbot guide (DingTalk & Lark)](docs/robot_en.md): Full setup, commands, and troubleshooting for using CyberStrikeAI from DingTalk or Lark on your phone. **Follow this doc to avoid common pitfalls.**
+- [Robot / Chatbot guide (DingTalk & Lark)](docs/robot_en.md): Full setup, commands, and troubleshooting for using 能盾智御 from DingTalk or Lark on your phone. **Follow this doc to avoid common pitfalls.**
 
 ## Project Layout
 
@@ -624,7 +624,7 @@ Build an attack chain for the latest engagement and export the node list with se
 
 <img src="./images/404StarLinkLogo.png" width="30%">
 
-CyberStrikeAI has joined [404Starlink](https://github.com/knownsec/404StarLink)
+能盾智御 has joined [404Starlink](https://github.com/knownsec/404StarLink)
 
 ## TCH Top-Ranked Intelligent Pentest Project  
 <div align="left">
@@ -641,7 +641,7 @@ CyberStrikeAI has joined [404Starlink](https://github.com/knownsec/404StarLink)
 
 ## License
 
-CyberStrikeAI is licensed under the Apache License 2.0.  
+能盾智御 is licensed under the Apache License 2.0.
 See the [LICENSE](LICENSE) file for details.
 
 ---
@@ -650,7 +650,7 @@ See the [LICENSE](LICENSE) file for details.
 
 **This tool is for educational and authorized testing purposes only!**
 
-CyberStrikeAI is a professional security testing platform designed to assist security researchers, penetration testers, and IT professionals in conducting security assessments and vulnerability research **with explicit authorization**.
+能盾智御 is a professional security testing platform designed to assist security researchers, penetration testers, and IT professionals in conducting security assessments and vulnerability research **with explicit authorization**.
 
 **By using this tool, you agree to:**
 - Use this tool only on systems where you have clear written authorization
@@ -663,4 +663,3 @@ CyberStrikeAI is a professional security testing platform designed to assist sec
 ---
 
 Need help or want to contribute? Open an issue or PR—community tooling additions are welcome!
-

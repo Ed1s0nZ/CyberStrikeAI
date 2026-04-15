@@ -1,6 +1,6 @@
 # OpenSpec Domains
 
-This directory is the domain-level specification map for CyberStrikeAI. Each subdirectory is a bounded capability area and is intended to act as a stable source of truth for future changes.
+This directory is the domain-level specification map for 能盾智御. Each subdirectory is a bounded capability area and is intended to act as a stable source of truth for future changes.
 
 ## Domain Map
 - `platform-core`

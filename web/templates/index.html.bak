@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CyberStrikeAI</title>
+    <title>能盾智御</title>
     <link rel="icon" type="image/png" href="/static/logo.png">
     <link rel="shortcut icon" type="image/png" href="/static/favicon.ico">
     <link rel="stylesheet" href="/static/css/style.css">
@@ -13,7 +13,7 @@
     <div id="login-overlay" class="login-overlay" style="display: none;">
         <div class="login-card">
             <div class="login-brand">
-                <h2>登录 CyberStrikeAI</h2>
+                <h2>登录 能盾智御</h2>
                 <p class="login-subtitle">请输入配置中的访问密码</p>
             </div>
             <form id="login-form" class="login-form">
@@ -33,8 +33,8 @@
         <header>
             <div class="header-content">
                 <div class="logo header-logo-link" onclick="switchPage('dashboard')" role="button" title="返回仪表盘">
-                    <img src="/static/logo.png" alt="CyberStrikeAI Logo" style="width: 32px; height: 32px; margin-right: 8px;">
-                    <h1>CyberStrikeAI</h1>
+                    <img src="/static/logo.png" alt="能盾智御 Logo" style="width: 32px; height: 32px; margin-right: 8px;">
+                    <h1>能盾智御</h1>
                     <span class="version-badge" title="当前版本">{{.Version}}</span>
                 </div>
                 <div class="header-right">
@@ -1214,7 +1214,7 @@
                             <div id="settings-section-robots" class="settings-section-content">
                                 <div class="settings-section-header">
                                     <h3>机器人设置</h3>
-                                    <p class="settings-description">配置企业微信、钉钉、飞书等机器人，在手机端直接与 CyberStrikeAI 对话，无需在服务器上打开网页。</p>
+                                    <p class="settings-description">配置企业微信、钉钉、飞书等机器人，在手机端直接与 能盾智御 对话，无需在服务器上打开网页。</p>
                                 </div>
 
                                 <!-- 企业微信 -->
@@ -2177,4 +2177,3 @@ version: 1.0.0<br>
     <script src="/static/js/roles.js"></script>
 </body>
 </html>
-

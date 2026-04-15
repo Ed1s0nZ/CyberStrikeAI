@@ -15,7 +15,7 @@ go run main.go
 - `GET /sse` - SSE事件流端点
 - `POST /message` - 消息接收端点
 
-### 2. 在CyberStrikeAI中添加配置
+### 2. 在能盾智御中添加配置
 
 在Web界面中添加外部MCP配置，使用以下JSON：
 
@@ -53,4 +53,3 @@ go run main.go
 - SSE客户端连接/断开
 - 收到的请求（方法名和ID）
 - 工具调用详情
-

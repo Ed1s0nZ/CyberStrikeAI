@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	clientName    = "CyberStrikeAI"
+	clientName    = "能盾智御"
 	clientVersion = "1.0.0"
 )
 

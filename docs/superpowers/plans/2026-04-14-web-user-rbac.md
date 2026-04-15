@@ -1402,7 +1402,7 @@ async function changePassword() {
 ```json
 // web/static/i18n/zh-CN.json
 "login": {
-  "title": "登录 CyberStrikeAI",
+  "title": "登录 能盾智御",
   "subtitle": "请输入 Web 用户名和密码",
   "usernameLabel": "用户名",
   "usernamePlaceholder": "输入用户名",

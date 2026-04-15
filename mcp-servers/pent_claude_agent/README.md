@@ -2,7 +2,7 @@
 
 [中文](README_CN.md)
 
-AI-powered **penetration testing engineer** MCP server. CyberStrikeAI can command it to run pentest tasks, analyze vulnerabilities, and perform security diagnostics. The agent runs a Claude-based AI internally and can be configured with its own MCP servers and tools.
+AI-powered **penetration testing engineer** MCP server. 能盾智御 can command it to run pentest tasks, analyze vulnerabilities, and perform security diagnostics. The agent runs a Claude-based AI internally and can be configured with its own MCP servers and tools.
 
 ## Tools
 
@@ -36,7 +36,7 @@ Config options (see `pent_claude_agent_config.yaml`):
 
 Path placeholders: `${PROJECT_ROOT}` = CyberStrikeAI root, `${SCRIPT_DIR}` = this script's directory.
 
-## Setup in CyberStrikeAI
+## Setup in 能盾智御
 
 1. **Paths**  
    Example: project root `/path/to/CyberStrikeAI-main`  
@@ -66,9 +66,9 @@ Path placeholders: `${PROJECT_ROOT}` = CyberStrikeAI root, `${SCRIPT_DIR}` = thi
    - Save, then click **Start** for this MCP to use the tools in chat.
 
 3. **Typical workflow**
-   - CyberStrikeAI calls `pent_claude_run_pentest_task("Scan target 192.168.1.1 for open ports")`.
+   - 能盾智御 calls `pent_claude_run_pentest_task("Scan target 192.168.1.1 for open ports")`.
    - pent_claude_agent starts a Claude agent internally, which may use Bash, nmap, etc.
-   - Results are returned to CyberStrikeAI.
+   - Results are returned to 能盾智御.
 
 ## Run locally (optional)
 
@@ -77,7 +77,7 @@ Path placeholders: `${PROJECT_ROOT}` = CyberStrikeAI root, `${SCRIPT_DIR}` = thi
 ./venv/bin/python mcp-servers/pent_claude_agent/mcp_pent_claude_agent.py
 ```
 
-The process talks MCP over stdio; CyberStrikeAI starts it the same way when using External MCP.
+The process talks MCP over stdio; 能盾智御 starts it the same way when using External MCP.
 
 ## Security
 

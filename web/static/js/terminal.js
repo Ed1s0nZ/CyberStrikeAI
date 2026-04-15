@@ -32,7 +32,7 @@
         }
         // i18n 未就绪时的后备（与 zh-CN 一致）
         var fallbacks = {
-            'settingsTerminal.welcomeLine': 'CyberStrikeAI 终端 - 真实 Shell 会话，直接输入命令；Ctrl+L 清屏',
+            'settingsTerminal.welcomeLine': '能盾智御终端 - 真实 Shell 会话，直接输入命令；Ctrl+L 清屏',
             'settingsTerminal.sessionClosed': '[会话已关闭]',
             'settingsTerminal.connectionError': '[终端连接出错]',
             'settingsTerminal.connectFailed': '[无法连接终端服务: {{msg}}]',

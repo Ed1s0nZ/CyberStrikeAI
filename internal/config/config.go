@@ -415,22 +415,22 @@ func PrintGeneratedPasswordWarning(password string, persisted bool, persistErr s
 	}
 
 	if persisted {
-		fmt.Println("[CyberStrikeAI] ✅ 已为您自动生成并写入 Web 登录密码。")
+		fmt.Println("[能盾智御] ✅ 已为您自动生成并写入 Web 登录密码。")
 	} else {
 		if persistErr != "" {
-			fmt.Printf("[CyberStrikeAI] ⚠️ 无法自动写入配置文件中的密码: %s\n", persistErr)
+			fmt.Printf("[能盾智御] ⚠️ 无法自动写入配置文件中的密码: %s\n", persistErr)
 		} else {
-			fmt.Println("[CyberStrikeAI] ⚠️ 无法自动写入配置文件中的密码。")
+			fmt.Println("[能盾智御] ⚠️ 无法自动写入配置文件中的密码。")
 		}
 		fmt.Println("请手动将以下随机密码写入 config.yaml 的 auth.password：")
 	}
 
 	fmt.Println("----------------------------------------------------------------")
-	fmt.Println("CyberStrikeAI Auto-Generated Web Password")
+	fmt.Println("能盾智御 Auto-Generated Web Password")
 	fmt.Printf("Password: %s\n", password)
-	fmt.Println("WARNING: Anyone with this password can fully control CyberStrikeAI.")
+	fmt.Println("WARNING: Anyone with this password can fully control 能盾智御.")
 	fmt.Println("Please store it securely and change it in config.yaml as soon as possible.")
-	fmt.Println("警告：持有此密码的人将拥有对 CyberStrikeAI 的完全控制权限。")
+	fmt.Println("警告：持有此密码的人将拥有对 能盾智御 的完全控制权限。")
 	fmt.Println("请妥善保管，并尽快在 config.yaml 中修改 auth.password！")
 	fmt.Println("----------------------------------------------------------------")
 }
@@ -545,7 +545,7 @@ func PrintMCPConfigJSON(mcp MCPConfig) {
 		},
 	}
 	b, _ := json.MarshalIndent(out, "", "  ")
-	fmt.Println("[CyberStrikeAI] MCP 配置（可复制到 Cursor / Claude Code 使用）：")
+	fmt.Println("[能盾智御] MCP 配置（可复制到 Cursor / Claude Code 使用）：")
 	fmt.Println("  Cursor: 放入 ~/.cursor/mcp.json 的 mcpServers，或项目 .cursor/mcp.json")
 	fmt.Println("  Claude Code: 放入 .mcp.json 或 ~/.claude.json 的 mcpServers")
 	fmt.Println("----------------------------------------------------------------")

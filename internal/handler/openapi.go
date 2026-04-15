@@ -42,11 +42,11 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 	spec := map[string]interface{}{
 		"openapi": "3.0.0",
 		"info": map[string]interface{}{
-			"title":       "CyberStrikeAI API",
+			"title":       "能盾智御 API",
 			"description": "AI驱动的自动化安全测试平台API文档",
 			"version":     "1.0.0",
 			"contact": map[string]interface{}{
-				"name": "CyberStrikeAI",
+				"name": "能盾智御",
 			},
 		},
 		"servers": []map[string]interface{}{

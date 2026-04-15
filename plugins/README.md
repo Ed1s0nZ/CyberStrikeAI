@@ -1,6 +1,6 @@
 ## Plugins
 
-This directory contains optional plugins/extensions that integrate CyberStrikeAI with other tools.
+This directory contains optional plugins/extensions that integrate 能盾智御 with other tools.
 
 - `burp-suite/`: Burp Suite extensions
 
@@ -9,4 +9,3 @@ This directory contains optional plugins/extensions that integrate CyberStrikeAI
 - **Path**: `plugins/burp-suite/cyberstrikeai-burp-extension/`
 - **Build output**: `plugins/burp-suite/cyberstrikeai-burp-extension/dist/cyberstrikeai-burp-extension.jar`
 - **Docs**: see the plugin folder `README.md` / `README.zh-CN.md`
-

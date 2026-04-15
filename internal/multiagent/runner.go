@@ -177,7 +177,7 @@ func RunDeepAgent(
 		}
 		instr := strings.TrimSpace(sub.Instruction)
 		if instr == "" {
-			instr = "你是 CyberStrikeAI 中的专业子代理，在授权渗透测试场景下协助完成用户委托的子任务。优先使用可用工具获取证据，回答简洁专业。"
+			instr = "你是能盾智御中的专业子代理，在授权渗透测试场景下协助完成用户委托的子任务。优先使用可用工具获取证据，回答简洁专业。"
 		}
 
 		roleTools := sub.RoleTools

@@ -3,7 +3,7 @@
 Reverse Shell MCP Server - 反向 Shell MCP 服务
 
 通过 MCP 协议暴露反向 Shell 能力：开启/停止监听、与已连接客户端交互执行命令。
-无需修改 CyberStrikeAI 后端，在「设置 → 外部 MCP」中以 stdio 方式添加即可。
+无需修改 能盾智御 后端，在「设置 → 外部 MCP」中以 stdio 方式添加即可。
 
 依赖：pip install mcp（或使用项目 venv）
 运行：python mcp_reverse_shell.py  或  python3 mcp_reverse_shell.py

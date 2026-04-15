@@ -751,7 +751,7 @@ final class CyberStrikeAITab implements ITab {
 
     @Override
     public String getTabCaption() {
-        return "CyberStrikeAI";
+        return "能盾智御";
     }
 
     @Override
@@ -759,4 +759,3 @@ final class CyberStrikeAITab implements ITab {
         return root;
     }
 }
-

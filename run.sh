@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-# CyberStrikeAI 一键部署启动脚本
+# 能盾智御 一键部署启动脚本
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT_DIR"
 
@@ -63,7 +63,7 @@ show_progress() {
 
 echo ""
 echo "=========================================="
-echo "  CyberStrikeAI 一键部署启动脚本"
+echo "  能盾智御 一键部署启动脚本"
 echo "=========================================="
 echo ""
 
@@ -377,7 +377,7 @@ main() {
     # 启动服务器
     success "所有准备工作完成！"
     echo ""
-    info "启动 CyberStrikeAI 服务器..."
+    info "启动 能盾智御 服务器..."
     echo "=========================================="
     echo ""
     

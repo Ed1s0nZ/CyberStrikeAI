@@ -1,6 +1,6 @@
 # pent_claude_agent 配置文件
 # 渗透测试工程师 Agent 的独立配置，可自定义 MCP、工具、环境等
-# 路径占位符：${PROJECT_ROOT} = CyberStrikeAI 项目根目录，${SCRIPT_DIR} = 本脚本所在目录
+# 路径占位符：${PROJECT_ROOT} = 能盾智御 项目根目录，${SCRIPT_DIR} = 本脚本所在目录
 
 # 工作目录（Agent 执行任务时的 cwd）
 cwd: "${PROJECT_ROOT}/mcp-servers/pent_claude_agent"

@@ -18,21 +18,21 @@ public class BurpExtender implements IBurpExtender, IContextMenuFactory {
         this.callbacks = callbacks;
         this.helpers = callbacks.getHelpers();
 
-        callbacks.setExtensionName("CyberStrikeAI Extension");
+        callbacks.setExtensionName("能盾智御 Extension");
 
         this.tab = new CyberStrikeAITab();
         callbacks.addSuiteTab(tab);
 
         callbacks.registerContextMenuFactory(this);
 
-        callbacks.printOutput("CyberStrikeAI extension loaded.");
+        callbacks.printOutput("能盾智御 extension loaded.");
     }
 
     @Override
     public List<JMenuItem> createMenuItems(IContextMenuInvocation invocation) {
         List<JMenuItem> items = new ArrayList<>();
 
-        JMenuItem sendItem = new JMenuItem("Send to CyberStrikeAI (stream test)");
+        JMenuItem sendItem = new JMenuItem("Send to 能盾智御 (stream test)");
         sendItem.addActionListener(e -> {
             IHttpRequestResponse[] selected = invocation.getSelectedMessages();
             if (selected == null || selected.length == 0) {
@@ -52,7 +52,7 @@ public class BurpExtender implements IBurpExtender, IContextMenuFactory {
         if (token == null || token.trim().isEmpty()) {
             JOptionPane.showMessageDialog(tab.getUiComponent(),
                     "Please click Validate first to obtain a token.",
-                    "CyberStrikeAI", JOptionPane.WARNING_MESSAGE);
+                    "能盾智御", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
@@ -136,7 +136,7 @@ public class BurpExtender implements IBurpExtender, IContextMenuFactory {
             public void onError(String message, Exception e) {
                 tab.appendProgressToRun(runId, "\n[error] " + message + "\n");
                 tab.setRunStatus(runId, "error");
-                callbacks.printError("CyberStrikeAI stream error: " + message);
+                callbacks.printError("能盾智御 stream error: " + message);
                 if (e != null) {
                     callbacks.printError(e.toString());
                 }
@@ -183,4 +183,3 @@ public class BurpExtender implements IBurpExtender, IContextMenuFactory {
         return value.trim();
     }
 }
-

@@ -23,7 +23,7 @@
     "actions": "操作"
   },
   "header": {
-    "title": "CyberStrikeAI",
+    "title": "能盾智御",
     "apiDocs": "API 文档",
     "github": "GitHub",
     "logout": "退出登录",
@@ -34,7 +34,7 @@
     "toggleSidebar": "折叠/展开侧边栏"
   },
   "login": {
-    "title": "登录 CyberStrikeAI",
+    "title": "登录 能盾智御",
     "subtitle": "请输入 Web 用户名和密码",
     "usernameLabel": "用户名",
     "usernamePlaceholder": "输入用户名",
@@ -601,7 +601,7 @@
     },
     "robots": {
       "title": "机器人设置",
-      "description": "配置企业微信、钉钉、飞书等机器人，在手机端直接与 CyberStrikeAI 对话，无需在服务器上打开网页。",
+      "description": "配置企业微信、钉钉、飞书等机器人，在手机端直接与 能盾智御 对话，无需在服务器上打开网页。",
       "wecom": {
         "title": "企业微信",
         "enabled": "启用企业微信机器人",
@@ -738,9 +738,9 @@
     "loadCallStatsError": "无法加载调用统计"
   },
   "apiDocs": {
-    "pageTitle": "API 文档 - CyberStrikeAI",
+    "pageTitle": "API 文档 - 能盾智御",
     "title": "API 文档",
-    "subtitle": "CyberStrikeAI 平台 API 接口文档，支持在线测试",
+    "subtitle": "能盾智御平台 API 接口文档，支持在线测试",
     "authTitle": "API 认证说明",
     "authAllNeedToken": "所有 API 接口都需要 Token 认证。",
     "authGetToken": "1. 获取 Token：",
@@ -1326,7 +1326,7 @@
     "title": "终端",
     "description": "在服务器上执行命令，便于运维与调试。命令在服务端执行，请勿执行敏感或破坏性操作。",
     "terminalTab": "终端 {{n}}",
-    "welcomeLine": "CyberStrikeAI 终端 - 真实 Shell 会话，直接输入命令；Ctrl+L 清屏",
+    "welcomeLine": "能盾智御终端 - 真实 Shell 会话，直接输入命令；Ctrl+L 清屏",
     "sessionClosed": "[会话已关闭]",
     "connectionError": "[终端连接出错]",
     "connectFailed": "[无法连接终端服务: {{msg}}]",

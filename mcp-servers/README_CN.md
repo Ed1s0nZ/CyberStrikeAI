@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-本目录存放 **独立 MCP（Model Context Protocol）服务**，采用标准 MCP 协议（stdio 或部分服务支持 HTTP/SSE），因此 **任意支持 MCP 的客户端** 均可使用——不限于 CyberStrikeAI，**Cursor**、**VS Code**（配合 MCP 扩展）、**Claude Code** 等均可接入。
+本目录存放 **独立 MCP（Model Context Protocol）服务**，采用标准 MCP 协议（stdio 或部分服务支持 HTTP/SSE），因此 **任意支持 MCP 的客户端** 均可使用，不限于 能盾智御，**Cursor**、**VS Code**（配合 MCP 扩展）、**Claude Code** 等均可接入。
 
 **我们会持续在此新增好用的 MCP 服务**，覆盖安全测试、自动化与集成等场景，敬请关注。
 
@@ -16,7 +16,7 @@
 
 各 MCP 需在对应客户端里配置后使用。stdio 模式下 `command` 与 `args` 请使用**绝对路径**。
 
-### CyberStrikeAI
+### 能盾智御
 
 1. 打开 Web 界面 → **设置** → **外部 MCP**。
 2. 添加新的外部 MCP，按各服务目录下 README 的说明填写 JSON 配置。

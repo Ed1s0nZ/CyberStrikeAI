@@ -7,7 +7,7 @@
     <groupId>ai.cyberstrike</groupId>
     <artifactId>cyberstrikeai-burp-extension</artifactId>
     <version>1.0.0</version>
-    <name>CyberStrikeAI Burp Suite Extension</name>
+    <name>能盾智御 Burp Suite Extension</name>
 
     <properties>
         <maven.compiler.release>11</maven.compiler.release>
@@ -41,4 +41,3 @@
         </plugins>
     </build>
 </project>
-

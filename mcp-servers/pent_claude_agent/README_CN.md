@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-AI 驱动的**渗透测试工程师** MCP 服务。CyberStrikeAI 可指挥 pent_claude_agent 执行渗透测试任务、分析漏洞、进行安全诊断。Agent 内部使用 Claude Agent SDK，可独立配置 MCP、工具等，作为独立的渗透测试工程师运行。
+AI 驱动的**渗透测试工程师** MCP 服务。能盾智御 可指挥 pent_claude_agent 执行渗透测试任务、分析漏洞、进行安全诊断。Agent 内部使用 Claude Agent SDK，可独立配置 MCP、工具等，作为独立的渗透测试工程师运行。
 
 ## 工具说明
 
@@ -36,7 +36,7 @@ Agent 默认使用本目录下的 `pent_claude_agent_config.yaml`。可通过以
 
 路径占位符：`${PROJECT_ROOT}` = CyberStrikeAI 项目根目录，`${SCRIPT_DIR}` = 本脚本所在目录。
 
-## 在 CyberStrikeAI 中接入
+## 在 能盾智御 中接入
 
 1. **路径**  
    例如项目根为 `/path/to/CyberStrikeAI-main`，则脚本路径为：  
@@ -66,9 +66,9 @@ Agent 默认使用本目录下的 `pent_claude_agent_config.yaml`。可通过以
    - 保存后点击该 MCP 的 **启动**，即可在对话中通过 AI 调用上述工具。
 
 3. **使用流程示例**
-   - CyberStrikeAI 调用 `pent_claude_run_pentest_task("扫描目标 192.168.1.1 的开放端口")`。
+   - 能盾智御 调用 `pent_claude_run_pentest_task("扫描目标 192.168.1.1 的开放端口")`。
    - pent_claude_agent 内部启动 Claude Agent，可能使用 Bash、nmap 等工具执行。
-   - 结果返回给 CyberStrikeAI。
+   - 结果返回给 能盾智御。
 
 ## 本地单独运行（可选）
 
@@ -77,7 +77,7 @@ Agent 默认使用本目录下的 `pent_claude_agent_config.yaml`。可通过以
 ./venv/bin/python mcp-servers/pent_claude_agent/mcp_pent_claude_agent.py
 ```
 
-进程通过 stdio 与 MCP 客户端通信；CyberStrikeAI 以 stdio 方式启动该脚本时行为相同。
+进程通过 stdio 与 MCP 客户端通信；能盾智御 以 stdio 方式启动该脚本时行为相同。
 
 ## 安全提示
 

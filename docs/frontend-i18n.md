@@ -1,6 +1,6 @@
-## CyberStrikeAI 前端国际化方案
+## 能盾智御 前端国际化方案
 
-本文档说明 CyberStrikeAI Web 前端（`web/templates/index.html` + `web/static/js/*.js`）的国际化设计与开发规范，确保在不引入打包工具和不改动后端路由的前提下，实现可扩展、低返工的多语言支持。
+本文档说明 能盾智御 Web 前端（`web/templates/index.html` + `web/static/js/*.js`）的国际化设计与开发规范，确保在不引入打包工具和不改动后端路由的前提下，实现可扩展、低返工的多语言支持。
 
 当前目标：
 
@@ -75,13 +75,13 @@
     "settings": "系统设置"
   },
   "header": {
-    "title": "CyberStrikeAI",
+    "title": "能盾智御",
     "apiDocs": "API 文档",
     "logout": "退出登录",
     "language": "界面语言"
   },
   "login": {
-    "title": "登录 CyberStrikeAI",
+    "title": "登录 能盾智御",
     "subtitle": "请输入配置中的访问密码",
     "passwordLabel": "密码",
     "passwordPlaceholder": "输入登录密码",
@@ -107,13 +107,13 @@
     "settings": "Settings"
   },
   "header": {
-    "title": "CyberStrikeAI",
+    "title": "能盾智御",
     "apiDocs": "API Docs",
     "logout": "Sign out",
     "language": "Interface language"
   },
   "login": {
-    "title": "Sign in to CyberStrikeAI",
+    "title": "Sign in to 能盾智御",
     "subtitle": "Enter the access password from config",
     "passwordLabel": "Password",
     "passwordPlaceholder": "Enter password",
@@ -332,4 +332,3 @@ function updateLangLabel() {
 - **避免 key 直接用中文/英文句子**，统一采用「模块.语义」短 key，便于 diff 与搜索。
 - 避免在 CSS 中写死文本（如 `content: "xxx"`），如确有需要，应通过 JS 设置并走 i18n。
 - 对于后端返回的可本地化错误文本（未来可能支持），优先由后端根据 `Accept-Language` 返回对应语言，前端只负责展示。
-

@@ -1,7 +1,7 @@
 # Platform Core
 
 ## Purpose
-Define the platform-level operating contract for CyberStrikeAI so all other specs compose against the same lifecycle, serving model, persistence posture, and degradation semantics.
+Define the platform-level operating contract for 能盾智御 so all other specs compose against the same lifecycle, serving model, persistence posture, and degradation semantics.
 
 ## Requirements
 ### Requirement: Unified platform surface
@@ -41,7 +41,7 @@ The platform SHALL retain enough evidence to explain how a user-visible outcome 
 - **THEN** the platform can correlate the visible result with stored messages, execution details, and related records
 
 ## Overview
-CyberStrikeAI is a single-process security operations platform that exposes one coherent system through Web UI, REST API, SSE streams, MCP endpoints, and robot channels. The platform's primary responsibility is to turn operator intent into durable, auditable security workflows that combine LLM reasoning, tool execution, knowledge retrieval, and evidence persistence.
+能盾智御 is a single-process security operations platform that exposes one coherent system through Web UI, REST API, SSE streams, MCP endpoints, and robot channels. The platform's primary responsibility is to turn operator intent into durable, auditable security workflows that combine LLM reasoning, tool execution, knowledge retrieval, and evidence persistence.
 
 This domain defines platform-level invariants rather than feature-local behavior. Feature domains may evolve independently, but they must remain composable under the same control plane, persistence model, and operational lifecycle.
 

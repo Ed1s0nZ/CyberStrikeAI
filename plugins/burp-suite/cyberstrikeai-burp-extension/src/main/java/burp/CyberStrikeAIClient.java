@@ -59,7 +59,7 @@ final class CyberStrikeAIClient {
 
         // Friendly diagnosis: HTML usually means wrong host/port (e.g., hit Burp UI/proxy page).
         if (looksLikeHtml(resp) || (contentType != null && contentType.toLowerCase().contains("text/html"))) {
-            throw new IOException("Login failed: server returned HTML, not API JSON. Check IP/Port and ensure you point to CyberStrikeAI backend.");
+            throw new IOException("Login failed: server returned HTML, not API JSON. Check IP/Port and ensure you point to 能盾智御 backend.");
         }
 
         String serverError = SimpleJson.extractStringField(resp, "error");
@@ -231,4 +231,3 @@ final class CyberStrikeAIClient {
         return t.startsWith("<!doctype html") || t.startsWith("<html") || t.contains("<head>") || t.contains("<body");
     }
 }
-

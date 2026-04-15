@@ -23,7 +23,7 @@
     "actions": "Actions"
   },
   "header": {
-    "title": "CyberStrikeAI",
+    "title": "能盾智御",
     "apiDocs": "API Docs",
     "github": "GitHub",
     "logout": "Sign out",
@@ -34,7 +34,7 @@
     "toggleSidebar": "Collapse/expand sidebar"
   },
   "login": {
-    "title": "Sign in to CyberStrikeAI",
+    "title": "Sign in to 能盾智御",
     "subtitle": "Enter your Web username and password",
     "usernameLabel": "Username",
     "usernamePlaceholder": "Enter username",
@@ -601,7 +601,7 @@
     },
     "robots": {
       "title": "Bot settings",
-      "description": "Configure WeCom, DingTalk and Lark bots so you can chat with CyberStrikeAI on your phone without opening the web UI.",
+      "description": "Configure WeCom, DingTalk and Lark bots so you can chat with 能盾智御 on your phone without opening the web UI.",
       "wecom": {
         "title": "WeCom",
         "enabled": "Enable WeCom bot",
@@ -738,9 +738,9 @@
     "loadCallStatsError": "Failed to load call statistics"
   },
   "apiDocs": {
-    "pageTitle": "API Docs - CyberStrikeAI",
+    "pageTitle": "API Docs - 能盾智御",
     "title": "API Docs",
-    "subtitle": "CyberStrikeAI platform API documentation with online testing",
+    "subtitle": "能盾智御 platform API documentation with online testing",
     "authTitle": "API Authentication",
     "authAllNeedToken": "All API endpoints require Token authentication.",
     "authGetToken": "1. Get Token:",
@@ -1326,7 +1326,7 @@
     "title": "Terminal",
     "description": "Run commands on the server for ops and debugging. Commands run on the server; avoid sensitive or destructive operations.",
     "terminalTab": "Terminal {{n}}",
-    "welcomeLine": "CyberStrikeAI Terminal — real shell session; type commands directly. Ctrl+L to clear screen",
+    "welcomeLine": "能盾智御 Terminal — real shell session; type commands directly. Ctrl+L to clear screen",
     "sessionClosed": "[Session closed]",
     "connectionError": "[Terminal connection error]",
     "connectFailed": "[Cannot connect to terminal service: {{msg}}]",

@@ -189,7 +189,7 @@ func (h *RobotHandler) HandleMessage(platform, userID, text string) (reply strin
 }
 
 func (h *RobotHandler) cmdHelp() string {
-	return "**【CyberStrikeAI 机器人命令】**\n\n" +
+	return "**【能盾智御 机器人命令】**\n\n" +
 		"- `帮助` `help` — 显示本帮助 | Show this help\n" +
 		"- `列表` `list` — 列出所有对话标题与 ID | List conversations\n" +
 		"- `切换 <ID>` `switch <ID>` — 指定对话继续 | Switch to conversation\n" +
@@ -358,7 +358,7 @@ func (h *RobotHandler) cmdVersion() string {
 	if v == "" {
 		v = "未知"
 	}
-	return "CyberStrikeAI " + v
+	return "能盾智御 " + v
 }
 
 // handleRobotCommand 处理机器人内置命令；若匹配到命令返回 (回复内容, true)，否则返回 ("", false)

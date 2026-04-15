@@ -2,7 +2,7 @@
 
 [中文](README_CN.md)
 
-This directory contains **standalone MCP (Model Context Protocol) servers**. They speak the standard MCP protocol over stdio (or HTTP/SSE when a server supports it), so **any MCP client** can use them—not only CyberStrikeAI, but also **Cursor**, **VS Code** (with an MCP extension), **Claude Code**, and other clients that support MCP.
+This directory contains **standalone MCP (Model Context Protocol) servers**. They speak the standard MCP protocol over stdio (or HTTP/SSE when a server supports it), so **any MCP client** can use them, not only 能盾智御, but also **Cursor**, **VS Code** (with an MCP extension), **Claude Code**, and other clients that support MCP.
 
 **We will keep adding useful MCP servers here.** New servers will cover security testing, automation, and integration scenarios. Stay tuned for updates.
 
@@ -16,7 +16,7 @@ This directory contains **standalone MCP (Model Context Protocol) servers**. The
 
 These MCPs are configured per client. Use **absolute paths** for `command` and `args` when using stdio.
 
-### CyberStrikeAI
+### 能盾智御
 
 1. Open Web UI → **Settings** → **External MCP**.
 2. Add a new external MCP and fill in the JSON config (see each server’s README for the exact config).

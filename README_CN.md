@@ -1,8 +1,8 @@
 <div align="center">
-  <img src="web/static/logo.png" alt="CyberStrikeAI Logo" width="200">
+  <img src="web/static/logo.png" alt="能盾智御 Logo" width="200">
 </div>
 
-# CyberStrikeAI
+# 能盾智御
 
 [中文](README_CN.md) | [English](README.md)
 
@@ -11,14 +11,14 @@
 <details>
 <summary><strong>微信群</strong>（点击展开二维码）</summary>
 
-<img src="./images/wechat-group-cyberstrikeai-qr.jpg" alt="CyberStrikeAI 微信群二维码" width="280">
+<img src="./images/wechat-group-cyberstrikeai-qr.jpg" alt="能盾智御 微信群二维码" width="280">
 
 </details>
 
 <details>
 <summary><strong>赞助</strong>（点击展开）</summary>
 
-若 CyberStrikeAI 对您有帮助，可通过 **微信支付** 或 **支付宝** 赞助项目：
+若 能盾智御 对您有帮助，可通过 **微信支付** 或 **支付宝** 赞助项目：
 
 <div align="center">
   <img src="./images/sponsor-wechat-alipay-qr.jpg" alt="微信与支付宝赞助二维码" width="480">
@@ -26,7 +26,7 @@
 
 </details>
 
-CyberStrikeAI 是一款 **AI 原生安全测试平台**，基于 Go 构建，集成了 100+ 安全工具、智能编排引擎、角色化测试与预设安全测试角色、Skills 技能系统与专业测试技能，以及完整的测试生命周期管理能力。通过原生 MCP 协议与 AI 智能体，支持从对话指令到漏洞发现、攻击链分析、知识检索与结果可视化的全流程自动化，为安全团队提供可审计、可追溯、可协作的专业测试环境。
+能盾智御 是一款 **AI 原生安全测试平台**，基于 Go 构建，集成了 100+ 安全工具、智能编排引擎、角色化测试与预设安全测试角色、Skills 技能系统与专业测试技能，以及完整的测试生命周期管理能力。通过原生 MCP 协议与 AI 智能体，支持从对话指令到漏洞发现、攻击链分析、知识检索与结果可视化的全流程自动化，为安全团队提供可审计、可追溯、可协作的专业测试环境。
 
 
 ## 界面与集成预览
@@ -117,7 +117,7 @@ CyberStrikeAI 是一款 **AI 原生安全测试平台**，基于 Go 构建，集
 - 🎭 角色化测试：预设安全测试角色（渗透测试、CTF、Web 应用扫描等），支持自定义提示词和工具限制
 - 🧩 **多代理模式（Eino DeepAgent）**：可选编排——协调主代理通过 `task` 调度 Markdown 定义的子代理；主代理见 `agents/orchestrator.md` 或 front matter `kind: orchestrator`，子代理为 `agents/*.md`；开启 `multi_agent.enabled` 后聊天可切换单代理/多代理（详见 [多代理说明](docs/MULTI_AGENT_EINO.md)）
 - 🎯 Skills 技能系统：20+ 预设安全测试技能（SQL 注入、XSS、API 安全等），可附加到角色或由 AI 按需调用
-- 📱 **机器人**：支持钉钉、飞书长连接，在手机端与 CyberStrikeAI 对话（配置与命令详见 [机器人使用说明](docs/robot.md)）
+- 📱 **机器人**：支持钉钉、飞书长连接，在手机端与 能盾智御 对话（配置与命令详见 [机器人使用说明](docs/robot.md)）
 - 🐚 **WebShell 管理**：添加与管理 WebShell 连接（兼容冰蝎/蚁剑等），通过虚拟终端执行命令、内置文件管理进行文件操作，并提供按连接维度保存历史的 AI 助手标签页；支持 PHP/ASP/ASPX/JSP 及自定义类型，可配置请求方法与命令参数。
 
 ## 插件（Plugins）
@@ -204,7 +204,7 @@ go build -o cyberstrike-ai cmd/server/main.go
 
 **说明：** Python 虚拟环境（`venv/`）由 `run.sh` 自动创建和管理。需要 Python 的工具（如 `api-fuzzer`、`http-framework-test` 等）会自动使用该环境。
 
-### CyberStrikeAI 版本更新（无兼容性问题）
+### 能盾智御 版本更新（无兼容性问题）
 
 1. （首次使用）启用脚本：`chmod +x upgrade.sh`
 2. 一键升级：`./upgrade.sh`（可选参数：`--tag vX.Y.Z`、`--no-venv`、`--preserve-custom`、`--yes`）
@@ -320,7 +320,7 @@ go build -o cyberstrike-ai cmd/server/main.go
 - **Web 模式**：自带 HTTP MCP 服务供前端调用。
 - **MCP stdio 模式**：`go run cmd/mcp-stdio/main.go` 可接入 Cursor/命令行。
 - **外部 MCP 联邦**：在设置中注册第三方 MCP（HTTP/stdio/SSE），按需启停并实时查看调用统计与健康度。
-- **可选 MCP 服务**：项目中的 [`mcp-servers/`](mcp-servers/README_CN.md) 目录提供独立 MCP（如反向 Shell），采用标准 MCP stdio，可在 CyberStrikeAI（设置 → 外部 MCP）、Cursor、VS Code 等任意支持 MCP 的客户端中使用。
+- **可选 MCP 服务**：项目中的 [`mcp-servers/`](mcp-servers/README_CN.md) 目录提供独立 MCP（如反向 Shell），采用标准 MCP stdio，可在 能盾智御（设置 → 外部 MCP）、Cursor、VS Code 等任意支持 MCP 的客户端中使用。
 
 #### MCP stdio 快速集成
 1. **编译可执行文件**（在项目根目录执行）：
@@ -373,7 +373,7 @@ HTTP MCP 服务在独立端口（默认 `8081`）运行，支持 **Header 鉴权
 若不配置 `auth_header` / `auth_header_value`，则端点不鉴权（仅适合本机或可信网络）。
 
 #### 外部 MCP 联邦（HTTP/stdio/SSE）
-CyberStrikeAI 支持通过三种传输模式连接外部 MCP 服务器：
+能盾智御 支持通过三种传输模式连接外部 MCP 服务器：
 - **HTTP 模式** – 通过 HTTP POST 进行传统的请求/响应通信
 - **stdio 模式** – 通过标准输入/输出进行进程间通信
 - **SSE 模式** – 通过 Server-Sent Events 实现实时流式通信
@@ -439,7 +439,7 @@ CyberStrikeAI 支持通过三种传输模式连接外部 MCP 服务器：
 **快速开始（使用预构建知识库）：**
 1. **下载知识数据库**：从 [GitHub Releases](https://github.com/Ed1s0nZ/CyberStrikeAI/releases) 下载预构建的知识数据库文件。
 2. **解压并放置**：将下载的知识数据库文件（`knowledge.db`）解压后放到项目的 `data/` 目录下。
-3. **重启服务**：重启 CyberStrikeAI 服务，知识库即可直接使用，无需重新构建索引。
+3. **重启服务**：重启 能盾智御 服务，知识库即可直接使用，无需重新构建索引。
 
 **知识库配置步骤：**
 1. **启用功能**：在 `config.yaml` 中设置 `knowledge.enabled: true`：
@@ -570,7 +570,7 @@ enabled: true
 ## 相关文档
 
 - [多代理模式（Eino）](docs/MULTI_AGENT_EINO.md)：DeepAgent 编排、`agents/*.md`、接口与流式说明。
-- [机器人使用说明（钉钉 / 飞书）](docs/robot.md)：在手机端通过钉钉、飞书与 CyberStrikeAI 对话的完整配置步骤、命令与排查说明，**建议按该文档操作以避免走弯路**。
+- [机器人使用说明（钉钉 / 飞书）](docs/robot.md)：在手机端通过钉钉、飞书与 能盾智御 对话的完整配置步骤、命令与排查说明，**建议按该文档操作以避免走弯路**。
 
 ## 项目结构
 
@@ -612,7 +612,7 @@ CyberStrikeAI/
 ## 404星链计划 
 <img src="./images/404StarLinkLogo.png" width="30%">
 
-CyberStrikeAI 现已加入 [404星链计划](https://github.com/knownsec/404StarLink)
+能盾智御 现已加入 [404星链计划](https://github.com/knownsec/404StarLink)
 
 ## TCH Top-Ranked Intelligent Pentest Project  
 <div align="left">
@@ -628,7 +628,7 @@ CyberStrikeAI 现已加入 [404星链计划](https://github.com/knownsec/404Star
 
 ## 许可证
 
-CyberStrikeAI 采用 **Apache License 2.0** 开源许可。  
+能盾智御 采用 **Apache License 2.0** 开源许可。
 完整条款见仓库根目录 [LICENSE](LICENSE) 文件。
 
 ---
@@ -637,7 +637,7 @@ CyberStrikeAI 采用 **Apache License 2.0** 开源许可。
 
 **本工具仅供教育和授权测试使用！**
 
-CyberStrikeAI 是一个专业的安全测试平台，旨在帮助安全研究人员、渗透测试人员和IT专业人员在**获得明确授权**的情况下进行安全评估和漏洞研究。
+能盾智御 是一个专业的安全测试平台，旨在帮助安全研究人员、渗透测试人员和IT专业人员在**获得明确授权**的情况下进行安全评估和漏洞研究。
 
 **使用本工具即表示您同意：**
 - 仅在您拥有明确书面授权的系统上使用此工具

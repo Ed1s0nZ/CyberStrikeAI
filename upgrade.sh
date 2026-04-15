@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# CyberStrikeAI GitHub one-click upgrade script (Release/Tag)
+# 能盾智御 GitHub one-click upgrade script (Release/Tag)
 #
 # Default preserves:
 # - config.yaml
@@ -418,4 +418,3 @@ main() {
 }
 
 main "$@"
-

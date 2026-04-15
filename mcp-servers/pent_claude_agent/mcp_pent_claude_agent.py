@@ -2,7 +2,7 @@
 """
 Pent Claude Agent MCP Server - 渗透测试工程师 MCP 服务
 
-通过 MCP 协议暴露 AI 渗透测试能力：CyberStrikeAI 可指挥 pent_claude_agent 执行渗透测试任务。
+通过 MCP 协议暴露 AI 渗透测试能力：能盾智御 可指挥 pent_claude_agent 执行渗透测试任务。
 pent_claude_agent 内部使用 Claude Agent SDK，可独立配置 MCP、工具等，作为独立的渗透测试工程师运行。
 
 依赖：pip install mcp claude-agent-sdk（或使用项目 venv）

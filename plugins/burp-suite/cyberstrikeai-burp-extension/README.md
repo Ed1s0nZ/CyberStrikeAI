@@ -1,4 +1,4 @@
-## CyberStrikeAI Burp Suite Extension
+## 能盾智御 Burp Suite Extension
 
 中文说明见：`README.zh-CN.md`
 
@@ -6,7 +6,7 @@
 
 - Configure **Host / Port / Password** and choose **Single-Agent** or **Multi-Agent**
 - Click **Validate** to login (`POST /api/auth/login`) and verify token (`GET /api/auth/validate`)
-- Right-click any HTTP message in Burp and send it to CyberStrikeAI for **streaming web pentest**
+- Right-click any HTTP message in Burp and send it to 能盾智御 for **streaming web pentest**
 - Keep a **test history sidebar** (searchable) so you can revisit previous runs
 - Output is split into **collapsible Progress** + **Final Response** (Markdown rendering supported)
 - View captured **Request / Response** for each run
@@ -63,6 +63,5 @@ If you already have Gradle available, you can still use `build.gradle` to build.
 
 ### Notes
 
-- This extension connects to your CyberStrikeAI server (default is `http://127.0.0.1:8080`).
+- This extension connects to your 能盾智御 server (default is `http://127.0.0.1:8080`).
 - It uses **Bearer Token** authentication obtained from the configured password.
-

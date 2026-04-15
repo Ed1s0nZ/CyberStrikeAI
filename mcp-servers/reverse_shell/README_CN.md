@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-通过**外部 MCP** 为 CyberStrikeAI 增加**反向 Shell** 能力：开启/停止 TCP 监听、与已连接目标交互执行命令，**无需修改后端代码**。
+通过**外部 MCP** 为 能盾智御 增加**反向 Shell** 能力：开启/停止 TCP 监听、与已连接目标交互执行命令，**无需修改后端代码**。
 
 ## 工具说明
 
@@ -19,7 +19,7 @@
 - Python 3.10+
 - 使用项目自带 venv 时已包含 `mcp`；单独运行需：`pip install mcp`
 
-## 在 CyberStrikeAI 中接入
+## 在 能盾智御 中接入
 
 1. **路径**  
    例如项目根为 `/path/to/CyberStrikeAI-main`，则脚本路径为：  
@@ -58,7 +58,7 @@
 ./venv/bin/python mcp-servers/reverse_shell/mcp_reverse_shell.py
 ```
 
-进程通过 stdio 与 MCP 客户端通信；CyberStrikeAI 以 stdio 方式启动该脚本时行为相同。
+进程通过 stdio 与 MCP 客户端通信；能盾智御 以 stdio 方式启动该脚本时行为相同。
 
 ## 安全提示
 
