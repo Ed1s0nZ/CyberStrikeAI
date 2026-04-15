@@ -304,6 +304,25 @@ func TestNormalizeWebPermissionsExpandsLegacyValues(t *testing.T) {
 	}
 }
 
+func TestNormalizeWebPermissionsIgnoresUnknownPermissions(t *testing.T) {
+	input := []string{
+		"system.config.read",
+		"unknown.permission",
+		" task.group.read ",
+		"also.unknown",
+	}
+
+	got := NormalizeWebPermissions(input)
+	want := []string{
+		"system.config_settings.read",
+		"task.group.read",
+	}
+
+	if !slices.Equal(got, want) {
+		t.Fatalf("NormalizeWebPermissions() = %#v, want %#v", got, want)
+	}
+}
+
 func TestIsCanonicalWebPermissionRejectsRetiredPermission(t *testing.T) {
 	if IsCanonicalWebPermission("system.super_admin") {
 		t.Fatal("expected retired legacy permission to be rejected")

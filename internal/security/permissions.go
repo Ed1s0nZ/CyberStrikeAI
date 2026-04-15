@@ -9,8 +9,8 @@ const (
 	PermissionSecurityRolesManageLegacy = "security.roles.manage"
 
 	// Backward-compatible aliases used by existing code paths.
-	PermissionSuperAdmin          = PermissionSuperAdminGrant
-	PermissionSystemConfigRead    = PermissionSystemConfigSettingsRead
+	PermissionSuperAdmin          = PermissionSuperAdminLegacy
+	PermissionSystemConfigRead    = PermissionSystemConfigReadLegacy
 	PermissionSystemConfigWrite   = PermissionSystemConfigWriteLegacy
 	PermissionSecurityUsersManage = PermissionSecurityUsersManageLegacy
 	PermissionSecurityRolesManage = PermissionSecurityRolesManageLegacy
@@ -153,26 +153,62 @@ var legacyPermissionMap = map[string][]string{
 	},
 }
 
+var canonicalToLegacyPermissionMap = buildCanonicalToLegacyPermissionMap()
+
 // HasPermission returns true when the required permission is present or the user has the super-admin grant.
 func HasPermission(permissionSet map[string]struct{}, required string) bool {
-	if _, ok := permissionSet[PermissionSuperAdminGrant]; ok {
+	if hasSuperAdminPermission(permissionSet) {
 		return true
+	}
+
+	required = normalizePermissionToken(required)
+	if required == "" {
+		return false
 	}
 
 	if _, ok := permissionSet[required]; ok {
 		return true
 	}
 
-	expanded := expandLegacyPermission(required)
-	if len(expanded) == 0 || (len(expanded) == 1 && expanded[0] == required) {
-		return false
+	if expandedLegacyRequired, ok := legacyPermissionMap[required]; ok {
+		return hasAllPermissions(permissionSet, expandedLegacyRequired)
 	}
 
-	for _, permission := range expanded {
+	for _, legacy := range canonicalToLegacyPermissionMap[required] {
+		if _, ok := permissionSet[legacy]; ok {
+			return true
+		}
+	}
+
+	return false
+}
+
+func hasSuperAdminPermission(permissionSet map[string]struct{}) bool {
+	if _, ok := permissionSet[PermissionSuperAdminLegacy]; ok {
+		return true
+	}
+	if _, ok := permissionSet[PermissionSuperAdminGrant]; ok {
+		return true
+	}
+	return false
+}
+
+func hasAllPermissions(permissionSet map[string]struct{}, permissions []string) bool {
+	for _, permission := range permissions {
 		if _, ok := permissionSet[permission]; !ok {
 			return false
 		}
 	}
-
 	return true
+}
+
+func buildCanonicalToLegacyPermissionMap() map[string][]string {
+	mapping := make(map[string][]string, len(canonicalWebPermissions))
+	for legacy, canonicalPermissions := range legacyPermissionMap {
+		for _, canonicalPermission := range canonicalPermissions {
+			mapping[canonicalPermission] = append(mapping[canonicalPermission], legacy)
+		}
+	}
+
+	return mapping
 }

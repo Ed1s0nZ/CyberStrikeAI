@@ -95,6 +95,8 @@ func IsCanonicalWebPermission(permission string) bool {
 	return ok
 }
 
+// NormalizeWebPermissions expands known legacy permissions and returns a sorted unique canonical list.
+// It intentionally drops unknown permission identifiers and must not be used as a validator.
 func NormalizeWebPermissions(input []string) []string {
 	normalized := make(map[string]struct{}, len(input))
 	for _, permission := range input {
