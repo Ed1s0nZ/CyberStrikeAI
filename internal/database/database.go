@@ -352,6 +352,62 @@ func (db *DB) initTables() error {
 		return fmt.Errorf("创建webshell_connection_states表失败: %w", err)
 	}
 
+	createWebUsersTable := `
+	CREATE TABLE IF NOT EXISTS web_users (
+		id TEXT PRIMARY KEY,
+		username TEXT NOT NULL UNIQUE,
+		display_name TEXT NOT NULL,
+		password_hash TEXT NOT NULL,
+		enabled INTEGER NOT NULL DEFAULT 1,
+		must_change_password INTEGER NOT NULL DEFAULT 0,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		last_login_at DATETIME
+	);`
+
+	createWebAccessRolesTable := `
+	CREATE TABLE IF NOT EXISTS web_access_roles (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL UNIQUE,
+		description TEXT NOT NULL DEFAULT '',
+		is_system INTEGER NOT NULL DEFAULT 0,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);`
+
+	createWebAccessRolePermissionsTable := `
+	CREATE TABLE IF NOT EXISTS web_access_role_permissions (
+		role_id TEXT NOT NULL,
+		permission TEXT NOT NULL,
+		PRIMARY KEY (role_id, permission),
+		FOREIGN KEY (role_id) REFERENCES web_access_roles(id) ON DELETE CASCADE
+	);`
+
+	createWebUserRoleBindingsTable := `
+	CREATE TABLE IF NOT EXISTS web_user_role_bindings (
+		user_id TEXT NOT NULL,
+		role_id TEXT NOT NULL,
+		PRIMARY KEY (user_id, role_id),
+		FOREIGN KEY (user_id) REFERENCES web_users(id) ON DELETE CASCADE,
+		FOREIGN KEY (role_id) REFERENCES web_access_roles(id) ON DELETE CASCADE
+	);`
+
+	if _, err := db.Exec(createWebUsersTable); err != nil {
+		return fmt.Errorf("创建web_users表失败: %w", err)
+	}
+
+	if _, err := db.Exec(createWebAccessRolesTable); err != nil {
+		return fmt.Errorf("创建web_access_roles表失败: %w", err)
+	}
+
+	if _, err := db.Exec(createWebAccessRolePermissionsTable); err != nil {
+		return fmt.Errorf("创建web_access_role_permissions表失败: %w", err)
+	}
+
+	if _, err := db.Exec(createWebUserRoleBindingsTable); err != nil {
+		return fmt.Errorf("创建web_user_role_bindings表失败: %w", err)
+	}
+
 	// 为已有表添加新字段（如果不存在）- 必须在创建索引之前
 	if err := db.migrateConversationsTable(); err != nil {
 		db.logger.Warn("迁移conversations表失败", zap.Error(err))

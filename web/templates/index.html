@@ -14,12 +14,16 @@
         <div class="login-card">
             <div class="login-brand">
                 <h2 data-i18n="login.title">登录 CyberStrikeAI</h2>
-                <p class="login-subtitle" data-i18n="login.subtitle">请输入配置中的访问密码</p>
+                <p class="login-subtitle" data-i18n="login.subtitle">请输入 Web 用户名和密码</p>
             </div>
             <form id="login-form" class="login-form">
                 <div class="form-group">
+                    <label for="login-username" data-i18n="login.usernameLabel">用户名</label>
+                    <input type="text" id="login-username" placeholder="输入用户名" required autocomplete="username" data-i18n="login.usernamePlaceholder" data-i18n-attr="placeholder" />
+                </div>
+                <div class="form-group">
                     <label for="login-password" data-i18n="login.passwordLabel">密码</label>
-                    <input type="password" id="login-password" placeholder="输入登录密码" required autocomplete="current-password" data-i18n="login.passwordPlaceholder" data-i18n-attr="placeholder" />
+                    <input type="password" id="login-password" placeholder="输入密码" required autocomplete="current-password" data-i18n="login.passwordPlaceholder" data-i18n-attr="placeholder" />
                 </div>
                 <div id="login-error" class="login-error" role="alert" style="display: none;"></div>
                 <button type="submit" class="btn-primary login-submit">
@@ -71,6 +75,9 @@
                                 </svg>
                             </button>
                             <div id="user-menu-dropdown" class="user-menu-dropdown" style="display: none;">
+                                <div class="user-menu-item user-menu-item--readonly">
+                                    <span id="current-auth-username">admin</span>
+                                </div>
                                 <div class="user-menu-item" onclick="logout()">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1687,28 +1694,69 @@
                             <div id="settings-section-security" class="settings-section-content">
                                 <div class="settings-section-header">
                                     <h3 data-i18n="settings.nav.security">安全设置</h3>
+                                    <p class="settings-description" data-i18n="settingsSecurity.accessBoundaryDesc">这里管理的是 Web 用户和 Web 访问角色，不会修改 AI Agent 角色页面里的角色定义。</p>
                                 </div>
-                                
-                                <div class="settings-subsection">
-                                    <h4 data-i18n="settingsSecurity.changePasswordTitle">修改密码</h4>
-                                    <p class="settings-description" data-i18n="settingsSecurity.changePasswordDesc">修改登录密码后，需要使用新密码重新登录。</p>
-                                    <div class="settings-form">
-                                        <div class="form-group">
-                                            <label for="auth-current-password" data-i18n="settingsSecurity.currentPassword">当前密码</label>
-                                            <input type="password" id="auth-current-password" data-i18n="settingsSecurity.currentPasswordPlaceholder" data-i18n-attr="placeholder" placeholder="输入当前登录密码" autocomplete="current-password" />
+
+                                <div class="settings-security-tabs">
+                                    <button class="settings-security-tab active" type="button" data-panel="account" onclick="switchSecurityPanel('account')" data-i18n="settingsSecurity.accountTab">账户</button>
+                                    <button class="settings-security-tab" type="button" data-panel="users" onclick="switchSecurityPanel('users')" data-i18n="settingsSecurity.usersTab">Web 用户</button>
+                                    <button class="settings-security-tab" type="button" data-panel="access-roles" onclick="switchSecurityPanel('access-roles')" data-i18n="settingsSecurity.rolesTab">Web 访问角色</button>
+                                </div>
+
+                                <div id="settings-security-panel-account" class="settings-security-panel active">
+                                    <div class="settings-subsection">
+                                        <h4 data-i18n="settingsSecurity.changePasswordTitle">修改密码</h4>
+                                        <p class="settings-description" data-i18n="settingsSecurity.changePasswordDesc">修改登录密码后，需要使用新密码重新登录。</p>
+                                        <div class="settings-form">
+                                            <div class="form-group">
+                                                <label for="auth-current-password" data-i18n="settingsSecurity.currentPassword">当前密码</label>
+                                                <input type="password" id="auth-current-password" data-i18n="settingsSecurity.currentPasswordPlaceholder" data-i18n-attr="placeholder" placeholder="输入当前登录密码" autocomplete="current-password" />
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="auth-new-password" data-i18n="settingsSecurity.newPassword">新密码</label>
+                                                <input type="password" id="auth-new-password" data-i18n="settingsSecurity.newPasswordPlaceholder" data-i18n-attr="placeholder" placeholder="设置新密码（至少 8 位）" autocomplete="new-password" />
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="auth-confirm-password" data-i18n="settingsSecurity.confirmPassword">确认新密码</label>
+                                                <input type="password" id="auth-confirm-password" data-i18n="settingsSecurity.confirmPasswordPlaceholder" data-i18n-attr="placeholder" placeholder="再次输入新密码" autocomplete="new-password" />
+                                            </div>
+                                            <div class="form-actions">
+                                                <button class="btn-secondary" type="button" onclick="resetPasswordForm()" data-i18n="settingsSecurity.clear">清空</button>
+                                                <button class="btn-primary change-password-submit" type="button" onclick="changePassword()" data-i18n="settingsSecurity.changePasswordBtn">修改密码</button>
+                                            </div>
                                         </div>
-                                        <div class="form-group">
-                                            <label for="auth-new-password" data-i18n="settingsSecurity.newPassword">新密码</label>
-                                            <input type="password" id="auth-new-password" data-i18n="settingsSecurity.newPasswordPlaceholder" data-i18n-attr="placeholder" placeholder="设置新密码（至少 8 位）" autocomplete="new-password" />
+                                    </div>
+                                </div>
+
+                                <div id="settings-security-panel-users" class="settings-security-panel">
+                                    <div class="settings-subsection">
+                                        <div class="settings-inline-header">
+                                            <div>
+                                                <h4 data-i18n="settingsSecurity.usersTitle">Web 用户</h4>
+                                                <p class="settings-description" data-i18n="settingsSecurity.usersDesc">管理可登录控制台的操作员账户，支持启用、禁用、重置密码和角色分配。</p>
+                                            </div>
+                                            <div class="settings-actions settings-actions-inline">
+                                                <button class="btn-primary" type="button" onclick="openWebUserModal()" data-i18n="settingsSecurity.createUserBtn">新建 Web 用户</button>
+                                            </div>
                                         </div>
-                                        <div class="form-group">
-                                            <label for="auth-confirm-password" data-i18n="settingsSecurity.confirmPassword">确认新密码</label>
-                                            <input type="password" id="auth-confirm-password" data-i18n="settingsSecurity.confirmPasswordPlaceholder" data-i18n-attr="placeholder" placeholder="再次输入新密码" autocomplete="new-password" />
+                                        <div id="web-users-feedback" class="settings-feedback" style="display: none;"></div>
+                                        <div id="web-users-list" class="security-card-list"></div>
+                                    </div>
+                                </div>
+
+                                <div id="settings-security-panel-access-roles" class="settings-security-panel">
+                                    <div class="settings-subsection">
+                                        <div class="settings-inline-header">
+                                            <div>
+                                                <h4 data-i18n="settingsSecurity.rolesTitle">Web 访问角色</h4>
+                                                <p class="settings-description" data-i18n="settingsSecurity.rolesDesc">这里的角色只用于 Web 控制台 RBAC，不会影响 AI Agent 角色目录。</p>
+                                            </div>
+                                            <div class="settings-actions settings-actions-inline">
+                                                <button class="btn-primary" type="button" onclick="openWebAccessRoleModal()" data-i18n="settingsSecurity.createRoleBtn">新建 Web 访问角色</button>
+                                            </div>
                                         </div>
-                                        <div class="form-actions">
-                                            <button class="btn-secondary" type="button" onclick="resetPasswordForm()" data-i18n="settingsSecurity.clear">清空</button>
-                                            <button class="btn-primary change-password-submit" type="button" onclick="changePassword()" data-i18n="settingsSecurity.changePasswordBtn">修改密码</button>
-                                        </div>
+                                        <div id="web-access-roles-feedback" class="settings-feedback" style="display: none;"></div>
+                                        <div id="web-access-roles-list" class="security-card-list"></div>
                                     </div>
                                 </div>
                             </div>
@@ -2545,6 +2593,118 @@ version: 1.0.0<br>
         </div>
     </div>
 
+    <div id="web-user-modal" class="modal" style="display: none;" onclick="if (event.target === this) closeWebUserModal()">
+        <div class="modal-content" style="max-width: 680px;">
+            <div class="modal-header">
+                <h2 id="web-user-modal-title" data-i18n="settingsSecurity.createUserTitle">新建 Web 用户</h2>
+                <span class="modal-close" onclick="closeWebUserModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="web-user-modal-feedback" class="settings-feedback" style="display: none;"></div>
+                <div class="form-group">
+                    <label for="web-user-username"><span data-i18n="settingsSecurity.usernameLabel">用户名</span> <span style="color: red;">*</span></label>
+                    <input type="text" id="web-user-username" data-i18n="settingsSecurity.usernamePlaceholder" data-i18n-attr="placeholder" placeholder="输入 Web 用户名" autocomplete="username" />
+                </div>
+                <div class="form-group">
+                    <label for="web-user-display-name"><span data-i18n="settingsSecurity.displayNameLabel">显示名称</span> <span style="color: red;">*</span></label>
+                    <input type="text" id="web-user-display-name" data-i18n="settingsSecurity.displayNamePlaceholder" data-i18n-attr="placeholder" placeholder="输入显示名称" />
+                </div>
+                <div id="web-user-password-group" class="form-group">
+                    <label for="web-user-password"><span data-i18n="settingsSecurity.initialPasswordLabel">初始密码</span> <span style="color: red;">*</span></label>
+                    <input type="password" id="web-user-password" data-i18n="settingsSecurity.initialPasswordPlaceholder" data-i18n-attr="placeholder" placeholder="设置初始密码（至少 8 位）" autocomplete="new-password" />
+                    <small class="form-hint" data-i18n="settingsSecurity.initialPasswordHint">创建后该用户首次登录需要修改密码。</small>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="web-user-enabled" class="modern-checkbox" checked />
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-text" data-i18n="settingsSecurity.enableUserCheckbox">启用该 Web 用户</span>
+                    </label>
+                    <small id="web-user-enabled-hint" class="form-hint" data-i18n="settingsSecurity.userEnabledCreateHint">新建用户默认启用，如需禁用请创建后再编辑。</small>
+                </div>
+                <div class="form-group">
+                    <label><span data-i18n="settingsSecurity.assignRolesLabel">分配 Web 访问角色</span> <span style="color: red;">*</span></label>
+                    <div id="web-user-role-options" class="security-option-list"></div>
+                    <small class="form-hint" data-i18n="settingsSecurity.roleSelectionHint">至少选择一个角色。</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" type="button" onclick="closeWebUserModal()" data-i18n="common.cancel">取消</button>
+                <button class="btn-primary" type="button" onclick="saveWebUserModal()" data-i18n="common.save">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="web-user-password-modal" class="modal" style="display: none;" onclick="if (event.target === this) closeWebUserPasswordModal()">
+        <div class="modal-content" style="max-width: 560px;">
+            <div class="modal-header">
+                <h2 id="web-user-password-modal-title" data-i18n="settingsSecurity.resetPasswordTitle">重置 Web 用户密码</h2>
+                <span class="modal-close" onclick="closeWebUserPasswordModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p class="settings-description" data-i18n="settingsSecurity.resetPasswordDesc">重置后该用户需要使用新密码重新登录，旧会话会立即失效。</p>
+                <div id="web-user-password-modal-feedback" class="settings-feedback" style="display: none;"></div>
+                <div class="form-group">
+                    <label for="web-user-reset-password"><span data-i18n="settingsSecurity.newPasswordLabel">新密码</span> <span style="color: red;">*</span></label>
+                    <input type="password" id="web-user-reset-password" data-i18n="settingsSecurity.newPasswordPlaceholder" data-i18n-attr="placeholder" placeholder="设置新密码（至少 8 位）" autocomplete="new-password" />
+                </div>
+                <div class="form-group">
+                    <label for="web-user-reset-password-confirm"><span data-i18n="settingsSecurity.confirmPasswordLabel">确认新密码</span> <span style="color: red;">*</span></label>
+                    <input type="password" id="web-user-reset-password-confirm" data-i18n="settingsSecurity.confirmPasswordPlaceholder" data-i18n-attr="placeholder" placeholder="再次输入新密码" autocomplete="new-password" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" type="button" onclick="closeWebUserPasswordModal()" data-i18n="common.cancel">取消</button>
+                <button class="btn-primary" type="button" onclick="submitWebUserPasswordReset()" data-i18n="settingsSecurity.resetPasswordBtn">重置密码</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="web-access-role-modal" class="modal" style="display: none;" onclick="if (event.target === this) closeWebAccessRoleModal()">
+        <div class="modal-content" style="max-width: 720px;">
+            <div class="modal-header">
+                <h2 id="web-access-role-modal-title" data-i18n="settingsSecurity.createRoleTitle">新建 Web 访问角色</h2>
+                <span class="modal-close" onclick="closeWebAccessRoleModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="web-access-role-modal-feedback" class="settings-feedback" style="display: none;"></div>
+                <div class="form-group">
+                    <label for="web-access-role-name"><span data-i18n="settingsSecurity.roleNameLabel">角色名称</span> <span style="color: red;">*</span></label>
+                    <input type="text" id="web-access-role-name" data-i18n="settingsSecurity.roleNamePlaceholder" data-i18n-attr="placeholder" placeholder="输入 Web 访问角色名称" />
+                </div>
+                <div class="form-group">
+                    <label for="web-access-role-description" data-i18n="settingsSecurity.roleDescriptionLabel">角色描述</label>
+                    <textarea id="web-access-role-description" rows="3" data-i18n="settingsSecurity.roleDescriptionPlaceholder" data-i18n-attr="placeholder" placeholder="输入角色描述"></textarea>
+                </div>
+                <div class="form-group">
+                    <label><span data-i18n="settingsSecurity.assignPermissionsLabel">分配权限</span> <span style="color: red;">*</span></label>
+                    <div id="web-access-role-permission-options" class="security-option-list"></div>
+                    <small class="form-hint" data-i18n="settingsSecurity.permissionSelectionHint">至少选择一个权限。</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" type="button" onclick="closeWebAccessRoleModal()" data-i18n="common.cancel">取消</button>
+                <button class="btn-primary" type="button" onclick="saveWebAccessRoleModal()" data-i18n="common.save">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="security-confirm-modal" class="modal" style="display: none;" onclick="if (event.target === this) closeSecurityConfirmModal()">
+        <div class="modal-content" style="max-width: 520px;">
+            <div class="modal-header">
+                <h2 id="security-confirm-title" data-i18n="settingsSecurity.confirmDialogTitle">确认操作</h2>
+                <span class="modal-close" onclick="closeSecurityConfirmModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p id="security-confirm-message" class="settings-description">请确认要继续执行该操作。</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" type="button" onclick="closeSecurityConfirmModal()" data-i18n="common.cancel">取消</button>
+                <button id="security-confirm-submit" class="btn-primary" type="button" onclick="confirmSecurityAction()" data-i18n="common.confirm">确认</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 角色编辑模态框 -->
     <div id="role-modal" class="modal">
         <div class="modal-content" style="max-width: 900px;">
@@ -2658,6 +2818,7 @@ version: 1.0.0<br>
     <script src="/static/js/monitor.js"></script>
     <script src="/static/js/chat.js"></script>
     <script src="/static/js/settings.js"></script>
+    <script src="/static/js/web-users.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm@4.19.0/lib/xterm.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.5.0/lib/xterm-addon-fit.js"></script>
     <script src="/static/js/terminal.js"></script>
@@ -2670,4 +2831,3 @@ version: 1.0.0<br>
     <script src="/static/js/roles.js"></script>
 </body>
 </html>
-

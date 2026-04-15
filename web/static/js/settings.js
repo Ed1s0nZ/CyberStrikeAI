@@ -46,6 +46,9 @@ function switchSettingsSection(section) {
     if (activeContent) {
         activeContent.classList.add('active');
     }
+    if (section === 'security' && typeof switchSecurityPanel === 'function') {
+        switchSecurityPanel('account');
+    }
     if (section === 'terminal' && typeof initTerminal === 'function') {
         setTimeout(initTerminal, 0);
     }
@@ -63,6 +66,9 @@ async function openSettings() {
     
     // 每次打开时重新加载最新配置（系统设置页面不需要加载工具列表）
     await loadConfig(false);
+    if (typeof refreshSecurityManagement === 'function') {
+        await refreshSecurityManagement({ silent: true });
+    }
     
     // 清除之前的验证错误状态
     document.querySelectorAll('.form-group input').forEach(input => {
@@ -1199,7 +1205,6 @@ async function changePassword() {
         alert(pwdMsg);
         resetPasswordForm();
         handleUnauthorized({ message: pwdMsg, silent: false });
-        closeSettings();
     } catch (error) {
         console.error('修改密码失败:', error);
         alert((typeof window.t === 'function' ? window.t('settings.security.changePasswordFailed') : '修改密码失败') + ': ' + error.message);

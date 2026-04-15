@@ -265,8 +265,12 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 				},
 				"LoginRequest": map[string]interface{}{
 					"type":     "object",
-					"required": []string{"password"},
+					"required": []string{"username", "password"},
 					"properties": map[string]interface{}{
+						"username": map[string]interface{}{
+							"type":        "string",
+							"description": "Web 用户名",
+						},
 						"password": map[string]interface{}{
 							"type":        "string",
 							"description": "登录密码",
@@ -280,10 +284,18 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 							"type":        "string",
 							"description": "认证Token",
 						},
+						"username": map[string]interface{}{
+							"type":        "string",
+							"description": "当前登录的 Web 用户名",
+						},
 						"expires_at": map[string]interface{}{
 							"type":        "string",
 							"format":      "date-time",
 							"description": "Token过期时间",
+						},
+						"must_change_password": map[string]interface{}{
+							"type":        "boolean",
+							"description": "是否需要在下次登录后修改密码",
 						},
 						"session_duration_hr": map[string]interface{}{
 							"type":        "integer",
@@ -302,6 +314,167 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"newPassword": map[string]interface{}{
 							"type":        "string",
 							"description": "新密码（至少8位）",
+						},
+					},
+				},
+				"CreateWebUserRequest": map[string]interface{}{
+					"type":     "object",
+					"required": []string{"username", "displayName", "password", "roleIds"},
+					"properties": map[string]interface{}{
+						"username": map[string]interface{}{
+							"type":        "string",
+							"description": "Web 用户名",
+						},
+						"displayName": map[string]interface{}{
+							"type":        "string",
+							"description": "显示名称",
+						},
+						"password": map[string]interface{}{
+							"type":        "string",
+							"description": "初始密码（至少 8 位）",
+						},
+						"roleIds": map[string]interface{}{
+							"type":        "array",
+							"description": "分配的 Web 访问角色 ID 列表",
+							"items": map[string]interface{}{
+								"type": "string",
+							},
+						},
+					},
+				},
+				"UpdateWebUserRequest": map[string]interface{}{
+					"type":     "object",
+					"required": []string{"username", "displayName", "enabled", "roleIds"},
+					"properties": map[string]interface{}{
+						"username": map[string]interface{}{
+							"type":        "string",
+							"description": "Web 用户名",
+						},
+						"displayName": map[string]interface{}{
+							"type":        "string",
+							"description": "显示名称",
+						},
+						"enabled": map[string]interface{}{
+							"type":        "boolean",
+							"description": "是否启用该 Web 用户",
+						},
+						"roleIds": map[string]interface{}{
+							"type":        "array",
+							"description": "分配的 Web 访问角色 ID 列表",
+							"items": map[string]interface{}{
+								"type": "string",
+							},
+						},
+					},
+				},
+				"ResetWebUserPasswordRequest": map[string]interface{}{
+					"type":     "object",
+					"required": []string{"password"},
+					"properties": map[string]interface{}{
+						"password": map[string]interface{}{
+							"type":        "string",
+							"description": "新的密码（至少 8 位）",
+						},
+					},
+				},
+				"WebUser": map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"id": map[string]interface{}{
+							"type":        "string",
+							"description": "Web 用户 ID",
+						},
+						"username": map[string]interface{}{
+							"type":        "string",
+							"description": "Web 用户名",
+						},
+						"displayName": map[string]interface{}{
+							"type":        "string",
+							"description": "显示名称",
+						},
+						"enabled": map[string]interface{}{
+							"type":        "boolean",
+							"description": "是否启用",
+						},
+						"mustChangePassword": map[string]interface{}{
+							"type":        "boolean",
+							"description": "下次登录是否必须修改密码",
+						},
+						"roleIds": map[string]interface{}{
+							"type":        "array",
+							"description": "角色 ID 列表",
+							"items": map[string]interface{}{
+								"type": "string",
+							},
+						},
+						"roleNames": map[string]interface{}{
+							"type":        "array",
+							"description": "角色名称列表",
+							"items": map[string]interface{}{
+								"type": "string",
+							},
+						},
+						"permissions": map[string]interface{}{
+							"type":        "array",
+							"description": "生效权限列表",
+							"items": map[string]interface{}{
+								"type": "string",
+							},
+						},
+						"lastLoginAt": map[string]interface{}{
+							"type":        "string",
+							"format":      "date-time",
+							"description": "最近登录时间",
+							"nullable":    true,
+						},
+					},
+				},
+				"WebAccessRoleRequest": map[string]interface{}{
+					"type":     "object",
+					"required": []string{"name", "permissions"},
+					"properties": map[string]interface{}{
+						"name": map[string]interface{}{
+							"type":        "string",
+							"description": "Web 访问角色名称",
+						},
+						"description": map[string]interface{}{
+							"type":        "string",
+							"description": "角色描述",
+						},
+						"permissions": map[string]interface{}{
+							"type":        "array",
+							"description": "权限标识列表",
+							"items": map[string]interface{}{
+								"type": "string",
+							},
+						},
+					},
+				},
+				"WebAccessRole": map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"id": map[string]interface{}{
+							"type":        "string",
+							"description": "Web 访问角色 ID",
+						},
+						"name": map[string]interface{}{
+							"type":        "string",
+							"description": "Web 访问角色名称",
+						},
+						"description": map[string]interface{}{
+							"type":        "string",
+							"description": "角色描述",
+						},
+						"isSystem": map[string]interface{}{
+							"type":        "boolean",
+							"description": "是否为系统内置角色",
+						},
+						"permissions": map[string]interface{}{
+							"type":        "array",
+							"description": "权限标识列表",
+							"items": map[string]interface{}{
+								"type": "string",
+							},
 						},
 					},
 				},
@@ -945,7 +1118,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 				"post": map[string]interface{}{
 					"tags":        []string{"认证"},
 					"summary":     "用户登录",
-					"description": "使用密码登录获取认证Token",
+					"description": "使用 Web 用户名和密码登录获取认证 Token",
 					"operationId": "login",
 					"security":    []map[string]interface{}{},
 					"requestBody": map[string]interface{}{
@@ -970,7 +1143,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 							},
 						},
 						"401": map[string]interface{}{
-							"description": "密码错误",
+							"description": "用户名或密码错误",
 						},
 					},
 				},
@@ -1064,10 +1237,18 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 												"type":        "string",
 												"description": "Token",
 											},
+											"username": map[string]interface{}{
+												"type":        "string",
+												"description": "当前登录的 Web 用户名",
+											},
 											"expires_at": map[string]interface{}{
 												"type":        "string",
 												"format":      "date-time",
 												"description": "过期时间",
+											},
+											"must_change_password": map[string]interface{}{
+												"type":        "boolean",
+												"description": "下次登录是否必须修改密码",
 											},
 										},
 									},
@@ -1540,9 +1721,9 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 								"schema": map[string]interface{}{
 									"type": "object",
 									"properties": map[string]interface{}{
-										"message":            map[string]interface{}{"type": "string"},
-										"conversationId":     map[string]interface{}{"type": "string"},
-										"role":               map[string]interface{}{"type": "string"},
+										"message":              map[string]interface{}{"type": "string"},
+										"conversationId":       map[string]interface{}{"type": "string"},
+										"role":                 map[string]interface{}{"type": "string"},
 										"webshellConnectionId": map[string]interface{}{"type": "string"},
 									},
 									"required": []string{"message"},
@@ -3382,6 +3563,262 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"401": map[string]interface{}{
 							"description": "未授权",
 						},
+					},
+				},
+			},
+			"/api/security/web-users": map[string]interface{}{
+				"get": map[string]interface{}{
+					"tags":        []string{"安全设置"},
+					"summary":     "列出 Web 用户",
+					"description": "获取全部 Web 用户及其生效角色与权限，不影响 AI Agent roles。",
+					"operationId": "listWebUsers",
+					"responses": map[string]interface{}{
+						"200": map[string]interface{}{
+							"description": "获取成功",
+							"content": map[string]interface{}{
+								"application/json": map[string]interface{}{
+									"schema": map[string]interface{}{
+										"type": "object",
+										"properties": map[string]interface{}{
+											"users": map[string]interface{}{
+												"type":  "array",
+												"items": map[string]interface{}{"$ref": "#/components/schemas/WebUser"},
+											},
+										},
+									},
+								},
+							},
+						},
+						"401": map[string]interface{}{"description": "未授权"},
+						"403": map[string]interface{}{"description": "权限不足"},
+					},
+				},
+				"post": map[string]interface{}{
+					"tags":        []string{"安全设置"},
+					"summary":     "创建 Web 用户",
+					"description": "创建新的控制台 Web 用户，并分配一个或多个 Web 访问角色。",
+					"operationId": "createWebUser",
+					"requestBody": map[string]interface{}{
+						"required": true,
+						"content": map[string]interface{}{
+							"application/json": map[string]interface{}{
+								"schema": map[string]interface{}{
+									"$ref": "#/components/schemas/CreateWebUserRequest",
+								},
+							},
+						},
+					},
+					"responses": map[string]interface{}{
+						"201": map[string]interface{}{"description": "创建成功"},
+						"400": map[string]interface{}{"description": "请求参数错误"},
+						"401": map[string]interface{}{"description": "未授权"},
+						"403": map[string]interface{}{"description": "权限不足"},
+					},
+				},
+			},
+			"/api/security/web-users/{id}": map[string]interface{}{
+				"put": map[string]interface{}{
+					"tags":        []string{"安全设置"},
+					"summary":     "更新 Web 用户",
+					"description": "更新 Web 用户基础信息、启用状态和角色分配；若权限变更生效，原有会话会失效。",
+					"operationId": "updateWebUser",
+					"parameters": []map[string]interface{}{
+						{
+							"name":        "id",
+							"in":          "path",
+							"required":    true,
+							"description": "Web 用户 ID",
+							"schema": map[string]interface{}{
+								"type": "string",
+							},
+						},
+					},
+					"requestBody": map[string]interface{}{
+						"required": true,
+						"content": map[string]interface{}{
+							"application/json": map[string]interface{}{
+								"schema": map[string]interface{}{
+									"$ref": "#/components/schemas/UpdateWebUserRequest",
+								},
+							},
+						},
+					},
+					"responses": map[string]interface{}{
+						"200": map[string]interface{}{"description": "更新成功"},
+						"400": map[string]interface{}{"description": "请求参数错误"},
+						"401": map[string]interface{}{"description": "未授权"},
+						"403": map[string]interface{}{"description": "权限不足"},
+						"404": map[string]interface{}{"description": "Web 用户不存在"},
+					},
+				},
+				"delete": map[string]interface{}{
+					"tags":        []string{"安全设置"},
+					"summary":     "删除 Web 用户",
+					"description": "删除指定 Web 用户；最后一个启用的 super-admin 不允许删除。",
+					"operationId": "deleteWebUser",
+					"parameters": []map[string]interface{}{
+						{
+							"name":        "id",
+							"in":          "path",
+							"required":    true,
+							"description": "Web 用户 ID",
+							"schema": map[string]interface{}{
+								"type": "string",
+							},
+						},
+					},
+					"responses": map[string]interface{}{
+						"200": map[string]interface{}{"description": "删除成功"},
+						"400": map[string]interface{}{"description": "请求参数错误或触发最后 super-admin 保护"},
+						"401": map[string]interface{}{"description": "未授权"},
+						"403": map[string]interface{}{"description": "权限不足"},
+						"404": map[string]interface{}{"description": "Web 用户不存在"},
+					},
+				},
+			},
+			"/api/security/web-users/{id}/reset-password": map[string]interface{}{
+				"post": map[string]interface{}{
+					"tags":        []string{"安全设置"},
+					"summary":     "重置 Web 用户密码",
+					"description": "重置指定 Web 用户密码，并吊销该用户已有会话。",
+					"operationId": "resetWebUserPassword",
+					"parameters": []map[string]interface{}{
+						{
+							"name":        "id",
+							"in":          "path",
+							"required":    true,
+							"description": "Web 用户 ID",
+							"schema": map[string]interface{}{
+								"type": "string",
+							},
+						},
+					},
+					"requestBody": map[string]interface{}{
+						"required": true,
+						"content": map[string]interface{}{
+							"application/json": map[string]interface{}{
+								"schema": map[string]interface{}{
+									"$ref": "#/components/schemas/ResetWebUserPasswordRequest",
+								},
+							},
+						},
+					},
+					"responses": map[string]interface{}{
+						"200": map[string]interface{}{"description": "重置成功"},
+						"400": map[string]interface{}{"description": "请求参数错误"},
+						"401": map[string]interface{}{"description": "未授权"},
+						"403": map[string]interface{}{"description": "权限不足"},
+						"404": map[string]interface{}{"description": "Web 用户不存在"},
+					},
+				},
+			},
+			"/api/security/web-access-roles": map[string]interface{}{
+				"get": map[string]interface{}{
+					"tags":        []string{"安全设置"},
+					"summary":     "列出 Web 访问角色",
+					"description": "获取全部 Web 访问角色及其权限，不影响 AI Agent roles。",
+					"operationId": "listWebAccessRoles",
+					"responses": map[string]interface{}{
+						"200": map[string]interface{}{
+							"description": "获取成功",
+							"content": map[string]interface{}{
+								"application/json": map[string]interface{}{
+									"schema": map[string]interface{}{
+										"type": "object",
+										"properties": map[string]interface{}{
+											"roles": map[string]interface{}{
+												"type":  "array",
+												"items": map[string]interface{}{"$ref": "#/components/schemas/WebAccessRole"},
+											},
+										},
+									},
+								},
+							},
+						},
+						"401": map[string]interface{}{"description": "未授权"},
+						"403": map[string]interface{}{"description": "权限不足"},
+					},
+				},
+				"post": map[string]interface{}{
+					"tags":        []string{"安全设置"},
+					"summary":     "创建 Web 访问角色",
+					"description": "创建新的 Web 控制台 RBAC 角色及权限集合。",
+					"operationId": "createWebAccessRole",
+					"requestBody": map[string]interface{}{
+						"required": true,
+						"content": map[string]interface{}{
+							"application/json": map[string]interface{}{
+								"schema": map[string]interface{}{
+									"$ref": "#/components/schemas/WebAccessRoleRequest",
+								},
+							},
+						},
+					},
+					"responses": map[string]interface{}{
+						"201": map[string]interface{}{"description": "创建成功"},
+						"400": map[string]interface{}{"description": "请求参数错误"},
+						"401": map[string]interface{}{"description": "未授权"},
+						"403": map[string]interface{}{"description": "权限不足"},
+					},
+				},
+			},
+			"/api/security/web-access-roles/{id}": map[string]interface{}{
+				"put": map[string]interface{}{
+					"tags":        []string{"安全设置"},
+					"summary":     "更新 Web 访问角色",
+					"description": "更新 Web 访问角色名称、描述和权限；系统内置角色不允许修改。",
+					"operationId": "updateWebAccessRole",
+					"parameters": []map[string]interface{}{
+						{
+							"name":        "id",
+							"in":          "path",
+							"required":    true,
+							"description": "Web 访问角色 ID",
+							"schema": map[string]interface{}{
+								"type": "string",
+							},
+						},
+					},
+					"requestBody": map[string]interface{}{
+						"required": true,
+						"content": map[string]interface{}{
+							"application/json": map[string]interface{}{
+								"schema": map[string]interface{}{
+									"$ref": "#/components/schemas/WebAccessRoleRequest",
+								},
+							},
+						},
+					},
+					"responses": map[string]interface{}{
+						"200": map[string]interface{}{"description": "更新成功"},
+						"400": map[string]interface{}{"description": "请求参数错误或系统内置角色不可修改"},
+						"401": map[string]interface{}{"description": "未授权"},
+						"403": map[string]interface{}{"description": "权限不足"},
+						"404": map[string]interface{}{"description": "Web 访问角色不存在"},
+					},
+				},
+				"delete": map[string]interface{}{
+					"tags":        []string{"安全设置"},
+					"summary":     "删除 Web 访问角色",
+					"description": "删除指定 Web 访问角色；系统内置角色不允许删除。",
+					"operationId": "deleteWebAccessRole",
+					"parameters": []map[string]interface{}{
+						{
+							"name":        "id",
+							"in":          "path",
+							"required":    true,
+							"description": "Web 访问角色 ID",
+							"schema": map[string]interface{}{
+								"type": "string",
+							},
+						},
+					},
+					"responses": map[string]interface{}{
+						"200": map[string]interface{}{"description": "删除成功"},
+						"400": map[string]interface{}{"description": "请求参数错误或系统内置角色不可删除"},
+						"401": map[string]interface{}{"description": "未授权"},
+						"403": map[string]interface{}{"description": "权限不足"},
+						"404": map[string]interface{}{"description": "Web 访问角色不存在"},
 					},
 				},
 			},

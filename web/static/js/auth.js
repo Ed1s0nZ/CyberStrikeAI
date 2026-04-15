@@ -1,6 +1,7 @@
 const AUTH_STORAGE_KEY = 'cyberstrike-auth';
 let authToken = null;
 let authTokenExpiry = null;
+let currentAuthUsername = null;
 let authPromise = null;
 let authPromiseResolvers = [];
 let isAppInitialized = false;
@@ -9,14 +10,24 @@ function isTokenValid() {
     return !!authToken && authTokenExpiry instanceof Date && authTokenExpiry.getTime() > Date.now();
 }
 
-function saveAuth(token, expiresAt) {
+function updateAuthUsernameLabel() {
+    const usernameLabel = document.getElementById('current-auth-username');
+    if (usernameLabel) {
+        usernameLabel.textContent = currentAuthUsername || '';
+    }
+}
+
+function saveAuth(token, expiresAt, username = null) {
     const expiry = expiresAt instanceof Date ? expiresAt : new Date(expiresAt);
     authToken = token;
     authTokenExpiry = expiry;
+    currentAuthUsername = username || null;
+    updateAuthUsernameLabel();
     try {
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
             token,
             expiresAt: expiry.toISOString(),
+            username: currentAuthUsername,
         }));
     } catch (error) {
         console.warn('无法持久化认证信息:', error);
@@ -26,6 +37,8 @@ function saveAuth(token, expiresAt) {
 function clearAuthStorage() {
     authToken = null;
     authTokenExpiry = null;
+    currentAuthUsername = null;
+    updateAuthUsernameLabel();
     try {
         localStorage.removeItem(AUTH_STORAGE_KEY);
     } catch (error) {
@@ -51,6 +64,8 @@ function loadAuthFromStorage() {
         }
         authToken = stored.token;
         authTokenExpiry = expiry;
+        currentAuthUsername = stored.username || null;
+        updateAuthUsernameLabel();
         return isTokenValid();
     } catch (error) {
         console.error('读取认证信息失败:', error);
@@ -68,6 +83,7 @@ function resolveAuthPromises(success) {
 function showLoginOverlay(message = '') {
     const overlay = document.getElementById('login-overlay');
     const errorBox = document.getElementById('login-error');
+    const usernameInput = document.getElementById('login-username');
     const passwordInput = document.getElementById('login-password');
     if (!overlay) {
         return;
@@ -83,7 +99,9 @@ function showLoginOverlay(message = '') {
         }
     }
     setTimeout(() => {
-        if (passwordInput) {
+        if (usernameInput && !usernameInput.value.trim()) {
+            usernameInput.focus();
+        } else if (passwordInput) {
             passwordInput.focus();
         }
     }, 100);
@@ -213,20 +231,22 @@ async function apiUploadWithProgress(url, formData, options = {}) {
 
 async function submitLogin(event) {
     event.preventDefault();
+    const usernameInput = document.getElementById('login-username');
     const passwordInput = document.getElementById('login-password');
     const errorBox = document.getElementById('login-error');
     const submitBtn = document.querySelector('.login-submit');
 
-    if (!passwordInput) {
+    if (!usernameInput || !passwordInput) {
         return;
     }
 
+    const username = usernameInput.value.trim();
     const password = passwordInput.value.trim();
-    if (!password) {
+    if (!username || !password) {
         if (errorBox) {
             const msgEmpty = (typeof window !== 'undefined' && typeof window.t === 'function')
-                ? window.t('auth.enterPassword')
-                : '请输入密码';
+                ? window.t('auth.enterUsernamePassword')
+                : '请输入用户名和密码';
             errorBox.textContent = msgEmpty;
             errorBox.style.display = 'block';
         }
@@ -243,21 +263,21 @@ async function submitLogin(event) {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ password }),
+            body: JSON.stringify({ username, password }),
         });
         const result = await response.json().catch(() => ({}));
         if (!response.ok || !result.token) {
             if (errorBox) {
                 const fallback = (typeof window !== 'undefined' && typeof window.t === 'function')
                     ? window.t('auth.loginFailedCheck')
-                    : '登录失败，请检查密码';
+                    : '登录失败，请检查用户名和密码';
                 errorBox.textContent = result.error || fallback;
                 errorBox.style.display = 'block';
             }
             return;
         }
 
-        saveAuth(result.token, result.expires_at);
+        saveAuth(result.token, result.expires_at, result.username || username);
         hideLoginOverlay();
         resolveAuthPromises(true);
         if (!isAppInitialized) {
@@ -390,6 +410,8 @@ async function initializeApp() {
                 method: 'GET',
             });
             if (response.ok) {
+                const result = await response.json().catch(() => ({}));
+                saveAuth(authToken, result.expires_at || authTokenExpiry, result.username || currentAuthUsername);
                 hideLoginOverlay();
                 resolveAuthPromises(true);
                 await bootstrapApp();

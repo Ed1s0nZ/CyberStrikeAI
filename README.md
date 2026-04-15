@@ -110,7 +110,7 @@ CyberStrikeAI is an **AI-native security testing platform** built in Go. It inte
 - 🧰 100+ prebuilt tool recipes + YAML-based extension system
 - 📄 Large-result pagination, compression, and searchable archives
 - 🔗 Attack-chain graph, risk scoring, and step-by-step replay
-- 🔒 Password-protected web UI, audit logs, and SQLite persistence
+- 🔒 Web-user login with RBAC authorization, audit logs, and SQLite persistence
 - 📚 Knowledge base with vector search and hybrid retrieval for security expertise
 - 📁 Conversation grouping with pinning, rename, and batch management
 - 🛡️ Vulnerability management with CRUD operations, severity tracking, status workflow, and statistics
@@ -184,6 +184,8 @@ The `run.sh` script will automatically:
      ```
    - Or edit `config.yaml` directly before launching
 2. **Login** - Use the auto-generated password shown in the console (or set `auth.password` in `config.yaml`)
+   - On first startup with no Web users in SQLite, the system bootstraps an `admin` Web user from `auth.password`
+   - After that, control-plane login uses durable Web users stored in SQLite instead of a shared password only
 3. **Install security tools (optional)** - Install tools as needed:
    ```bash
    # macOS
@@ -237,6 +239,13 @@ Requirements / tips:
 - **Batch task management** – Create task queues with multiple tasks, add or edit tasks before execution, and run them sequentially. Each task executes as a separate conversation, with status tracking (pending/running/completed/failed/cancelled) and full execution history.
 - **WebShell management** – Add and manage WebShell connections (PHP/ASP/ASPX/JSP or custom). Use the virtual terminal to run commands, the file manager to list, read, edit, upload, and delete files, and the AI assistant tab to drive scripted tests with per-connection conversation history. Connections are stored in SQLite; supports GET/POST and configurable command parameter (e.g. IceSword/AntSword style).
 - **Settings** – Tweak provider keys, MCP enablement, tool toggles, and agent iteration limits.
+
+## Web Users And Web Access Roles
+
+- Control-plane authentication now uses durable Web users stored in SQLite.
+- Web access roles are RBAC authorization roles for human operators signing into the Web console.
+- AI Agent roles under `roles/` are unchanged and still control prompts, tools, and skills for the AI runtime.
+- The initial bootstrap `admin` account is created from `auth.password` only when the database has no Web users yet.
 
 ### Built-in Safeguards
 - Required-field validation prevents accidental blank API credentials.
@@ -654,5 +663,4 @@ CyberStrikeAI is a professional security testing platform designed to assist sec
 ---
 
 Need help or want to contribute? Open an issue or PR—community tooling additions are welcome!
-
 

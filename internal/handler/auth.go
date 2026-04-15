@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -31,6 +32,7 @@ func NewAuthHandler(manager *security.AuthManager, cfg *config.Config, configPat
 }
 
 type loginRequest struct {
+	Username string `json:"username"`
 	Password string `json:"password" binding:"required"`
 }
 
@@ -47,16 +49,31 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	token, expiresAt, err := h.manager.Authenticate(req.Password)
+	username := strings.TrimSpace(req.Username)
+	if username == "" {
+		username = "admin"
+	}
+
+	session, err := h.manager.Authenticate(c.Request.Context(), username, req.Password)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "密码错误"})
+		switch {
+		case errors.Is(err, security.ErrInvalidCredentials), errors.Is(err, security.ErrUserDisabled):
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "用户名或密码错误"})
+		default:
+			if h.logger != nil {
+				h.logger.Error("登录失败", zap.Error(err), zap.String("username", username))
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "登录失败，请稍后重试"})
+		}
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"token":               token,
-		"expires_at":          expiresAt.UTC().Format(time.RFC3339),
-		"session_duration_hr": h.manager.SessionDurationHours(),
+		"token":                session.Token,
+		"username":             session.Username,
+		"expires_at":           session.ExpiresAt.UTC().Format(time.RFC3339),
+		"must_change_password": session.MustChangePassword,
+		"session_duration_hr":  h.manager.SessionDurationHours(),
 	})
 }
 
@@ -102,34 +119,26 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	if !h.manager.CheckPassword(oldPassword) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "当前密码不正确"})
+	token := c.GetString(security.ContextAuthTokenKey)
+	session, ok := h.manager.ValidateToken(token)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "会话无效"})
 		return
 	}
 
-	if err := config.PersistAuthPassword(h.configPath, newPassword); err != nil {
-		if h.logger != nil {
-			h.logger.Error("保存新密码失败", zap.Error(err))
+	if err := h.manager.ChangePassword(c.Request.Context(), session.UserID, oldPassword, newPassword); err != nil {
+		switch {
+		case errors.Is(err, security.ErrInvalidCredentials):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "当前密码不正确"})
+		case errors.Is(err, security.ErrUserDisabled):
+			c.JSON(http.StatusForbidden, gin.H{"error": "当前用户已被禁用"})
+		default:
+			if h.logger != nil {
+				h.logger.Error("更新认证配置失败", zap.Error(err), zap.String("userID", session.UserID))
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "更新认证配置失败"})
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存新密码失败，请重试"})
 		return
-	}
-
-	if err := h.manager.UpdateConfig(newPassword, h.config.Auth.SessionDurationHours); err != nil {
-		if h.logger != nil {
-			h.logger.Error("更新认证配置失败", zap.Error(err))
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新认证配置失败"})
-		return
-	}
-
-	h.config.Auth.Password = newPassword
-	h.config.Auth.GeneratedPassword = ""
-	h.config.Auth.GeneratedPasswordPersisted = false
-	h.config.Auth.GeneratedPasswordPersistErr = ""
-
-	if h.logger != nil {
-		h.logger.Info("登录密码已更新，所有会话已失效")
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "密码已更新，请使用新密码重新登录"})
@@ -150,7 +159,9 @@ func (h *AuthHandler) Validate(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"token":      session.Token,
-		"expires_at": session.ExpiresAt.UTC().Format(time.RFC3339),
+		"token":                session.Token,
+		"username":             session.Username,
+		"expires_at":           session.ExpiresAt.UTC().Format(time.RFC3339),
+		"must_change_password": session.MustChangePassword,
 	})
 }

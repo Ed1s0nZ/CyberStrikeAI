@@ -61,12 +61,6 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	// CORS中间件
 	router.Use(corsMiddleware())
 
-	// 认证管理器
-	authManager, err := security.NewAuthManager(cfg.Auth.Password, cfg.Auth.SessionDurationHours)
-	if err != nil {
-		return nil, fmt.Errorf("初始化认证失败: %w", err)
-	}
-
 	// 初始化数据库
 	dbPath := cfg.Database.Path
 	if dbPath == "" {
@@ -82,6 +76,13 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("初始化数据库失败: %w", err)
 	}
+
+	if err := security.EnsureBootstrapAdmin(context.Background(), db, cfg.Auth.Password); err != nil {
+		return nil, fmt.Errorf("初始化引导管理员失败: %w", err)
+	}
+
+	// 认证管理器
+	authManager := security.NewAuthManager(db, cfg.Auth.SessionDurationHours)
 
 	// 创建MCP服务器（带数据库持久化）
 	mcpServer := mcp.NewServerWithStorage(log.Logger, db)
@@ -342,6 +343,8 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	configHandler := handler.NewConfigHandler(configPath, cfg, mcpServer, executor, agent, attackChainHandler, externalMCPMgr, log.Logger)
 	externalMCPHandler := handler.NewExternalMCPHandler(externalMCPMgr, cfg, configPath, log.Logger)
 	roleHandler := handler.NewRoleHandler(cfg, configPath, log.Logger)
+	webUsersHandler := handler.NewWebUsersHandler(db, authManager, log.Logger)
+	webAccessRolesHandler := handler.NewWebAccessRolesHandler(db, authManager, log.Logger)
 	roleHandler.SetSkillsManager(skillsManager) // 设置Skills管理器到RoleHandler
 	skillsHandler := handler.NewSkillsHandler(skillsManager, cfg, configPath, log.Logger)
 	fofaHandler := handler.NewFofaHandler(cfg, log.Logger)
@@ -467,6 +470,8 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 		webshellHandler,
 		chatUploadsHandler,
 		roleHandler,
+		webUsersHandler,
+		webAccessRolesHandler,
 		skillsHandler,
 		markdownAgentsHandler,
 		fofaHandler,
@@ -597,6 +602,8 @@ func setupRoutes(
 	webshellHandler *handler.WebShellHandler,
 	chatUploadsHandler *handler.ChatUploadsHandler,
 	roleHandler *handler.RoleHandler,
+	webUsersHandler *handler.WebUsersHandler,
+	webAccessRolesHandler *handler.WebAccessRolesHandler,
 	skillsHandler *handler.SkillsHandler,
 	markdownAgentsHandler *handler.MarkdownAgentsHandler,
 	fofaHandler *handler.FofaHandler,
@@ -697,11 +704,22 @@ func setupRoutes(
 		protected.GET("/monitor/stats", monitorHandler.GetStats)
 
 		// 配置管理
-		protected.GET("/config", configHandler.GetConfig)
-		protected.GET("/config/tools", configHandler.GetTools)
-		protected.PUT("/config", configHandler.UpdateConfig)
-		protected.POST("/config/apply", configHandler.ApplyConfig)
-		protected.POST("/config/test-openai", configHandler.TestOpenAI)
+		protected.GET("/config", security.RequirePermission(security.PermissionSystemConfigRead), configHandler.GetConfig)
+		protected.GET("/config/tools", security.RequirePermission(security.PermissionSystemConfigRead), configHandler.GetTools)
+		protected.PUT("/config", security.RequirePermission(security.PermissionSystemConfigWrite), configHandler.UpdateConfig)
+		protected.POST("/config/apply", security.RequirePermission(security.PermissionSystemConfigWrite), configHandler.ApplyConfig)
+		protected.POST("/config/test-openai", security.RequirePermission(security.PermissionSystemConfigWrite), configHandler.TestOpenAI)
+
+		// Web 用户与 Web 访问角色管理
+		protected.GET("/security/web-users", security.RequirePermission(security.PermissionSecurityUsersManage), webUsersHandler.ListWebUsers)
+		protected.POST("/security/web-users", security.RequirePermission(security.PermissionSecurityUsersManage), webUsersHandler.CreateWebUser)
+		protected.PUT("/security/web-users/:id", security.RequirePermission(security.PermissionSecurityUsersManage), webUsersHandler.UpdateWebUser)
+		protected.POST("/security/web-users/:id/reset-password", security.RequirePermission(security.PermissionSecurityUsersManage), webUsersHandler.ResetWebUserPassword)
+		protected.DELETE("/security/web-users/:id", security.RequirePermission(security.PermissionSecurityUsersManage), webUsersHandler.DeleteWebUser)
+		protected.GET("/security/web-access-roles", security.RequirePermission(security.PermissionSecurityRolesManage), webAccessRolesHandler.ListWebAccessRoles)
+		protected.POST("/security/web-access-roles", security.RequirePermission(security.PermissionSecurityRolesManage), webAccessRolesHandler.CreateWebAccessRole)
+		protected.PUT("/security/web-access-roles/:id", security.RequirePermission(security.PermissionSecurityRolesManage), webAccessRolesHandler.UpdateWebAccessRole)
+		protected.DELETE("/security/web-access-roles/:id", security.RequirePermission(security.PermissionSecurityRolesManage), webAccessRolesHandler.DeleteWebAccessRole)
 
 		// 系统设置 - 终端（执行命令，提高运维效率）
 		protected.POST("/terminal/run", terminalHandler.RunCommand)

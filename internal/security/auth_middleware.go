@@ -8,8 +8,11 @@ import (
 )
 
 const (
-	ContextAuthTokenKey  = "authToken"
-	ContextSessionExpiry = "authSessionExpiry"
+	ContextAuthTokenKey    = "authToken"
+	ContextAuthUserIDKey   = "authUserID"
+	ContextAuthUsernameKey = "authUsername"
+	ContextPermissionsKey  = "authPermissions"
+	ContextSessionExpiry   = "authSessionExpiry"
 )
 
 // AuthMiddleware enforces authentication on protected routes.
@@ -25,7 +28,33 @@ func AuthMiddleware(manager *AuthManager) gin.HandlerFunc {
 		}
 
 		c.Set(ContextAuthTokenKey, session.Token)
+		c.Set(ContextAuthUserIDKey, session.UserID)
+		c.Set(ContextAuthUsernameKey, session.Username)
+		c.Set(ContextPermissionsKey, session.Permissions)
 		c.Set(ContextSessionExpiry, session.ExpiresAt)
+		c.Next()
+	}
+}
+
+// RequirePermission rejects authenticated requests that lack the required RBAC permission.
+func RequirePermission(permission string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		rawPermissions, ok := c.Get(ContextPermissionsKey)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"error": "权限不足",
+			})
+			return
+		}
+
+		permissionSet, ok := rawPermissions.(map[string]struct{})
+		if !ok || !HasPermission(permissionSet, permission) {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"error": "权限不足",
+			})
+			return
+		}
+
 		c.Next()
 	}
 }
