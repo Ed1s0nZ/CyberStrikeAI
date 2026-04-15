@@ -8,12 +8,12 @@
 
 - 将 Web RBAC 权限模型从“按功能分类授权”调整为“按资源授权”，并覆盖信息收集、任务管理、漏洞管理、WebShell 管理、文件管理、MCP、知识、Skills、Agents、角色、系统设置等受保护业务域。
 - 权限标识统一采用 `domain.resource.action` 命名，并使用固定业务域 `intel`、`task`、`vulnerability`、`webshell`、`file`、`mcp`、`knowledge`、`skill`、`agent`、`role`、`system`。
-- canonical permission catalog 覆盖平台级权限全集，包括 `intel.fofa_query.execute`、`task.batch_queue.*`、`task.batch_task.*`、`task.conversation.*`、`task.group.*`、`task.execution.*`、`task.attack_chain.*`、`task.conversation_result.read`、`vulnerability.record.*`、`vulnerability.stats.read`、`webshell.connection.*`、`webshell.session.*`、`webshell.command.execute`、`webshell.file.execute`、`file.workspace_entry.*`、`file.workspace_content.*`、`mcp.gateway.execute`、`mcp.external_server.*`、`knowledge.category.read`、`knowledge.item.*`、`knowledge.index.*`、`knowledge.retrieval_log.*`、`knowledge.search.execute`、`knowledge.stats.read`、`skill.definition.*`、`skill.binding.read`、`skill.stats.*`、`agent.run.*`、`agent.multi_run.*`、`agent.markdown_agent.*`、`agent.robot_test.execute`、`role.agent_role.*`、`system.config_settings.*`、`system.runtime_config.apply`、`system.model_connectivity.test`、`system.web_user.*`、`system.web_user_credential.reset`、`system.web_access_role.*`、`system.terminal.execute`、`system.api_spec.read`、`system.super_admin.grant`。
+- canonical permission catalog 以“resource family + approved action subset”定义唯一权限全集：`intel.fofa_query{execute}`；`task.batch_queue{read,create,update,delete}`、`task.batch_task{read,create,update,delete}`、`task.conversation{read,create,update,delete}`、`task.group{read,create,update,delete}`、`task.execution{read,start,stop}`、`task.attack_chain{read,create,update,delete,regenerate}`、`task.conversation_result{read}`；`vulnerability.record{read,create,update,delete}`、`vulnerability.stats{read}`；`webshell.connection{read,create,update,delete}`、`webshell.session{read,create,update,delete}`、`webshell.command{execute}`、`webshell.file{execute}`；`file.workspace_entry{read,create,update,delete}`、`file.workspace_content{read,create,update,delete}`；`mcp.gateway{execute}`、`mcp.external_server{read,create,update,delete,test}`；`knowledge.category{read}`、`knowledge.item{read,create,update,delete}`、`knowledge.index{read,create,update,delete}`、`knowledge.retrieval_log{read,delete}`、`knowledge.search{execute}`、`knowledge.stats{read}`；`skill.definition{read,create,update,delete}`、`skill.binding{read}`、`skill.stats{read}`；`agent.run{read,create,update,delete,execute}`、`agent.multi_run{read,create,update,delete,execute}`、`agent.markdown_agent{read,create,update,delete}`、`agent.robot_test{execute}`；`role.agent_role{read,create,update,delete}`；`system.config_settings{read,update}`、`system.runtime_config{apply}`、`system.model_connectivity{test}`、`system.web_user{read,create,update,delete}`、`system.web_user_credential{reset}`、`system.web_access_role{read,create,update,delete}`、`system.terminal{execute}`、`system.api_spec{read}`、`system.super_admin{grant}`。
 - 将受保护接口的鉴权映射改为每条路由显式绑定一个 canonical `domain.resource.action` 权限，并保持 `401`/`403` 语义不变。
 - 更新 Web access role 的创建、编辑、展示和文档，使角色授权按业务域与资源分组展示，只接受 canonical permission identifiers。
-- 为旧权限标识定义确定性规范化迁移规则，使升级后的角色持久化内容只保留 canonical permission identifiers。
+- 为旧权限标识定义确定性规范化迁移和合法性校验规则，使升级后的角色持久化内容只保留 approved canonical permission identifiers。
 - **BREAKING**: 已持久化的旧权限标识仅做确定性规范化迁移；此前仅依赖登录态访问的业务 API 现在也将纳入显式资源权限控制，现有非超级管理员角色在未重新授权前可能对这些业务域收到 `403`。
-- **BREAKING**: proposal 必须列出完整 canonical permission catalog，而不是旧的窄范围权限子集；依赖旧权限标识、旧角色语义、旧接口示例和旧运维认知的内容都需要同步更新。
+- **BREAKING**: canonical permission catalog 改为平台级资源全集，依赖旧权限标识、旧角色语义、旧接口示例和旧运维认知的内容都需要同步更新。
 
 ## Capabilities
 
@@ -27,5 +27,5 @@
 
 - Affected backend areas: `internal/security/permissions.go`、鉴权中间件、路由注册、内置角色引导、Web access role 持久化与角色迁移逻辑。
 - Affected frontend areas: system settings 中 Web users / Web access roles 的权限展示、角色配置弹窗、权限分组结构和相关 i18n 文案。
-- Affected APIs: Web access role 读写 payload 中的 `permissions` 内容语义、受保护接口的权限校验映射、权限目录接口，以及 `/api/auth/validate` 返回的有效权限集合。
+- Affected APIs: Web access role 读写 payload 中的 `permissions` 内容语义、后端提供给分组 UI 的 canonical permission catalog、受保护接口的权限校验映射，以及 `/api/auth/validate` 返回的当前会话 canonical effective permissions。
 - Operational impact: 已存在角色权限需要规范化迁移到 canonical permission catalog；新增受保护业务域权限不会自动授予旧的非超级管理员角色，必须由管理员显式分配。

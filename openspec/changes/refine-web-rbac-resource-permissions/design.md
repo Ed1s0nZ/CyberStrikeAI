@@ -30,19 +30,19 @@
 
 普通权限统一采用 canonical `domain.resource.action` 命名。权限目录按业务域拆分，在每个业务域内定义具体资源，而不是继续保留 `*.manage` 聚合权限。这样既能表达最小权限，又能避免每条路由都成为一个单独权限概念。
 
-canonical permission catalog 覆盖以下受保护业务域：
+canonical permission catalog 以“resource family + approved action subset”定义，读者必须能够从该表唯一推出最终权限集合：
 
-- `intel`: `intel.fofa_query.execute`
-- `task`: `task.batch_queue.*`、`task.batch_task.*`、`task.conversation.*`、`task.group.*`、`task.execution.*`、`task.attack_chain.*`、`task.conversation_result.read`
-- `vulnerability`: `vulnerability.record.*`、`vulnerability.stats.read`
-- `webshell`: `webshell.connection.*`、`webshell.session.*`、`webshell.command.execute`、`webshell.file.execute`
-- `file`: `file.workspace_entry.*`、`file.workspace_content.*`
-- `mcp`: `mcp.gateway.execute`、`mcp.external_server.*`
-- `knowledge`: `knowledge.category.read`、`knowledge.item.*`、`knowledge.index.*`、`knowledge.retrieval_log.*`、`knowledge.search.execute`、`knowledge.stats.read`
-- `skill`: `skill.definition.*`、`skill.binding.read`、`skill.stats.*`
-- `agent`: `agent.run.*`、`agent.multi_run.*`、`agent.markdown_agent.*`、`agent.robot_test.execute`
-- `role`: `role.agent_role.*`
-- `system`: `system.config_settings.*`、`system.runtime_config.apply`、`system.model_connectivity.test`、`system.web_user.*`、`system.web_user_credential.reset`、`system.web_access_role.*`、`system.terminal.execute`、`system.api_spec.read`、`system.super_admin.grant`
+- `intel`: `intel.fofa_query{execute}`
+- `task`: `task.batch_queue{read,create,update,delete}`、`task.batch_task{read,create,update,delete}`、`task.conversation{read,create,update,delete}`、`task.group{read,create,update,delete}`、`task.execution{read,start,stop}`、`task.attack_chain{read,create,update,delete,regenerate}`、`task.conversation_result{read}`
+- `vulnerability`: `vulnerability.record{read,create,update,delete}`、`vulnerability.stats{read}`
+- `webshell`: `webshell.connection{read,create,update,delete}`、`webshell.session{read,create,update,delete}`、`webshell.command{execute}`、`webshell.file{execute}`
+- `file`: `file.workspace_entry{read,create,update,delete}`、`file.workspace_content{read,create,update,delete}`
+- `mcp`: `mcp.gateway{execute}`、`mcp.external_server{read,create,update,delete,test}`
+- `knowledge`: `knowledge.category{read}`、`knowledge.item{read,create,update,delete}`、`knowledge.index{read,create,update,delete}`、`knowledge.retrieval_log{read,delete}`、`knowledge.search{execute}`、`knowledge.stats{read}`
+- `skill`: `skill.definition{read,create,update,delete}`、`skill.binding{read}`、`skill.stats{read}`
+- `agent`: `agent.run{read,create,update,delete,execute}`、`agent.multi_run{read,create,update,delete,execute}`、`agent.markdown_agent{read,create,update,delete}`、`agent.robot_test{execute}`
+- `role`: `role.agent_role{read,create,update,delete}`
+- `system`: `system.config_settings{read,update}`、`system.runtime_config{apply}`、`system.model_connectivity{test}`、`system.web_user{read,create,update,delete}`、`system.web_user_credential{reset}`、`system.web_access_role{read,create,update,delete}`、`system.terminal{execute}`、`system.api_spec{read}`、`system.super_admin{grant}`
 
 ### 2. 新增受保护业务域不对旧的非超级管理员角色做自动放权
 
@@ -80,13 +80,13 @@ canonical permission catalog 覆盖以下受保护业务域：
 
 `system.super_admin.grant` 继续作为全局绕过键，且必须保留最后一个超级管理员保护判断。
 
-### 4. Web access role 配置 UI 按业务域和资源分组展示，并只提交 canonical permission identifiers
+### 4. Web access role permission picker 按业务域和资源分组展示，并只提交 canonical permission identifiers
 
-前端仍可沿用 `permissions: []string` 的接口形态，但角色编辑与查看界面必须按 business domain 和 resource 分组展示权限，再在每组下列出可选动作。提交 payload 时只允许 canonical permission identifiers，不接受 retired function-category identifiers。
+前端仍可沿用 `permissions: []string` 的接口形态，但角色编辑与查看界面必须以后端提供的 canonical permission catalog 作为唯一来源，按 business domain 和 resource 分组展示权限，再在每组下列出该 resource family 的 approved actions。提交 payload 时只允许 approved canonical permission identifiers，不接受 retired function-category identifiers，也不接受格式合法但不在 approved catalog 中的标识。
 
 这样做的原因：
 
-- 展示结构与 canonical permission catalog 对齐，便于管理员理解新增业务域权限边界。
+- 展示结构以后端 canonical permission catalog 为唯一来源，便于管理员理解新增业务域权限边界，并避免前后端各自维护动作子集。
 - 保留数组形态可减少 API 改动面，同时不牺牲 canonical 化目标。
 
 ## Risks / Trade-offs
@@ -101,7 +101,7 @@ canonical permission catalog 覆盖以下受保护业务域：
 1. 定义 canonical permission catalog、旧权限到新权限的固定映射表以及合法性校验。
 2. 更新内置角色引导逻辑，使新安装实例只写入 canonical permission identifiers。
 3. 在启动期或显式迁移步骤中，将数据库内旧权限标识规范化为 canonical permission identifiers 并去重。
-4. 更新路由鉴权绑定、角色接口校验、权限目录接口和角色展示文案。
+4. 更新路由鉴权绑定、角色接口校验、权限目录接口、`/api/auth/validate` 会话权限返回和角色展示文案。
 5. 运行回归测试与手动验证，重点覆盖旧角色迁移、显式权限拒绝、超级管理员绕过和角色配置 UI。
 
 回滚策略：

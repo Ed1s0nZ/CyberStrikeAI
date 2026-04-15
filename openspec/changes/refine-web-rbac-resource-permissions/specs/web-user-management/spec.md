@@ -11,9 +11,24 @@ The system SHALL normalize previously persisted Web access role grants from reti
 - **WHEN** an authorized administrator creates or updates a Web access role using a retired function-category permission identifier
 - **THEN** the system rejects the request and reports that only canonical resource permission identifiers are accepted
 
+#### Scenario: Role write with unapproved canonical-looking permission identifier is rejected
+- **WHEN** an authorized administrator creates or updates a Web access role using a permission identifier such as `task.foo.read` that matches the `domain.resource.action` format but is not in the approved canonical permission catalog
+- **THEN** the system rejects the request and reports that only approved canonical permission identifiers are accepted
+
+### Requirement: Canonical permission catalog for Web access roles
+The system SHALL provide the canonical Web access role permission catalog as the sole backend contract for permission validation and grouped UI rendering.
+
 #### Scenario: Resource permission catalog follows the canonical naming scheme
 - **WHEN** the platform publishes or validates Web access role permission identifiers
 - **THEN** every non-legacy permission identifier follows the `domain.resource.action` naming scheme and belongs to the approved canonical permission catalog
+
+#### Scenario: Backend publishes grouped canonical catalog for the permission picker
+- **WHEN** an authorized administrator requests the available Web access role permissions
+- **THEN** the backend response MUST expose the approved canonical permission catalog as the only source for business-domain, resource, and action grouping used by the UI
+
+#### Scenario: Approved permission catalog exposes platform-wide business domains
+- **WHEN** an authorized administrator inspects the available Web access role permission grants
+- **THEN** the catalog MUST cover only the approved business domains `intel`、`task`、`vulnerability`、`webshell`、`file`、`mcp`、`knowledge`、`skill`、`agent`、`role` and `system`
 
 ## MODIFIED Requirements
 
@@ -32,19 +47,10 @@ The system SHALL allow authorized administrators to manage Web access roles and 
 - **WHEN** an authorized administrator changes the canonical resource permission grants of an existing Web access role
 - **THEN** the system persists the updated permission set for future authorization decisions
 
-#### Scenario: Web access role assignment is grouped by business domain and resource
+#### Scenario: Web access role permission configuration is grouped by business domain and resource
 - **WHEN** an operator edits a Web access role in system settings
 - **THEN** the UI MUST present permissions grouped by business domain and resource
 - **AND** the submitted payload MUST contain only canonical permission identifiers
-
-#### Scenario: Route authorization uses canonical resource permissions
-- **WHEN** a protected API route is registered
-- **THEN** it MUST bind exactly one canonical `domain.resource.action` permission from the approved catalog
-- **AND** `system.super_admin.grant` MUST continue to bypass the check
-
-#### Scenario: Approved permission catalog exposes platform-wide business domains
-- **WHEN** an authorized administrator inspects the available Web access role permission grants
-- **THEN** the catalog MUST cover only the approved business domains `intel`、`task`、`vulnerability`、`webshell`、`file`、`mcp`、`knowledge`、`skill`、`agent`、`role` and `system`
 
 ### Requirement: User-role assignment and effective permissions
 The system SHALL support assigning one or more Web access roles to each Web user and SHALL evaluate the union of assigned canonical resource permission grants as that user's effective RBAC permission set.
@@ -60,3 +66,10 @@ The system SHALL support assigning one or more Web access roles to each Web user
 #### Scenario: Role update revokes dependent sessions
 - **WHEN** an authorized administrator changes a Web access role that is currently assigned to one or more users
 - **THEN** sessions for affected users are revoked so future requests must re-evaluate the updated canonical resource permission set
+
+### Requirement: Session permission introspection for authenticated Web users
+The system SHALL expose the current session's canonical effective permissions so authenticated clients can render RBAC-aware UX from the same permission set used for authorization.
+
+#### Scenario: `/api/auth/validate` returns current-session canonical effective permissions
+- **WHEN** an authenticated Web user calls `/api/auth/validate`
+- **THEN** the response MUST include the current session's canonical effective permission identifiers after assigned-role union and legacy-grant normalization have been applied

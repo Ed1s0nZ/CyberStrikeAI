@@ -10,7 +10,7 @@
 ## 3. Authorization And APIs
 
 - [ ] 3.1 Rebind all protected routes to canonical route permissions.
-- [ ] 3.2 Reject retired permission identifiers and expose the permission catalog and current-session permissions.
+- [ ] 3.2 Reject retired or unapproved permission identifiers and expose the canonical permission catalog and current-session permissions.
 
 ## 4. UI And Verification
 

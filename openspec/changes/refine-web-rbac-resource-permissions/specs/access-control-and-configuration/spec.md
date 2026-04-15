@@ -23,7 +23,3 @@ Protected operational interfaces SHALL require a valid authenticated Web user se
 - **WHEN** a protected API route is registered
 - **THEN** it MUST bind exactly one canonical `domain.resource.action` permission from the approved catalog
 - **AND** `system.super_admin.grant` MUST continue to bypass the check
-
-#### Scenario: Legacy permission identifiers are normalized before authorization
-- **WHEN** previously persisted Web access role grants still contain retired function-category permission identifiers
-- **THEN** the system MUST deterministically normalize them to canonical permission identifiers before those grants are used for authorization
