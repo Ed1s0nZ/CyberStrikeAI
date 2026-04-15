@@ -77,6 +77,62 @@ func TestHasPermissionLegacyCanonicalCompatibilityMatrix(t *testing.T) {
 			required: PermissionSystemConfigWriteLegacy,
 			want:     true,
 		},
+		{
+			name:        "security users legacy set satisfies canonical required",
+			permissions: permissionSetForTest(PermissionSecurityUsersManageLegacy),
+			required:    PermissionSystemWebUserDelete,
+			want:        true,
+		},
+		{
+			name: "security users canonical full set implies legacy required",
+			permissions: permissionSetForTest(
+				PermissionSystemWebUserRead,
+				PermissionSystemWebUserCreate,
+				PermissionSystemWebUserUpdate,
+				PermissionSystemWebUserDelete,
+				PermissionSystemWebUserCredentialReset,
+			),
+			required: PermissionSecurityUsersManageLegacy,
+			want:     true,
+		},
+		{
+			name: "security users canonical partial set does not imply legacy required",
+			permissions: permissionSetForTest(
+				PermissionSystemWebUserRead,
+				PermissionSystemWebUserCreate,
+				PermissionSystemWebUserUpdate,
+				PermissionSystemWebUserDelete,
+			),
+			required: PermissionSecurityUsersManageLegacy,
+			want:     false,
+		},
+		{
+			name:        "security roles legacy set satisfies canonical required",
+			permissions: permissionSetForTest(PermissionSecurityRolesManageLegacy),
+			required:    PermissionSystemWebAccessRoleUpdate,
+			want:        true,
+		},
+		{
+			name: "security roles canonical full set implies legacy required",
+			permissions: permissionSetForTest(
+				PermissionSystemWebAccessRoleRead,
+				PermissionSystemWebAccessRoleCreate,
+				PermissionSystemWebAccessRoleUpdate,
+				PermissionSystemWebAccessRoleDelete,
+			),
+			required: PermissionSecurityRolesManageLegacy,
+			want:     true,
+		},
+		{
+			name: "security roles canonical partial set does not imply legacy required",
+			permissions: permissionSetForTest(
+				PermissionSystemWebAccessRoleRead,
+				PermissionSystemWebAccessRoleCreate,
+				PermissionSystemWebAccessRoleUpdate,
+			),
+			required: PermissionSecurityRolesManageLegacy,
+			want:     false,
+		},
 	}
 
 	for _, tc := range cases {

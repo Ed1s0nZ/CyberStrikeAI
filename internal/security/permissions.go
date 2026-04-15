@@ -155,7 +155,8 @@ var legacyPermissionMap = map[string][]string{
 
 var canonicalToLegacyPermissionMap = buildCanonicalToLegacyPermissionMap()
 
-// HasPermission returns true when the required permission is present or the user has the super-admin grant.
+// HasPermission returns true when the required permission is present.
+// Either legacy or canonical super-admin permissions bypass all required permission checks.
 func HasPermission(permissionSet map[string]struct{}, required string) bool {
 	if hasSuperAdminPermission(permissionSet) {
 		return true
