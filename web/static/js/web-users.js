@@ -5,6 +5,7 @@ let activeWebUserId = '';
 let activeWebUserPasswordResetId = '';
 let activeWebAccessRoleId = '';
 let pendingSecurityConfirmAction = null;
+let webPermissionCatalog = { domains: [] };
 
 function securityText(key, fallback) {
     if (typeof window !== 'undefined' && typeof window.t === 'function') {
@@ -13,34 +14,190 @@ function securityText(key, fallback) {
     return fallback;
 }
 
-function getKnownWebPermissions() {
-    return [
-        {
-            id: 'system.super_admin',
-            label: securityText('settingsSecurity.permissionSuperAdminLabel', '超级管理员'),
-            description: securityText('settingsSecurity.permissionSuperAdminDesc', '拥有所有控制台权限，可绕过其他 Web RBAC 检查。'),
-        },
-        {
-            id: 'system.config.read',
-            label: securityText('settingsSecurity.permissionConfigReadLabel', '系统配置读取'),
-            description: securityText('settingsSecurity.permissionConfigReadDesc', '查看系统配置、状态信息和安全管理列表。'),
-        },
-        {
-            id: 'system.config.write',
-            label: securityText('settingsSecurity.permissionConfigWriteLabel', '系统配置修改'),
-            description: securityText('settingsSecurity.permissionConfigWriteDesc', '修改系统配置并应用变更。'),
-        },
-        {
-            id: 'security.users.manage',
-            label: securityText('settingsSecurity.permissionUsersManageLabel', 'Web 用户管理'),
-            description: securityText('settingsSecurity.permissionUsersManageDesc', '创建、编辑、禁用、重置密码和删除 Web 用户。'),
-        },
-        {
-            id: 'security.roles.manage',
-            label: securityText('settingsSecurity.permissionRolesManageLabel', 'Web 访问角色管理'),
-            description: securityText('settingsSecurity.permissionRolesManageDesc', '创建、编辑和删除 Web 访问角色。'),
-        },
-    ];
+function formatPermissionToken(token) {
+    return String(token || '')
+        .split('_')
+        .filter(Boolean)
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
+}
+
+function parsePermissionIdentifier(permission) {
+    const parts = String(permission || '').trim().split('.');
+    if (parts.length !== 3 || parts.some(part => !part)) {
+        return null;
+    }
+    return {
+        domain: parts[0],
+        resource: parts[1],
+        action: parts[2],
+    };
+}
+
+function permissionDomainLabel(domain) {
+    return securityText(`settingsSecurity.permissionDomain.${domain}`, formatPermissionToken(domain));
+}
+
+function permissionResourceLabel(resource) {
+    return securityText(`settingsSecurity.permissionResource.${resource}`, formatPermissionToken(resource));
+}
+
+function permissionActionLabel(permissionOrAction) {
+    const raw = String(permissionOrAction || '').trim();
+    const action = raw.includes('.') ? raw.split('.').pop() : raw;
+    return securityText(`settingsSecurity.permissionAction.${action}`, formatPermissionToken(action));
+}
+
+function formatPermissionLabel(permission) {
+    const parsed = parsePermissionIdentifier(permission);
+    if (!parsed) {
+        return permission;
+    }
+    return `${permissionDomainLabel(parsed.domain)} / ${permissionResourceLabel(parsed.resource)}: ${permissionActionLabel(parsed.action)}`;
+}
+
+function groupPermissionsForSummary(permissions = []) {
+    const grouped = new Map();
+    const unknown = [];
+
+    permissions.forEach(permission => {
+        const parsed = parsePermissionIdentifier(permission);
+        if (!parsed) {
+            unknown.push(String(permission || ''));
+            return;
+        }
+
+        const key = `${parsed.domain}.${parsed.resource}`;
+        if (!grouped.has(key)) {
+            grouped.set(key, {
+                domain: parsed.domain,
+                resource: parsed.resource,
+                actions: new Set(),
+            });
+        }
+        grouped.get(key).actions.add(parsed.action);
+    });
+
+    const items = Array.from(grouped.values())
+        .sort((left, right) => {
+            if (left.domain === right.domain) {
+                return left.resource.localeCompare(right.resource);
+            }
+            return left.domain.localeCompare(right.domain);
+        })
+        .map(item => ({
+            domain: permissionDomainLabel(item.domain),
+            resource: permissionResourceLabel(item.resource),
+            actions: Array.from(item.actions).sort().map(permissionActionLabel),
+        }));
+
+    unknown.sort();
+    return { items, unknown };
+}
+
+function summarizePermissions(permissions = []) {
+    if (!Array.isArray(permissions) || !permissions.length) {
+        return securityText('settingsSecurity.noPermissions', '无权限');
+    }
+
+    const grouped = groupPermissionsForSummary(permissions);
+    const summary = grouped.items.map(item => `${item.domain} / ${item.resource}: ${item.actions.join('、')}`);
+    grouped.unknown.forEach(permission => {
+        summary.push(permission);
+    });
+
+    return summary.length ? summary.join('；') : securityText('settingsSecurity.noPermissions', '无权限');
+}
+
+function getCatalogPermissions() {
+    const permissions = [];
+    (webPermissionCatalog.domains || []).forEach(domain => {
+        (domain.resources || []).forEach(resource => {
+            (resource.actions || []).forEach(action => {
+                if (action && action.permission) {
+                    permissions.push(action.permission);
+                }
+            });
+        });
+    });
+    return permissions;
+}
+
+function countDomainSelections(domain, selectedPermissions) {
+    const actions = (domain.resources || []).flatMap(resource => resource.actions || []);
+    const selectedCount = actions.reduce((count, action) => count + (selectedPermissions.has(action.permission) ? 1 : 0), 0);
+    return `${selectedCount}/${actions.length}`;
+}
+
+function renderPermissionGroups(selectedPermissions = []) {
+    const selected = new Set(selectedPermissions);
+    const catalogPermissions = new Set(getCatalogPermissions());
+    const unknownPermissions = selectedPermissions
+        .filter(permission => !catalogPermissions.has(permission))
+        .sort();
+
+    const groupedMarkup = (webPermissionCatalog.domains || []).map(domain => {
+        const domainId = domain.domain || '';
+        return `
+            <div class="security-option-group">
+                <div class="security-option-group-title">${escapeHtml(permissionDomainLabel(domainId))} · ${escapeHtml(countDomainSelections(domain, selected))}</div>
+                ${(domain.resources || []).map(resource => `
+                    <div class="security-option-subgroup">
+                        <div class="security-option-subgroup-title">${escapeHtml(permissionResourceLabel(resource.resource || ''))}</div>
+                        ${(resource.actions || []).map(action => `
+                            <label class="security-option-item">
+                                <input
+                                    type="checkbox"
+                                    name="web-access-role-permission"
+                                    value="${escapeHtml(action.permission || '')}"
+                                    ${selected.has(action.permission) ? 'checked' : ''}
+                                />
+                                <span class="security-option-content">
+                                    <span class="security-option-title">${escapeHtml(permissionActionLabel(action.action || action.permission || ''))}</span>
+                                    <span class="security-option-description">${escapeHtml(action.permission || '')}</span>
+                                </span>
+                            </label>
+                        `).join('')}
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }).join('');
+
+    const unknownMarkup = unknownPermissions.length ? `
+        <div class="security-option-group">
+            <div class="security-option-group-title">${escapeHtml(securityText('settingsSecurity.unknownPermissionsLabel', '未识别权限'))}</div>
+            ${unknownPermissions.map(permission => `
+                <label class="security-option-item">
+                    <input
+                        type="checkbox"
+                        name="web-access-role-permission"
+                        value="${escapeHtml(permission)}"
+                        checked
+                    />
+                    <span class="security-option-content">
+                        <span class="security-option-title">${escapeHtml(formatPermissionLabel(permission))}</span>
+                    </span>
+                </label>
+            `).join('')}
+        </div>
+    ` : '';
+
+    return groupedMarkup + unknownMarkup;
+}
+
+async function loadWebPermissionCatalog() {
+    const response = await apiFetch('/api/security/web-access-roles/permission-catalog');
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(result.error || securityText('settingsSecurity.loadPermissionCatalogFailed', '获取权限目录失败'));
+    }
+
+    webPermissionCatalog = {
+        domains: Array.isArray(result.domains) ? result.domains : [],
+    };
+
+    return webPermissionCatalog;
 }
 
 function setSecurityFeedback(targetId, message = '', type = 'info') {
@@ -191,32 +348,18 @@ function renderWebUserRoleOptions(selectedRoleIds = []) {
 }
 
 function renderWebAccessRolePermissionOptions(selectedPermissions = []) {
-    const knownPermissions = getKnownWebPermissions();
-    const knownIds = new Set(knownPermissions.map(item => item.id));
-    const extraPermissions = selectedPermissions
-        .filter(permission => !knownIds.has(permission))
-        .map(permission => ({
-            value: permission,
-            label: permission,
-            description: '',
-        }));
+    const container = document.getElementById('web-access-role-permission-options');
+    if (!container) {
+        return;
+    }
 
-    renderSelectableOptions(
-        'web-access-role-permission-options',
-        [
-            ...knownPermissions.map(item => ({
-                value: item.id,
-                label: item.label,
-                description: item.description,
-            })),
-            ...extraPermissions,
-        ],
-        {
-            inputName: 'web-access-role-permission',
-            selectedValues: selectedPermissions,
-            emptyText: securityText('settingsSecurity.noPermissions', '无权限'),
-        },
-    );
+    const markup = renderPermissionGroups(selectedPermissions);
+    if (!markup) {
+        container.innerHTML = `<div class="security-empty-state">${escapeHtml(securityText('settingsSecurity.noPermissions', '无权限'))}</div>`;
+        return;
+    }
+
+    container.innerHTML = markup;
 }
 
 function switchSecurityPanel(panel) {
@@ -236,7 +379,7 @@ function switchSecurityPanel(panel) {
 
 async function refreshSecurityManagement(options = {}) {
     const { silent = false } = options;
-    const loaders = [loadWebUsers({ silent }), loadWebAccessRoles({ silent })];
+    const loaders = [loadWebPermissionCatalog(), loadWebUsers({ silent }), loadWebAccessRoles({ silent })];
     const results = await Promise.allSettled(loaders);
     securityManagementLoaded = true;
 
@@ -316,7 +459,7 @@ function renderWebUsers() {
 
     container.innerHTML = webUsers.map(user => {
         const roles = Array.isArray(user.roleNames) && user.roleNames.length ? user.roleNames.join(', ') : securityText('settingsSecurity.noRolesAssigned', '未分配角色');
-        const permissions = Array.isArray(user.permissions) && user.permissions.length ? user.permissions.join(', ') : securityText('settingsSecurity.noPermissions', '无权限');
+        const permissions = summarizePermissions(Array.isArray(user.permissions) ? user.permissions : []);
         const lastLogin = user.lastLoginAt ? formatSecurityTime(user.lastLoginAt) : securityText('settingsSecurity.neverLoggedIn', '从未登录');
         const statusKey = user.enabled ? 'settingsSecurity.enabled' : 'settingsSecurity.disabled';
         const statusText = user.enabled ? securityText(statusKey, '已启用') : securityText(statusKey, '已禁用');
@@ -355,7 +498,7 @@ function renderWebAccessRoles() {
     }
 
     container.innerHTML = webAccessRoles.map(role => {
-        const permissions = Array.isArray(role.permissions) && role.permissions.length ? role.permissions.join(', ') : securityText('settingsSecurity.noPermissions', '无权限');
+        const permissions = summarizePermissions(Array.isArray(role.permissions) ? role.permissions : []);
         const systemHint = role.isSystem ? `<div class="security-card-note">${escapeHtml(securityText('settingsSecurity.systemRoleHint', '系统内置角色仅用于 bootstrap 管理，不允许编辑或删除。'))}</div>` : '';
         return `
             <div class="security-card">
@@ -755,7 +898,16 @@ function resetWebAccessRoleModalForm() {
     renderWebAccessRolePermissionOptions([]);
 }
 
-function openWebAccessRoleModal(roleID = '') {
+async function openWebAccessRoleModal(roleID = '') {
+    try {
+        if (!(webPermissionCatalog.domains || []).length) {
+            await loadWebPermissionCatalog();
+        }
+    } catch (error) {
+        setSecurityFeedback('web-access-roles-feedback', error.message || securityText('settingsSecurity.loadPermissionCatalogFailed', '获取权限目录失败'), 'error');
+        return;
+    }
+
     resetWebAccessRoleModalForm();
 
     const existing = roleID ? webAccessRoles.find(role => role.id === roleID) : null;
