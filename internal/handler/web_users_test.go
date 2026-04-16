@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"cyberstrike-ai/internal/database"
@@ -353,6 +354,44 @@ func TestWebAccessRolesHandler_UpdateRoleRejectsLegacyPermission(t *testing.T) {
 	}
 }
 
+func TestWebAccessRolesHandler_UpdateRoleRejectsUnknownCanonicalPermission(t *testing.T) {
+	router, db, _ := setupWebAuthRouter(t)
+	adminToken := mustLoginToken(t, router, "admin", "LegacyPass123!")
+	roleID := createWebAuthTestRole(t, db, "update-role-unknown-reject", []string{security.PermissionSystemWebAccessRoleRead})
+
+	testCases := []struct {
+		name        string
+		permissions []string
+	}{
+		{
+			name:        "unknown canonical-like identifier",
+			permissions: []string{"system.web_access_role.publish"},
+		},
+		{
+			name:        "unapproved identifier token",
+			permissions: []string{"unapproved.permission.token"},
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			w := doJSONRequest(t, router, http.MethodPut, "/api/security/web-access-roles/"+roleID, map[string]any{
+				"name":        "update-role-unknown-reject",
+				"description": "attempt with unknown/unapproved permission",
+				"permissions": tc.permissions,
+			}, adminToken)
+
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400 for %s, got %d: %s", tc.name, w.Code, w.Body.String())
+			}
+			if !bytes.Contains(w.Body.Bytes(), []byte("未注册")) {
+				t.Fatalf("expected unapproved permission error for %s, got: %s", tc.name, w.Body.String())
+			}
+		})
+	}
+}
+
 func TestWebAccessRolesHandler_PermissionCatalog(t *testing.T) {
 	router, _, _ := setupWebAuthRouter(t)
 	adminToken := mustLoginToken(t, router, "admin", "LegacyPass123!")
@@ -379,6 +418,56 @@ func TestWebAccessRolesHandler_PermissionCatalog(t *testing.T) {
 	}
 	if len(response.Domains) == 0 {
 		t.Fatalf("expected non-empty permission catalog domains: %s", w.Body.String())
+	}
+
+	w2 := doJSONRequest(t, router, http.MethodGet, "/api/security/web-access-roles/permission-catalog", nil, adminToken)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("expected 200 from repeated catalog request, got %d: %s", w2.Code, w2.Body.String())
+	}
+	if !bytes.Equal(w.Body.Bytes(), w2.Body.Bytes()) {
+		t.Fatalf("expected stable catalog order across requests, first=%s second=%s", w.Body.String(), w2.Body.String())
+	}
+
+	domainNames := make([]string, 0, len(response.Domains))
+	foundSystemWebUserRead := false
+	for _, domain := range response.Domains {
+		domainNames = append(domainNames, domain.Domain)
+		resourceNames := make([]string, 0, len(domain.Resources))
+		for _, resource := range domain.Resources {
+			resourceNames = append(resourceNames, resource.Resource)
+			actionNames := make([]string, 0, len(resource.Actions))
+			for _, action := range resource.Actions {
+				actionNames = append(actionNames, action.Action)
+				expectedPermission := domain.Domain + "." + resource.Resource + "." + action.Action
+				if action.Permission != expectedPermission {
+					t.Fatalf("expected permission %s, got %s", expectedPermission, action.Permission)
+				}
+
+				if domain.Domain == "system" && resource.Resource == "web_user" && action.Action == "read" {
+					foundSystemWebUserRead = true
+					if action.Permission != "system.web_user.read" {
+						t.Fatalf("expected system.web_user.read sample permission, got %s", action.Permission)
+					}
+				}
+			}
+			assertSortedStrings(t, "actions under "+domain.Domain+"."+resource.Resource, actionNames)
+		}
+		assertSortedStrings(t, "resources under "+domain.Domain, resourceNames)
+	}
+	assertSortedStrings(t, "domains", domainNames)
+	if !foundSystemWebUserRead {
+		t.Fatalf("expected to find system.web_user.read in catalog response: %s", w.Body.String())
+	}
+}
+
+func assertSortedStrings(t *testing.T, label string, values []string) {
+	t.Helper()
+	expected := append([]string(nil), values...)
+	sort.Strings(expected)
+	for i := range values {
+		if values[i] != expected[i] {
+			t.Fatalf("expected %s to be sorted lexicographically, got %v", label, values)
+		}
 	}
 }
 
