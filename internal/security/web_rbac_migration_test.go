@@ -2,6 +2,7 @@ package security
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"cyberstrike-ai/internal/database"
@@ -90,6 +91,41 @@ func TestNormalizePersistedWebRBACPermissionsIsIdempotent(t *testing.T) {
 	}
 	if len(got) != 1 || got[0] != PermissionSystemWebUserRead {
 		t.Fatalf("expected canonical role permissions unchanged, got %#v", got)
+	}
+}
+
+func TestNormalizePersistedWebRBACPermissionsRejectsNormalizedEmptyRoles(t *testing.T) {
+	db := openTestSecurityDB(t)
+
+	roleID, err := db.CreateWebAccessRole(database.CreateWebAccessRoleInput{
+		Name:        "unknown-only-role",
+		Description: "role with unknown legacy permission only",
+		Permissions: nil,
+		IsSystem:    false,
+	})
+	if err != nil {
+		t.Fatalf("CreateWebAccessRole() error = %v", err)
+	}
+
+	const unknownPermission = "unknown.permission.only"
+	if _, err := db.Exec(
+		`INSERT INTO web_access_role_permissions (role_id, permission) VALUES (?, ?)`,
+		roleID, unknownPermission,
+	); err != nil {
+		t.Fatalf("insert unknown permission %q: %v", unknownPermission, err)
+	}
+
+	err = NormalizePersistedWebRBACPermissions(context.Background(), db)
+	if !errors.Is(err, database.ErrWebAccessRolePermissionsEmpty) {
+		t.Fatalf("expected ErrWebAccessRolePermissionsEmpty, got %v", err)
+	}
+
+	got, err := listRolePermissions(db, roleID)
+	if err != nil {
+		t.Fatalf("listRolePermissions() error = %v", err)
+	}
+	if len(got) != 1 || got[0] != unknownPermission {
+		t.Fatalf("expected unknown permission to remain after rollback, got %#v", got)
 	}
 }
 

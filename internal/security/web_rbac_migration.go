@@ -3,6 +3,7 @@ package security
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"cyberstrike-ai/internal/database"
 )
@@ -56,7 +57,11 @@ func NormalizePersistedWebRBACPermissions(ctx context.Context, db *database.DB) 
 			return err
 		}
 
-		normalized := NormalizeWebPermissions(permissionsByRole[roleID])
+		originalPermissions := permissionsByRole[roleID]
+		normalized := NormalizeWebPermissions(originalPermissions)
+		if len(originalPermissions) > 0 && len(normalized) == 0 {
+			return fmt.Errorf("normalize persisted web rbac permissions role %s: %w", roleID, database.ErrWebAccessRolePermissionsEmpty)
+		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM web_access_role_permissions WHERE role_id = ?`, roleID); err != nil {
 			return err
 		}
