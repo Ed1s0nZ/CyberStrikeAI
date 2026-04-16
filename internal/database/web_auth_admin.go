@@ -181,7 +181,9 @@ func (db *DB) ListWebAccessRoles() ([]*WebAccessRole, error) {
 
 	roles := make([]*WebAccessRole, 0, len(order))
 	for _, roleID := range order {
-		roles = append(roles, rolesByID[roleID])
+		role := rolesByID[roleID]
+		role.Permissions = db.normalizeWebPermissions(role.Permissions)
+		roles = append(roles, role)
 	}
 	return roles, nil
 }
@@ -202,6 +204,8 @@ func (db *DB) GetWebAccessRoleByID(roleID string) (*WebAccessRole, error) {
 
 // UpdateWebAccessRole updates a web access role and replaces its permissions.
 func (db *DB) UpdateWebAccessRole(input UpdateWebAccessRoleInput) (*WebAccessRole, error) {
+	input.Permissions = db.normalizeWebPermissions(input.Permissions)
+
 	tx, err := db.Begin()
 	if err != nil {
 		return nil, err

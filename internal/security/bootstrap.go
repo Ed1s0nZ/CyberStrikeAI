@@ -94,7 +94,7 @@ func ensureBootstrapRole(ctx context.Context, tx *sql.Tx) (string, error) {
 	if _, err := tx.ExecContext(
 		ctx,
 		`INSERT OR IGNORE INTO web_access_role_permissions (role_id, permission) VALUES (?, ?)`,
-		roleID, PermissionSuperAdmin,
+		roleID, PermissionSuperAdminGrant,
 	); err != nil {
 		return "", err
 	}

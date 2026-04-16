@@ -75,6 +75,78 @@ func TestAuthManager_AuthenticateByUsername(t *testing.T) {
 	}
 }
 
+func TestAuthManager_AuthenticateNormalizesLegacyPermissions(t *testing.T) {
+	db := openTestSecurityDB(t)
+	db.SetWebPermissionNormalizer(NormalizeWebPermissions)
+
+	roleID, err := db.CreateWebAccessRole(database.CreateWebAccessRoleInput{
+		Name:        "legacy-normalize-role",
+		Description: "legacy permissions role",
+		Permissions: nil,
+		IsSystem:    false,
+	})
+	if err != nil {
+		t.Fatalf("CreateWebAccessRole() error = %v", err)
+	}
+
+	for _, permission := range []string{
+		PermissionSystemConfigWriteLegacy,
+		PermissionSecurityUsersManageLegacy,
+		"unknown.permission",
+	} {
+		if _, err := db.Exec(
+			`INSERT INTO web_access_role_permissions (role_id, permission) VALUES (?, ?)`,
+			roleID, permission,
+		); err != nil {
+			t.Fatalf("insert legacy permission %q: %v", permission, err)
+		}
+	}
+
+	passwordHash, err := HashPassword("LegacyReaderPass123!")
+	if err != nil {
+		t.Fatalf("HashPassword() error = %v", err)
+	}
+
+	if _, err := db.CreateWebUser(database.CreateWebUserInput{
+		Username:     "legacy-reader",
+		DisplayName:  "Legacy Reader",
+		PasswordHash: passwordHash,
+		Enabled:      true,
+		RoleIDs:      []string{roleID},
+	}); err != nil {
+		t.Fatalf("CreateWebUser() error = %v", err)
+	}
+
+	manager := NewAuthManager(db, 12)
+	session, err := manager.Authenticate(context.Background(), "legacy-reader", "LegacyReaderPass123!")
+	if err != nil {
+		t.Fatalf("Authenticate() error = %v", err)
+	}
+
+	expected := []string{
+		PermissionSystemConfigSettingsUpdate,
+		PermissionSystemRuntimeConfigApply,
+		PermissionSystemModelConnectivityTest,
+		PermissionSystemWebUserRead,
+		PermissionSystemWebUserCreate,
+		PermissionSystemWebUserUpdate,
+		PermissionSystemWebUserDelete,
+		PermissionSystemWebUserCredentialReset,
+	}
+
+	if len(session.Permissions) != len(expected) {
+		t.Fatalf("session permissions = %#v, want %#v", session.Permissions, expected)
+	}
+	for _, permission := range expected {
+		if _, ok := session.Permissions[permission]; !ok {
+			t.Fatalf("expected canonical permission %q in session, got %#v", permission, session.Permissions)
+		}
+	}
+	if _, ok := session.Permissions[PermissionSecurityUsersManageLegacy]; ok {
+		t.Fatalf("expected legacy permission %q to be absent in session", PermissionSecurityUsersManageLegacy)
+	}
+}
+
 func TestAuthManager_RevokeUserSessions(t *testing.T) {
 	db := openTestSecurityDB(t)
 

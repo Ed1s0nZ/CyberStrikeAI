@@ -22,7 +22,7 @@ func openTestSecurityDB(t *testing.T) *database.DB {
 	return db
 }
 
-func TestEnsureBootstrapAdmin_CreatesAdminFromLegacyPassword(t *testing.T) {
+func TestEnsureBootstrapAdminSeedsCanonicalSuperAdmin(t *testing.T) {
 	db := openTestSecurityDB(t)
 
 	if err := EnsureBootstrapAdmin(context.Background(), db, "LegacyPass123!"); err != nil {
@@ -38,8 +38,8 @@ func TestEnsureBootstrapAdmin_CreatesAdminFromLegacyPassword(t *testing.T) {
 		t.Fatal("expected admin to be enabled")
 	}
 
-	if _, ok := permissionSet(admin.Permissions)[PermissionSuperAdmin]; !ok {
-		t.Fatalf("expected admin to include %q permission, got %#v", PermissionSuperAdmin, admin.Permissions)
+	if _, ok := permissionSet(admin.Permissions)[PermissionSuperAdminGrant]; !ok {
+		t.Fatalf("expected admin to include %q permission, got %#v", PermissionSuperAdminGrant, admin.Permissions)
 	}
 }
 

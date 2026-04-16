@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"path/filepath"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -426,4 +428,237 @@ func TestCountEnabledUsersWithPermission_LegacySuperAdminCountsCanonicalGrant(t 
 	if count != 1 {
 		t.Fatalf("expected canonical system.super_admin.grant user to count as legacy super admin, got %d", count)
 	}
+}
+
+func TestListWebAccessRolesNormalizesLegacyPermissions(t *testing.T) {
+	db := openTestWebAuthDB(t)
+	db.SetWebPermissionNormalizer(testNormalizeWebPermissions)
+
+	roleID, err := db.CreateWebAccessRole(CreateWebAccessRoleInput{
+		Name:        "legacy-normalize-role",
+		Description: "role with mixed legacy and canonical permissions",
+		Permissions: []string{
+			"system.config.write",
+			"system.super_admin",
+			"system.web_user.read",
+			"unknown.permission",
+		},
+		IsSystem: false,
+	})
+	if err != nil {
+		t.Fatalf("CreateWebAccessRole() error = %v", err)
+	}
+
+	want := []string{
+		"system.config_settings.update",
+		"system.model_connectivity.test",
+		"system.runtime_config.apply",
+		"system.super_admin.grant",
+		"system.web_user.read",
+	}
+
+	gotPersisted, err := listPersistedRolePermissions(db, roleID)
+	if err != nil {
+		t.Fatalf("listPersistedRolePermissions() error = %v", err)
+	}
+	if !equalStringSlices(gotPersisted, want) {
+		t.Fatalf("persisted permissions = %#v, want %#v", gotPersisted, want)
+	}
+
+	roles, err := db.ListWebAccessRoles()
+	if err != nil {
+		t.Fatalf("ListWebAccessRoles() error = %v", err)
+	}
+
+	var gotRole *WebAccessRole
+	for _, role := range roles {
+		if role.ID == roleID {
+			gotRole = role
+			break
+		}
+	}
+	if gotRole == nil {
+		t.Fatalf("expected role %q in list", roleID)
+	}
+	if !equalStringSlices(gotRole.Permissions, want) {
+		t.Fatalf("ListWebAccessRoles() permissions = %#v, want %#v", gotRole.Permissions, want)
+	}
+
+	byID, err := db.GetWebAccessRoleByID(roleID)
+	if err != nil {
+		t.Fatalf("GetWebAccessRoleByID() error = %v", err)
+	}
+	if !equalStringSlices(byID.Permissions, want) {
+		t.Fatalf("GetWebAccessRoleByID() permissions = %#v, want %#v", byID.Permissions, want)
+	}
+}
+
+func TestGetWebUserWithPermissionsByUsernameNormalizesLegacyPermissions(t *testing.T) {
+	db := openTestWebAuthDB(t)
+	db.SetWebPermissionNormalizer(testNormalizeWebPermissions)
+
+	roleID, err := db.CreateWebAccessRole(CreateWebAccessRoleInput{
+		Name:        "legacy-permissions-role",
+		Description: "role to test resolved canonical permissions",
+		Permissions: nil,
+		IsSystem:    false,
+	})
+	if err != nil {
+		t.Fatalf("CreateWebAccessRole() error = %v", err)
+	}
+
+	// Bypass role write-path normalization to emulate persisted legacy data.
+	for _, permission := range []string{
+		"system.config.read",
+		"security.users.manage",
+		"system.web_user.read",
+		"unknown.permission",
+	} {
+		if _, err := db.Exec(
+			`INSERT INTO web_access_role_permissions (role_id, permission) VALUES (?, ?)`,
+			roleID, permission,
+		); err != nil {
+			t.Fatalf("insert legacy permission %q: %v", permission, err)
+		}
+	}
+
+	if _, err := db.CreateWebUser(CreateWebUserInput{
+		Username:     "legacy-reader",
+		DisplayName:  "Legacy Reader",
+		PasswordHash: "hash",
+		Enabled:      true,
+		RoleIDs:      []string{roleID},
+	}); err != nil {
+		t.Fatalf("CreateWebUser() error = %v", err)
+	}
+
+	user, err := db.GetWebUserWithPermissionsByUsername("legacy-reader")
+	if err != nil {
+		t.Fatalf("GetWebUserWithPermissionsByUsername() error = %v", err)
+	}
+
+	want := []string{
+		"system.config_settings.read",
+		"system.web_user.create",
+		"system.web_user.delete",
+		"system.web_user.read",
+		"system.web_user.update",
+		"system.web_user_credential.reset",
+	}
+	if !equalStringSlices(user.Permissions, want) {
+		t.Fatalf("resolved user permissions = %#v, want %#v", user.Permissions, want)
+	}
+}
+
+func listPersistedRolePermissions(db *DB, roleID string) ([]string, error) {
+	rows, err := db.Query(
+		`SELECT permission FROM web_access_role_permissions WHERE role_id = ? ORDER BY permission ASC`,
+		roleID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	permissions := make([]string, 0)
+	for rows.Next() {
+		var permission string
+		if err := rows.Scan(&permission); err != nil {
+			return nil, err
+		}
+		permissions = append(permissions, permission)
+	}
+
+	return permissions, rows.Err()
+}
+
+func equalStringSlices(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func testNormalizeWebPermissions(input []string) []string {
+	legacy := map[string][]string{
+		"system.config.read": {
+			"system.config_settings.read",
+		},
+		"system.config.write": {
+			"system.config_settings.update",
+			"system.runtime_config.apply",
+			"system.model_connectivity.test",
+		},
+		"security.users.manage": {
+			"system.web_user.read",
+			"system.web_user.create",
+			"system.web_user.update",
+			"system.web_user.delete",
+			"system.web_user_credential.reset",
+		},
+		"security.roles.manage": {
+			"system.web_access_role.read",
+			"system.web_access_role.create",
+			"system.web_access_role.update",
+			"system.web_access_role.delete",
+		},
+		"system.super_admin": {
+			"system.super_admin.grant",
+		},
+	}
+
+	canonical := map[string]struct{}{
+		"system.config_settings.read":      {},
+		"system.config_settings.update":    {},
+		"system.runtime_config.apply":      {},
+		"system.model_connectivity.test":   {},
+		"system.web_user.read":             {},
+		"system.web_user.create":           {},
+		"system.web_user.update":           {},
+		"system.web_user.delete":           {},
+		"system.web_user_credential.reset": {},
+		"system.web_access_role.read":      {},
+		"system.web_access_role.create":    {},
+		"system.web_access_role.update":    {},
+		"system.web_access_role.delete":    {},
+		"system.super_admin.grant":         {},
+	}
+
+	seen := make(map[string]struct{}, len(input))
+	add := func(permission string) {
+		permission = strings.TrimSpace(permission)
+		if permission == "" {
+			return
+		}
+		if _, ok := canonical[permission]; !ok {
+			return
+		}
+		seen[permission] = struct{}{}
+	}
+
+	for _, permission := range input {
+		permission = strings.TrimSpace(permission)
+		if permission == "" {
+			continue
+		}
+		if expanded, ok := legacy[permission]; ok {
+			for _, candidate := range expanded {
+				add(candidate)
+			}
+			continue
+		}
+		add(permission)
+	}
+
+	result := make([]string, 0, len(seen))
+	for permission := range seen {
+		result = append(result, permission)
+	}
+	sort.Strings(result)
+	return result
 }

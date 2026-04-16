@@ -12,7 +12,8 @@ import (
 // DB 数据库连接
 type DB struct {
 	*sql.DB
-	logger *zap.Logger
+	logger                  *zap.Logger
+	webPermissionNormalizer func([]string) []string
 }
 
 // NewDB 创建数据库连接

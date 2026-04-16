@@ -49,6 +49,8 @@ type CreateWebAccessRoleInput struct {
 
 // CreateWebAccessRole inserts a role with permissions.
 func (db *DB) CreateWebAccessRole(input CreateWebAccessRoleInput) (string, error) {
+	input.Permissions = db.normalizeWebPermissions(input.Permissions)
+
 	roleID := uuid.NewString()
 	tx, err := db.Begin()
 	if err != nil {
@@ -312,7 +314,6 @@ func (db *DB) GetWebUserWithPermissionsByUsername(username string) (*WebUserWith
 	defer rows.Close()
 
 	roleSeen := make(map[string]bool)
-	permSeen := make(map[string]bool)
 	for rows.Next() {
 		var roleID, roleName string
 		var permission sql.NullString
@@ -325,12 +326,14 @@ func (db *DB) GetWebUserWithPermissionsByUsername(username string) (*WebUserWith
 			roleSeen[roleID] = true
 		}
 		if permission.Valid {
-			if !permSeen[permission.String] {
-				user.Permissions = append(user.Permissions, permission.String)
-				permSeen[permission.String] = true
-			}
+			user.Permissions = append(user.Permissions, permission.String)
 		}
 	}
 
-	return &user, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	user.Permissions = db.normalizeWebPermissions(user.Permissions)
+	return &user, nil
 }

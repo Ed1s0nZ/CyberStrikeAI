@@ -77,7 +77,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 		return nil, fmt.Errorf("初始化数据库失败: %w", err)
 	}
 
-	if err := security.EnsureBootstrapAdmin(context.Background(), db, cfg.Auth.Password); err != nil {
+	if err := bootstrapWebRBAC(context.Background(), db, cfg.Auth.Password); err != nil {
 		return nil, fmt.Errorf("初始化引导管理员失败: %w", err)
 	}
 
