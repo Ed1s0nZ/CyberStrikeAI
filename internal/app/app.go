@@ -723,18 +723,18 @@ func setupRoutes(
 		protected.GET("/security/web-access-roles/permission-catalog", security.RequireRoutePermission(http.MethodGet, "/security/web-access-roles/permission-catalog"), webAccessRolesHandler.GetPermissionCatalog)
 
 		// 系统设置 - 终端（执行命令，提高运维效率）
-		protected.POST("/terminal/run", terminalHandler.RunCommand)
-		protected.POST("/terminal/run/stream", terminalHandler.RunCommandStream)
-		protected.GET("/terminal/ws", terminalHandler.RunCommandWS)
+		protected.POST("/terminal/run", security.RequireRoutePermission(http.MethodPost, "/terminal/run"), terminalHandler.RunCommand)
+		protected.POST("/terminal/run/stream", security.RequireRoutePermission(http.MethodPost, "/terminal/run/stream"), terminalHandler.RunCommandStream)
+		protected.GET("/terminal/ws", security.RequireRoutePermission(http.MethodGet, "/terminal/ws"), terminalHandler.RunCommandWS)
 
 		// 外部MCP管理
-		protected.GET("/external-mcp", externalMCPHandler.GetExternalMCPs)
-		protected.GET("/external-mcp/stats", externalMCPHandler.GetExternalMCPStats)
-		protected.GET("/external-mcp/:name", externalMCPHandler.GetExternalMCP)
-		protected.PUT("/external-mcp/:name", externalMCPHandler.AddOrUpdateExternalMCP)
-		protected.DELETE("/external-mcp/:name", externalMCPHandler.DeleteExternalMCP)
-		protected.POST("/external-mcp/:name/start", externalMCPHandler.StartExternalMCP)
-		protected.POST("/external-mcp/:name/stop", externalMCPHandler.StopExternalMCP)
+		protected.GET("/external-mcp", security.RequireRoutePermission(http.MethodGet, "/external-mcp"), externalMCPHandler.GetExternalMCPs)
+		protected.GET("/external-mcp/stats", security.RequireRoutePermission(http.MethodGet, "/external-mcp/stats"), externalMCPHandler.GetExternalMCPStats)
+		protected.GET("/external-mcp/:name", security.RequireRoutePermission(http.MethodGet, "/external-mcp/:name"), externalMCPHandler.GetExternalMCP)
+		protected.PUT("/external-mcp/:name", security.RequireRoutePermission(http.MethodPut, "/external-mcp/:name"), externalMCPHandler.AddOrUpdateExternalMCP)
+		protected.DELETE("/external-mcp/:name", security.RequireRoutePermission(http.MethodDelete, "/external-mcp/:name"), externalMCPHandler.DeleteExternalMCP)
+		protected.POST("/external-mcp/:name/start", security.RequireRoutePermission(http.MethodPost, "/external-mcp/:name/start"), externalMCPHandler.StartExternalMCP)
+		protected.POST("/external-mcp/:name/stop", security.RequireRoutePermission(http.MethodPost, "/external-mcp/:name/stop"), externalMCPHandler.StopExternalMCP)
 
 		// 攻击链可视化
 		protected.GET("/attack-chain/:conversationId", security.RequireRoutePermission(http.MethodGet, "/attack-chain/:conversationId"), attackChainHandler.GetAttackChain)
@@ -743,7 +743,7 @@ func setupRoutes(
 		// 知识库管理（始终注册路由，通过 App 实例动态获取 handler）
 		knowledgeRoutes := protected.Group("/knowledge")
 		{
-			knowledgeRoutes.GET("/categories", func(c *gin.Context) {
+			knowledgeRoutes.GET("/categories", security.RequireRoutePermission(http.MethodGet, "/knowledge/categories"), func(c *gin.Context) {
 				if app.knowledgeHandler == nil {
 					c.JSON(http.StatusOK, gin.H{
 						"categories": []string{},
@@ -754,7 +754,7 @@ func setupRoutes(
 				}
 				app.knowledgeHandler.GetCategories(c)
 			})
-			knowledgeRoutes.GET("/items", func(c *gin.Context) {
+			knowledgeRoutes.GET("/items", security.RequireRoutePermission(http.MethodGet, "/knowledge/items"), func(c *gin.Context) {
 				if app.knowledgeHandler == nil {
 					c.JSON(http.StatusOK, gin.H{
 						"items":   []interface{}{},
@@ -765,7 +765,7 @@ func setupRoutes(
 				}
 				app.knowledgeHandler.GetItems(c)
 			})
-			knowledgeRoutes.GET("/items/:id", func(c *gin.Context) {
+			knowledgeRoutes.GET("/items/:id", security.RequireRoutePermission(http.MethodGet, "/knowledge/items/:id"), func(c *gin.Context) {
 				if app.knowledgeHandler == nil {
 					c.JSON(http.StatusOK, gin.H{
 						"enabled": false,
@@ -775,7 +775,7 @@ func setupRoutes(
 				}
 				app.knowledgeHandler.GetItem(c)
 			})
-			knowledgeRoutes.POST("/items", func(c *gin.Context) {
+			knowledgeRoutes.POST("/items", security.RequireRoutePermission(http.MethodPost, "/knowledge/items"), func(c *gin.Context) {
 				if app.knowledgeHandler == nil {
 					c.JSON(http.StatusOK, gin.H{
 						"enabled": false,
@@ -785,7 +785,7 @@ func setupRoutes(
 				}
 				app.knowledgeHandler.CreateItem(c)
 			})
-			knowledgeRoutes.PUT("/items/:id", func(c *gin.Context) {
+			knowledgeRoutes.PUT("/items/:id", security.RequireRoutePermission(http.MethodPut, "/knowledge/items/:id"), func(c *gin.Context) {
 				if app.knowledgeHandler == nil {
 					c.JSON(http.StatusOK, gin.H{
 						"enabled": false,
@@ -795,7 +795,7 @@ func setupRoutes(
 				}
 				app.knowledgeHandler.UpdateItem(c)
 			})
-			knowledgeRoutes.DELETE("/items/:id", func(c *gin.Context) {
+			knowledgeRoutes.DELETE("/items/:id", security.RequireRoutePermission(http.MethodDelete, "/knowledge/items/:id"), func(c *gin.Context) {
 				if app.knowledgeHandler == nil {
 					c.JSON(http.StatusOK, gin.H{
 						"enabled": false,
@@ -805,7 +805,7 @@ func setupRoutes(
 				}
 				app.knowledgeHandler.DeleteItem(c)
 			})
-			knowledgeRoutes.GET("/index-status", func(c *gin.Context) {
+			knowledgeRoutes.GET("/index-status", security.RequireRoutePermission(http.MethodGet, "/knowledge/index-status"), func(c *gin.Context) {
 				if app.knowledgeHandler == nil {
 					c.JSON(http.StatusOK, gin.H{
 						"enabled":          false,
@@ -819,7 +819,7 @@ func setupRoutes(
 				}
 				app.knowledgeHandler.GetIndexStatus(c)
 			})
-			knowledgeRoutes.POST("/index", func(c *gin.Context) {
+			knowledgeRoutes.POST("/index", security.RequireRoutePermission(http.MethodPost, "/knowledge/index"), func(c *gin.Context) {
 				if app.knowledgeHandler == nil {
 					c.JSON(http.StatusOK, gin.H{
 						"enabled": false,
@@ -829,7 +829,7 @@ func setupRoutes(
 				}
 				app.knowledgeHandler.RebuildIndex(c)
 			})
-			knowledgeRoutes.POST("/scan", func(c *gin.Context) {
+			knowledgeRoutes.POST("/scan", security.RequireRoutePermission(http.MethodPost, "/knowledge/scan"), func(c *gin.Context) {
 				if app.knowledgeHandler == nil {
 					c.JSON(http.StatusOK, gin.H{
 						"enabled": false,
@@ -839,7 +839,7 @@ func setupRoutes(
 				}
 				app.knowledgeHandler.ScanKnowledgeBase(c)
 			})
-			knowledgeRoutes.GET("/retrieval-logs", func(c *gin.Context) {
+			knowledgeRoutes.GET("/retrieval-logs", security.RequireRoutePermission(http.MethodGet, "/knowledge/retrieval-logs"), func(c *gin.Context) {
 				if app.knowledgeHandler == nil {
 					c.JSON(http.StatusOK, gin.H{
 						"logs":    []interface{}{},
@@ -850,7 +850,7 @@ func setupRoutes(
 				}
 				app.knowledgeHandler.GetRetrievalLogs(c)
 			})
-			knowledgeRoutes.DELETE("/retrieval-logs/:id", func(c *gin.Context) {
+			knowledgeRoutes.DELETE("/retrieval-logs/:id", security.RequireRoutePermission(http.MethodDelete, "/knowledge/retrieval-logs/:id"), func(c *gin.Context) {
 				if app.knowledgeHandler == nil {
 					c.JSON(http.StatusOK, gin.H{
 						"enabled": false,
@@ -860,7 +860,7 @@ func setupRoutes(
 				}
 				app.knowledgeHandler.DeleteRetrievalLog(c)
 			})
-			knowledgeRoutes.POST("/search", func(c *gin.Context) {
+			knowledgeRoutes.POST("/search", security.RequireRoutePermission(http.MethodPost, "/knowledge/search"), func(c *gin.Context) {
 				if app.knowledgeHandler == nil {
 					c.JSON(http.StatusOK, gin.H{
 						"results": []interface{}{},
@@ -871,7 +871,7 @@ func setupRoutes(
 				}
 				app.knowledgeHandler.Search(c)
 			})
-			knowledgeRoutes.GET("/stats", func(c *gin.Context) {
+			knowledgeRoutes.GET("/stats", security.RequireRoutePermission(http.MethodGet, "/knowledge/stats"), func(c *gin.Context) {
 				if app.knowledgeHandler == nil {
 					c.JSON(http.StatusOK, gin.H{
 						"enabled":          false,
@@ -886,56 +886,56 @@ func setupRoutes(
 		}
 
 		// 漏洞管理
-		protected.GET("/vulnerabilities", vulnerabilityHandler.ListVulnerabilities)
-		protected.GET("/vulnerabilities/stats", vulnerabilityHandler.GetVulnerabilityStats)
-		protected.GET("/vulnerabilities/:id", vulnerabilityHandler.GetVulnerability)
-		protected.POST("/vulnerabilities", vulnerabilityHandler.CreateVulnerability)
-		protected.PUT("/vulnerabilities/:id", vulnerabilityHandler.UpdateVulnerability)
-		protected.DELETE("/vulnerabilities/:id", vulnerabilityHandler.DeleteVulnerability)
+		protected.GET("/vulnerabilities", security.RequireRoutePermission(http.MethodGet, "/vulnerabilities"), vulnerabilityHandler.ListVulnerabilities)
+		protected.GET("/vulnerabilities/stats", security.RequireRoutePermission(http.MethodGet, "/vulnerabilities/stats"), vulnerabilityHandler.GetVulnerabilityStats)
+		protected.GET("/vulnerabilities/:id", security.RequireRoutePermission(http.MethodGet, "/vulnerabilities/:id"), vulnerabilityHandler.GetVulnerability)
+		protected.POST("/vulnerabilities", security.RequireRoutePermission(http.MethodPost, "/vulnerabilities"), vulnerabilityHandler.CreateVulnerability)
+		protected.PUT("/vulnerabilities/:id", security.RequireRoutePermission(http.MethodPut, "/vulnerabilities/:id"), vulnerabilityHandler.UpdateVulnerability)
+		protected.DELETE("/vulnerabilities/:id", security.RequireRoutePermission(http.MethodDelete, "/vulnerabilities/:id"), vulnerabilityHandler.DeleteVulnerability)
 
 		// WebShell 管理（代理执行 + 连接配置存 SQLite）
-		protected.GET("/webshell/connections", webshellHandler.ListConnections)
-		protected.POST("/webshell/connections", webshellHandler.CreateConnection)
-		protected.GET("/webshell/connections/:id/ai-history", webshellHandler.GetAIHistory)
-		protected.GET("/webshell/connections/:id/ai-conversations", webshellHandler.ListAIConversations)
-		protected.GET("/webshell/connections/:id/state", webshellHandler.GetConnectionState)
-		protected.PUT("/webshell/connections/:id", webshellHandler.UpdateConnection)
-		protected.PUT("/webshell/connections/:id/state", webshellHandler.SaveConnectionState)
-		protected.DELETE("/webshell/connections/:id", webshellHandler.DeleteConnection)
-		protected.POST("/webshell/exec", webshellHandler.Exec)
-		protected.POST("/webshell/file", webshellHandler.FileOp)
+		protected.GET("/webshell/connections", security.RequireRoutePermission(http.MethodGet, "/webshell/connections"), webshellHandler.ListConnections)
+		protected.POST("/webshell/connections", security.RequireRoutePermission(http.MethodPost, "/webshell/connections"), webshellHandler.CreateConnection)
+		protected.GET("/webshell/connections/:id/ai-history", security.RequireRoutePermission(http.MethodGet, "/webshell/connections/:id/ai-history"), webshellHandler.GetAIHistory)
+		protected.GET("/webshell/connections/:id/ai-conversations", security.RequireRoutePermission(http.MethodGet, "/webshell/connections/:id/ai-conversations"), webshellHandler.ListAIConversations)
+		protected.GET("/webshell/connections/:id/state", security.RequireRoutePermission(http.MethodGet, "/webshell/connections/:id/state"), webshellHandler.GetConnectionState)
+		protected.PUT("/webshell/connections/:id", security.RequireRoutePermission(http.MethodPut, "/webshell/connections/:id"), webshellHandler.UpdateConnection)
+		protected.PUT("/webshell/connections/:id/state", security.RequireRoutePermission(http.MethodPut, "/webshell/connections/:id/state"), webshellHandler.SaveConnectionState)
+		protected.DELETE("/webshell/connections/:id", security.RequireRoutePermission(http.MethodDelete, "/webshell/connections/:id"), webshellHandler.DeleteConnection)
+		protected.POST("/webshell/exec", security.RequireRoutePermission(http.MethodPost, "/webshell/exec"), webshellHandler.Exec)
+		protected.POST("/webshell/file", security.RequireRoutePermission(http.MethodPost, "/webshell/file"), webshellHandler.FileOp)
 
 		// 对话附件（chat_uploads）管理
-		protected.GET("/chat-uploads", chatUploadsHandler.List)
-		protected.GET("/chat-uploads/download", chatUploadsHandler.Download)
-		protected.GET("/chat-uploads/content", chatUploadsHandler.GetContent)
-		protected.POST("/chat-uploads", chatUploadsHandler.Upload)
-		protected.POST("/chat-uploads/mkdir", chatUploadsHandler.Mkdir)
-		protected.DELETE("/chat-uploads", chatUploadsHandler.Delete)
-		protected.PUT("/chat-uploads/rename", chatUploadsHandler.Rename)
-		protected.PUT("/chat-uploads/content", chatUploadsHandler.PutContent)
+		protected.GET("/chat-uploads", security.RequireRoutePermission(http.MethodGet, "/chat-uploads"), chatUploadsHandler.List)
+		protected.GET("/chat-uploads/download", security.RequireRoutePermission(http.MethodGet, "/chat-uploads/download"), chatUploadsHandler.Download)
+		protected.GET("/chat-uploads/content", security.RequireRoutePermission(http.MethodGet, "/chat-uploads/content"), chatUploadsHandler.GetContent)
+		protected.POST("/chat-uploads", security.RequireRoutePermission(http.MethodPost, "/chat-uploads"), chatUploadsHandler.Upload)
+		protected.POST("/chat-uploads/mkdir", security.RequireRoutePermission(http.MethodPost, "/chat-uploads/mkdir"), chatUploadsHandler.Mkdir)
+		protected.DELETE("/chat-uploads", security.RequireRoutePermission(http.MethodDelete, "/chat-uploads"), chatUploadsHandler.Delete)
+		protected.PUT("/chat-uploads/rename", security.RequireRoutePermission(http.MethodPut, "/chat-uploads/rename"), chatUploadsHandler.Rename)
+		protected.PUT("/chat-uploads/content", security.RequireRoutePermission(http.MethodPut, "/chat-uploads/content"), chatUploadsHandler.PutContent)
 
 		// 角色管理
-		protected.GET("/roles", roleHandler.GetRoles)
-		protected.GET("/roles/:name", roleHandler.GetRole)
-		protected.GET("/roles/skills/list", roleHandler.GetSkills)
-		protected.POST("/roles", roleHandler.CreateRole)
-		protected.PUT("/roles/:name", roleHandler.UpdateRole)
-		protected.DELETE("/roles/:name", roleHandler.DeleteRole)
+		protected.GET("/roles", security.RequireRoutePermission(http.MethodGet, "/roles"), roleHandler.GetRoles)
+		protected.GET("/roles/:name", security.RequireRoutePermission(http.MethodGet, "/roles/:name"), roleHandler.GetRole)
+		protected.GET("/roles/skills/list", security.RequireRoutePermission(http.MethodGet, "/roles/skills/list"), roleHandler.GetSkills)
+		protected.POST("/roles", security.RequireRoutePermission(http.MethodPost, "/roles"), roleHandler.CreateRole)
+		protected.PUT("/roles/:name", security.RequireRoutePermission(http.MethodPut, "/roles/:name"), roleHandler.UpdateRole)
+		protected.DELETE("/roles/:name", security.RequireRoutePermission(http.MethodDelete, "/roles/:name"), roleHandler.DeleteRole)
 
 		// Skills管理
-		protected.GET("/skills", skillsHandler.GetSkills)
-		protected.GET("/skills/stats", skillsHandler.GetSkillStats)
-		protected.DELETE("/skills/stats", skillsHandler.ClearSkillStats)
-		protected.GET("/skills/:name", skillsHandler.GetSkill)
-		protected.GET("/skills/:name/bound-roles", skillsHandler.GetSkillBoundRoles)
-		protected.POST("/skills", skillsHandler.CreateSkill)
-		protected.PUT("/skills/:name", skillsHandler.UpdateSkill)
-		protected.DELETE("/skills/:name", skillsHandler.DeleteSkill)
-		protected.DELETE("/skills/:name/stats", skillsHandler.ClearSkillStatsByName)
+		protected.GET("/skills", security.RequireRoutePermission(http.MethodGet, "/skills"), skillsHandler.GetSkills)
+		protected.GET("/skills/stats", security.RequireRoutePermission(http.MethodGet, "/skills/stats"), skillsHandler.GetSkillStats)
+		protected.DELETE("/skills/stats", security.RequireRoutePermission(http.MethodDelete, "/skills/stats"), skillsHandler.ClearSkillStats)
+		protected.GET("/skills/:name", security.RequireRoutePermission(http.MethodGet, "/skills/:name"), skillsHandler.GetSkill)
+		protected.GET("/skills/:name/bound-roles", security.RequireRoutePermission(http.MethodGet, "/skills/:name/bound-roles"), skillsHandler.GetSkillBoundRoles)
+		protected.POST("/skills", security.RequireRoutePermission(http.MethodPost, "/skills"), skillsHandler.CreateSkill)
+		protected.PUT("/skills/:name", security.RequireRoutePermission(http.MethodPut, "/skills/:name"), skillsHandler.UpdateSkill)
+		protected.DELETE("/skills/:name", security.RequireRoutePermission(http.MethodDelete, "/skills/:name"), skillsHandler.DeleteSkill)
+		protected.DELETE("/skills/:name/stats", security.RequireRoutePermission(http.MethodDelete, "/skills/:name/stats"), skillsHandler.ClearSkillStatsByName)
 
 		// MCP端点
-		protected.POST("/mcp", func(c *gin.Context) {
+		protected.POST("/mcp", security.RequireRoutePermission(http.MethodPost, "/mcp"), func(c *gin.Context) {
 			mcpServer.HandleHTTP(c.Writer, c.Request)
 		})
 
@@ -944,7 +944,7 @@ func setupRoutes(
 	}
 
 	// OpenAPI规范（需要认证，避免暴露API结构信息）
-	protected.GET("/openapi/spec", openAPIHandler.GetOpenAPISpec)
+	protected.GET("/openapi/spec", security.RequireRoutePermission(http.MethodGet, "/openapi/spec"), openAPIHandler.GetOpenAPISpec)
 
 	// API文档页面（公开访问，但需要登录后才能使用API）
 	router.GET("/api-docs", func(c *gin.Context) {

@@ -119,3 +119,92 @@ func TestLookupRoutePermissionForTaskAndAgentRoutes(t *testing.T) {
 		})
 	}
 }
+
+func TestLookupRoutePermissionForKnowledgeAndOpsRoutes(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		method     string
+		path       string
+		permission string
+	}{
+		{method: "GET", path: "/knowledge/categories", permission: PermissionKnowledgeCategoryRead},
+		{method: "GET", path: "/knowledge/items", permission: PermissionKnowledgeItemRead},
+		{method: "GET", path: "/knowledge/items/:id", permission: PermissionKnowledgeItemRead},
+		{method: "POST", path: "/knowledge/items", permission: PermissionKnowledgeItemCreate},
+		{method: "PUT", path: "/knowledge/items/:id", permission: PermissionKnowledgeItemUpdate},
+		{method: "DELETE", path: "/knowledge/items/:id", permission: PermissionKnowledgeItemDelete},
+		{method: "GET", path: "/knowledge/index-status", permission: PermissionKnowledgeIndexRead},
+		{method: "POST", path: "/knowledge/index", permission: PermissionKnowledgeIndexExecute},
+		{method: "POST", path: "/knowledge/scan", permission: PermissionKnowledgeIndexExecute},
+		{method: "GET", path: "/knowledge/retrieval-logs", permission: PermissionKnowledgeRetrievalLogRead},
+		{method: "DELETE", path: "/knowledge/retrieval-logs/:id", permission: PermissionKnowledgeRetrievalLogDelete},
+		{method: "POST", path: "/knowledge/search", permission: PermissionKnowledgeSearchExecute},
+		{method: "GET", path: "/knowledge/stats", permission: PermissionKnowledgeStatsRead},
+		{method: "GET", path: "/vulnerabilities", permission: PermissionVulnerabilityRecordRead},
+		{method: "GET", path: "/vulnerabilities/stats", permission: PermissionVulnerabilityStatsRead},
+		{method: "GET", path: "/vulnerabilities/:id", permission: PermissionVulnerabilityRecordRead},
+		{method: "POST", path: "/vulnerabilities", permission: PermissionVulnerabilityRecordCreate},
+		{method: "PUT", path: "/vulnerabilities/:id", permission: PermissionVulnerabilityRecordUpdate},
+		{method: "DELETE", path: "/vulnerabilities/:id", permission: PermissionVulnerabilityRecordDelete},
+		{method: "GET", path: "/webshell/connections", permission: PermissionWebshellConnectionRead},
+		{method: "POST", path: "/webshell/connections", permission: PermissionWebshellConnectionCreate},
+		{method: "GET", path: "/webshell/connections/:id/ai-history", permission: PermissionWebshellSessionRead},
+		{method: "GET", path: "/webshell/connections/:id/ai-conversations", permission: PermissionWebshellSessionRead},
+		{method: "GET", path: "/webshell/connections/:id/state", permission: PermissionWebshellSessionRead},
+		{method: "PUT", path: "/webshell/connections/:id", permission: PermissionWebshellConnectionUpdate},
+		{method: "PUT", path: "/webshell/connections/:id/state", permission: PermissionWebshellSessionUpdate},
+		{method: "DELETE", path: "/webshell/connections/:id", permission: PermissionWebshellConnectionDelete},
+		{method: "POST", path: "/webshell/exec", permission: PermissionWebshellCommandExecute},
+		{method: "POST", path: "/webshell/file", permission: PermissionWebshellFileExecute},
+		{method: "GET", path: "/chat-uploads", permission: PermissionFileWorkspaceEntryRead},
+		{method: "GET", path: "/chat-uploads/download", permission: PermissionFileWorkspaceContentRead},
+		{method: "GET", path: "/chat-uploads/content", permission: PermissionFileWorkspaceContentRead},
+		{method: "POST", path: "/chat-uploads", permission: PermissionFileWorkspaceEntryCreate},
+		{method: "POST", path: "/chat-uploads/mkdir", permission: PermissionFileWorkspaceEntryCreate},
+		{method: "DELETE", path: "/chat-uploads", permission: PermissionFileWorkspaceEntryDelete},
+		{method: "PUT", path: "/chat-uploads/rename", permission: PermissionFileWorkspaceEntryUpdate},
+		{method: "PUT", path: "/chat-uploads/content", permission: PermissionFileWorkspaceContentUpdate},
+		{method: "GET", path: "/roles", permission: PermissionRoleAgentRoleRead},
+		{method: "GET", path: "/roles/:name", permission: PermissionRoleAgentRoleRead},
+		{method: "GET", path: "/roles/skills/list", permission: PermissionRoleAgentRoleRead},
+		{method: "POST", path: "/roles", permission: PermissionRoleAgentRoleCreate},
+		{method: "PUT", path: "/roles/:name", permission: PermissionRoleAgentRoleUpdate},
+		{method: "DELETE", path: "/roles/:name", permission: PermissionRoleAgentRoleDelete},
+		{method: "GET", path: "/skills", permission: PermissionSkillDefinitionRead},
+		{method: "GET", path: "/skills/stats", permission: PermissionSkillStatsRead},
+		{method: "DELETE", path: "/skills/stats", permission: PermissionSkillStatsDelete},
+		{method: "GET", path: "/skills/:name", permission: PermissionSkillDefinitionRead},
+		{method: "GET", path: "/skills/:name/bound-roles", permission: PermissionSkillBindingRead},
+		{method: "POST", path: "/skills", permission: PermissionSkillDefinitionCreate},
+		{method: "PUT", path: "/skills/:name", permission: PermissionSkillDefinitionUpdate},
+		{method: "DELETE", path: "/skills/:name", permission: PermissionSkillDefinitionDelete},
+		{method: "DELETE", path: "/skills/:name/stats", permission: PermissionSkillStatsDelete},
+		{method: "GET", path: "/external-mcp", permission: PermissionMCPExternalServerRead},
+		{method: "GET", path: "/external-mcp/stats", permission: PermissionMCPExternalServerRead},
+		{method: "GET", path: "/external-mcp/:name", permission: PermissionMCPExternalServerRead},
+		{method: "PUT", path: "/external-mcp/:name", permission: PermissionMCPExternalServerUpdate},
+		{method: "DELETE", path: "/external-mcp/:name", permission: PermissionMCPExternalServerDelete},
+		{method: "POST", path: "/external-mcp/:name/start", permission: PermissionMCPExternalServerStart},
+		{method: "POST", path: "/external-mcp/:name/stop", permission: PermissionMCPExternalServerStop},
+		{method: "POST", path: "/mcp", permission: PermissionMCPGatewayExecute},
+		{method: "POST", path: "/terminal/run", permission: PermissionSystemTerminalExecute},
+		{method: "POST", path: "/terminal/run/stream", permission: PermissionSystemTerminalExecute},
+		{method: "GET", path: "/terminal/ws", permission: PermissionSystemTerminalExecute},
+		{method: "GET", path: "/openapi/spec", permission: PermissionSystemAPISpecRead},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.method+" "+tc.path, func(t *testing.T) {
+			t.Parallel()
+			got, ok := LookupRoutePermission(tc.method, tc.path)
+			if !ok {
+				t.Fatalf("expected route permission for %s %s", tc.method, tc.path)
+			}
+			if got != tc.permission {
+				t.Fatalf("LookupRoutePermission(%q, %q) = %q, want %q", tc.method, tc.path, got, tc.permission)
+			}
+		})
+	}
+}
