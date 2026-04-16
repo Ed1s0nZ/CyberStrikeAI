@@ -634,74 +634,74 @@ func setupRoutes(
 	protected.Use(security.AuthMiddleware(authManager))
 	{
 		// 机器人测试（需登录）：POST /api/robot/test，body: {"platform":"dingtalk","user_id":"test","text":"帮助"}，用于验证机器人逻辑
-		protected.POST("/robot/test", robotHandler.HandleRobotTest)
+		protected.POST("/robot/test", security.RequireRoutePermission(http.MethodPost, "/robot/test"), robotHandler.HandleRobotTest)
 
 		// Agent Loop
-		protected.POST("/agent-loop", agentHandler.AgentLoop)
+		protected.POST("/agent-loop", security.RequireRoutePermission(http.MethodPost, "/agent-loop"), agentHandler.AgentLoop)
 		// Agent Loop 流式输出
-		protected.POST("/agent-loop/stream", agentHandler.AgentLoopStream)
+		protected.POST("/agent-loop/stream", security.RequireRoutePermission(http.MethodPost, "/agent-loop/stream"), agentHandler.AgentLoopStream)
 		// Agent Loop 取消与任务列表
-		protected.POST("/agent-loop/cancel", agentHandler.CancelAgentLoop)
-		protected.GET("/agent-loop/tasks", agentHandler.ListAgentTasks)
-		protected.GET("/agent-loop/tasks/completed", agentHandler.ListCompletedTasks)
+		protected.POST("/agent-loop/cancel", security.RequireRoutePermission(http.MethodPost, "/agent-loop/cancel"), agentHandler.CancelAgentLoop)
+		protected.GET("/agent-loop/tasks", security.RequireRoutePermission(http.MethodGet, "/agent-loop/tasks"), agentHandler.ListAgentTasks)
+		protected.GET("/agent-loop/tasks/completed", security.RequireRoutePermission(http.MethodGet, "/agent-loop/tasks/completed"), agentHandler.ListCompletedTasks)
 
 		// Eino DeepAgent 多代理（与单 Agent 并存，需 config.multi_agent.enabled）
 		// 多代理路由常注册；是否可用由运行时 h.config.MultiAgent.Enabled 决定（应用配置后无需重启）
-		protected.POST("/multi-agent", agentHandler.MultiAgentLoop)
-		protected.POST("/multi-agent/stream", agentHandler.MultiAgentLoopStream)
-		protected.GET("/multi-agent/markdown-agents", markdownAgentsHandler.ListMarkdownAgents)
-		protected.GET("/multi-agent/markdown-agents/:filename", markdownAgentsHandler.GetMarkdownAgent)
-		protected.POST("/multi-agent/markdown-agents", markdownAgentsHandler.CreateMarkdownAgent)
-		protected.PUT("/multi-agent/markdown-agents/:filename", markdownAgentsHandler.UpdateMarkdownAgent)
-		protected.DELETE("/multi-agent/markdown-agents/:filename", markdownAgentsHandler.DeleteMarkdownAgent)
+		protected.POST("/multi-agent", security.RequireRoutePermission(http.MethodPost, "/multi-agent"), agentHandler.MultiAgentLoop)
+		protected.POST("/multi-agent/stream", security.RequireRoutePermission(http.MethodPost, "/multi-agent/stream"), agentHandler.MultiAgentLoopStream)
+		protected.GET("/multi-agent/markdown-agents", security.RequireRoutePermission(http.MethodGet, "/multi-agent/markdown-agents"), markdownAgentsHandler.ListMarkdownAgents)
+		protected.GET("/multi-agent/markdown-agents/:filename", security.RequireRoutePermission(http.MethodGet, "/multi-agent/markdown-agents/:filename"), markdownAgentsHandler.GetMarkdownAgent)
+		protected.POST("/multi-agent/markdown-agents", security.RequireRoutePermission(http.MethodPost, "/multi-agent/markdown-agents"), markdownAgentsHandler.CreateMarkdownAgent)
+		protected.PUT("/multi-agent/markdown-agents/:filename", security.RequireRoutePermission(http.MethodPut, "/multi-agent/markdown-agents/:filename"), markdownAgentsHandler.UpdateMarkdownAgent)
+		protected.DELETE("/multi-agent/markdown-agents/:filename", security.RequireRoutePermission(http.MethodDelete, "/multi-agent/markdown-agents/:filename"), markdownAgentsHandler.DeleteMarkdownAgent)
 
 		// 信息收集 - FOFA 查询（后端代理）
-		protected.POST("/fofa/search", fofaHandler.Search)
+		protected.POST("/fofa/search", security.RequireRoutePermission(http.MethodPost, "/fofa/search"), fofaHandler.Search)
 		// 信息收集 - 自然语言解析为 FOFA 语法（需人工确认后再查询）
-		protected.POST("/fofa/parse", fofaHandler.ParseNaturalLanguage)
+		protected.POST("/fofa/parse", security.RequireRoutePermission(http.MethodPost, "/fofa/parse"), fofaHandler.ParseNaturalLanguage)
 
 		// 批量任务管理
-		protected.POST("/batch-tasks", agentHandler.CreateBatchQueue)
-		protected.GET("/batch-tasks", agentHandler.ListBatchQueues)
-		protected.GET("/batch-tasks/:queueId", agentHandler.GetBatchQueue)
-		protected.POST("/batch-tasks/:queueId/start", agentHandler.StartBatchQueue)
-		protected.POST("/batch-tasks/:queueId/pause", agentHandler.PauseBatchQueue)
-		protected.PUT("/batch-tasks/:queueId/schedule-enabled", agentHandler.SetBatchQueueScheduleEnabled)
-		protected.DELETE("/batch-tasks/:queueId", agentHandler.DeleteBatchQueue)
-		protected.PUT("/batch-tasks/:queueId/tasks/:taskId", agentHandler.UpdateBatchTask)
-		protected.POST("/batch-tasks/:queueId/tasks", agentHandler.AddBatchTask)
-		protected.DELETE("/batch-tasks/:queueId/tasks/:taskId", agentHandler.DeleteBatchTask)
+		protected.POST("/batch-tasks", security.RequireRoutePermission(http.MethodPost, "/batch-tasks"), agentHandler.CreateBatchQueue)
+		protected.GET("/batch-tasks", security.RequireRoutePermission(http.MethodGet, "/batch-tasks"), agentHandler.ListBatchQueues)
+		protected.GET("/batch-tasks/:queueId", security.RequireRoutePermission(http.MethodGet, "/batch-tasks/:queueId"), agentHandler.GetBatchQueue)
+		protected.POST("/batch-tasks/:queueId/start", security.RequireRoutePermission(http.MethodPost, "/batch-tasks/:queueId/start"), agentHandler.StartBatchQueue)
+		protected.POST("/batch-tasks/:queueId/pause", security.RequireRoutePermission(http.MethodPost, "/batch-tasks/:queueId/pause"), agentHandler.PauseBatchQueue)
+		protected.PUT("/batch-tasks/:queueId/schedule-enabled", security.RequireRoutePermission(http.MethodPut, "/batch-tasks/:queueId/schedule-enabled"), agentHandler.SetBatchQueueScheduleEnabled)
+		protected.DELETE("/batch-tasks/:queueId", security.RequireRoutePermission(http.MethodDelete, "/batch-tasks/:queueId"), agentHandler.DeleteBatchQueue)
+		protected.PUT("/batch-tasks/:queueId/tasks/:taskId", security.RequireRoutePermission(http.MethodPut, "/batch-tasks/:queueId/tasks/:taskId"), agentHandler.UpdateBatchTask)
+		protected.POST("/batch-tasks/:queueId/tasks", security.RequireRoutePermission(http.MethodPost, "/batch-tasks/:queueId/tasks"), agentHandler.AddBatchTask)
+		protected.DELETE("/batch-tasks/:queueId/tasks/:taskId", security.RequireRoutePermission(http.MethodDelete, "/batch-tasks/:queueId/tasks/:taskId"), agentHandler.DeleteBatchTask)
 
 		// 对话历史
-		protected.POST("/conversations", conversationHandler.CreateConversation)
-		protected.GET("/conversations", conversationHandler.ListConversations)
-		protected.GET("/conversations/:id", conversationHandler.GetConversation)
+		protected.POST("/conversations", security.RequireRoutePermission(http.MethodPost, "/conversations"), conversationHandler.CreateConversation)
+		protected.GET("/conversations", security.RequireRoutePermission(http.MethodGet, "/conversations"), conversationHandler.ListConversations)
+		protected.GET("/conversations/:id", security.RequireRoutePermission(http.MethodGet, "/conversations/:id"), conversationHandler.GetConversation)
 		protected.GET("/messages/:id/process-details", conversationHandler.GetMessageProcessDetails)
-		protected.PUT("/conversations/:id", conversationHandler.UpdateConversation)
-		protected.DELETE("/conversations/:id", conversationHandler.DeleteConversation)
-		protected.POST("/conversations/:id/delete-turn", conversationHandler.DeleteConversationTurn)
-		protected.PUT("/conversations/:id/pinned", groupHandler.UpdateConversationPinned)
+		protected.PUT("/conversations/:id", security.RequireRoutePermission(http.MethodPut, "/conversations/:id"), conversationHandler.UpdateConversation)
+		protected.DELETE("/conversations/:id", security.RequireRoutePermission(http.MethodDelete, "/conversations/:id"), conversationHandler.DeleteConversation)
+		protected.POST("/conversations/:id/delete-turn", security.RequireRoutePermission(http.MethodPost, "/conversations/:id/delete-turn"), conversationHandler.DeleteConversationTurn)
+		protected.PUT("/conversations/:id/pinned", security.RequireRoutePermission(http.MethodPut, "/conversations/:id/pinned"), groupHandler.UpdateConversationPinned)
 
 		// 对话分组
-		protected.POST("/groups", groupHandler.CreateGroup)
-		protected.GET("/groups", groupHandler.ListGroups)
-		protected.GET("/groups/:id", groupHandler.GetGroup)
-		protected.PUT("/groups/:id", groupHandler.UpdateGroup)
-		protected.DELETE("/groups/:id", groupHandler.DeleteGroup)
-		protected.PUT("/groups/:id/pinned", groupHandler.UpdateGroupPinned)
-		protected.GET("/groups/:id/conversations", groupHandler.GetGroupConversations)
-		protected.GET("/groups/mappings", groupHandler.GetAllMappings)
-		protected.POST("/groups/conversations", groupHandler.AddConversationToGroup)
-		protected.DELETE("/groups/:id/conversations/:conversationId", groupHandler.RemoveConversationFromGroup)
-		protected.PUT("/groups/:id/conversations/:conversationId/pinned", groupHandler.UpdateConversationPinnedInGroup)
+		protected.POST("/groups", security.RequireRoutePermission(http.MethodPost, "/groups"), groupHandler.CreateGroup)
+		protected.GET("/groups", security.RequireRoutePermission(http.MethodGet, "/groups"), groupHandler.ListGroups)
+		protected.GET("/groups/:id", security.RequireRoutePermission(http.MethodGet, "/groups/:id"), groupHandler.GetGroup)
+		protected.PUT("/groups/:id", security.RequireRoutePermission(http.MethodPut, "/groups/:id"), groupHandler.UpdateGroup)
+		protected.DELETE("/groups/:id", security.RequireRoutePermission(http.MethodDelete, "/groups/:id"), groupHandler.DeleteGroup)
+		protected.PUT("/groups/:id/pinned", security.RequireRoutePermission(http.MethodPut, "/groups/:id/pinned"), groupHandler.UpdateGroupPinned)
+		protected.GET("/groups/:id/conversations", security.RequireRoutePermission(http.MethodGet, "/groups/:id/conversations"), groupHandler.GetGroupConversations)
+		protected.GET("/groups/mappings", security.RequireRoutePermission(http.MethodGet, "/groups/mappings"), groupHandler.GetAllMappings)
+		protected.POST("/groups/conversations", security.RequireRoutePermission(http.MethodPost, "/groups/conversations"), groupHandler.AddConversationToGroup)
+		protected.DELETE("/groups/:id/conversations/:conversationId", security.RequireRoutePermission(http.MethodDelete, "/groups/:id/conversations/:conversationId"), groupHandler.RemoveConversationFromGroup)
+		protected.PUT("/groups/:id/conversations/:conversationId/pinned", security.RequireRoutePermission(http.MethodPut, "/groups/:id/conversations/:conversationId/pinned"), groupHandler.UpdateConversationPinnedInGroup)
 
 		// 监控
-		protected.GET("/monitor", monitorHandler.Monitor)
-		protected.GET("/monitor/execution/:id", monitorHandler.GetExecution)
-		protected.POST("/monitor/executions/names", monitorHandler.BatchGetToolNames)
-		protected.DELETE("/monitor/execution/:id", monitorHandler.DeleteExecution)
-		protected.DELETE("/monitor/executions", monitorHandler.DeleteExecutions)
-		protected.GET("/monitor/stats", monitorHandler.GetStats)
+		protected.GET("/monitor", security.RequireRoutePermission(http.MethodGet, "/monitor"), monitorHandler.Monitor)
+		protected.GET("/monitor/execution/:id", security.RequireRoutePermission(http.MethodGet, "/monitor/execution/:id"), monitorHandler.GetExecution)
+		protected.POST("/monitor/executions/names", security.RequireRoutePermission(http.MethodPost, "/monitor/executions/names"), monitorHandler.BatchGetToolNames)
+		protected.DELETE("/monitor/execution/:id", security.RequireRoutePermission(http.MethodDelete, "/monitor/execution/:id"), monitorHandler.DeleteExecution)
+		protected.DELETE("/monitor/executions", security.RequireRoutePermission(http.MethodDelete, "/monitor/executions"), monitorHandler.DeleteExecutions)
+		protected.GET("/monitor/stats", security.RequireRoutePermission(http.MethodGet, "/monitor/stats"), monitorHandler.GetStats)
 
 		// 配置管理
 		protected.GET("/config", security.RequireRoutePermission(http.MethodGet, "/config"), configHandler.GetConfig)
@@ -737,8 +737,8 @@ func setupRoutes(
 		protected.POST("/external-mcp/:name/stop", externalMCPHandler.StopExternalMCP)
 
 		// 攻击链可视化
-		protected.GET("/attack-chain/:conversationId", attackChainHandler.GetAttackChain)
-		protected.POST("/attack-chain/:conversationId/regenerate", attackChainHandler.RegenerateAttackChain)
+		protected.GET("/attack-chain/:conversationId", security.RequireRoutePermission(http.MethodGet, "/attack-chain/:conversationId"), attackChainHandler.GetAttackChain)
+		protected.POST("/attack-chain/:conversationId/regenerate", security.RequireRoutePermission(http.MethodPost, "/attack-chain/:conversationId/regenerate"), attackChainHandler.RegenerateAttackChain)
 
 		// 知识库管理（始终注册路由，通过 App 实例动态获取 handler）
 		knowledgeRoutes := protected.Group("/knowledge")
@@ -940,7 +940,7 @@ func setupRoutes(
 		})
 
 		// OpenAPI结果聚合端点（可选，用于获取对话的完整结果）
-		protected.GET("/conversations/:id/results", openAPIHandler.GetConversationResults)
+		protected.GET("/conversations/:id/results", security.RequireRoutePermission(http.MethodGet, "/conversations/:id/results"), openAPIHandler.GetConversationResults)
 	}
 
 	// OpenAPI规范（需要认证，避免暴露API结构信息）
