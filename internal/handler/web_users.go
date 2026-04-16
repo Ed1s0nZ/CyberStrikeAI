@@ -321,6 +321,9 @@ func isConstraintError(err error) bool {
 	if err == nil {
 		return false
 	}
+	if errors.Is(err, database.ErrWebAccessRolePermissionsEmpty) {
+		return true
+	}
 	message := err.Error()
 	return strings.Contains(message, "UNIQUE constraint failed") ||
 		strings.Contains(message, "FOREIGN KEY constraint failed")

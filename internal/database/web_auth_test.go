@@ -563,8 +563,8 @@ func TestCreateWebAccessRoleRejectsEmptyPermissionsAfterNormalization(t *testing
 	if err == nil {
 		t.Fatal("expected CreateWebAccessRole to fail when normalized permissions are empty")
 	}
-	if !strings.Contains(err.Error(), "FOREIGN KEY constraint failed") {
-		t.Fatalf("expected constraint-style bad request error, got %v", err)
+	if !errors.Is(err, ErrWebAccessRolePermissionsEmpty) {
+		t.Fatalf("expected ErrWebAccessRolePermissionsEmpty, got %v", err)
 	}
 
 	roles, err := db.ListWebAccessRoles()
@@ -599,8 +599,8 @@ func TestUpdateWebAccessRoleRejectsEmptyPermissionsAfterNormalization(t *testing
 	if err == nil {
 		t.Fatal("expected UpdateWebAccessRole to fail when normalized permissions are empty")
 	}
-	if !strings.Contains(err.Error(), "FOREIGN KEY constraint failed") {
-		t.Fatalf("expected constraint-style bad request error, got %v", err)
+	if !errors.Is(err, ErrWebAccessRolePermissionsEmpty) {
+		t.Fatalf("expected ErrWebAccessRolePermissionsEmpty, got %v", err)
 	}
 
 	persisted, err := listPersistedRolePermissions(db, roleID)
