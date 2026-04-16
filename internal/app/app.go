@@ -676,7 +676,7 @@ func setupRoutes(
 		protected.POST("/conversations", security.RequireRoutePermission(http.MethodPost, "/conversations"), conversationHandler.CreateConversation)
 		protected.GET("/conversations", security.RequireRoutePermission(http.MethodGet, "/conversations"), conversationHandler.ListConversations)
 		protected.GET("/conversations/:id", security.RequireRoutePermission(http.MethodGet, "/conversations/:id"), conversationHandler.GetConversation)
-		protected.GET("/messages/:id/process-details", conversationHandler.GetMessageProcessDetails)
+		protected.GET("/messages/:id/process-details", security.RequireRoutePermission(http.MethodGet, "/messages/:id/process-details"), conversationHandler.GetMessageProcessDetails)
 		protected.PUT("/conversations/:id", security.RequireRoutePermission(http.MethodPut, "/conversations/:id"), conversationHandler.UpdateConversation)
 		protected.DELETE("/conversations/:id", security.RequireRoutePermission(http.MethodDelete, "/conversations/:id"), conversationHandler.DeleteConversation)
 		protected.POST("/conversations/:id/delete-turn", security.RequireRoutePermission(http.MethodPost, "/conversations/:id/delete-turn"), conversationHandler.DeleteConversationTurn)

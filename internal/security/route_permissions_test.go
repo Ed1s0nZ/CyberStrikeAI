@@ -78,6 +78,7 @@ func TestLookupRoutePermissionForTaskAndAgentRoutes(t *testing.T) {
 		{method: "POST", path: "/conversations", permission: PermissionTaskConversationCreate},
 		{method: "GET", path: "/conversations", permission: PermissionTaskConversationRead},
 		{method: "GET", path: "/conversations/:id", permission: PermissionTaskConversationRead},
+		{method: "GET", path: "/messages/:id/process-details", permission: PermissionTaskConversationRead},
 		{method: "PUT", path: "/conversations/:id", permission: PermissionTaskConversationUpdate},
 		{method: "DELETE", path: "/conversations/:id", permission: PermissionTaskConversationDelete},
 		{method: "POST", path: "/conversations/:id/delete-turn", permission: PermissionTaskConversationUpdate},

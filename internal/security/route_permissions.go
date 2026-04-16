@@ -46,6 +46,7 @@ var routePermissionRegistry = map[string]string{
 	"POST /conversations":                                  PermissionTaskConversationCreate,
 	"GET /conversations":                                   PermissionTaskConversationRead,
 	"GET /conversations/:id":                               PermissionTaskConversationRead,
+	"GET /messages/:id/process-details":                    PermissionTaskConversationRead,
 	"PUT /conversations/:id":                               PermissionTaskConversationUpdate,
 	"DELETE /conversations/:id":                            PermissionTaskConversationDelete,
 	"POST /conversations/:id/delete-turn":                  PermissionTaskConversationUpdate,
