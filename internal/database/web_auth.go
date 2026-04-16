@@ -49,7 +49,11 @@ type CreateWebAccessRoleInput struct {
 
 // CreateWebAccessRole inserts a role with permissions.
 func (db *DB) CreateWebAccessRole(input CreateWebAccessRoleInput) (string, error) {
+	rawPermissions := input.Permissions
 	input.Permissions = db.normalizeWebPermissions(input.Permissions)
+	if err := validateNonEmptyWebAccessRolePermissions(rawPermissions, input.Permissions); err != nil {
+		return "", err
+	}
 
 	roleID := uuid.NewString()
 	tx, err := db.Begin()

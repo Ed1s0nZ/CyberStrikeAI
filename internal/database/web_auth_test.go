@@ -550,6 +550,69 @@ func TestGetWebUserWithPermissionsByUsernameNormalizesLegacyPermissions(t *testi
 	}
 }
 
+func TestCreateWebAccessRoleRejectsEmptyPermissionsAfterNormalization(t *testing.T) {
+	db := openTestWebAuthDB(t)
+	db.SetWebPermissionNormalizer(testNormalizeWebPermissions)
+
+	_, err := db.CreateWebAccessRole(CreateWebAccessRoleInput{
+		Name:        "normalized-empty-role",
+		Description: "all provided permissions are filtered out",
+		Permissions: []string{"unknown.permission", " ", "\t"},
+		IsSystem:    false,
+	})
+	if err == nil {
+		t.Fatal("expected CreateWebAccessRole to fail when normalized permissions are empty")
+	}
+	if !strings.Contains(err.Error(), "FOREIGN KEY constraint failed") {
+		t.Fatalf("expected constraint-style bad request error, got %v", err)
+	}
+
+	roles, err := db.ListWebAccessRoles()
+	if err != nil {
+		t.Fatalf("ListWebAccessRoles() error = %v", err)
+	}
+	if len(roles) != 0 {
+		t.Fatalf("expected no role persisted on failed create, got %d", len(roles))
+	}
+}
+
+func TestUpdateWebAccessRoleRejectsEmptyPermissionsAfterNormalization(t *testing.T) {
+	db := openTestWebAuthDB(t)
+
+	roleID, err := db.CreateWebAccessRole(CreateWebAccessRoleInput{
+		Name:        "web-user-reader",
+		Description: "canonical read permission",
+		Permissions: []string{"system.web_user.read"},
+		IsSystem:    false,
+	})
+	if err != nil {
+		t.Fatalf("CreateWebAccessRole() error = %v", err)
+	}
+
+	db.SetWebPermissionNormalizer(testNormalizeWebPermissions)
+	_, err = db.UpdateWebAccessRole(UpdateWebAccessRoleInput{
+		ID:          roleID,
+		Name:        "web-user-reader-updated",
+		Description: "attempt to clear permissions through normalization",
+		Permissions: []string{"unknown.permission", " ", "\n"},
+	})
+	if err == nil {
+		t.Fatal("expected UpdateWebAccessRole to fail when normalized permissions are empty")
+	}
+	if !strings.Contains(err.Error(), "FOREIGN KEY constraint failed") {
+		t.Fatalf("expected constraint-style bad request error, got %v", err)
+	}
+
+	persisted, err := listPersistedRolePermissions(db, roleID)
+	if err != nil {
+		t.Fatalf("listPersistedRolePermissions() error = %v", err)
+	}
+	want := []string{"system.web_user.read"}
+	if !equalStringSlices(persisted, want) {
+		t.Fatalf("persisted permissions after failed update = %#v, want %#v", persisted, want)
+	}
+}
+
 func listPersistedRolePermissions(db *DB, roleID string) ([]string, error) {
 	rows, err := db.Query(
 		`SELECT permission FROM web_access_role_permissions WHERE role_id = ? ORDER BY permission ASC`,

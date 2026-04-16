@@ -204,7 +204,11 @@ func (db *DB) GetWebAccessRoleByID(roleID string) (*WebAccessRole, error) {
 
 // UpdateWebAccessRole updates a web access role and replaces its permissions.
 func (db *DB) UpdateWebAccessRole(input UpdateWebAccessRoleInput) (*WebAccessRole, error) {
+	rawPermissions := input.Permissions
 	input.Permissions = db.normalizeWebPermissions(input.Permissions)
+	if err := validateNonEmptyWebAccessRolePermissions(rawPermissions, input.Permissions); err != nil {
+		return nil, err
+	}
 
 	tx, err := db.Begin()
 	if err != nil {

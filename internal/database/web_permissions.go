@@ -1,6 +1,11 @@
 package database
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
+
+var errWebAccessRolePermissionsEmpty = errors.New("FOREIGN KEY constraint failed: web_access_role_permissions.permission")
 
 // SetWebPermissionNormalizer configures role permission normalization for Web RBAC persistence.
 // Passing nil disables custom normalization and falls back to trimmed de-duplication.
@@ -35,4 +40,11 @@ func dedupeTrimmedPermissions(input []string) []string {
 		result = append(result, permission)
 	}
 	return result
+}
+
+func validateNonEmptyWebAccessRolePermissions(inputPermissions, normalizedPermissions []string) error {
+	if len(inputPermissions) > 0 && len(normalizedPermissions) == 0 {
+		return errWebAccessRolePermissionsEmpty
+	}
+	return nil
 }
