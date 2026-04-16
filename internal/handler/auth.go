@@ -158,10 +158,20 @@ func (h *AuthHandler) Validate(c *gin.Context) {
 		return
 	}
 
+	rawPermissions := make([]string, 0, len(session.Permissions))
+	for permission := range session.Permissions {
+		rawPermissions = append(rawPermissions, permission)
+	}
+	permissions := security.NormalizeWebPermissions(rawPermissions)
+	if permissions == nil {
+		permissions = []string{}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"token":                session.Token,
 		"username":             session.Username,
 		"expires_at":           session.ExpiresAt.UTC().Format(time.RFC3339),
 		"must_change_password": session.MustChangePassword,
+		"permissions":          permissions,
 	})
 }

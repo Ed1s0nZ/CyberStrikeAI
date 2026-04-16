@@ -1250,6 +1250,13 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 												"type":        "boolean",
 												"description": "下次登录是否必须修改密码",
 											},
+											"permissions": map[string]interface{}{
+												"type":        "array",
+												"description": "当前会话生效的 canonical 权限标识",
+												"items": map[string]interface{}{
+													"type": "string",
+												},
+											},
 										},
 									},
 								},
@@ -3819,6 +3826,66 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"401": map[string]interface{}{"description": "未授权"},
 						"403": map[string]interface{}{"description": "权限不足"},
 						"404": map[string]interface{}{"description": "Web 访问角色不存在"},
+					},
+				},
+			},
+			"/api/security/web-access-roles/permission-catalog": map[string]interface{}{
+				"get": map[string]interface{}{
+					"tags":        []string{"安全设置"},
+					"summary":     "获取 Web RBAC 权限目录",
+					"description": "返回按 domain/resource 分组的 canonical Web 权限目录。",
+					"operationId": "getWebAccessRolePermissionCatalog",
+					"responses": map[string]interface{}{
+						"200": map[string]interface{}{
+							"description": "获取成功",
+							"content": map[string]interface{}{
+								"application/json": map[string]interface{}{
+									"schema": map[string]interface{}{
+										"type": "object",
+										"properties": map[string]interface{}{
+											"domains": map[string]interface{}{
+												"type": "array",
+												"items": map[string]interface{}{
+													"type": "object",
+													"properties": map[string]interface{}{
+														"domain": map[string]interface{}{
+															"type": "string",
+														},
+														"resources": map[string]interface{}{
+															"type": "array",
+															"items": map[string]interface{}{
+																"type": "object",
+																"properties": map[string]interface{}{
+																	"resource": map[string]interface{}{
+																		"type": "string",
+																	},
+																	"actions": map[string]interface{}{
+																		"type": "array",
+																		"items": map[string]interface{}{
+																			"type": "object",
+																			"properties": map[string]interface{}{
+																				"action": map[string]interface{}{
+																					"type": "string",
+																				},
+																				"permission": map[string]interface{}{
+																					"type": "string",
+																				},
+																			},
+																		},
+																	},
+																},
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						"401": map[string]interface{}{"description": "未授权"},
+						"403": map[string]interface{}{"description": "权限不足"},
 					},
 				},
 			},

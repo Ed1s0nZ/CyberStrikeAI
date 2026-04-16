@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"sort"
 	"strings"
 
 	"cyberstrike-ai/internal/database"
@@ -61,10 +62,16 @@ func (h *WebAccessRolesHandler) CreateWebAccessRole(c *gin.Context) {
 		return
 	}
 
+	validatedPermissions, err := validateCanonicalRolePermissions(req.Permissions)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	roleID, err := h.db.CreateWebAccessRole(database.CreateWebAccessRoleInput{
 		Name:        req.Name,
 		Description: req.Description,
-		Permissions: req.Permissions,
+		Permissions: validatedPermissions,
 		IsSystem:    false,
 	})
 	if err != nil {
@@ -96,6 +103,12 @@ func (h *WebAccessRolesHandler) UpdateWebAccessRole(c *gin.Context) {
 		return
 	}
 
+	validatedPermissions, err := validateCanonicalRolePermissions(req.Permissions)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	existing, err := h.db.GetWebAccessRoleByID(roleID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -120,7 +133,7 @@ func (h *WebAccessRolesHandler) UpdateWebAccessRole(c *gin.Context) {
 		ID:          roleID,
 		Name:        req.Name,
 		Description: req.Description,
-		Permissions: req.Permissions,
+		Permissions: validatedPermissions,
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -180,6 +193,13 @@ func (h *WebAccessRolesHandler) DeleteWebAccessRole(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Web 访问角色已删除"})
 }
 
+// GetPermissionCatalog returns canonical grouped permissions for RBAC role editing.
+func (h *WebAccessRolesHandler) GetPermissionCatalog(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"domains": security.CanonicalWebPermissionCatalog(),
+	})
+}
+
 func webAccessRoleResponse(role *database.WebAccessRole) gin.H {
 	return gin.H{
 		"id":          role.ID,
@@ -205,4 +225,54 @@ func (h *WebAccessRolesHandler) writeServerError(c *gin.Context, message string,
 		h.logger.Error(message, zap.Error(err))
 	}
 	c.JSON(http.StatusInternalServerError, gin.H{"error": message})
+}
+
+func validateCanonicalRolePermissions(input []string) ([]string, error) {
+	if len(input) == 0 {
+		return nil, database.ErrWebAccessRolePermissionsEmpty
+	}
+
+	canonical := make([]string, 0, len(input))
+	seen := make(map[string]struct{}, len(input))
+	retired := make([]string, 0)
+	unapproved := make([]string, 0)
+
+	for _, permission := range input {
+		permission = strings.TrimSpace(permission)
+		if permission == "" {
+			unapproved = append(unapproved, permission)
+			continue
+		}
+
+		if security.IsCanonicalWebPermission(permission) {
+			if _, ok := seen[permission]; ok {
+				continue
+			}
+			seen[permission] = struct{}{}
+			canonical = append(canonical, permission)
+			continue
+		}
+
+		if len(security.NormalizeWebPermissions([]string{permission})) > 0 {
+			retired = append(retired, permission)
+			continue
+		}
+
+		unapproved = append(unapproved, permission)
+	}
+
+	if len(retired) > 0 {
+		sort.Strings(retired)
+		return nil, errors.New("permissions 包含已废弃标识: " + strings.Join(retired, ", "))
+	}
+	if len(unapproved) > 0 {
+		sort.Strings(unapproved)
+		return nil, errors.New("permissions 包含未注册标识: " + strings.Join(unapproved, ", "))
+	}
+	if len(canonical) == 0 {
+		return nil, database.ErrWebAccessRolePermissionsEmpty
+	}
+
+	sort.Strings(canonical)
+	return canonical, nil
 }

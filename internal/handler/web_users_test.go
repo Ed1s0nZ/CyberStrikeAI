@@ -51,6 +51,7 @@ func setupWebAuthRouter(t *testing.T) (*gin.Engine, *database.DB, *security.Auth
 	protected.POST("/security/web-access-roles", security.RequirePermission(security.PermissionSecurityRolesManage), webAccessRolesHandler.CreateWebAccessRole)
 	protected.PUT("/security/web-access-roles/:id", security.RequirePermission(security.PermissionSecurityRolesManage), webAccessRolesHandler.UpdateWebAccessRole)
 	protected.DELETE("/security/web-access-roles/:id", security.RequirePermission(security.PermissionSecurityRolesManage), webAccessRolesHandler.DeleteWebAccessRole)
+	protected.GET("/security/web-access-roles/permission-catalog", security.RequirePermission(security.PermissionSecurityRolesManage), webAccessRolesHandler.GetPermissionCatalog)
 
 	return router, db, authManager
 }
@@ -306,6 +307,81 @@ func TestWebAccessRolesHandler_CreateRole_DuplicateRejected(t *testing.T) {
 	}
 }
 
+func TestCreateWebAccessRoleRejectsLegacyPermission(t *testing.T) {
+	router, _, _ := setupWebAuthRouter(t)
+	adminToken := mustLoginToken(t, router, "admin", "LegacyPass123!")
+
+	w := doJSONRequest(t, router, http.MethodPost, "/api/security/web-access-roles", map[string]any{
+		"name":        "legacy-permission-role",
+		"description": "uses retired permission identifiers",
+		"permissions": []string{security.PermissionSecurityRolesManageLegacy},
+	}, adminToken)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for legacy permissions, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestWebAccessRolesHandler_CreateRoleRejectsUnknownCanonicalPermission(t *testing.T) {
+	router, _, _ := setupWebAuthRouter(t)
+	adminToken := mustLoginToken(t, router, "admin", "LegacyPass123!")
+
+	w := doJSONRequest(t, router, http.MethodPost, "/api/security/web-access-roles", map[string]any{
+		"name":        "unknown-permission-role",
+		"description": "uses unknown canonical-like identifier",
+		"permissions": []string{"system.web_access_role.publish"},
+	}, adminToken)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unknown canonical permission, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestWebAccessRolesHandler_UpdateRoleRejectsLegacyPermission(t *testing.T) {
+	router, db, _ := setupWebAuthRouter(t)
+	adminToken := mustLoginToken(t, router, "admin", "LegacyPass123!")
+	roleID := createWebAuthTestRole(t, db, "update-role-legacy-reject", []string{security.PermissionSystemWebAccessRoleRead})
+
+	w := doJSONRequest(t, router, http.MethodPut, "/api/security/web-access-roles/"+roleID, map[string]any{
+		"name":        "update-role-legacy-reject",
+		"description": "attempt with retired permission",
+		"permissions": []string{security.PermissionSecurityRolesManageLegacy},
+	}, adminToken)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for legacy permissions on update, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestWebAccessRolesHandler_PermissionCatalog(t *testing.T) {
+	router, _, _ := setupWebAuthRouter(t)
+	adminToken := mustLoginToken(t, router, "admin", "LegacyPass123!")
+
+	w := doJSONRequest(t, router, http.MethodGet, "/api/security/web-access-roles/permission-catalog", nil, adminToken)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var response struct {
+		Domains []struct {
+			Domain    string `json:"domain"`
+			Resources []struct {
+				Resource string `json:"resource"`
+				Actions  []struct {
+					Action     string `json:"action"`
+					Permission string `json:"permission"`
+				} `json:"actions"`
+			} `json:"resources"`
+		} `json:"domains"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	if len(response.Domains) == 0 {
+		t.Fatalf("expected non-empty permission catalog domains: %s", w.Body.String())
+	}
+}
+
 func TestWebAccessRolesHandler_UpdateRole_RevokesOnlyAffectedSessions(t *testing.T) {
 	router, db, _ := setupWebAuthRouter(t)
 	affectedRoleID := createWebAuthTestRole(t, db, "affected-role", []string{security.PermissionSystemConfigRead})
@@ -317,7 +393,7 @@ func TestWebAccessRolesHandler_UpdateRole_RevokesOnlyAffectedSessions(t *testing
 	update := doJSONRequest(t, router, http.MethodPut, "/api/security/web-access-roles/"+affectedRoleID, map[string]any{
 		"name":        "affected-role-updated",
 		"description": "updated description",
-		"permissions": []string{security.PermissionSystemConfigRead, security.PermissionSecurityUsersManage},
+		"permissions": []string{security.PermissionSystemConfigSettingsRead, security.PermissionSystemWebUserRead},
 	}, adminToken)
 	if update.Code != http.StatusOK {
 		t.Fatalf("expected update role 200, got %d: %s", update.Code, update.Body.String())

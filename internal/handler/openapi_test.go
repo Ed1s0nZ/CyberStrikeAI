@@ -68,4 +68,43 @@ func TestOpenAPI_IncludesWebUserRbacEndpoints(t *testing.T) {
 	if _, ok := paths["/api/security/web-access-roles"]; !ok {
 		t.Fatal("expected /api/security/web-access-roles path in OpenAPI output")
 	}
+	if _, ok := paths["/api/security/web-access-roles/permission-catalog"]; !ok {
+		t.Fatal("expected /api/security/web-access-roles/permission-catalog path in OpenAPI output")
+	}
+
+	validatePath, ok := paths["/api/auth/validate"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected /api/auth/validate path in OpenAPI output")
+	}
+	getOp, ok := validatePath["get"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected GET operation for /api/auth/validate")
+	}
+	responses, ok := getOp["responses"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected responses for /api/auth/validate")
+	}
+	response200, ok := responses["200"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected 200 response for /api/auth/validate")
+	}
+	content, ok := response200["content"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected content for /api/auth/validate 200 response")
+	}
+	jsonContent, ok := content["application/json"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected application/json schema for /api/auth/validate")
+	}
+	schema, ok := jsonContent["schema"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected schema for /api/auth/validate")
+	}
+	properties, ok := schema["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected properties in /api/auth/validate schema")
+	}
+	if _, ok := properties["permissions"]; !ok {
+		t.Fatal("expected permissions field in /api/auth/validate schema")
+	}
 }

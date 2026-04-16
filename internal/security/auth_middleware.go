@@ -1,6 +1,7 @@
 package security
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -57,6 +58,16 @@ func RequirePermission(permission string) gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+// RequireRoutePermission enforces route-level canonical permission binding.
+// It panics if the route is missing from the permission registry.
+func RequireRoutePermission(method, path string) gin.HandlerFunc {
+	permission, ok := LookupRoutePermission(method, path)
+	if !ok {
+		panic(fmt.Sprintf("missing route permission binding for %s %s", method, path))
+	}
+	return RequirePermission(permission)
 }
 
 func extractTokenFromRequest(c *gin.Context) string {

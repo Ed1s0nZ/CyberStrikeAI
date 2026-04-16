@@ -79,3 +79,32 @@ func TestRequirePermission_ReturnsForbidden(t *testing.T) {
 		t.Fatalf("expected 403, got %d", w.Code)
 	}
 }
+
+func TestRequireRoutePermission_UsesCanonicalRouteBinding(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/protected", func(c *gin.Context) {
+		c.Set(ContextPermissionsKey, map[string]struct{}{PermissionSystemWebUserRead: {}})
+		c.Next()
+	}, RequireRoutePermission(http.MethodGet, "/security/web-users"), func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", w.Code)
+	}
+}
+
+func TestRequireRoutePermission_PanicsWhenRouteUnbound(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("expected RequireRoutePermission to panic for unbound route")
+		}
+	}()
+
+	_ = RequireRoutePermission(http.MethodGet, "/unknown/route")
+}

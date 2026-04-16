@@ -7,6 +7,21 @@ import (
 
 type permissionResourceActions map[string][]string
 
+type PermissionCatalogAction struct {
+	Action     string `json:"action"`
+	Permission string `json:"permission"`
+}
+
+type PermissionCatalogResource struct {
+	Resource string                    `json:"resource"`
+	Actions  []PermissionCatalogAction `json:"actions"`
+}
+
+type PermissionCatalogDomain struct {
+	Domain    string                      `json:"domain"`
+	Resources []PermissionCatalogResource `json:"resources"`
+}
+
 var canonicalPermissionCatalog = map[string]permissionResourceActions{
 	"intel": {
 		"fofa_query": {"execute"},
@@ -147,4 +162,48 @@ func buildCanonicalWebPermissions() []string {
 	}
 	sort.Strings(permissions)
 	return permissions
+}
+
+func CanonicalWebPermissionCatalog() []PermissionCatalogDomain {
+	domains := make([]string, 0, len(canonicalPermissionCatalog))
+	for domain := range canonicalPermissionCatalog {
+		domains = append(domains, domain)
+	}
+	sort.Strings(domains)
+
+	result := make([]PermissionCatalogDomain, 0, len(domains))
+	for _, domain := range domains {
+		resources := canonicalPermissionCatalog[domain]
+		resourceNames := make([]string, 0, len(resources))
+		for resource := range resources {
+			resourceNames = append(resourceNames, resource)
+		}
+		sort.Strings(resourceNames)
+
+		catalogResources := make([]PermissionCatalogResource, 0, len(resourceNames))
+		for _, resource := range resourceNames {
+			actions := append([]string(nil), resources[resource]...)
+			sort.Strings(actions)
+
+			catalogActions := make([]PermissionCatalogAction, 0, len(actions))
+			for _, action := range actions {
+				catalogActions = append(catalogActions, PermissionCatalogAction{
+					Action:     action,
+					Permission: domain + "." + resource + "." + action,
+				})
+			}
+
+			catalogResources = append(catalogResources, PermissionCatalogResource{
+				Resource: resource,
+				Actions:  catalogActions,
+			})
+		}
+
+		result = append(result, PermissionCatalogDomain{
+			Domain:    domain,
+			Resources: catalogResources,
+		})
+	}
+
+	return result
 }

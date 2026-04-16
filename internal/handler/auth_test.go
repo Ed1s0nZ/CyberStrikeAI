@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"testing"
 
 	"cyberstrike-ai/internal/config"
@@ -201,5 +203,72 @@ func TestAuthHandler_ChangePassword_InvalidatesOldPasswordAndSession(t *testing.
 	}, "")
 	if loginWithNewPassword.Code != http.StatusOK {
 		t.Fatalf("expected new password login 200, got %d: %s", loginWithNewPassword.Code, loginWithNewPassword.Body.String())
+	}
+}
+
+func TestValidateReturnsCanonicalPermissions(t *testing.T) {
+	router, db := setupAuthHandlerTest(t)
+
+	roleID, err := db.CreateWebAccessRole(database.CreateWebAccessRoleInput{
+		Name:        "role-canonical-validate",
+		Description: "validate permissions role",
+		Permissions: []string{
+			security.PermissionSecurityUsersManageLegacy,
+			security.PermissionSystemConfigReadLegacy,
+		},
+		IsSystem: false,
+	})
+	if err != nil {
+		t.Fatalf("CreateWebAccessRole() error = %v", err)
+	}
+
+	passwordHash, err := security.HashPassword("ValidatePass123!")
+	if err != nil {
+		t.Fatalf("HashPassword() error = %v", err)
+	}
+	if _, err := db.CreateWebUser(database.CreateWebUserInput{
+		Username:           "validate-user",
+		DisplayName:        "Validate User",
+		PasswordHash:       passwordHash,
+		Enabled:            true,
+		MustChangePassword: false,
+		RoleIDs:            []string{roleID},
+	}); err != nil {
+		t.Fatalf("CreateWebUser() error = %v", err)
+	}
+
+	login := doAuthJSONRequest(t, router, http.MethodPost, "/api/auth/login", map[string]string{
+		"username": "validate-user",
+		"password": "ValidatePass123!",
+	}, "")
+	if login.Code != http.StatusOK {
+		t.Fatalf("expected login 200, got %d: %s", login.Code, login.Body.String())
+	}
+	token := extractLoginToken(t, login)
+
+	validate := doAuthJSONRequest(t, router, http.MethodGet, "/api/auth/validate", nil, token)
+	if validate.Code != http.StatusOK {
+		t.Fatalf("expected validate 200, got %d: %s", validate.Code, validate.Body.String())
+	}
+
+	var response struct {
+		Permissions []string `json:"permissions"`
+	}
+	if err := json.Unmarshal(validate.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal(validate response) error = %v", err)
+	}
+
+	want := []string{
+		security.PermissionSystemConfigSettingsRead,
+		security.PermissionSystemWebUserCreate,
+		security.PermissionSystemWebUserCredentialReset,
+		security.PermissionSystemWebUserDelete,
+		security.PermissionSystemWebUserRead,
+		security.PermissionSystemWebUserUpdate,
+	}
+	sort.Strings(want)
+
+	if !reflect.DeepEqual(response.Permissions, want) {
+		t.Fatalf("validate permissions = %#v, want %#v", response.Permissions, want)
 	}
 }

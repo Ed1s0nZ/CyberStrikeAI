@@ -704,22 +704,23 @@ func setupRoutes(
 		protected.GET("/monitor/stats", monitorHandler.GetStats)
 
 		// 配置管理
-		protected.GET("/config", security.RequirePermission(security.PermissionSystemConfigRead), configHandler.GetConfig)
-		protected.GET("/config/tools", security.RequirePermission(security.PermissionSystemConfigRead), configHandler.GetTools)
-		protected.PUT("/config", security.RequirePermission(security.PermissionSystemConfigWrite), configHandler.UpdateConfig)
-		protected.POST("/config/apply", security.RequirePermission(security.PermissionSystemConfigWrite), configHandler.ApplyConfig)
-		protected.POST("/config/test-openai", security.RequirePermission(security.PermissionSystemConfigWrite), configHandler.TestOpenAI)
+		protected.GET("/config", security.RequireRoutePermission(http.MethodGet, "/config"), configHandler.GetConfig)
+		protected.GET("/config/tools", security.RequireRoutePermission(http.MethodGet, "/config/tools"), configHandler.GetTools)
+		protected.PUT("/config", security.RequireRoutePermission(http.MethodPut, "/config"), configHandler.UpdateConfig)
+		protected.POST("/config/apply", security.RequireRoutePermission(http.MethodPost, "/config/apply"), configHandler.ApplyConfig)
+		protected.POST("/config/test-openai", security.RequireRoutePermission(http.MethodPost, "/config/test-openai"), configHandler.TestOpenAI)
 
 		// Web 用户与 Web 访问角色管理
-		protected.GET("/security/web-users", security.RequirePermission(security.PermissionSecurityUsersManage), webUsersHandler.ListWebUsers)
-		protected.POST("/security/web-users", security.RequirePermission(security.PermissionSecurityUsersManage), webUsersHandler.CreateWebUser)
-		protected.PUT("/security/web-users/:id", security.RequirePermission(security.PermissionSecurityUsersManage), webUsersHandler.UpdateWebUser)
-		protected.POST("/security/web-users/:id/reset-password", security.RequirePermission(security.PermissionSecurityUsersManage), webUsersHandler.ResetWebUserPassword)
-		protected.DELETE("/security/web-users/:id", security.RequirePermission(security.PermissionSecurityUsersManage), webUsersHandler.DeleteWebUser)
-		protected.GET("/security/web-access-roles", security.RequirePermission(security.PermissionSecurityRolesManage), webAccessRolesHandler.ListWebAccessRoles)
-		protected.POST("/security/web-access-roles", security.RequirePermission(security.PermissionSecurityRolesManage), webAccessRolesHandler.CreateWebAccessRole)
-		protected.PUT("/security/web-access-roles/:id", security.RequirePermission(security.PermissionSecurityRolesManage), webAccessRolesHandler.UpdateWebAccessRole)
-		protected.DELETE("/security/web-access-roles/:id", security.RequirePermission(security.PermissionSecurityRolesManage), webAccessRolesHandler.DeleteWebAccessRole)
+		protected.GET("/security/web-users", security.RequireRoutePermission(http.MethodGet, "/security/web-users"), webUsersHandler.ListWebUsers)
+		protected.POST("/security/web-users", security.RequireRoutePermission(http.MethodPost, "/security/web-users"), webUsersHandler.CreateWebUser)
+		protected.PUT("/security/web-users/:id", security.RequireRoutePermission(http.MethodPut, "/security/web-users/:id"), webUsersHandler.UpdateWebUser)
+		protected.POST("/security/web-users/:id/reset-password", security.RequireRoutePermission(http.MethodPost, "/security/web-users/:id/reset-password"), webUsersHandler.ResetWebUserPassword)
+		protected.DELETE("/security/web-users/:id", security.RequireRoutePermission(http.MethodDelete, "/security/web-users/:id"), webUsersHandler.DeleteWebUser)
+		protected.GET("/security/web-access-roles", security.RequireRoutePermission(http.MethodGet, "/security/web-access-roles"), webAccessRolesHandler.ListWebAccessRoles)
+		protected.POST("/security/web-access-roles", security.RequireRoutePermission(http.MethodPost, "/security/web-access-roles"), webAccessRolesHandler.CreateWebAccessRole)
+		protected.PUT("/security/web-access-roles/:id", security.RequireRoutePermission(http.MethodPut, "/security/web-access-roles/:id"), webAccessRolesHandler.UpdateWebAccessRole)
+		protected.DELETE("/security/web-access-roles/:id", security.RequireRoutePermission(http.MethodDelete, "/security/web-access-roles/:id"), webAccessRolesHandler.DeleteWebAccessRole)
+		protected.GET("/security/web-access-roles/permission-catalog", security.RequireRoutePermission(http.MethodGet, "/security/web-access-roles/permission-catalog"), webAccessRolesHandler.GetPermissionCatalog)
 
 		// 系统设置 - 终端（执行命令，提高运维效率）
 		protected.POST("/terminal/run", terminalHandler.RunCommand)
