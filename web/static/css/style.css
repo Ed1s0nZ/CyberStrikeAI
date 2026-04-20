@@ -14188,13 +14188,69 @@ header {
 
 .role-tools-stats {
     display: flex;
-    gap: 16px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
     padding: 8px 12px;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 6px;
     font-size: 0.8125rem;
     color: var(--text-secondary);
+}
+
+.role-tools-stats-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+}
+
+.role-tools-stats-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+    width: 100%;
+}
+
+.role-tool-mcp-disabled-badge {
+    padding: 2px 6px;
+    background: rgba(108, 117, 125, 0.15);
+    color: var(--text-muted);
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
+    margin-left: 4px;
+}
+
+.role-tools-filter-banner {
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    border: 1px solid var(--border-color);
+}
+.role-tools-filter-banner-on {
+    background: rgba(0, 102, 255, 0.08);
+    color: var(--text-primary);
+    border-color: rgba(0, 102, 255, 0.25);
+}
+.role-tools-filter-banner-off {
+    background: rgba(108, 117, 125, 0.1);
+    color: var(--text-secondary);
+}
+
+.role-tool-mcp-on-badge {
+    padding: 2px 6px;
+    background: rgba(25, 135, 84, 0.12);
+    color: #198754;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    margin-left: 6px;
 }
 
 .role-tools-stats span {
@@ -14446,118 +14502,6 @@ header {
         top: 8px;
         right: 8px;
     }
-}
-
-/* Skills选择相关样式 */
-.role-skills-controls {
-    margin-bottom: 12px;
-}
-
-.role-skills-actions {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-}
-
-.role-skills-search-box {
-    position: relative;
-    flex: 1;
-    min-width: 200px;
-    max-width: 400px;
-}
-
-.role-skills-search-box input {
-    width: 100%;
-    padding: 8px 32px 8px 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    font-size: 0.875rem;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    transition: all 0.2s;
-}
-
-.role-skills-search-box input:focus {
-    outline: none;
-    border-color: var(--accent-color);
-    box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
-}
-
-.role-skills-search-clear {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--text-secondary);
-    padding: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: color 0.2s;
-}
-
-.role-skills-search-clear:hover {
-    color: var(--text-primary);
-}
-
-.role-skills-stats {
-    font-size: 0.8125rem;
-    color: var(--text-secondary);
-    margin-top: 8px;
-}
-
-.role-skills-list {
-    max-height: 300px;
-    overflow-y: auto;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 8px;
-    background: var(--bg-primary);
-}
-
-.role-skill-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 10px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    background: var(--bg-primary);
-    transition: all 0.2s ease;
-    margin-bottom: 6px;
-}
-
-.role-skill-item:last-child {
-    margin-bottom: 0;
-}
-
-.role-skill-item:hover {
-    background: var(--bg-secondary);
-    border-color: var(--accent-color);
-    box-shadow: 0 2px 4px rgba(0, 102, 255, 0.1);
-}
-
-.role-skill-item .checkbox-text {
-    font-size: 0.9375rem;
-    color: var(--text-primary);
-    font-weight: 500;
-}
-
-.skills-loading,
-.skills-empty,
-.skills-error {
-    padding: 20px;
-    text-align: center;
-    color: var(--text-secondary);
-    font-size: 0.875rem;
-}
-
-.skills-error {
-    color: var(--error-color);
 }
 
 /* Skills管理页面样式 */

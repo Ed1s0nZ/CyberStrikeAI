@@ -117,7 +117,7 @@ CyberStrikeAI is an **AI-native security testing platform** built in Go. It inte
 - 📋 Batch task management: create task queues, add multiple tasks, and execute them sequentially
 - 🎭 Role-based testing: predefined security testing roles (Penetration Testing, CTF, Web App Scanning, etc.) with custom prompts and tool restrictions
 - 🧩 **Multi-agent (CloudWeGo Eino)**: alongside **single-agent ReAct** (`/api/agent-loop`), **multi mode** (`/api/multi-agent/stream`) offers **`deep`** (coordinator + `task` sub-agents), **`plan_execute`** (planner / executor / replanner), and **`supervisor`** (orchestrator + `transfer` / `exit`); chosen per request via **`orchestration`**. Markdown under `agents/`: `orchestrator.md` (Deep), `orchestrator-plan-execute.md`, `orchestrator-supervisor.md`, plus sub-agent `*.md` where applicable (see [Multi-agent doc](docs/MULTI_AGENT_EINO.md))
-- 🎯 **Skills (refactored for Eino)**: packs under `skills_dir` follow **Agent Skills** layout (`SKILL.md` + optional files); **multi-agent** sessions use the official Eino ADK **`skill`** tool for **progressive disclosure** (load by name), with optional **host filesystem / shell** via `multi_agent.eino_skills`; optional **`eino_middleware`** adds patchtoolcalls, tool_search, plantask, reduction, checkpoints, and Deep tuning—20+ sample domains (SQLi, XSS, API security, …) can still be bound to roles
+- 🎯 **Skills (refactored for Eino)**: packs under `skills_dir` follow **Agent Skills** layout (`SKILL.md` + optional files); **multi-agent** sessions use the official Eino ADK **`skill`** tool for **progressive disclosure** (load by name), with optional **host filesystem / shell** via `multi_agent.eino_skills`; optional **`eino_middleware`** adds patchtoolcalls, tool_search, plantask, reduction, checkpoints, and Deep tuning—20+ sample domains (SQLi, XSS, API security, …) ship under `skills/`
 - 📱 **Chatbot**: DingTalk and Lark (Feishu) long-lived connections so you can talk to CyberStrikeAI from mobile (see [Robot / Chatbot guide](docs/robot_en.md) for setup and commands)
  - 🐚 **WebShell management**: Add and manage WebShell connections (e.g. IceSword/AntSword compatible), use a virtual terminal for command execution, a built-in file manager for file operations, and an AI assistant tab that orchestrates tests and keeps per-connection conversation history; supports PHP, ASP, ASPX, JSP and custom shell types with configurable request method and command parameter.
 
@@ -250,8 +250,8 @@ Requirements / tips:
 - **Predefined roles** – System includes 12+ predefined security testing roles (Penetration Testing, CTF, Web App Scanning, API Security Testing, Binary Analysis, Cloud Security Audit, etc.) in the `roles/` directory.
 - **Custom prompts** – Each role can define a `user_prompt` that prepends to user messages, guiding the AI to adopt specialized testing methodologies and focus areas.
 - **Tool restrictions** – Roles can specify a `tools` list to limit available tools, ensuring focused testing workflows (e.g., CTF role restricts to CTF-specific utilities).
-- **Skills integration** – Roles can attach security testing skills. Skill ids are hinted in the system prompt; in **multi-agent** sessions the Eino ADK **`skill`** tool loads package content **on demand** (progressive disclosure). **`multi_agent.eino_skills`** toggles the middleware, tool name override, and optional **read_file / glob / grep / write / edit / execute** on the host (**Deep / Supervisor** main and sub-agents when enabled; **plan_execute** executor has no custom skill middleware—see docs). Single-agent ReAct does not mount this Eino skill stack today.
-- **Easy role creation** – Create custom roles by adding YAML files to the `roles/` directory. Each role defines `name`, `description`, `user_prompt`, `icon`, `tools`, `skills`, and `enabled` fields.
+- **Skills** – Skill packs live under `skills_dir` and are loaded in **multi-agent / Eino** sessions via the ADK **`skill`** tool (**progressive disclosure**). Configure **`multi_agent.eino_skills`** for middleware, tool name override, and optional host **read_file / glob / grep / write / edit / execute** (**Deep / Supervisor** when enabled; **plan_execute** differs—see docs). Single-agent ReAct does not mount this Eino skill stack today.
+- **Easy role creation** – Create custom roles by adding YAML files to the `roles/` directory. Each role defines `name`, `description`, `user_prompt`, `icon`, `tools`, and `enabled` fields.
 - **Web UI integration** – Select roles from a dropdown in the chat interface. Role selection affects both AI behavior and available tool suggestions.
 
 **Creating a custom role (example):**
@@ -265,8 +265,6 @@ Requirements / tips:
      - api-fuzzer
      - arjun
      - graphql-scanner
-   skills:
-     - cyberstrike-eino-demo
    enabled: true
    ```
 2. Restart the server or reload configuration; the role appears in the role selector dropdown.
@@ -286,14 +284,13 @@ Requirements / tips:
 - **Layout** – Each skill is a directory with **required** `SKILL.md` only ([Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview)): YAML front matter **only** `name` and `description`, plus Markdown body. Optional sibling files (`FORMS.md`, `REFERENCE.md`, `scripts/*`, …). **No** `SKILL.yaml` (not part of Claude or Eino specs); sections/scripts/progressive behavior are **derived at runtime** from Markdown and the filesystem.
 - **Runtime refactor** – **`skills_dir`** is the single root for packs. **Multi-agent** loads them through Eino’s official **`skill`** middleware (**progressive disclosure**: model calls `skill` with a pack **name** instead of receiving full SKILL text up front). Configure via **`multi_agent.eino_skills`**: `disable`, `filesystem_tools` (host read/glob/grep/write/edit/execute), `skill_tool_name`.
 - **Eino / RAG** – Packages are also split into `schema.Document` chunks for `FilesystemSkillsRetriever` (`skills.AsEinoRetriever()`) in **compose** graphs (e.g. knowledge/indexing pipelines).
-- **Skill hints in prompts** – Role-bound skill **ids** (directory names) are recommended in the system prompt; full text is not injected by default.
 - **HTTP API** – `/api/skills` listing and `depth` (`summary` | `full`), `section`, and `resource_path` remain for the web UI and ops; **model-side** skill loading in multi-agent uses the **`skill`** tool, not MCP.
 - **Optional `eino_middleware`** – e.g. `tool_search` (dynamic MCP tool list), `patch_tool_calls`, `plantask` (structured tasks; persistence defaults under a subdirectory of `skills_dir`), `reduction`, `checkpoint_dir`, Deep output key / model retries / task-tool description prefix—see `config.yaml` and `internal/config/config.go`.
 - **Shipped demo** – `skills/cyberstrike-eino-demo/`; see `skills/README.md`.
 
 **Creating a skill:**
 1. `mkdir skills/<skill-id>` and add standard `SKILL.md` (+ any optional files), or drop in an open-source skill folder as-is.
-2. Reference `<skill-id>` in a role’s `skills` list in `roles/*.yaml`.
+2. Use **multi-agent** with **`multi_agent.eino_skills`** enabled so the model can call the **`skill`** tool with that pack **name**.
 
 ### Tool Orchestration & Extensions
 - **YAML recipes** in `tools/*.yaml` describe commands, arguments, prompts, and metadata.

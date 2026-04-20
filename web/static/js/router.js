@@ -59,6 +59,7 @@ function switchPage(pageId) {
         initPage(pageId);
     }
 }
+window.switchPage = switchPage;
 
 // 更新导航状态
 function updateNavState(pageId) {
@@ -159,6 +160,7 @@ function toggleSubmenu(menuId) {
         navItem.classList.toggle('expanded');
     }
 }
+window.toggleSubmenu = toggleSubmenu;
 
 // 显示子菜单弹出框
 function showSubmenuPopup(navItem, menuId) {
@@ -427,6 +429,7 @@ function toggleSidebar() {
         localStorage.setItem('sidebarCollapsed', isCollapsed ? 'true' : 'false');
     }
 }
+window.toggleSidebar = toggleSidebar;
 
 // 初始化侧边栏状态
 function initSidebarState() {
@@ -449,6 +452,7 @@ function toggleConversationSidebar() {
         localStorage.setItem('conversationSidebarCollapsed', isCollapsed ? 'true' : 'false');
     }
 }
+window.toggleConversationSidebar = toggleConversationSidebar;
 
 // 恢复对话列表折叠状态（进入对话页时生效）
 function initConversationSidebarState() {
@@ -463,10 +467,6 @@ function initConversationSidebarState() {
     }
 }
 
-// 导出函数供其他脚本使用
-window.switchPage = switchPage;
-window.toggleSubmenu = toggleSubmenu;
-window.toggleSidebar = toggleSidebar;
-window.toggleConversationSidebar = toggleConversationSidebar;
+// 导出函数供其他脚本使用（与上方尽早绑定保持一致，便于外部脚本探测）
 window.currentPage = function() { return currentPage; };
 

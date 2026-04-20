@@ -248,8 +248,8 @@ go build -o cyberstrike-ai cmd/server/main.go
 - **预设角色**：系统内置 12+ 个预设的安全测试角色（渗透测试、CTF、Web 应用扫描、API 安全测试、二进制分析、云安全审计等），位于 `roles/` 目录。
 - **自定义提示词**：每个角色可定义 `user_prompt`，会在用户消息前自动添加，引导 AI 采用特定的测试方法和关注重点。
 - **工具限制**：角色可指定 `tools` 列表，限制可用工具，实现聚焦的测试流程（如 CTF 角色限制为 CTF 专用工具）。
-- **Skills 集成**：角色可附加安全测试技能，id 写入提示；**多代理** 下由 Eino **`skill`** 工具 **按需加载**（渐进式披露）。**`multi_agent.eino_skills`** 控制中间件与本机 read_file/glob/grep/write/edit/execute（**Deep / Supervisor** 主/子代理；**plan_execute** 执行器无独立 skill 中间件，见文档）。**单代理 ReAct** 当前不挂载该 Eino skill 链。
-- **轻松创建角色**：通过在 `roles/` 目录添加 YAML 文件即可创建自定义角色。每个角色定义 `name`、`description`、`user_prompt`、`icon`、`tools`、`skills`、`enabled` 字段。
+- **Skills**：技能包位于 `skills_dir`；**多代理 / Eino** 下由 **`skill`** 工具 **按需加载**（渐进式披露）。**`multi_agent.eino_skills`** 控制中间件与本机 read_file/glob/grep/write/edit/execute（**Deep / Supervisor** 主/子代理；**plan_execute** 执行器无独立 skill 中间件，见文档）。**单代理 ReAct** 当前不挂载该 Eino skill 链。
+- **轻松创建角色**：通过在 `roles/` 目录添加 YAML 文件即可创建自定义角色。每个角色定义 `name`、`description`、`user_prompt`、`icon`、`tools`、`enabled` 字段。
 - **Web 界面集成**：在聊天界面通过下拉菜单选择角色。角色选择会影响 AI 行为和可用工具建议。
 
 **创建自定义角色示例：**
@@ -263,8 +263,6 @@ go build -o cyberstrike-ai cmd/server/main.go
      - api-fuzzer
      - arjun
      - graphql-scanner
-   skills:
-     - cyberstrike-eino-demo
    enabled: true
    ```
 2. 重启服务或重新加载配置，角色会出现在角色选择下拉菜单中。
@@ -284,14 +282,13 @@ go build -o cyberstrike-ai cmd/server/main.go
 - **目录规范**：与 [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) 一致，**仅**需目录下的 **`SKILL.md`**：YAML 头只用官方的 **`name` 与 `description`**，正文为 Markdown。可选同目录其他文件（`FORMS.md`、`REFERENCE.md`、`scripts/*` 等）。**不使用 `SKILL.yaml`**（Claude / Eino 官方均无此文件）；章节、`scripts/` 列表、渐进式行为由运行时从正文与磁盘 **自动推导**。
 - **运行侧重构**：**`skills_dir`** 为技能包唯一根目录；**多代理** 通过 Eino 官方 **`skill`** 中间件做 **渐进式披露**（模型按 **name** 调用 `skill`，而非一次性注入全文）。由 **`multi_agent.eino_skills`** 控制：`disable`、`filesystem_tools`（本机读写与 Shell）、`skill_tool_name`。
 - **Eino / 知识流水线**：技能包可切分为 `schema.Document`，供 `FilesystemSkillsRetriever`（`skills.AsEinoRetriever()`）在 **compose** 图（如索引/编排）中使用。
-- **提示词**：角色绑定的技能 **id**（文件夹名）会作为推荐写入系统提示；正文默认不整包注入。
 - **HTTP 管理**：`/api/skills` 列表与 `depth=summary|full`、`section`、`resource_path` 等仍用于 Web 与运维；**模型侧** 多代理走 **`skill`** 工具，而非 MCP。
 - **可选 `eino_middleware`**：如 `tool_search`（动态工具列表）、`patch_tool_calls`、`plantask`（结构化任务；默认落在 `skills_dir` 下子目录）、`reduction`、`checkpoint_dir`、Deep 输出键 / 模型重试 / task 描述前缀等，见 `config.yaml` 与 `internal/config/config.go`。
 - **自带示例**：`skills/cyberstrike-eino-demo/`；说明见 `skills/README.md`。
 
 **新建技能：**
 1. 在 `skills/` 下创建 `<skill-id>/`，放入标准 `SKILL.md`（及任意可选文件），或直接解压开源技能包到该目录。
-2. 在 `roles/*.yaml` 的 `skills` 列表中引用该 `<skill-id>`。
+2. 启用 **`multi_agent.eino_skills`** 并使用 **多代理** 会话，由模型通过 **`skill`** 工具按包 **name** 加载。
 
 ### 工具编排与扩展
 - `tools/*.yaml` 定义命令、参数、提示词与元数据，可热加载。

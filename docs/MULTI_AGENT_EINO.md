@@ -58,3 +58,4 @@
 | 2026-03-22 | `agents/*.md` 子代理定义、`agents_dir`、合并进 `RunDeepAgent`、前端 Agents 菜单与 CRUD API。 |
 | 2026-03-22 | `orchestrator.md` / `kind: orchestrator` 主代理、列表主/子标记、与 `orchestrator_instruction` 优先级。 |
 | 2026-04-19 | 主聊天「对话模式」：原生 ReAct 与 Deep / Plan-Execute / Supervisor；`POST /api/multi-agent*` 请求体 `orchestration` 与界面一致；`config.yaml` / 设置页不再维护预置编排字段（机器人/批量默认 `deep`）。 |
+| 2026-04-21 | 移除角色 `skills` 与 `/api/roles/skills/list`；`bind_role` 仅继承 tools；Skills 仅通过 Eino `skill` 工具按需加载。 |

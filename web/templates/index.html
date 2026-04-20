@@ -159,7 +159,7 @@
                         </div>
                     </div>
                     <div class="nav-item nav-item-has-submenu" data-page="mcp">
-                        <div class="nav-item-content" data-title="MCP" onclick="toggleSubmenu('mcp')" data-i18n="nav.mcp" data-i18n-attr="data-title" data-i18n-skip-text="true">
+                        <div class="nav-item-content" data-title="MCP" onclick="window.toggleSubmenu('mcp')" data-i18n="nav.mcp" data-i18n-attr="data-title" data-i18n-skip-text="true">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
                             </svg>
@@ -178,7 +178,7 @@
                         </div>
                     </div>
                     <div class="nav-item nav-item-has-submenu" data-page="knowledge">
-                        <div class="nav-item-content" data-title="知识" onclick="toggleSubmenu('knowledge')" data-i18n="nav.knowledge" data-i18n-attr="data-title" data-i18n-skip-text="true">
+                        <div class="nav-item-content" data-title="知识" onclick="window.toggleSubmenu('knowledge')" data-i18n="nav.knowledge" data-i18n-attr="data-title" data-i18n-skip-text="true">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
                                 <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
@@ -198,7 +198,7 @@
                         </div>
                     </div>
                     <div class="nav-item nav-item-has-submenu" data-page="skills">
-                        <div class="nav-item-content" data-title="Skills" onclick="toggleSubmenu('skills')" data-i18n="nav.skills" data-i18n-attr="data-title" data-i18n-skip-text="true">
+                        <div class="nav-item-content" data-title="Skills" onclick="window.toggleSubmenu('skills')" data-i18n="nav.skills" data-i18n-attr="data-title" data-i18n-skip-text="true">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
                                 <polyline points="14 2 14 8 20 8"></polyline>
@@ -221,7 +221,7 @@
                         </div>
                     </div>
                     <div class="nav-item nav-item-has-submenu" data-page="agents">
-                        <div class="nav-item-content" data-title="Agents" onclick="toggleSubmenu('agents')" data-i18n="nav.agents" data-i18n-attr="data-title" data-i18n-skip-text="true">
+                        <div class="nav-item-content" data-title="Agents" onclick="window.toggleSubmenu('agents')" data-i18n="nav.agents" data-i18n-attr="data-title" data-i18n-skip-text="true">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
                                 <polyline points="2 17 12 22 22 17"></polyline>
@@ -239,7 +239,7 @@
                         </div>
                     </div>
                     <div class="nav-item nav-item-has-submenu" data-page="roles">
-                        <div class="nav-item-content" data-title="角色" onclick="toggleSubmenu('roles')" data-i18n="nav.roles" data-i18n-attr="data-title" data-i18n-skip-text="true">
+                        <div class="nav-item-content" data-title="角色" onclick="window.toggleSubmenu('roles')" data-i18n="nav.roles" data-i18n-attr="data-title" data-i18n-skip-text="true">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                                 <circle cx="9" cy="7" r="4"></circle>
@@ -2699,6 +2699,11 @@
                         <div class="role-tools-actions">
                             <button type="button" class="btn-secondary" onclick="selectAllRoleTools()" data-i18n="roleModal.selectAll">全选</button>
                             <button type="button" class="btn-secondary" onclick="deselectAllRoleTools()" data-i18n="roleModal.deselectAll">全不选</button>
+                            <div id="role-tools-status-filter" class="tools-status-filter">
+                                <button type="button" class="btn-filter active" data-filter="" onclick="filterRoleToolsByStatus('')" data-i18n="roleModal.filterRoleAll">全部</button>
+                                <button type="button" class="btn-filter" data-filter="role_on" onclick="filterRoleToolsByStatus('role_on')" data-i18n="roleModal.filterRoleOn">本角色已开</button>
+                                <button type="button" class="btn-filter" data-filter="role_off" onclick="filterRoleToolsByStatus('role_off')" data-i18n="roleModal.filterRoleOff">本角色已关</button>
+                            </div>
                             <div class="role-tools-search-box">
                                 <input type="text" id="role-tools-search" data-i18n="roleModal.searchToolsPlaceholder" data-i18n-attr="placeholder" placeholder="搜索工具..." 
                                        oninput="searchRoleTools(this.value)" 
@@ -2718,32 +2723,6 @@
                         <div class="tools-loading" data-i18n="roleModal.loadingTools">正在加载工具列表...</div>
                     </div>
                     <small class="form-hint" data-i18n="roleModal.relatedToolsHint">勾选要关联的工具，留空则使用MCP管理中的全部工具配置。</small>
-                </div>
-                <div class="form-group" id="role-skills-section">
-                    <label data-i18n="roleModal.relatedSkills">关联的Skills（可选）</label>
-                    <div class="role-skills-controls">
-                        <div class="role-skills-actions">
-                            <button type="button" class="btn-secondary" onclick="selectAllRoleSkills()" data-i18n="roleModal.selectAll">全选</button>
-                            <button type="button" class="btn-secondary" onclick="deselectAllRoleSkills()" data-i18n="roleModal.deselectAll">全不选</button>
-                            <div class="role-skills-search-box">
-                                <input type="text" id="role-skills-search" data-i18n="roleModal.searchSkillsPlaceholder" data-i18n-attr="placeholder" placeholder="搜索skill..." 
-                                       oninput="searchRoleSkills(this.value)" 
-                                       onkeypress="if(event.key === 'Enter') searchRoleSkills(this.value)" />
-                                <button class="role-skills-search-clear" id="role-skills-search-clear" 
-                                        onclick="clearRoleSkillsSearch()" style="display: none;" data-i18n="common.clearSearch" data-i18n-attr="title" title="清除搜索">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-                                        <path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                        <div id="role-skills-stats" class="role-skills-stats"></div>
-                    </div>
-                    <div id="role-skills-list" class="role-skills-list">
-                        <div class="skills-loading" data-i18n="roleModal.loadingSkills">正在加载skills列表...</div>
-                    </div>
-                    <small class="form-hint" data-i18n="roleModal.relatedSkillsHint">勾选要关联的skills，这些skills的内容会在执行任务前注入到系统提示词中，帮助AI更好地理解相关专业知识。</small>
                 </div>
                 <div class="form-group">
                     <label class="checkbox-label">
