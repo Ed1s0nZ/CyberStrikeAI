@@ -194,12 +194,13 @@ type GetConfigResponse struct {
 
 // ToolConfigInfo 工具配置信息
 type ToolConfigInfo struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Enabled     bool   `json:"enabled"`
-	IsExternal  bool   `json:"is_external,omitempty"`  // 是否为外部MCP工具
-	ExternalMCP string `json:"external_mcp,omitempty"` // 外部MCP名称（如果是外部工具）
-	RoleEnabled *bool  `json:"role_enabled,omitempty"` // 该工具在当前角色中是否启用（nil表示未指定角色或使用所有工具）
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Enabled     bool                   `json:"enabled"`
+	IsExternal  bool                   `json:"is_external,omitempty"`  // 是否为外部MCP工具
+	ExternalMCP string                 `json:"external_mcp,omitempty"` // 外部MCP名称（如果是外部工具）
+	RoleEnabled *bool                  `json:"role_enabled,omitempty"` // 该工具在当前角色中是否启用（nil表示未指定角色或使用所有工具）
+	InputSchema map[string]interface{} `json:"input_schema,omitempty"` // 工具参数 JSON Schema（用于前端展示详情）
 }
 
 // GetConfig 获取当前配置
@@ -211,25 +212,25 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 	// 首先从配置文件获取工具
 	configToolMap := make(map[string]bool)
 	tools := make([]ToolConfigInfo, 0, len(h.config.Security.Tools))
+
 	for _, tool := range h.config.Security.Tools {
 		configToolMap[tool.Name] = true
-		tools = append(tools, ToolConfigInfo{
+		info := ToolConfigInfo{
 			Name:        tool.Name,
 			Description: h.pickToolDescription(tool.ShortDescription, tool.Description),
 			Enabled:     tool.Enabled,
 			IsExternal:  false,
-		})
+		}
+		tools = append(tools, info)
 	}
 
 	// 从MCP服务器获取所有已注册的工具（包括直接注册的工具，如知识检索工具）
 	if h.mcpServer != nil {
 		mcpTools := h.mcpServer.GetAllTools()
 		for _, mcpTool := range mcpTools {
-			// 跳过已经在配置文件中的工具（避免重复）
 			if configToolMap[mcpTool.Name] {
 				continue
 			}
-			// 添加直接注册到MCP服务器的工具（如知识检索工具）
 			description := mcpTool.ShortDescription
 			if description == "" {
 				description = mcpTool.Description
@@ -240,7 +241,7 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 			tools = append(tools, ToolConfigInfo{
 				Name:        mcpTool.Name,
 				Description: description,
-				Enabled:     true, // 直接注册的工具默认启用
+				Enabled:     true,
 				IsExternal:  false,
 			})
 		}
@@ -442,7 +443,7 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 			toolInfo := ToolConfigInfo{
 				Name:        mcpTool.Name,
 				Description: description,
-				Enabled:     true, // 直接注册的工具默认启用
+				Enabled:     true,
 				IsExternal:  false,
 			}
 
@@ -1142,32 +1143,7 @@ func (h *ConfigHandler) saveConfig() error {
 	updateRobotsConfig(root, h.config.Robots)
 	updateMultiAgentConfig(root, h.config.MultiAgent)
 	// 更新外部MCP配置（使用external_mcp.go中的函数，同一包中可直接调用）
-	// 读取原始配置以保持向后兼容
-	originalConfigs := make(map[string]map[string]bool)
-	externalMCPNode := findMapValue(root, "external_mcp")
-	if externalMCPNode != nil && externalMCPNode.Kind == yaml.MappingNode {
-		serversNode := findMapValue(externalMCPNode, "servers")
-		if serversNode != nil && serversNode.Kind == yaml.MappingNode {
-			for i := 0; i < len(serversNode.Content); i += 2 {
-				if i+1 >= len(serversNode.Content) {
-					break
-				}
-				nameNode := serversNode.Content[i]
-				serverNode := serversNode.Content[i+1]
-				if nameNode.Kind == yaml.ScalarNode && serverNode.Kind == yaml.MappingNode {
-					serverName := nameNode.Value
-					originalConfigs[serverName] = make(map[string]bool)
-					if enabledVal := findBoolInMap(serverNode, "enabled"); enabledVal != nil {
-						originalConfigs[serverName]["enabled"] = *enabledVal
-					}
-					if disabledVal := findBoolInMap(serverNode, "disabled"); disabledVal != nil {
-						originalConfigs[serverName]["disabled"] = *disabledVal
-					}
-				}
-			}
-		}
-	}
-	updateExternalMCPConfig(root, h.config.ExternalMCP, originalConfigs)
+	updateExternalMCPConfig(root, h.config.ExternalMCP)
 
 	if err := writeYAMLDocument(h.configPath, root); err != nil {
 		return fmt.Errorf("保存配置文件失败: %w", err)
@@ -1585,7 +1561,7 @@ func (h *ConfigHandler) calculateExternalToolEnabled(mcpName, toolName string, c
 	}
 
 	// 首先检查外部MCP是否启用
-	if !cfg.ExternalMCPEnable && !(cfg.Enabled && !cfg.Disabled) {
+	if !cfg.ExternalMCPEnable {
 		return false // MCP未启用，所有工具都禁用
 	}
 
@@ -1623,4 +1599,110 @@ func (h *ConfigHandler) pickToolDescription(shortDesc, fullDesc string) string {
 		description = description[:10000] + "..."
 	}
 	return description
+}
+
+// GetToolSchema 获取单个工具的 inputSchema（按需加载，避免列表接口返回大量 schema 数据）
+func (h *ConfigHandler) GetToolSchema(c *gin.Context) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	toolName := c.Param("name")
+	if toolName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "工具名称不能为空"})
+		return
+	}
+
+	// 检查是否为外部工具（格式：mcpName::toolName）
+	externalMCP := c.Query("external_mcp")
+	if externalMCP != "" {
+		// 外部 MCP 工具
+		if h.externalMCPMgr != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			externalTools, _ := h.externalMCPMgr.GetAllTools(ctx)
+			fullName := externalMCP + "::" + toolName
+			for _, t := range externalTools {
+				if t.Name == fullName {
+					c.JSON(http.StatusOK, gin.H{"input_schema": t.InputSchema})
+					return
+				}
+			}
+		}
+		c.JSON(http.StatusNotFound, gin.H{"error": "外部工具未找到"})
+		return
+	}
+
+	// 内部工具：从 YAML 配置的 Parameters 构建
+	for _, tool := range h.config.Security.Tools {
+		if tool.Name == toolName {
+			c.JSON(http.StatusOK, gin.H{"input_schema": buildInputSchemaFromParams(tool.Parameters)})
+			return
+		}
+	}
+
+	// MCP 注册工具（如知识检索）
+	if h.mcpServer != nil {
+		for _, mt := range h.mcpServer.GetAllTools() {
+			if mt.Name == toolName {
+				c.JSON(http.StatusOK, gin.H{"input_schema": mt.InputSchema})
+				return
+			}
+		}
+	}
+
+	c.JSON(http.StatusNotFound, gin.H{"error": "工具未找到"})
+}
+
+// buildInputSchemaFromParams 从 YAML 工具的 ParameterConfig 构建 JSON Schema（用于前端展示）。
+// 不依赖 MCP 服务器注册状态，所有工具（包括未启用的）都能返回参数定义。
+func buildInputSchemaFromParams(params []config.ParameterConfig) map[string]interface{} {
+	if len(params) == 0 {
+		return nil
+	}
+
+	properties := make(map[string]interface{})
+	required := make([]string, 0)
+
+	for _, p := range params {
+		name := strings.TrimSpace(p.Name)
+		if name == "" {
+			continue
+		}
+		prop := map[string]interface{}{
+			"type":        convertParamType(p.Type),
+			"description": p.Description,
+		}
+		if p.Default != nil {
+			prop["default"] = p.Default
+		}
+		if len(p.Options) > 0 {
+			prop["enum"] = p.Options
+		}
+		properties[name] = prop
+		if p.Required {
+			required = append(required, name)
+		}
+	}
+
+	schema := map[string]interface{}{
+		"type":       "object",
+		"properties": properties,
+	}
+	if len(required) > 0 {
+		schema["required"] = required
+	}
+	return schema
+}
+
+func convertParamType(t string) string {
+	switch strings.TrimSpace(strings.ToLower(t)) {
+	case "int", "integer", "number":
+		return "number"
+	case "bool", "boolean":
+		return "boolean"
+	case "array", "list":
+		return "array"
+	default:
+		return "string"
+	}
 }

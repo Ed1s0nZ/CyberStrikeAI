@@ -949,7 +949,7 @@ func (a *Agent) getAvailableTools(roleTools []string) []Tool {
 				enabled := false
 				if cfg, exists := externalMCPConfigs[mcpName]; exists {
 					// 首先检查外部MCP是否启用
-					if !cfg.ExternalMCPEnable && !(cfg.Enabled && !cfg.Disabled) {
+					if !cfg.ExternalMCPEnable {
 						enabled = false // MCP未启用，所有工具都禁用
 					} else {
 						// MCP已启用，检查单个工具的启用状态

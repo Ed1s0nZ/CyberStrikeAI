@@ -487,7 +487,10 @@ func (c *Client) claudeChatCompletionStream(ctx context.Context, payload interfa
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return "", fmt.Errorf("claude bridge: read error response: %w", readErr)
+		}
 		return "", &APIError{
 			StatusCode: resp.StatusCode,
 			Body:       string(respBody),
@@ -588,7 +591,10 @@ func (c *Client) claudeChatCompletionStreamWithToolCalls(
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return "", nil, "", fmt.Errorf("claude bridge: read error response: %w", readErr)
+		}
 		return "", nil, "", &APIError{
 			StatusCode: resp.StatusCode,
 			Body:       string(respBody),
@@ -824,7 +830,11 @@ func (rt *claudeRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 
 	// 非 200：尝试把 Claude 错误格式转成 OpenAI 错误格式，便于 Eino 解析
 	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
+		bodyBytes, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("claude bridge: read error response: %w", readErr)
+		}
 		resp.Body.Close()
 		converted := rt.tryConvertClaudeErrorToOpenAI(bodyBytes)
 		return &http.Response{
@@ -838,7 +848,11 @@ func (rt *claudeRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 
 	// 非流式：一次性转换响应体
 	if !claudeReq.Stream {
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("claude bridge: read response: %w", readErr)
+		}
 		resp.Body.Close()
 		oaiJSON, err := claudeToOpenAIResponseJSON(respBody)
 		if err != nil {

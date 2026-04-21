@@ -411,7 +411,10 @@ func (h *WebShellHandler) Exec(c *gin.Context) {
 	}
 	defer resp.Body.Close()
 
-	out, _ := io.ReadAll(resp.Body)
+	out, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		h.logger.Warn("webshell exec read body", zap.Error(readErr))
+	}
 	output := string(out)
 	httpCode := resp.StatusCode
 
@@ -578,7 +581,10 @@ func (h *WebShellHandler) FileOp(c *gin.Context) {
 	}
 	defer resp.Body.Close()
 
-	out, _ := io.ReadAll(resp.Body)
+	out, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		h.logger.Warn("webshell fileop read body", zap.Error(readErr))
+	}
 	output := string(out)
 
 	c.JSON(http.StatusOK, FileOpResponse{
@@ -633,7 +639,10 @@ func (h *WebShellHandler) ExecWithConnection(conn *database.WebShellConnection, 
 		return "", false, err.Error()
 	}
 	defer resp.Body.Close()
-	out, _ := io.ReadAll(resp.Body)
+	out, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		h.logger.Warn("webshell ExecWithConnection read body", zap.Error(readErr))
+	}
 	return string(out), resp.StatusCode == http.StatusOK, ""
 }
 
@@ -701,6 +710,9 @@ func (h *WebShellHandler) FileOpWithConnection(conn *database.WebShellConnection
 		return "", false, err.Error()
 	}
 	defer resp.Body.Close()
-	out, _ := io.ReadAll(resp.Body)
+	out, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		h.logger.Warn("webshell FileOpWithConnection read body", zap.Error(readErr))
+	}
 	return string(out), resp.StatusCode == http.StatusOK, ""
 }

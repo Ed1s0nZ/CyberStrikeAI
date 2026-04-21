@@ -2089,12 +2089,15 @@ func (h *AgentHandler) nextBatchQueueRunAt(cronExpr string, from time.Time) (*ti
 }
 
 func (h *AgentHandler) startBatchQueueExecution(queueID string, scheduled bool) (bool, error) {
-	queue, exists := h.batchTaskManager.GetBatchQueue(queueID)
-	if !exists {
-		return false, nil
-	}
+	// 先获取执行互斥门，再读取队列状态，避免基于过时快照做判断
 	if !h.markBatchQueueRunning(queueID) {
 		return true, nil
+	}
+
+	queue, exists := h.batchTaskManager.GetBatchQueue(queueID)
+	if !exists {
+		h.unmarkBatchQueueRunning(queueID)
+		return false, nil
 	}
 
 	if scheduled {

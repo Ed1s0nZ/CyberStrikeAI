@@ -543,14 +543,21 @@ func (m *BatchTaskManager) UpdateTaskStatus(queueID, taskID, status string, resu
 
 // UpdateTaskStatusWithConversationID 更新任务状态（包含conversationId）
 func (m *BatchTaskManager) UpdateTaskStatusWithConversationID(queueID, taskID, status string, result, errorMsg, conversationID string) {
-	var needDBUpdate bool
-
-	// 在锁内只更新内存状态
 	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	queue, exists := m.queues[queueID]
 	if !exists {
-		m.mu.Unlock()
 		return
+	}
+
+	// DB 优先：先持久化，成功后再更新内存，避免重启后状态不一致
+	if m.db != nil {
+		if err := m.db.UpdateBatchTaskStatus(queueID, taskID, status, conversationID, result, errorMsg); err != nil {
+			m.logger.Warn("batch task DB status update failed, skipping memory update",
+				zap.String("queueId", queueID), zap.String("taskId", taskID), zap.Error(err))
+			return
+		}
 	}
 
 	for _, task := range queue.Tasks {
@@ -575,28 +582,25 @@ func (m *BatchTaskManager) UpdateTaskStatusWithConversationID(queueID, taskID, s
 			break
 		}
 	}
-
-	needDBUpdate = m.db != nil
-	m.mu.Unlock()
-
-	// 释放锁后写 DB
-	if needDBUpdate {
-		if err := m.db.UpdateBatchTaskStatus(queueID, taskID, status, conversationID, result, errorMsg); err != nil {
-			m.logger.Warn("batch task DB status update failed", zap.String("queueId", queueID), zap.String("taskId", taskID), zap.Error(err))
-		}
-	}
 }
 
 // UpdateQueueStatus 更新队列状态
 func (m *BatchTaskManager) UpdateQueueStatus(queueID, status string) {
-	var needDBUpdate bool
-
-	// 在锁内只更新内存状态
 	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	queue, exists := m.queues[queueID]
 	if !exists {
-		m.mu.Unlock()
 		return
+	}
+
+	// DB 优先：先持久化，成功后再更新内存
+	if m.db != nil {
+		if err := m.db.UpdateBatchQueueStatus(queueID, status); err != nil {
+			m.logger.Warn("batch queue DB status update failed, skipping memory update",
+				zap.String("queueId", queueID), zap.Error(err))
+			return
+		}
 	}
 
 	queue.Status = status
@@ -606,16 +610,6 @@ func (m *BatchTaskManager) UpdateQueueStatus(queueID, status string) {
 	}
 	if status == BatchQueueStatusCompleted || status == BatchQueueStatusCancelled {
 		queue.CompletedAt = &now
-	}
-
-	needDBUpdate = m.db != nil
-	m.mu.Unlock()
-
-	// 释放锁后写 DB
-	if needDBUpdate {
-		if err := m.db.UpdateBatchQueueStatus(queueID, status); err != nil {
-			m.logger.Warn("batch queue DB status update failed", zap.String("queueId", queueID), zap.Error(err))
-		}
 	}
 }
 
@@ -756,6 +750,16 @@ func (m *BatchTaskManager) ResetQueueForRerun(queueID string) bool {
 	if !exists {
 		return false
 	}
+
+	// DB 优先：先持久化重置，成功后再更新内存，避免 DB 失败导致内存脏状态
+	if m.db != nil {
+		if err := m.db.ResetBatchQueueForRerun(queueID); err != nil {
+			m.logger.Warn("batch queue DB reset for rerun failed, skipping memory update",
+				zap.String("queueId", queueID), zap.Error(err))
+			return false
+		}
+	}
+
 	queue.Status = BatchQueueStatusPending
 	queue.CurrentIndex = 0
 	queue.StartedAt = nil
@@ -770,12 +774,6 @@ func (m *BatchTaskManager) ResetQueueForRerun(queueID string) bool {
 		task.CompletedAt = nil
 		task.Error = ""
 		task.Result = ""
-	}
-
-	if m.db != nil {
-		if err := m.db.ResetBatchQueueForRerun(queueID); err != nil {
-			return false
-		}
 	}
 	return true
 }
@@ -870,7 +868,7 @@ func (m *BatchTaskManager) DeleteTask(queueID, taskID string) error {
 		return fmt.Errorf("队列正在执行或未就绪，无法删除任务")
 	}
 
-	// 查找并删除任务
+	// 查找任务
 	taskIndex := -1
 	for i, task := range queue.Tasks {
 		if task.ID == taskID {
@@ -886,18 +884,14 @@ func (m *BatchTaskManager) DeleteTask(queueID, taskID string) error {
 		return fmt.Errorf("任务不存在")
 	}
 
-	// 从内存队列中删除
-	queue.Tasks = append(queue.Tasks[:taskIndex], queue.Tasks[taskIndex+1:]...)
-
-	// 同步到数据库
+	// DB 优先：先从数据库删除，成功后再从内存移除
 	if m.db != nil {
 		if err := m.db.DeleteBatchTask(queueID, taskID); err != nil {
-			// 如果数据库删除失败，恢复内存中的任务
-			// 这里需要重新插入，但为了简化，我们只记录错误
 			return fmt.Errorf("删除任务失败: %w", err)
 		}
 	}
 
+	queue.Tasks = append(queue.Tasks[:taskIndex], queue.Tasks[taskIndex+1:]...)
 	return nil
 }
 
@@ -987,9 +981,7 @@ func (m *BatchTaskManager) SetTaskCancel(queueID string, cancel context.CancelFu
 // PauseQueue 暂停队列
 func (m *BatchTaskManager) PauseQueue(queueID string) bool {
 	var cancelFunc context.CancelFunc
-	var needDBUpdate bool
 
-	// 在锁内只更新内存状态
 	m.mu.Lock()
 	queue, exists := m.queues[queueID]
 	if !exists {
@@ -1002,6 +994,16 @@ func (m *BatchTaskManager) PauseQueue(queueID string) bool {
 		return false
 	}
 
+	// DB 优先：先持久化，成功后再更新内存
+	if m.db != nil {
+		if err := m.db.UpdateBatchQueueStatus(queueID, BatchQueueStatusPaused); err != nil {
+			m.logger.Warn("batch queue DB pause update failed, skipping memory update",
+				zap.String("queueId", queueID), zap.Error(err))
+			m.mu.Unlock()
+			return false
+		}
+	}
+
 	queue.Status = BatchQueueStatusPaused
 
 	// 取消当前正在执行的任务（通过取消context）
@@ -1009,20 +1011,11 @@ func (m *BatchTaskManager) PauseQueue(queueID string) bool {
 		cancelFunc = cancel
 		delete(m.taskCancels, queueID)
 	}
-
-	needDBUpdate = m.db != nil
 	m.mu.Unlock()
 
-	// 释放锁后执行取消回调
+	// 释放锁后执行取消回调（cancel 可能阻塞，不应持锁）
 	if cancelFunc != nil {
 		cancelFunc()
-	}
-
-	// 释放锁后写 DB
-	if needDBUpdate {
-		if err := m.db.UpdateBatchQueueStatus(queueID, BatchQueueStatusPaused); err != nil {
-			m.logger.Warn("batch queue DB pause update failed", zap.String("queueId", queueID), zap.Error(err))
-		}
 	}
 
 	return true
@@ -1032,9 +1025,7 @@ func (m *BatchTaskManager) PauseQueue(queueID string) bool {
 func (m *BatchTaskManager) CancelQueue(queueID string) bool {
 	now := time.Now()
 	var cancelFunc context.CancelFunc
-	var needDBUpdate bool
 
-	// 在锁内只更新内存状态，不做 DB 操作
 	m.mu.Lock()
 	queue, exists := m.queues[queueID]
 	if !exists {
@@ -1045,6 +1036,22 @@ func (m *BatchTaskManager) CancelQueue(queueID string) bool {
 	if queue.Status == BatchQueueStatusCompleted || queue.Status == BatchQueueStatusCancelled {
 		m.mu.Unlock()
 		return false
+	}
+
+	// DB 优先：先持久化，成功后再更新内存
+	if m.db != nil {
+		if err := m.db.CancelPendingBatchTasks(queueID, now); err != nil {
+			m.logger.Warn("batch task DB batch cancel failed, skipping memory update",
+				zap.String("queueId", queueID), zap.Error(err))
+			m.mu.Unlock()
+			return false
+		}
+		if err := m.db.UpdateBatchQueueStatus(queueID, BatchQueueStatusCancelled); err != nil {
+			m.logger.Warn("batch queue DB cancel update failed, skipping memory update",
+				zap.String("queueId", queueID), zap.Error(err))
+			m.mu.Unlock()
+			return false
+		}
 	}
 
 	queue.Status = BatchQueueStatusCancelled
@@ -1063,23 +1070,11 @@ func (m *BatchTaskManager) CancelQueue(queueID string) bool {
 		cancelFunc = cancel
 		delete(m.taskCancels, queueID)
 	}
-
-	needDBUpdate = m.db != nil
 	m.mu.Unlock()
 
-	// 释放锁后执行取消回调
+	// 释放锁后执行取消回调（cancel 可能阻塞，不应持锁）
 	if cancelFunc != nil {
 		cancelFunc()
-	}
-
-	// 释放锁后批量写 DB（单条 SQL 取消所有 pending 任务）
-	if needDBUpdate {
-		if err := m.db.CancelPendingBatchTasks(queueID, now); err != nil {
-			m.logger.Warn("batch task DB batch cancel failed", zap.String("queueId", queueID), zap.Error(err))
-		}
-		if err := m.db.UpdateBatchQueueStatus(queueID, BatchQueueStatusCancelled); err != nil {
-			m.logger.Warn("batch queue DB cancel update failed", zap.String("queueId", queueID), zap.Error(err))
-		}
 	}
 
 	return true

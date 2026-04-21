@@ -60,13 +60,13 @@ func TestExternalMCPHandler_AddOrUpdateExternalMCP_Stdio(t *testing.T) {
 	router, _, configPath := setupTestRouter()
 	defer cleanupTestConfig(configPath)
 
-	// 测试添加stdio模式的配置
+	// 测试添加stdio模式的配置（官方格式：有 command 时 type 可省略）
 	configJSON := `{
 		"command": "python3",
 		"args": ["/path/to/script.py", "--server", "http://example.com"],
 		"description": "Test stdio MCP",
 		"timeout": 300,
-		"enabled": true
+		"external_mcp_enable": true
 	}`
 
 	var configObj config.ExternalMCPServerConfig
@@ -115,20 +115,17 @@ func TestExternalMCPHandler_AddOrUpdateExternalMCP_Stdio(t *testing.T) {
 	if response.Config.Timeout != 300 {
 		t.Errorf("期望timeout为300，实际%d", response.Config.Timeout)
 	}
-	if !response.Config.Enabled {
-		t.Error("期望enabled为true")
-	}
 }
 
 func TestExternalMCPHandler_AddOrUpdateExternalMCP_HTTP(t *testing.T) {
 	router, _, configPath := setupTestRouter()
 	defer cleanupTestConfig(configPath)
 
-	// 测试添加HTTP模式的配置
+	// 测试添加HTTP模式的配置（使用官方 type 字段）
 	configJSON := `{
-		"transport": "http",
+		"type": "http",
 		"url": "http://127.0.0.1:8081/mcp",
-		"enabled": true
+		"external_mcp_enable": true
 	}`
 
 	var configObj config.ExternalMCPServerConfig
@@ -165,14 +162,11 @@ func TestExternalMCPHandler_AddOrUpdateExternalMCP_HTTP(t *testing.T) {
 		t.Fatalf("解析响应失败: %v", err)
 	}
 
-	if response.Config.Transport != "http" {
-		t.Errorf("期望transport为http，实际%s", response.Config.Transport)
+	if response.Config.Type != "http" {
+		t.Errorf("期望type为http，实际%s", response.Config.Type)
 	}
 	if response.Config.URL != "http://127.0.0.1:8081/mcp" {
 		t.Errorf("期望url为'http://127.0.0.1:8081/mcp'，实际%s", response.Config.URL)
-	}
-	if !response.Config.Enabled {
-		t.Error("期望enabled为true")
 	}
 }
 
@@ -187,22 +181,22 @@ func TestExternalMCPHandler_AddOrUpdateExternalMCP_InvalidConfig(t *testing.T) {
 	}{
 		{
 			name:        "缺少command和url",
-			configJSON:  `{"enabled": true}`,
-			expectedErr: "需要指定command（stdio模式）或url（http/sse模式）",
+			configJSON:  `{"external_mcp_enable": true}`,
+			expectedErr: "需要指定 command（stdio模式）或 url + type（http/sse模式）",
 		},
 		{
 			name:        "stdio模式缺少command",
-			configJSON:  `{"args": ["test"], "enabled": true}`,
+			configJSON:  `{"args": ["test"], "external_mcp_enable": true}`,
 			expectedErr: "stdio模式需要command",
 		},
 		{
 			name:        "http模式缺少url",
-			configJSON:  `{"transport": "http", "enabled": true}`,
-			expectedErr: "HTTP模式需要URL",
+			configJSON:  `{"type": "http", "external_mcp_enable": true}`,
+			expectedErr: "HTTP模式需要 url",
 		},
 		{
-			name:        "无效的transport",
-			configJSON:  `{"transport": "invalid", "enabled": true}`,
+			name:        "无效的type",
+			configJSON:  `{"type": "invalid", "external_mcp_enable": true}`,
 			expectedErr: "不支持的传输模式",
 		},
 	}
@@ -254,7 +248,7 @@ func TestExternalMCPHandler_DeleteExternalMCP(t *testing.T) {
 	// 先添加一个配置
 	configObj := config.ExternalMCPServerConfig{
 		Command: "python3",
-		Enabled: true,
+		ExternalMCPEnable: true,
 	}
 	handler.manager.AddOrUpdateConfig("test-delete", configObj)
 
@@ -283,11 +277,11 @@ func TestExternalMCPHandler_GetExternalMCPs(t *testing.T) {
 	// 添加多个配置
 	handler.manager.AddOrUpdateConfig("test1", config.ExternalMCPServerConfig{
 		Command: "python3",
-		Enabled: true,
+		ExternalMCPEnable: true,
 	})
 	handler.manager.AddOrUpdateConfig("test2", config.ExternalMCPServerConfig{
 		URL:     "http://127.0.0.1:8081/mcp",
-		Enabled: false,
+		ExternalMCPEnable: false,
 	})
 
 	req := httptest.NewRequest("GET", "/api/external-mcp", nil)
@@ -326,16 +320,14 @@ func TestExternalMCPHandler_GetExternalMCPStats(t *testing.T) {
 	// 添加配置
 	handler.manager.AddOrUpdateConfig("enabled1", config.ExternalMCPServerConfig{
 		Command: "python3",
-		Enabled: true,
+		ExternalMCPEnable: true,
 	})
 	handler.manager.AddOrUpdateConfig("enabled2", config.ExternalMCPServerConfig{
 		URL:     "http://127.0.0.1:8081/mcp",
-		Enabled: true,
+		ExternalMCPEnable: true,
 	})
 	handler.manager.AddOrUpdateConfig("disabled1", config.ExternalMCPServerConfig{
 		Command:  "python3",
-		Enabled:  false,
-		Disabled: true,
 	})
 
 	req := httptest.NewRequest("GET", "/api/external-mcp/stats", nil)
@@ -369,8 +361,6 @@ func TestExternalMCPHandler_StartStopExternalMCP(t *testing.T) {
 	// 添加一个禁用的配置
 	handler.manager.AddOrUpdateConfig("test-start-stop", config.ExternalMCPServerConfig{
 		Command:  "python3",
-		Enabled:  false,
-		Disabled: true,
 	})
 
 	// 测试启动（可能会失败，因为没有真实的服务器）
@@ -427,7 +417,7 @@ func TestExternalMCPHandler_AddOrUpdateExternalMCP_EmptyName(t *testing.T) {
 
 	configObj := config.ExternalMCPServerConfig{
 		Command: "python3",
-		Enabled: true,
+		ExternalMCPEnable: true,
 	}
 
 	reqBody := AddOrUpdateExternalMCPRequest{
@@ -470,14 +460,14 @@ func TestExternalMCPHandler_UpdateExistingConfig(t *testing.T) {
 	// 先添加配置
 	config1 := config.ExternalMCPServerConfig{
 		Command: "python3",
-		Enabled: true,
+		ExternalMCPEnable: true,
 	}
 	handler.manager.AddOrUpdateConfig("test-update", config1)
 
 	// 更新配置
 	config2 := config.ExternalMCPServerConfig{
 		URL:     "http://127.0.0.1:8081/mcp",
-		Enabled: true,
+		ExternalMCPEnable: true,
 	}
 
 	reqBody := AddOrUpdateExternalMCPRequest{

@@ -157,35 +157,18 @@ func (h *ExternalMCPHandler) AddOrUpdateExternalMCP(c *gin.Context) {
 		h.config.ExternalMCP.Servers = make(map[string]config.ExternalMCPServerConfig)
 	}
 
-	// 如果用户提供了 disabled 或 enabled 字段，保留它们以保持向后兼容
-	// 同时将值迁移到 external_mcp_enable
 	cfg := req.Config
 
-	if req.Config.Disabled {
-		// 用户设置了 disabled: true
+	// 官方 disabled 字段 → ExternalMCPEnable 取反
+	if cfg.Disabled {
 		cfg.ExternalMCPEnable = false
-		cfg.Disabled = true
-		cfg.Enabled = false
-	} else if req.Config.Enabled {
-		// 用户设置了 enabled: true
+	} else if !cfg.ExternalMCPEnable {
+		// 用户未显式设置 external_mcp_enable，官方配置默认就是启用的
 		cfg.ExternalMCPEnable = true
-		cfg.Enabled = true
-		cfg.Disabled = false
-	} else if !req.Config.ExternalMCPEnable {
-		// 用户没有设置任何字段，且 external_mcp_enable 为 false
-		// 检查现有配置是否有旧字段
-		if existingCfg, exists := h.config.ExternalMCP.Servers[name]; exists {
-			// 保留现有的旧字段
-			cfg.Enabled = existingCfg.Enabled
-			cfg.Disabled = existingCfg.Disabled
-		}
-	} else {
-		// 用户通过新字段启用了（external_mcp_enable: true），但没有设置旧字段
-		// 为了向后兼容，我们设置 enabled: true
-		// 这样即使原始配置中有 disabled: false，也会被转换为 enabled: true
-		cfg.Enabled = true
-		cfg.Disabled = false
 	}
+
+	// 展开 ${VAR} 环境变量
+	config.ExpandConfigEnv(&cfg)
 
 	h.config.ExternalMCP.Servers[name] = cfg
 
@@ -315,32 +298,25 @@ func (h *ExternalMCPHandler) GetExternalMCPStats(c *gin.Context) {
 	c.JSON(http.StatusOK, stats)
 }
 
-// validateConfig 验证配置
+// validateConfig 验证配置（同时支持官方 type 字段和旧版 transport 字段）
 func (h *ExternalMCPHandler) validateConfig(cfg config.ExternalMCPServerConfig) error {
-	transport := cfg.Transport
+	transport := cfg.GetTransportType()
 	if transport == "" {
-		// 如果没有指定transport，根据是否有command或url判断
-		if cfg.Command != "" {
-			transport = "stdio"
-		} else if cfg.URL != "" {
-			transport = "http"
-		} else {
-			return fmt.Errorf("需要指定command（stdio模式）或url（http/sse模式）")
-		}
+		return fmt.Errorf("需要指定 command（stdio模式）或 url + type（http/sse模式）")
 	}
 
 	switch transport {
 	case "http":
 		if cfg.URL == "" {
-			return fmt.Errorf("HTTP模式需要URL")
+			return fmt.Errorf("HTTP模式需要 url")
 		}
 	case "stdio":
 		if cfg.Command == "" {
-			return fmt.Errorf("stdio模式需要command")
+			return fmt.Errorf("stdio模式需要 command")
 		}
 	case "sse":
 		if cfg.URL == "" {
-			return fmt.Errorf("SSE模式需要URL")
+			return fmt.Errorf("SSE模式需要 url")
 		}
 	default:
 		return fmt.Errorf("不支持的传输模式: %s，支持的模式: http, stdio, sse", transport)
@@ -351,25 +327,11 @@ func (h *ExternalMCPHandler) validateConfig(cfg config.ExternalMCPServerConfig) 
 
 // isEnabled 检查是否启用
 func (h *ExternalMCPHandler) isEnabled(cfg config.ExternalMCPServerConfig) bool {
-	// 优先使用 ExternalMCPEnable 字段
-	// 如果没有设置，检查旧的 enabled/disabled 字段（向后兼容）
-	if cfg.ExternalMCPEnable {
-		return true
-	}
-	// 向后兼容：检查旧字段
-	if cfg.Disabled {
-		return false
-	}
-	if cfg.Enabled {
-		return true
-	}
-	// 都没有设置，默认为启用
-	return true
+	return cfg.ExternalMCPEnable
 }
 
 // saveConfig 保存配置到文件
 func (h *ExternalMCPHandler) saveConfig() error {
-	// 读取现有配置文件并创建备份
 	data, err := os.ReadFile(h.configPath)
 	if err != nil {
 		return fmt.Errorf("读取配置文件失败: %w", err)
@@ -384,37 +346,7 @@ func (h *ExternalMCPHandler) saveConfig() error {
 		return fmt.Errorf("解析配置文件失败: %w", err)
 	}
 
-	// 在更新前，读取原始配置中的 enabled/disabled 字段，以便保持向后兼容
-	originalConfigs := make(map[string]map[string]bool)
-	externalMCPNode := findMapValue(root.Content[0], "external_mcp")
-	if externalMCPNode != nil && externalMCPNode.Kind == yaml.MappingNode {
-		serversNode := findMapValue(externalMCPNode, "servers")
-		if serversNode != nil && serversNode.Kind == yaml.MappingNode {
-			// 遍历现有的服务器配置，保存 enabled/disabled 字段
-			for i := 0; i < len(serversNode.Content); i += 2 {
-				if i+1 >= len(serversNode.Content) {
-					break
-				}
-				nameNode := serversNode.Content[i]
-				serverNode := serversNode.Content[i+1]
-				if nameNode.Kind == yaml.ScalarNode && serverNode.Kind == yaml.MappingNode {
-					serverName := nameNode.Value
-					originalConfigs[serverName] = make(map[string]bool)
-					// 检查是否有 enabled 字段
-					if enabledVal := findBoolInMap(serverNode, "enabled"); enabledVal != nil {
-						originalConfigs[serverName]["enabled"] = *enabledVal
-					}
-					// 检查是否有 disabled 字段
-					if disabledVal := findBoolInMap(serverNode, "disabled"); disabledVal != nil {
-						originalConfigs[serverName]["disabled"] = *disabledVal
-					}
-				}
-			}
-		}
-	}
-
-	// 更新外部MCP配置
-	updateExternalMCPConfig(root, h.config.ExternalMCP, originalConfigs)
+	updateExternalMCPConfig(root, h.config.ExternalMCP)
 
 	if err := writeYAMLDocument(h.configPath, root); err != nil {
 		return fmt.Errorf("保存配置文件失败: %w", err)
@@ -425,7 +357,7 @@ func (h *ExternalMCPHandler) saveConfig() error {
 }
 
 // updateExternalMCPConfig 更新外部MCP配置
-func updateExternalMCPConfig(doc *yaml.Node, cfg config.ExternalMCPConfig, originalConfigs map[string]map[string]bool) {
+func updateExternalMCPConfig(doc *yaml.Node, cfg config.ExternalMCPConfig) {
 	root := doc.Content[0]
 	externalMCPNode := ensureMap(root, "external_mcp")
 	serversNode := ensureMap(externalMCPNode, "servers")
@@ -435,32 +367,31 @@ func updateExternalMCPConfig(doc *yaml.Node, cfg config.ExternalMCPConfig, origi
 
 	// 添加新的服务器配置
 	for name, serverCfg := range cfg.Servers {
-		// 添加服务器名称键
 		nameNode := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: name}
 		serverNode := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
 		serversNode.Content = append(serversNode.Content, nameNode, serverNode)
 
-		// 设置服务器配置字段
+		// type（官方 MCP 传输类型）
+		effectiveType := serverCfg.GetTransportType()
+		if effectiveType != "" && effectiveType != "stdio" {
+			// stdio 可省略（有 command 时自动推断）
+			setStringInMap(serverNode, "type", effectiveType)
+		}
 		if serverCfg.Command != "" {
 			setStringInMap(serverNode, "command", serverCfg.Command)
 		}
 		if len(serverCfg.Args) > 0 {
 			setStringArrayInMap(serverNode, "args", serverCfg.Args)
 		}
-		// 保存 env 字段（环境变量）
 		if serverCfg.Env != nil && len(serverCfg.Env) > 0 {
 			envNode := ensureMap(serverNode, "env")
 			for envKey, envValue := range serverCfg.Env {
 				setStringInMap(envNode, envKey, envValue)
 			}
 		}
-		if serverCfg.Transport != "" {
-			setStringInMap(serverNode, "transport", serverCfg.Transport)
-		}
 		if serverCfg.URL != "" {
 			setStringInMap(serverNode, "url", serverCfg.URL)
 		}
-		// 保存 headers 字段（HTTP/SSE 请求头）
 		if serverCfg.Headers != nil && len(serverCfg.Headers) > 0 {
 			headersNode := ensureMap(serverNode, "headers")
 			for k, v := range serverCfg.Headers {
@@ -473,45 +404,31 @@ func updateExternalMCPConfig(doc *yaml.Node, cfg config.ExternalMCPConfig, origi
 		if serverCfg.Timeout > 0 {
 			setIntInMap(serverNode, "timeout", serverCfg.Timeout)
 		}
-		// 保存 external_mcp_enable 字段（新字段）
+		// 官方标准字段
+		if serverCfg.Disabled {
+			setBoolInMap(serverNode, "disabled", true)
+		}
+		if len(serverCfg.AutoApprove) > 0 {
+			setStringArrayInMap(serverNode, "autoApprove", serverCfg.AutoApprove)
+		}
+
+		// SDK 高级配置
+		if serverCfg.MaxRetries > 0 {
+			setIntInMap(serverNode, "max_retries", serverCfg.MaxRetries)
+		}
+		if serverCfg.TerminateDuration > 0 {
+			setIntInMap(serverNode, "terminate_duration", serverCfg.TerminateDuration)
+		}
+		if serverCfg.KeepAlive > 0 {
+			setIntInMap(serverNode, "keep_alive", serverCfg.KeepAlive)
+		}
+
 		setBoolInMap(serverNode, "external_mcp_enable", serverCfg.ExternalMCPEnable)
-		// 保存 tool_enabled 字段（每个工具的启用状态）
 		if serverCfg.ToolEnabled != nil && len(serverCfg.ToolEnabled) > 0 {
 			toolEnabledNode := ensureMap(serverNode, "tool_enabled")
 			for toolName, enabled := range serverCfg.ToolEnabled {
 				setBoolInMap(toolEnabledNode, toolName, enabled)
 			}
-		}
-		// 保留旧的 enabled/disabled 字段以保持向后兼容
-		originalFields, hasOriginal := originalConfigs[name]
-
-		// 如果原始配置中有 enabled 字段，保留它
-		if hasOriginal {
-			if enabledVal, hasEnabled := originalFields["enabled"]; hasEnabled {
-				setBoolInMap(serverNode, "enabled", enabledVal)
-			}
-			// 如果原始配置中有 disabled 字段，保留它
-			// 注意：由于 omitempty，disabled: false 不会被保存，但 disabled: true 会被保存
-			if disabledVal, hasDisabled := originalFields["disabled"]; hasDisabled {
-				if disabledVal {
-					setBoolInMap(serverNode, "disabled", disabledVal)
-				} else {
-					// 如果原始配置中有 disabled: false，我们保存 enabled: true 来等效表示
-					// 因为 disabled: false 等价于 enabled: true
-					setBoolInMap(serverNode, "enabled", true)
-				}
-			}
-		}
-
-		// 如果用户在当前请求中明确设置了这些字段，也保存它们
-		if serverCfg.Enabled {
-			setBoolInMap(serverNode, "enabled", serverCfg.Enabled)
-		}
-		if serverCfg.Disabled {
-			setBoolInMap(serverNode, "disabled", serverCfg.Disabled)
-		} else if !hasOriginal && serverCfg.ExternalMCPEnable {
-			// 如果用户通过新字段启用了，且原始配置中没有旧字段，保存 enabled: true 以保持向后兼容
-			setBoolInMap(serverNode, "enabled", true)
 		}
 	}
 }

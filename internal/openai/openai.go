@@ -189,7 +189,10 @@ func (c *Client) ChatCompletionStream(ctx context.Context, payload interface{}, 
 
 	// 非200：读完 body 返回
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			c.logger.Warn("failed to read OpenAI error response body", zap.Error(readErr))
+		}
 		return "", &APIError{
 			StatusCode: resp.StatusCode,
 			Body:       string(respBody),
@@ -329,7 +332,10 @@ func (c *Client) ChatCompletionStreamWithToolCalls(
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			c.logger.Warn("failed to read OpenAI error response body", zap.Error(readErr))
+		}
 		return "", nil, "", &APIError{
 			StatusCode: resp.StatusCode,
 			Body:       string(respBody),

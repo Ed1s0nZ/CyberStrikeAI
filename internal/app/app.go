@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"crypto/subtle"
 	"database/sql"
 	"fmt"
 	"net/http"
@@ -459,7 +460,9 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 func (a *App) mcpHandlerWithAuth(w http.ResponseWriter, r *http.Request) {
 	cfg := a.config.MCP
 	if cfg.AuthHeader != "" {
-		if r.Header.Get(cfg.AuthHeader) != cfg.AuthHeaderValue {
+		actual := []byte(r.Header.Get(cfg.AuthHeader))
+		expected := []byte(cfg.AuthHeaderValue)
+		if subtle.ConstantTimeCompare(actual, expected) != 1 {
 			a.logger.Logger.Debug("MCP 鉴权失败：header 缺失或值不匹配", zap.String("header", cfg.AuthHeader))
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
@@ -470,18 +473,25 @@ func (a *App) mcpHandlerWithAuth(w http.ResponseWriter, r *http.Request) {
 	a.mcpServer.HandleHTTP(w, r)
 }
 
-// Run 启动应用
+// Run 启动应用（向后兼容，不支持优雅关闭）
 func (a *App) Run() error {
+	return a.RunWithContext(context.Background())
+}
+
+// RunWithContext 启动应用，支持通过 context 取消来优雅关闭
+func (a *App) RunWithContext(ctx context.Context) error {
 	// 启动MCP服务器（如果启用）
+	var mcpServer *http.Server
 	if a.config.MCP.Enabled {
+		mcpAddr := fmt.Sprintf("%s:%d", a.config.MCP.Host, a.config.MCP.Port)
+		a.logger.Info("启动MCP服务器", zap.String("address", mcpAddr))
+
+		mux := http.NewServeMux()
+		mux.HandleFunc("/mcp", a.mcpHandlerWithAuth)
+
+		mcpServer = &http.Server{Addr: mcpAddr, Handler: mux}
 		go func() {
-			mcpAddr := fmt.Sprintf("%s:%d", a.config.MCP.Host, a.config.MCP.Port)
-			a.logger.Info("启动MCP服务器", zap.String("address", mcpAddr))
-
-			mux := http.NewServeMux()
-			mux.HandleFunc("/mcp", a.mcpHandlerWithAuth)
-
-			if err := http.ListenAndServe(mcpAddr, mux); err != nil {
+			if err := mcpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				a.logger.Error("MCP服务器启动失败", zap.Error(err))
 			}
 		}()
@@ -491,7 +501,27 @@ func (a *App) Run() error {
 	addr := fmt.Sprintf("%s:%d", a.config.Server.Host, a.config.Server.Port)
 	a.logger.Info("启动HTTP服务器", zap.String("address", addr))
 
-	return a.router.Run(addr)
+	srv := &http.Server{Addr: addr, Handler: a.router}
+
+	// 监听 context 取消，优雅关闭 HTTP 服务器
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			a.logger.Error("HTTP服务器关闭失败", zap.Error(err))
+		}
+		if mcpServer != nil {
+			if err := mcpServer.Shutdown(shutdownCtx); err != nil {
+				a.logger.Error("MCP服务器关闭失败", zap.Error(err))
+			}
+		}
+	}()
+
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		return err
+	}
+	return nil
 }
 
 // Shutdown 关闭应用
@@ -517,6 +547,13 @@ func (a *App) Shutdown() {
 	if a.knowledgeDB != nil {
 		if err := a.knowledgeDB.Close(); err != nil {
 			a.logger.Logger.Warn("关闭知识库数据库连接失败", zap.Error(err))
+		}
+	}
+
+	// 关闭主数据库连接
+	if a.db != nil {
+		if err := a.db.Close(); err != nil {
+			a.logger.Logger.Warn("关闭主数据库连接失败", zap.Error(err))
 		}
 	}
 }
@@ -593,10 +630,16 @@ func setupRoutes(
 	}
 
 	// 机器人回调（无需登录，供企业微信/钉钉/飞书服务器调用）
-	api.GET("/robot/wecom", robotHandler.HandleWecomGET)
-	api.POST("/robot/wecom", robotHandler.HandleWecomPOST)
-	api.POST("/robot/dingtalk", robotHandler.HandleDingtalkPOST)
-	api.POST("/robot/lark", robotHandler.HandleLarkPOST)
+	// 添加速率限制：每个 IP 每分钟最多 60 次请求，防止滥用
+	robotRL := security.NewRateLimiter(60, 1*time.Minute)
+	robotGroup := api.Group("/robot")
+	robotGroup.Use(security.RateLimitMiddleware(robotRL))
+	{
+		robotGroup.GET("/wecom", robotHandler.HandleWecomGET)
+		robotGroup.POST("/wecom", robotHandler.HandleWecomPOST)
+		robotGroup.POST("/dingtalk", robotHandler.HandleDingtalkPOST)
+		robotGroup.POST("/lark", robotHandler.HandleLarkPOST)
+	}
 
 	protected := api.Group("")
 	protected.Use(security.AuthMiddleware(authManager))
@@ -680,6 +723,7 @@ func setupRoutes(
 		// 配置管理
 		protected.GET("/config", configHandler.GetConfig)
 		protected.GET("/config/tools", configHandler.GetTools)
+		protected.GET("/config/tools/:name/schema", configHandler.GetToolSchema)
 		protected.PUT("/config", configHandler.UpdateConfig)
 		protected.POST("/config/apply", configHandler.ApplyConfig)
 		protected.POST("/config/test-openai", configHandler.TestOpenAI)
