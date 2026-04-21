@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 	"go.uber.org/zap"
@@ -15,12 +16,28 @@ type DB struct {
 	logger *zap.Logger
 }
 
+// configureDBPool tunes the SQLite connection pool for typical server workloads.
+// SQLite writes serialize on the file lock anyway, so a very wide pool buys
+// nothing and wastes goroutines — 25 open / 5 idle is enough headroom for
+// bursty reads, and recycling every 30 min avoids stale cached prepared
+// statements on long-running processes.
+func configureDBPool(db *sql.DB) {
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(30 * time.Minute)
+}
+
 // NewDB database connection
 func NewDB(dbPath string, logger *zap.Logger) (*DB, error) {
-	db, err := sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_foreign_keys=1")
+	// _busy_timeout lets SQLite wait 5s for a locked write instead of returning
+	// SQLITE_BUSY immediately; _synchronous=NORMAL is the standard WAL pairing
+	// that keeps durability without fsync-per-commit latency.
+	db, err := sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_foreign_keys=1&_busy_timeout=5000&_synchronous=NORMAL")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
+
+	configureDBPool(db)
 
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
