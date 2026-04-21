@@ -59,13 +59,22 @@ func NewExternalMCPManagerWithStorage(logger *zap.Logger, storage MonitorStorage
 	return manager
 }
 
-// LoadConfigs loads configurations
+// LoadConfigs loads configurations, replacing any existing set. Existing
+// clients are closed before the config map is replaced so reloading does not
+// abandon stdio child processes or HTTP sessions from the previous generation.
+// Today this is only called once at startup (where m.clients is empty), but
+// the Close() sweep keeps the function safe for callers that reload at runtime.
 func (m *ExternalMCPManager) LoadConfigs(cfg *config.ExternalMCPConfig) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if cfg == nil || cfg.Servers == nil {
 		return
+	}
+
+	for name, client := range m.clients {
+		client.Close()
+		delete(m.clients, name)
 	}
 
 	m.configs = make(map[string]config.ExternalMCPServerConfig)
@@ -874,9 +883,16 @@ func (m *ExternalMCPManager) startToolCountRefresh() {
 	}()
 }
 
-// triggerToolCountRefresh triggers an immediate tool count refresh (async)
+// triggerToolCountRefresh triggers an immediate tool count refresh (async).
+// Tracked by refreshWg so StopAll can wait for in-flight refreshes before
+// tearing down m.clients - otherwise a straggler goroutine races the teardown
+// and repopulates caches against state that is already being cleared.
 func (m *ExternalMCPManager) triggerToolCountRefresh() {
-	go m.refreshToolCounts()
+	m.refreshWg.Add(1)
+	go func() {
+		defer m.refreshWg.Done()
+		m.refreshToolCounts()
+	}()
 }
 
 // createClient creates a client (without connecting). Uses the official MCP Go SDK lazy client uniformly; connection is completed at Initialize time.
@@ -948,17 +964,38 @@ func (m *ExternalMCPManager) setClientStatus(client ExternalMCPClient, status st
 	}
 }
 
-// connectClient connects a client (async) - kept for backward compatibility
+// connectClient connects a client (async). Installs the client in the map in
+// "connecting" state before initialization so a concurrent StartClient call for
+// the same name sees the existing entry and yields to this goroutine instead
+// of racing it. On Initialize failure, sets the client to "error" state and
+// records the message in m.errors so the UI can surface it - matching the
+// behavior of StartClient's failure path.
 func (m *ExternalMCPManager) connectClient(name string, serverCfg config.ExternalMCPServerConfig) error {
 	client := m.createClient(serverCfg)
 	if client == nil {
 		return fmt.Errorf("failed to create client: unsupported transport mode")
 	}
 
-	// set status to connecting
+	// Claim the slot before spending time on Initialize. If another goroutine
+	// (typically StartClient, or a sibling connectClient from a rapid
+	// AddOrUpdateConfig -> StartClient sequence) has already installed a
+	// client for this name, release our unused client and exit - whoever won
+	// the race owns the slot and we must not silently overwrite their session.
+	m.mu.Lock()
+	if existing, exists := m.clients[name]; exists && existing != nil {
+		m.mu.Unlock()
+		client.Close()
+		m.logger.Debug("connectClient yielding: another goroutine already installed a client",
+			zap.String("name", name),
+		)
+		return nil
+	}
+	m.clients[name] = client
+	delete(m.errors, name) // clear any stale error from a previous attempt
+	m.mu.Unlock()
+
 	m.setClientStatus(client, "connecting")
 
-	// initialize connection
 	timeout := time.Duration(serverCfg.Timeout) * time.Second
 	if timeout <= 0 {
 		timeout = 30 * time.Second
@@ -972,13 +1009,16 @@ func (m *ExternalMCPManager) connectClient(name string, serverCfg config.Externa
 			zap.String("name", name),
 			zap.Error(err),
 		)
+		// Keep the client in the map so the UI sees "error" state instead of
+		// the misleading "disconnected" (which would hide the error message).
+		// m.errors[name] carries the detail the UI displays.
+		m.setClientStatus(client, "error")
+		m.mu.Lock()
+		m.errors[name] = err.Error()
+		m.mu.Unlock()
+		m.triggerToolCountRefresh()
 		return err
 	}
-
-	// save the client
-	m.mu.Lock()
-	m.clients[name] = client
-	m.mu.Unlock()
 
 	m.logger.Info("external MCP client connected",
 		zap.String("name", name),
@@ -987,8 +1027,8 @@ func (m *ExternalMCPManager) connectClient(name string, serverCfg config.Externa
 	// connection succeeded, trigger tool count refresh and tool list cache refresh
 	m.triggerToolCountRefresh()
 	m.mu.RLock()
-	if client, exists := m.clients[name]; exists {
-		m.refreshToolCache(name, client)
+	if c, exists := m.clients[name]; exists {
+		m.refreshToolCache(name, c)
 	}
 	m.mu.RUnlock()
 
@@ -1071,32 +1111,43 @@ func (m *ExternalMCPManager) StartAllEnabled() {
 	}
 }
 
-// StopAll stops all clients
+// StopAll stops all clients and waits for background refresh goroutines to drain.
+//
+// Ordering matters: we stop the ticker and drain refreshWg *before* taking the
+// write lock on m.mu. If we waited while holding m.mu an in-flight
+// refreshToolCounts goroutine blocked on m.mu.RLock would never finish, and
+// refreshWg.Wait() would deadlock. Lock-free shutdown first, then clear state.
+//
+// Lock-order invariant for this package (see finding #6 of the MCP review):
+// m.mu is acquired *before* m.toolCountsMu / m.toolCacheMu. Both
+// refreshToolCounts and StopAll follow that order; any future modification
+// that reverses it will deadlock.
 func (m *ExternalMCPManager) StopAll() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	// 1. Signal the background ticker to stop, then drain any in-flight
+	//    refreshes (both ticker-driven and triggered). Use a select to avoid
+	//    closing an already-closed channel when StopAll is invoked twice.
+	select {
+	case <-m.stopRefresh:
+		// already closed
+	default:
+		close(m.stopRefresh)
+	}
+	m.refreshWg.Wait()
 
+	// 2. Close clients and clear config-related state.
+	m.mu.Lock()
 	for name, client := range m.clients {
 		client.Close()
 		delete(m.clients, name)
 	}
+	m.mu.Unlock()
 
-	// clear all tool count caches
+	// 3. Clear caches. These two locks are leaves of the lock order.
 	m.toolCountsMu.Lock()
 	m.toolCounts = make(map[string]int)
 	m.toolCountsMu.Unlock()
 
-	// clear all tool list caches
 	m.toolCacheMu.Lock()
 	m.toolCache = make(map[string][]Tool)
 	m.toolCacheMu.Unlock()
-
-	// stop background refresh (use select to avoid closing an already-closed channel)
-	select {
-	case <-m.stopRefresh:
-		// already closed, no need to close again
-	default:
-		close(m.stopRefresh)
-		m.refreshWg.Wait()
-	}
 }

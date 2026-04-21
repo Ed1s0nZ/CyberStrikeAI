@@ -237,3 +237,75 @@ func TestExternalMCPManager_GetAllTools(t *testing.T) {
 		t.Logf("got %d tools", len(tools))
 	}
 }
+
+// TestConnectClient_FailurePath_SetsErrorStatus covers reviewer finding #4:
+// when Initialize fails inside connectClient, the manager must leave the
+// client in the map with an "error" status and record the message in
+// m.errors so the handler/UI can surface it. Previously connectClient just
+// logged and returned, so GetExternalMCP reported "disconnected" and the
+// error was invisible.
+func TestConnectClient_FailurePath_SetsErrorStatus(t *testing.T) {
+	logger := zap.NewNop()
+	manager := NewExternalMCPManager(logger)
+
+	cfg := config.ExternalMCPServerConfig{
+		Transport:         "http",
+		URL:               "http://127.0.0.1:19998/does-not-exist",
+		Timeout:           2,
+		ExternalMCPEnable: true,
+	}
+	// Register config directly; avoid AddOrUpdateConfig's auto-connect goroutine
+	// so the test remains deterministic about when connectClient runs.
+	manager.configs["failing"] = cfg
+
+	err := manager.connectClient("failing", cfg)
+	if err == nil {
+		t.Fatal("expected connectClient to return an error on failed Initialize")
+	}
+
+	client, exists := manager.GetClient("failing")
+	if !exists {
+		t.Fatal("client must remain in the map so the UI can show error state (not just disappear)")
+	}
+	if status := client.GetStatus(); status != "error" {
+		t.Errorf("client status = %q, want %q", status, "error")
+	}
+	if errMsg := manager.GetError("failing"); errMsg == "" {
+		t.Error("manager.GetError is empty; expected the Initialize error message to be recorded")
+	}
+}
+
+// TestConnectClient_YieldsToExistingClient covers reviewer finding #2:
+// if another goroutine has already installed a client for the same name while
+// connectClient is between createClient and Initialize, connectClient must
+// close its own new client and leave the existing one in the map. The bug
+// the fix targets is a silent overwrite that leaks the existing session.
+func TestConnectClient_YieldsToExistingClient(t *testing.T) {
+	logger := zap.NewNop()
+	manager := NewExternalMCPManager(logger)
+
+	existing := newLazySDKClient(config.ExternalMCPServerConfig{
+		Transport: "http",
+		URL:       "http://127.0.0.1:19997/does-not-exist",
+		Timeout:   1,
+	}, logger)
+	manager.clients["squatted"] = existing
+
+	cfg := config.ExternalMCPServerConfig{
+		Transport:         "http",
+		URL:               "http://127.0.0.1:19997/does-not-exist",
+		Timeout:           1,
+		ExternalMCPEnable: true,
+	}
+	if err := manager.connectClient("squatted", cfg); err != nil {
+		t.Fatalf("connectClient should have yielded cleanly, got error: %v", err)
+	}
+
+	got, exists := manager.GetClient("squatted")
+	if !exists {
+		t.Fatal("existing client should still be in the map")
+	}
+	if got != existing {
+		t.Error("connectClient overwrote the existing client instead of yielding to it")
+	}
+}
