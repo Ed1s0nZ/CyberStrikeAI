@@ -1,6 +1,6 @@
 name: "gobuster"
 command: "gobuster"
-enabled: true
+enabled: false
 short_description: "Web内容扫描工具，用于发现目录、文件和子域名"
 description: |
   Gobuster是一个快速的内容发现工具，用于Web应用程序的目录、文件和子域名枚举。
