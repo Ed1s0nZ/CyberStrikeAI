@@ -1084,7 +1084,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 				"post": map[string]interface{}{
 					"tags":        []string{"Conversation Management"},
 					"summary":     "Create conversation",
-					"description": "Create a new security testing conversation.\n**Important notes**:\n- ✅ The created conversation is **immediately saved to the database**\n- ✅ The frontend page **automatically refreshes** to show the new conversation\n- ✅ **Fully consistent** with conversations created from the frontend\n**Two ways to create a conversation**:\n**Method 1 (recommended):** Send a message directly via `/api/agent-loop` **without** providing the `conversationId` parameter; the system will automatically create a new conversation and send the message. This is the simplest approach — creation and sending in one step.\n**Method 2:** Call this endpoint first to create an empty conversation, then use the returned `conversationId` to call `/api/agent-loop` and send a message. Use this when you need to create the conversation first and send the message later.\n**Example**:\n```json\n{\n  \"title\": \"Web Application Security Testing\"\n}\n```",
+					"description": "Create a new security testing conversation.\n**Important notes**:\n- ✅ The created conversation is **immediately saved to the database**\n- ✅ The frontend page **automatically refreshes** to show the new conversation\n- ✅ **Fully consistent** with conversations created from the frontend\n**Two ways to create a conversation**:\n**Method 1 (recommended):** Send a message directly via `/api/agent-loop` **without** providing the `conversationId` parameter; the system will automatically create a new conversation and send the message. This is the simplest approach - creation and sending in one step.\n**Method 2:** Call this endpoint first to create an empty conversation, then use the returned `conversationId` to call `/api/agent-loop` and send a message. Use this when you need to create the conversation first and send the message later.\n**Example**:\n```json\n{\n  \"title\": \"Web Application Security Testing\"\n}\n```",
 					"operationId": "createConversation",
 					"requestBody": map[string]interface{}{
 						"required": true,
@@ -1484,8 +1484,8 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 			"/api/multi-agent": map[string]interface{}{
 				"post": map[string]interface{}{
 					"tags": []string{"conversation"},
-					"summary": "message AI （Eino DeepAgent，）",
-					"description": " `POST /api/agent-loop` request body， **CloudWeGo Eino DeepAgent** 。****：`multi_agent.enabled: true`（ `config.yaml` ）；returns 404 JSON。request body `webshellConnectionId`（ WebShell ）。",
+					"summary": "message AI (Eino DeepAgent,)",
+					"description": " `POST /api/agent-loop` request body, **CloudWeGo Eino DeepAgent** .****:`multi_agent.enabled: true`( `config.yaml` );returns 404 JSON.request body `webshellConnectionId`( WebShell ).",
 					"operationId": "sendMessageMultiAgent",
 					"requestBody": map[string]interface{}{
 						"required": true,
@@ -1496,19 +1496,19 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 									"properties": map[string]interface{}{
 										"message": map[string]interface{}{
 											"type":        "string",
-											"description": "message（）",
+											"description": "message()",
 										},
 										"conversationId": map[string]interface{}{
 											"type":        "string",
-											"description": "conversation ID（，）",
+											"description": "conversation ID(,)",
 										},
 										"role": map[string]interface{}{
 											"type":        "string",
-											"description": "role（）",
+											"description": "role()",
 										},
 										"webshellConnectionId": map[string]interface{}{
 											"type":        "string",
-											"description": "WebShell connection ID（， agent-loop ）",
+											"description": "WebShell connection ID(, agent-loop )",
 										},
 									},
 									"required": []string{"message"},
@@ -1518,7 +1518,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 					},
 					"responses": map[string]interface{}{
 						"200": map[string]interface{}{
-							"description": "，format /api/agent-loop",
+							"description": ",format /api/agent-loop",
 						},
 						"400": map[string]interface{}{"description": "error"},
 						"401": map[string]interface{}{"description": "unauthorized"},
@@ -1530,8 +1530,8 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 			"/api/multi-agent/stream": map[string]interface{}{
 				"post": map[string]interface{}{
 					"tags": []string{"conversation"},
-					"summary": "message AI （Eino DeepAgent，SSE）",
-					"description": " `POST /api/agent-loop/stream` ，type； Eino DeepAgent 。****：`multi_agent.enabled: true`；，returns 200 SSE， `type: error` `done`。 `webshellConnectionId`。",
+					"summary": "message AI (Eino DeepAgent,SSE)",
+					"description": " `POST /api/agent-loop/stream` ,type; Eino DeepAgent .****:`multi_agent.enabled: true`;,returns 200 SSE, `type: error` `done`. `webshellConnectionId`.",
 					"operationId": "sendMessageMultiAgentStream",
 					"requestBody": map[string]interface{}{
 						"required": true,
@@ -1552,7 +1552,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 					},
 					"responses": map[string]interface{}{
 						"200": map[string]interface{}{
-							"description": "text/event-stream（SSE）",
+							"description": "text/event-stream(SSE)",
 							"content": map[string]interface{}{
 								"text/event-stream": map[string]interface{}{
 									"schema": map[string]interface{}{

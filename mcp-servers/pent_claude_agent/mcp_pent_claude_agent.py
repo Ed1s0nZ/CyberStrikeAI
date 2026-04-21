@@ -2,11 +2,11 @@
 """
 Pent Claude Agent MCP Server - MCP 
 
- MCP AI ：CyberStrikeAI pent_claude_agent 。
-pent_claude_agent Claude Agent SDK， MCP、，。
+ MCP AI :CyberStrikeAI pent_claude_agent .
+pent_claude_agent Claude Agent SDK, MCP,,.
 
-：pip install mcp claude-agent-sdk（ venv）
-：python mcp_pent_claude_agent.py [--config /path/to/config.yaml]
+:pip install mcp claude-agent-sdk( venv)
+:python mcp_pent_claude_agent.py [--config /path/to/config.yaml]
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from typing import Any
 import yaml
 from mcp.server.fastmcp import FastMCP
 
-# ， MCP 
+# , MCP 
 _claude_sdk_available = False
 try:
     from claude_agent_sdk import ClaudeAgentOptions, query
@@ -36,14 +36,14 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 _DEFAULT_CONFIG_PATH = os.path.join(SCRIPT_DIR, "pent_claude_agent_config.yaml")
 
-# Agent （， status）
+# Agent (, status)
 _last_task: str | None = None
 _last_result: str | None = None
 _task_count: int = 0
 
 
 def _load_config(config_path: str | None) -> dict[str, Any]:
- """ YAML ，。"""
+ """ YAML ,."""
     defaults: dict[str, Any] = {
         "cwd": PROJECT_ROOT,
         "allowed_tools": ["Read", "Write", "Bash", "Grep", "Glob"],
@@ -55,8 +55,8 @@ def _load_config(config_path: str | None) -> dict[str, Any]:
         },
         "mcp_servers": {},
         "system_prompt": (
- "。，、、。"
- "，、。。"
+ ".,,,."
+ ",,.."
         ),
     }
     path = config_path or os.environ.get("PENT_CLAUDE_AGENT_CONFIG", _DEFAULT_CONFIG_PATH)
@@ -81,12 +81,12 @@ def _load_config(config_path: str | None) -> dict[str, Any]:
 
 
 def _resolve_path(s: str) -> str:
- """。"""
+ """."""
     return s.replace("${PROJECT_ROOT}", PROJECT_ROOT).replace("${SCRIPT_DIR}", SCRIPT_DIR)
 
 
 def _build_agent_options(config: dict[str, Any], cwd_override: str | None = None) -> ClaudeAgentOptions:
- """ ClaudeAgentOptions。"""
+ """ ClaudeAgentOptions."""
     raw_cwd = cwd_override or config.get("cwd", PROJECT_ROOT)
     cwd = _resolve_path(str(raw_cwd)) if isinstance(raw_cwd, str) else str(raw_cwd)
     env = dict(os.environ)
@@ -112,13 +112,13 @@ def _build_agent_options(config: dict[str, Any], cwd_override: str | None = None
 
 
 async def _run_claude_agent(prompt: str, config_path: str | None = None, cwd: str | None = None) -> str:
- """ Claude Agent，。"""
+ """ Claude Agent,."""
     global _last_task, _last_result, _task_count
     _last_task = prompt
     _task_count += 1
 
     if not _claude_sdk_available:
- _last_result = "： claude-agent-sdk， pip install claude-agent-sdk"
+ _last_result = ": claude-agent-sdk, pip install claude-agent-sdk"
         return _last_result
 
     config = _load_config(config_path)
@@ -136,10 +136,10 @@ async def _run_claude_agent(prompt: str, config_path: str | None = None, cwd: st
  _last_result = "()"
         return _last_result
 
- # ， ResultMessage（）
+ # , ResultMessage()
     result_msgs = [m for m in messages if hasattr(m, "result") and getattr(m, "result", None) is not None]
     last = result_msgs[-1] if result_msgs else messages[-1]
- # ， ResultMessage.result， metadata
+ # , ResultMessage.result, metadata
     if hasattr(last, "result") and last.result is not None:
         text = last.result
     elif hasattr(last, "content") and last.content:
@@ -160,12 +160,12 @@ async def _run_claude_agent(prompt: str, config_path: str | None = None, cwd: st
 
 app = FastMCP(
     name="pent-claude-agent",
- instructions=" MCP：， Claude Agent 、，。",
+ instructions=" MCP:, Claude Agent ,,.",
 )
 
 
 @app.tool(
- description="。，pent_claude_agent ， Claude Agent 。：、、Web 、。",
+ description=".,pent_claude_agent , Claude Agent .:,,Web ,.",
 )
 async def pent_claude_run_pentest_task(task: str) -> str:
     """Run a penetration testing task. The agent executes independently and returns results."""
@@ -173,16 +173,16 @@ async def pent_claude_run_pentest_task(task: str) -> str:
 
 
 @app.tool(
- description="。、PoC、， Agent 。",
+ description=".,PoC,, Agent .",
 )
 async def pent_claude_analyze_vulnerability(vuln_info: str) -> str:
     """Analyze vulnerability information and provide remediation suggestions."""
- prompt = f"，：、、、。\n\n{vuln_info}"
+ prompt = f",:,,,.\n\n{vuln_info}"
     return await _run_claude_agent(prompt)
 
 
 @app.tool(
- description="。，Agent 。",
+ description=".,Agent .",
 )
 async def pent_agent_execute(task: str) -> str:
     """Execute a task. The agent chooses appropriate tools and methods."""
@@ -190,16 +190,16 @@ async def pent_agent_execute(task: str) -> str:
 
 
 @app.tool(
- description="。 URL、IP、，Agent 。",
+ description=". URL,IP,,Agent .",
 )
 async def pent_agent_diagnose(target: str) -> str:
     """Diagnose a target (URL, IP, domain) for security assessment."""
- prompt = f"：{target}\n\n：、、。"
+ prompt = f":{target}\n\n:,,."
     return await _run_claude_agent(prompt)
 
 
 @app.tool(
- description=" pent_claude_agent ：、、。",
+ description=" pent_claude_agent :,,.",
 )
 def pent_claude_status() -> str:
     """Get the current status of pent_claude_agent."""
@@ -221,7 +221,7 @@ if __name__ == "__main__":
         help="Path to pent_claude_agent config YAML (env: PENT_CLAUDE_AGENT_CONFIG)",
     )
     args, _ = parser.parse_known_args()
- # config ，
+ # config ,
     if args.config:
         os.environ["PENT_CLAUDE_AGENT_CONFIG"] = args.config
     app.run(transport="stdio")

@@ -106,7 +106,7 @@ EOF
 
 ## Notes
 
-- **Important**: Skill content is NOT automatically injected into the system prompt — only the skill name is added as a hint.
+- **Important**: Skill content is NOT automatically injected into the system prompt - only the skill name is added as a hint.
 - AI agents must proactively use the `read_skill` tool to retrieve skill content. This saves tokens and improves flexibility.
 - Skill content should be clear and structured for AI to understand.
 - Code examples and command examples can be included.

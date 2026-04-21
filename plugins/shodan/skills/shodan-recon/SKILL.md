@@ -205,14 +205,14 @@ Take Shodan results and feed IPs + ports into active tools:
 
 | Field | Significance |
 |-------|-------------|
-| `ports` | Open services — attack surface |
-| `vulns` | Known CVEs — prioritize exploitation |
-| `os` | Operating system — helps select exploits |
-| `product/version` | Software ID — check for known vulns |
-| `hostnames` | DNS names — may reveal internal naming |
-| `org/isp` | Hosting provider — infrastructure intel |
-| `ssl.jarm` | TLS fingerprint — C2 detection |
-| `http.title` | Page title — quick service identification |
+| `ports` | Open services - attack surface |
+| `vulns` | Known CVEs - prioritize exploitation |
+| `os` | Operating system - helps select exploits |
+| `product/version` | Software ID - check for known vulns |
+| `hostnames` | DNS names - may reveal internal naming |
+| `org/isp` | Hosting provider - infrastructure intel |
+| `ssl.jarm` | TLS fingerprint - C2 detection |
+| `http.title` | Page title - quick service identification |
 
 ### Common Banner Patterns
 
@@ -242,11 +242,11 @@ Take Shodan results and feed IPs + ports into active tools:
 - Use `count` + facets first to understand result landscape
 - Use `minify` to reduce response size
 - Combine Shodan with free tools (crt.sh for subdomains, Censys free lookups)
-- Cache results — don't re-run the same query
+- Cache results - don't re-run the same query
 
 ## Tips
 
-- **JARM fingerprinting** (`ssl.jarm`) is excellent for C2 detection — known C2 frameworks have published JARM hashes
+- **JARM fingerprinting** (`ssl.jarm`) is excellent for C2 detection - known C2 frameworks have published JARM hashes
 - **Favicon hashes** (`http.favicon.hash`) uniquely identify web applications even when titles change
 - **Historical data** via `host --history` shows how services changed over time
 - **Faceted counts** are free and reveal organizational structure without spending credits

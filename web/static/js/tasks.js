@@ -3,7 +3,7 @@ function _t(key, opts) {
     return typeof window.t === 'function' ? window.t(key, opts) : key;
 }
 
-// HTMLescape function（ifnot defined）
+// HTMLescape function(ifnot defined)
 if (typeof escapeHtml === 'undefined') {
     function escapeHtml(text) {
         if (text == null) return '';
@@ -58,28 +58,28 @@ function saveCompletedTasksHistory() {
 
 // updatecompletedtaskhistory
 function updateCompletedTasksHistory(currentTasks) {
- // Savecurrentalltaskasfast（used forundertime）
+ // Savecurrentalltaskasfast(used forundertime)
     const currentTaskIds = new Set(currentTasks.map(t => t.conversationId));
     
- // if it isfirst timeload，onlyneedSavecurrenttaskfast
+ // if it isfirst timeload,onlyneedSavecurrenttaskfast
     if (tasksState.allTasks.length === 0) {
         return;
     }
     
     const previousTaskIds = new Set(tasksState.allTasks.map(t => t.conversationId));
     
- // outcomplete's task（beforeexistbutatnotexist's ）
- // onlyneedtaskfromlistin，thenascompleted
+ // outcomplete's task(beforeexistbutatnotexist's )
+ // onlyneedtaskfromlistin,thenascompleted
     const justCompleted = tasksState.allTasks.filter(task => {
         return previousTaskIds.has(task.conversationId) && !currentTaskIds.has(task.conversationId);
     });
     
  // willcomplete's taskaddtohistoryin
     justCompleted.forEach(task => {
- // checkisalready exists（avoidrepeatadd）
+ // checkisalready exists(avoidrepeatadd)
         const exists = tasksState.completedTasksHistory.some(t => t.conversationId === task.conversationId);
         if (!exists) {
-            // iftaskstatusnotisfinalstatus，markascompleted
+            // iftaskstatusnotisfinalstatus,markascompleted
             const finalStatus = ['completed', 'failed', 'timeout', 'cancelled'].includes(task.status) 
                 ? task.status 
                 : 'completed';
@@ -94,7 +94,7 @@ function updateCompletedTasksHistory(currentTasks) {
         }
     });
     
-    // limithistoryrecordcount（at mostpreserve50record）
+    // limithistoryrecordcount(at mostpreserve50record)
     if (tasksState.completedTasksHistory.length > 50) {
         tasksState.completedTasksHistory = tasksState.completedTasksHistory
             .sort((a, b) => new Date(b.completedAt || b.startedAt) - new Date(a.completedAt || a.startedAt))
@@ -115,7 +115,7 @@ async function loadTasks() {
  // lineloadrunningin's taskandcompleted's taskhistory
         const [activeResponse, completedResponse] = await Promise.allSettled([
             apiFetch('/api/agent-loop/tasks'),
-            apiFetch('/api/agent-loop/tasks/completed').catch(() => null) // ifAPInotexist，returnnull
+            apiFetch('/api/agent-loop/tasks/completed').catch(() => null) // ifAPInotexist,returnnull
         ]);
 
         // processrunningin's task
@@ -126,7 +126,7 @@ async function loadTasks() {
         const activeResult = await activeResponse.value.json();
         const activeTasks = activeResult.tasks || [];
         
-        // loadcompletedtaskhistory（ifAPIavailable）
+        // loadcompletedtaskhistory(ifAPIavailable)
         let completedTasks = [];
         if (completedResponse.status === 'fulfilled' && completedResponse.value && completedResponse.value.ok) {
             try {
@@ -140,15 +140,15 @@ async function loadTasks() {
         // Savealltask
         tasksState.allTasks = activeTasks;
         
-        // updatecompletedtaskhistory（frombackendAPIget）
+        // updatecompletedtaskhistory(frombackendAPIget)
         if (completedTasks.length > 0) {
- // mergebackendhistoryrecordandlocalhistoryrecord（to）
+ // mergebackendhistoryrecordandlocalhistoryrecord(to)
             const backendTaskIds = new Set(completedTasks.map(t => t.conversationId));
             const localHistory = tasksState.completedTasksHistory.filter(t => 
                 !backendTaskIds.has(t.conversationId)
             );
             
- // backend's historyrecordprefer，afteraddlocalhas's 
+ // backend's historyrecordprefer,afteraddlocalhas's 
             tasksState.completedTasksHistory = [
                 ...completedTasks.map(t => ({
                     conversationId: t.conversationId,
@@ -169,7 +169,7 @@ async function loadTasks() {
             
             saveCompletedTasksHistory();
         } else {
- // ifbackendAPInotavailable，stillusefrontendupdatehistory
+ // ifbackendAPInotavailable,stillusefrontendupdatehistory
             updateCompletedTasksHistory(activeTasks);
         }
         
@@ -244,7 +244,7 @@ function filterAndSortTasks() {
     // mergecurrenttaskandhistorytask
     let allTasks = [...tasksState.allTasks];
     
-    // ifShow historyrecord，addhistorytask
+    // ifShow historyrecord,addhistorytask
     if (tasksState.showHistory) {
         const historyTasks = tasksState.completedTasksHistory
             .filter(ht => !tasksState.allTasks.some(t => t.conversationId === ht.conversationId))
@@ -255,7 +255,7 @@ function filterAndSortTasks() {
     // Filter
     let filtered = allTasks;
     if (statusFilter === 'active') {
-        // onlyrunningin's task（notincludehistory）
+        // onlyrunningin's task(notincludehistory)
         filtered = tasksState.allTasks.filter(task => 
             task.status === 'running' || task.status === 'cancelling'
         );
@@ -619,9 +619,9 @@ function viewConversation(conversationId) {
             } else if (typeof window.loadConversation === 'function') {
                 window.loadConversation(conversationId);
             } else {
-                // iffunctionnotexist，tryviaURLnavigate
+                // iffunctionnotexist,tryviaURLnavigate
                 window.location.hash = `chat?conversation=${conversationId}`;
-                console.log('switchtoconversationpage，conversationID:', conversationId);
+                console.log('switchtoconversationpage,conversationID:', conversationId);
             }
         }, 500);
     }
@@ -672,7 +672,7 @@ function initTasksPage() {
     loadBatchQueues();
 }
 
-// cleanuptimer（pageswitchwhencall）
+// cleanuptimer(pageswitchwhencall)
 function cleanupTasksPage() {
     if (tasksState.refreshInterval) {
         clearInterval(tasksState.refreshInterval);
@@ -740,7 +740,7 @@ async function showBatchImportModal() {
         if (roleSelect && typeof loadRoles === 'function') {
             try {
                 const loadedRoles = await loadRoles();
- // clearhasoption（defaultoption）
+ // clearhasoption(defaultoption)
                 roleSelect.innerHTML = '<option value="">' + _t('batchImportModal.defaultRole') + '</option>';
                 
                 // addEnabled's role
@@ -822,10 +822,10 @@ async function createBatchQueue() {
         return;
     }
     
-    // gettitle（optional）
+    // gettitle(optional)
     const title = titleInput ? titleInput.value.trim() : '';
     
-    // getrole（optional，emptystringindicatesdefault role）
+    // getrole(optional,emptystringindicatesdefault role)
     const role = roleSelect ? roleSelect.value || '' : '';
     
     try {
@@ -856,7 +856,7 @@ async function createBatchQueue() {
     }
 }
 
-// getroleicon（function）
+// getroleicon(function)
 function getRoleIconForDisplay(roleName, rolesList) {
     if (!roleName || roleName === '') {
         return '🔵'; // default roleicon
@@ -866,14 +866,14 @@ function getRoleIconForDisplay(roleName, rolesList) {
         const role = rolesList.find(r => r.name === roleName);
         if (role && role.icon) {
             let icon = role.icon;
-            // check if it is Unicode escape format（may contain quotes）
+            // check if it is Unicode escape format(may contain quotes)
             const unicodeMatch = icon.match(/^"?\\U([0-9A-F]{8})"?$/i);
             if (unicodeMatch) {
                 try {
                     const codePoint = parseInt(unicodeMatch[1], 16);
                     icon = String.fromCodePoint(codePoint);
                 } catch (e) {
-                    // Conversion failed，use default icon
+                    // Conversion failed,use default icon
                     console.warn('convert icon Unicode escape failed:', icon, e);
                     return '👤';
                 }
@@ -889,18 +889,18 @@ async function loadBatchQueues(page) {
     const section = document.getElementById('batch-queues-section');
     if (!section) return;
     
-    // ifspecifypage，use it；otherwise usecurrentpage
+    // ifspecifypage,use it;otherwise usecurrentpage
     if (page !== undefined) {
         batchQueuesState.currentPage = page;
     }
     
-    // loadrolelist（used forShow correct's roleicon）
+    // loadrolelist(used forShow correct's roleicon)
     let loadedRoles = [];
     if (typeof loadRoles === 'function') {
         try {
             loadedRoles = await loadRoles();
         } catch (error) {
-            console.warn('Failed to load role list，will use default icons:', error);
+            console.warn('Failed to load role list,will use default icons:', error);
         }
     }
     batchQueuesState.loadedRoles = loadedRoles; // save tostatusinforrenderuse
@@ -972,7 +972,7 @@ function renderBatchQueues() {
         return;
     }
     
- // ensurepaginationcontrolscan（resetbeforepossiblysettings's display: none）
+ // ensurepaginationcontrolscan(resetbeforepossiblysettings's display: none)
     if (pagination) {
         pagination.style.display = '';
     }
@@ -1007,12 +1007,12 @@ function renderBatchQueues() {
         });
         
         const progress = stats.total > 0 ? Math.round((stats.completed + stats.failed + stats.cancelled) / stats.total * 100) : 0;
- // allowDeleteline、completedoralreadyCancelstatus's queue
+ // allowDeleteline,completedoralreadyCancelstatus's queue
         const canDelete = queue.status === 'pending' || queue.status === 'completed' || queue.status === 'cancelled';
         
         const titleDisplay = queue.title ? `<span class="batch-queue-title" style="font-weight: 600; color: var(--text-primary); margin-right: 8px;">${escapeHtml(queue.title)}</span>` : '';
         
-        // Show roleInfo（usecorrect's roleicon）
+        // Show roleInfo(usecorrect's roleicon)
         const loadedRoles = batchQueuesState.loadedRoles || [];
         const roleIcon = getRoleIconForDisplay(queue.role, loadedRoles);
         const roleName = queue.role && queue.role !== '' ? queue.role : _t('batchQueueDetailModal.defaultRole');
@@ -1054,14 +1054,14 @@ function renderBatchQueues() {
     renderBatchQueuesPagination();
 }
 
-// renderbatchtaskqueuepaginationcontrols（referenceSkillsmanagement pagestyle）
+// renderbatchtaskqueuepaginationcontrols(referenceSkillsmanagement pagestyle)
 function renderBatchQueuesPagination() {
     const paginationContainer = document.getElementById('batch-queues-pagination');
     if (!paginationContainer) return;
     
     const { currentPage, pageSize, total, totalPages } = batchQueuesState;
     
- // even ifonlyhaspagealsoShow paginationInfo（referenceSkillsstyle）
+ // even ifonlyhaspagealsoShow paginationInfo(referenceSkillsstyle)
     if (total === 0) {
         paginationContainer.innerHTML = '';
         return;
@@ -1073,7 +1073,7 @@ function renderBatchQueuesPagination() {
     
     let paginationHTML = '<div class="pagination">';
     
-    // left side：Show rangeInfoandeachpagecountselector（referenceSkillsstyle）
+    // left side:Show rangeInfoandeachpagecountselector(referenceSkillsstyle)
     paginationHTML += `
         <div class="pagination-info">
             <span>` + _t('tasks.paginationShow', { start: start, end: end, total: total }) + `</span>
@@ -1089,7 +1089,7 @@ function renderBatchQueuesPagination() {
         </div>
     `;
     
-    // right side：paginationbutton（referenceSkillsstyle：First、Previous、X/Ypage、Next、Last）
+    // right side:paginationbutton(referenceSkillsstyle:First,Previous,X/Ypage,Next,Last)
     paginationHTML += `
         <div class="pagination-controls">
             <button class="btn-secondary" onclick="goBatchQueuesPage(1)" ${currentPage === 1 || total === 0 ? 'disabled' : ''}>` + _t('tasks.paginationFirst') + `</button>
@@ -1104,23 +1104,23 @@ function renderBatchQueuesPagination() {
     
     paginationContainer.innerHTML = paginationHTML;
     
-    // ensurepaginationcomponentandlistcontentareaalign（excluding scrollbar）
+    // ensurepaginationcomponentandlistcontentareaalign(excluding scrollbar)
     function alignPaginationWidth() {
         const batchQueuesList = document.getElementById('batch-queues-list');
         if (batchQueuesList && paginationContainer) {
-            // getlist's actualcontentwidth（excluding scrollbar）
-            const listClientWidth = batchQueuesList.clientWidth; // visibleareawidth（excluding scrollbar）
+            // getlist's actualcontentwidth(excluding scrollbar)
+            const listClientWidth = batchQueuesList.clientWidth; // visibleareawidth(excluding scrollbar)
             const listScrollHeight = batchQueuesList.scrollHeight; // contenttotal height
             const listClientHeight = batchQueuesList.clientHeight; // visibleareaheight
             const hasScrollbar = listScrollHeight > listClientHeight;
             
-            // iflisthasverticalscrollrecord，pagination should align with list content area（clientWidth）
-            // if no scrollbar，use100%width
+            // iflisthasverticalscrollrecord,pagination should align with list content area(clientWidth)
+            // if no scrollbar,use100%width
             if (hasScrollbar) {
-                // pagination should align with list content area，excluding scrollbar
+                // pagination should align with list content area,excluding scrollbar
                 paginationContainer.style.width = `${listClientWidth}px`;
             } else {
-                // if no scrollbar，use100%width
+                // if no scrollbar,use100%width
                 paginationContainer.style.width = '100%';
             }
         }
@@ -1180,13 +1180,13 @@ async function showBatchQueueDetail(queueId) {
         if (!modal || !content) return;
         
         try {
-        // loadrolelist（ifstillnot loaded）
+        // loadrolelist(ifstillnot loaded)
         let loadedRoles = [];
         if (typeof loadRoles === 'function') {
             try {
                 loadedRoles = await loadRoles();
             } catch (error) {
-                console.warn('Failed to load role list，will use default icons:', error);
+                console.warn('Failed to load role list,will use default icons:', error);
             }
         }
         
@@ -1200,7 +1200,7 @@ async function showBatchQueueDetail(queueId) {
         batchQueuesState.currentQueueId = queueId;
         
         if (title) {
- // textContent itselfwilldoescape；herenotneedthen escapeHtml，otherwisewill && Show &amp;...（looks like“deformed/garbled”）
+ // textContent itselfwilldoescape;herenotneedthen escapeHtml,otherwisewill && Show &amp;...(looks like"deformed/garbled")
             title.textContent = queue.title ? _t('tasks.batchQueueTitle') + ' - ' + String(queue.title) : _t('tasks.batchQueueTitle');
         }
         
@@ -1210,7 +1210,7 @@ async function showBatchQueueDetail(queueId) {
             addTaskBtn.style.display = queue.status === 'pending' ? 'inline-block' : 'none';
         }
         if (startBtn) {
- // pendingstatusShow "startline"，pausedstatusShow "Continueline"
+ // pendingstatusShow "startline",pausedstatusShow "Continueline"
             startBtn.style.display = (queue.status === 'pending' || queue.status === 'paused') ? 'inline-block' : 'none';
             if (startBtn && queue.status === 'paused') {
                 startBtn.textContent = _t('tasks.resumeExecute');
@@ -1223,7 +1223,7 @@ async function showBatchQueueDetail(queueId) {
             pauseBtn.style.display = queue.status === 'running' ? 'inline-block' : 'none';
         }
         if (deleteBtn) {
- // allowDeleteline、completedoralreadyCancelstatus's queue
+ // allowDeleteline,completedoralreadyCancelstatus's queue
             deleteBtn.style.display = (queue.status === 'pending' || queue.status === 'completed' || queue.status === 'cancelled' || queue.status === 'paused') ? 'inline-block' : 'none';
         }
         
@@ -1245,10 +1245,10 @@ async function showBatchQueueDetail(queueId) {
             'cancelled': { text: _t('tasks.statusCancelled'), class: 'batch-task-status-cancelled' }
         };
         
-        // getroleInfo（ifqueuehasrole configuration）
+        // getroleInfo(ifqueuehasrole configuration)
         let roleDisplay = '';
         if (queue.role && queue.role !== '') {
-            // ifhasrole configuration，trygetroledetailedInfo
+            // ifhasrole configuration,trygetroledetailedInfo
             let roleName = queue.role;
             let roleIcon = '👤';
             // fromalreadyload's rolelistinfindroleicon
@@ -1262,7 +1262,7 @@ async function showBatchQueueDetail(queueId) {
                             const codePoint = parseInt(unicodeMatch[1], 16);
                             icon = String.fromCodePoint(codePoint);
                         } catch (e) {
-                            // Conversion failed，use default icon
+                            // Conversion failed,use default icon
                         }
                     }
                     roleIcon = icon;
@@ -1340,7 +1340,7 @@ async function showBatchQueueDetail(queueId) {
         
         modal.style.display = 'block';
         
-        // ifqueuecurrently running，autoRefresh
+        // ifqueuecurrently running,autoRefresh
         if (queue.status === 'running') {
             startBatchQueueRefresh(queueId);
         }
@@ -1402,7 +1402,7 @@ async function pauseBatchQueue() {
     }
 }
 
-// Deletebatchtaskqueue（fromdetailsmodal）
+// Deletebatchtaskqueue(fromdetailsmodal)
 async function deleteBatchQueue() {
     const queueId = batchQueuesState.currentQueueId;
     if (!queueId) return;
@@ -1447,7 +1447,7 @@ async function deleteBatchQueueFromList(queueId) {
             throw new Error(result.error || _t('tasks.deleteQueueFailed'));
         }
         
-        // ifcurrentcurrently viewthis queue's details，Closedetailsmodal
+        // ifcurrentcurrently viewthis queue's details,Closedetailsmodal
         if (batchQueuesState.currentQueueId === queueId) {
             closeBatchQueueDetailModal();
         }
@@ -1506,8 +1506,8 @@ function viewBatchTaskConversation(conversationId) {
     // Closebatchtaskdetailsmodal
     closeBatchQueueDetailModal();
     
-    // use directlyURL hashnavigate，letrouterprocesspageswitchandconversationload
- // this reliable，becauserouterwillensurepageswitchcompleteafterthenloadconversation
+    // use directlyURL hashnavigate,letrouterprocesspageswitchandconversationload
+ // this reliable,becauserouterwillensurepageswitchcompleteafterthenloadconversation
     window.location.hash = `chat?conversation=${conversationId}`;
 }
 

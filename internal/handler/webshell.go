@@ -17,14 +17,14 @@ import (
 	"go.uber.org/zap"
 )
 
-// WebShellHandler WebShell （/），build request
+// WebShellHandler WebShell (/),build request
 type WebShellHandler struct {
 	logger *zap.Logger
 	client *http.Client
 	db     *database.DB
 }
 
-// NewWebShellHandler WebShell handler，db nil（）
+// NewWebShellHandler WebShell handler,db nil()
 func NewWebShellHandler(logger *zap.Logger, db *database.DB) *WebShellHandler {
 	return &WebShellHandler{
 		logger: logger,
@@ -56,7 +56,7 @@ type UpdateConnectionRequest struct {
 	Remark   string `json:"remark"`
 }
 
-// ListConnections list all WebShell connections（GET /api/webshell/connections）
+// ListConnections list all WebShell connections(GET /api/webshell/connections)
 func (h *WebShellHandler) ListConnections(c *gin.Context) {
 	if h.db == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "database not available"})
@@ -73,7 +73,7 @@ func (h *WebShellHandler) ListConnections(c *gin.Context) {
 	c.JSON(http.StatusOK, list)
 }
 
-// CreateConnection WebShell （POST /api/webshell/connections）
+// CreateConnection WebShell (POST /api/webshell/connections)
 func (h *WebShellHandler) CreateConnection(c *gin.Context) {
 	if h.db == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "database not available"})
@@ -118,7 +118,7 @@ func (h *WebShellHandler) CreateConnection(c *gin.Context) {
 	c.JSON(http.StatusOK, conn)
 }
 
-// UpdateConnection update WebShell connection（PUT /api/webshell/connections/:id）
+// UpdateConnection update WebShell connection(PUT /api/webshell/connections/:id)
 func (h *WebShellHandler) UpdateConnection(c *gin.Context) {
 	if h.db == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "database not available"})
@@ -176,7 +176,7 @@ func (h *WebShellHandler) UpdateConnection(c *gin.Context) {
 	}
 }
 
-// DeleteConnection delete WebShell （DELETE /api/webshell/connections/:id）
+// DeleteConnection delete WebShell (DELETE /api/webshell/connections/:id)
 func (h *WebShellHandler) DeleteConnection(c *gin.Context) {
 	if h.db == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "database not available"})
@@ -198,7 +198,7 @@ func (h *WebShellHandler) DeleteConnection(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
-// GetConnectionState WebShell status（GET /api/webshell/connections/:id/state）
+// GetConnectionState WebShell status(GET /api/webshell/connections/:id/state)
 func (h *WebShellHandler) GetConnectionState(c *gin.Context) {
 	if h.db == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "database not available"})
@@ -230,7 +230,7 @@ func (h *WebShellHandler) GetConnectionState(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"state": state})
 }
 
-// SaveConnectionState WebShell status（PUT /api/webshell/connections/:id/state）
+// SaveConnectionState WebShell status(PUT /api/webshell/connections/:id/state)
 func (h *WebShellHandler) SaveConnectionState(c *gin.Context) {
 	if h.db == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "database not available"})
@@ -277,7 +277,7 @@ func (h *WebShellHandler) SaveConnectionState(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
-// GetAIHistory WebShell AI conversation（GET /api/webshell/connections/:id/ai-history）
+// GetAIHistory WebShell AI conversation(GET /api/webshell/connections/:id/ai-history)
 func (h *WebShellHandler) GetAIHistory(c *gin.Context) {
 	if h.db == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "database not available"})
@@ -301,7 +301,7 @@ func (h *WebShellHandler) GetAIHistory(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"conversationId": conv.ID, "messages": conv.Messages})
 }
 
-// ListAIConversations WebShell AI conversation（）
+// ListAIConversations WebShell AI conversation()
 func (h *WebShellHandler) ListAIConversations(c *gin.Context) {
 	if h.db == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "database not available"})
@@ -324,13 +324,13 @@ func (h *WebShellHandler) ListAIConversations(c *gin.Context) {
 	c.JSON(http.StatusOK, list)
 }
 
-// ExecRequest （ + ）
+// ExecRequest ( + )
 type ExecRequest struct {
 	URL      string `json:"url" binding:"required"`
 	Password string `json:"password"`
 	Type     string `json:"type"`      // php, asp, aspx, jsp, custom
-	Method string `json:"method"` // GET POST，default POST
-	CmdParam string `json:"cmd_param"` // command parameter， cmd/xxx，default cmd
+	Method string `json:"method"` // GET POST,default POST
+	CmdParam string `json:"cmd_param"` // command parameter, cmd/xxx,default cmd
 	Command  string `json:"command" binding:"required"`
 }
 
@@ -347,13 +347,13 @@ type FileOpRequest struct {
 	URL        string `json:"url" binding:"required"`
 	Password   string `json:"password"`
 	Type       string `json:"type"`
-	Method string `json:"method"` // GET POST，default POST
-	CmdParam string `json:"cmd_param"` // command parameter， cmd/xxx，default cmd
+	Method string `json:"method"` // GET POST,default POST
+	CmdParam string `json:"cmd_param"` // command parameter, cmd/xxx,default cmd
 	Action     string `json:"action" binding:"required"` // list, read, delete, write, mkdir, rename, upload, upload_chunk
 	Path       string `json:"path"`
 	TargetPath string `json:"target_path"` // rename 
 	Content string `json:"content"` // write/upload 
-	ChunkIndex int `json:"chunk_index"` // upload_chunk ，0 
+	ChunkIndex int `json:"chunk_index"` // upload_chunk ,0 
 }
 
 // FileOpResponse 
@@ -422,13 +422,13 @@ func (h *WebShellHandler) Exec(c *gin.Context) {
 	})
 }
 
-// buildExecBody WebShell POST （ pass + cmd，command parameter）
+// buildExecBody WebShell POST ( pass + cmd,command parameter)
 func (h *WebShellHandler) buildExecBody(shellType, password, cmdParam, command string) []byte {
 	form := h.execParams(shellType, password, cmdParam, command)
 	return []byte(form.Encode())
 }
 
-// buildExecURL GET URL（baseURL + ?pass=xxx&cmd=yyy，cmd ）
+// buildExecURL GET URL(baseURL + ?pass=xxx&cmd=yyy,cmd )
 func (h *WebShellHandler) buildExecURL(baseURL, shellType, password, cmdParam, command string) string {
 	form := h.execParams(shellType, password, cmdParam, command)
 	if parsed, err := url.Parse(baseURL); err == nil {
@@ -471,7 +471,7 @@ func (h *WebShellHandler) FileOp(c *gin.Context) {
 		return
 	}
 
-	// （）
+	// ()
 	var command string
 	shellType := strings.ToLower(strings.TrimSpace(req.Type))
 	switch req.Action {
@@ -533,7 +533,7 @@ func (h *WebShellHandler) FileOp(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, FileOpResponse{OK: false, Error: "upload content too large (max 512KB base64)"})
 			return
 		}
-		// base64 A-Za-z0-9+/=，
+		// base64 A-Za-z0-9+/=,
 		command = "echo " + "'" + req.Content + "'" + " | base64 -d > " + h.escapePath(path)
 	case "upload_chunk":
 		path := strings.TrimSpace(req.Path)
@@ -591,16 +591,16 @@ func (h *WebShellHandler) escapePath(p string) string {
 	if p == "" {
 		return "."
 	}
-	// ，
+	// ,
 	return "'" + strings.ReplaceAll(p, "'", "'\\''") + "'"
 }
 
 func (h *WebShellHandler) escapeForEcho(s string) string {
-	// write：base64 ，
+	// write:base64 ,
 	return "'" + strings.ReplaceAll(s, "'", "'\"'\"'") + "'"
 }
 
-// ExecWithConnection WebShell （ MCP/Agent HTTP ）
+// ExecWithConnection WebShell ( MCP/Agent HTTP )
 func (h *WebShellHandler) ExecWithConnection(conn *database.WebShellConnection, command string) (output string, ok bool, errMsg string) {
 	if conn == nil {
 		return "", false, "connection is nil"
@@ -637,7 +637,7 @@ func (h *WebShellHandler) ExecWithConnection(conn *database.WebShellConnection, 
 	return string(out), resp.StatusCode == http.StatusOK, ""
 }
 
-// FileOpWithConnection WebShell （ MCP/Agent ）， list / read / write
+// FileOpWithConnection WebShell ( MCP/Agent ), list / read / write
 func (h *WebShellHandler) FileOpWithConnection(conn *database.WebShellConnection, action, path, content, targetPath string) (output string, ok bool, errMsg string) {
 	if conn == nil {
 		return "", false, "connection is nil"

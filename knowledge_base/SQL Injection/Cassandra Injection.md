@@ -19,7 +19,7 @@
 
 * Another limitation is the absence of the `OR` operator in CQL, which prevents creating always-true conditions; for instance, a query like `SELECT * FROM table WHERE col1='a' OR col2='b';` will be rejected.
 
-* Time-based SQL injections, which typically rely on functions like `SLEEP()` to introduce a delay, are also difficult to execute in CQL since it doesn’t include a `SLEEP()` function.
+* Time-based SQL injections, which typically rely on functions like `SLEEP()` to introduce a delay, are also difficult to execute in CQL since it doesn't include a `SLEEP()` function.
 
 * CQL does not allow subqueries or other nested statements, so a query like `SELECT * FROM table WHERE column=(SELECT column FROM table LIMIT 1);` would be rejected.
 

@@ -55,7 +55,7 @@ body {
     column-gap: 0px;
 }
 
-/* Main sidebar styles — compact width, following typical admin UIs at 200–220px */
+/* Main sidebar styles - compact width, following typical admin UIs at 200–220px */
 .main-sidebar {
     /* Slightly widen the sidebar to give multi-language menu labels more breathing room */
     width: 224px;
@@ -244,7 +244,7 @@ body {
     font-size: 0.9375rem;
     font-weight: 400;
     white-space: nowrap;
-    /* Prevent long titles from hitting the edge — ellipsis inside the right padding instead of overflowing */
+    /* Prevent long titles from hitting the edge - ellipsis inside the right padding instead of overflowing */
     overflow: hidden;
     text-overflow: ellipsis;
     opacity: 1;
@@ -489,7 +489,7 @@ body {
 }
 
 .conversation-sidebar-collapse-btn {
-    /* Don't use absolute positioning — would overlap "New chat" */
+    /* Don't use absolute positioning - would overlap "New chat" */
     position: static;
     flex-shrink: 0;
     align-self: center;
@@ -1417,7 +1417,7 @@ header {
 }
 
 /* Markdown table styles */
-/* Table wrapper — gives each table its own horizontal scroll */
+/* Table wrapper - gives each table its own horizontal scroll */
 .message-bubble .table-wrapper {
     width: 100%;
     overflow-x: auto;
@@ -1447,7 +1447,7 @@ header {
     background: rgba(0, 0, 0, 0.3);
 }
 
-/* The table itself — allow width to auto-expand based on content */
+/* The table itself - allow width to auto-expand based on content */
 .message-bubble table {
     width: auto;
     min-width: 100%;
@@ -1514,7 +1514,7 @@ header {
     position: relative;
 }
 
-/* Message copy button — bottom-right of the message bubble */
+/* Message copy button - bottom-right of the message bubble */
 .message-copy-btn {
     position: absolute;
     bottom: 12px;
@@ -1883,10 +1883,10 @@ header {
     vertical-align: middle;
     /* Hide the scrollbar while keeping scrolling functional */
     scrollbar-width: thin; /* Firefox */
-    scrollbar-color: transparent transparent; /* Firefox — hide scrollbar */
+    scrollbar-color: transparent transparent; /* Firefox - hide scrollbar */
 }
 
-/* WebKit browsers (Chrome, Safari, Edge) — hide scrollbar while keeping scrolling */
+/* WebKit browsers (Chrome, Safari, Edge) - hide scrollbar while keeping scrolling */
 .chat-input-container textarea::-webkit-scrollbar {
     width: 4px; /* Narrowest scrollbar */
 }
@@ -2709,7 +2709,7 @@ header {
         overflow: hidden;
     }
 
-    /* Collapsed chat list keeps its narrow rail on narrow screens — don't let the 240px rule override it */
+    /* Collapsed chat list keeps its narrow rail on narrow screens - don't let the 240px rule override it */
     .conversation-sidebar.collapsed {
         width: 56px;
     }
@@ -2841,7 +2841,7 @@ header {
     color: var(--text-primary);
 }
 
-/* Details-area bottom "collapse/expand" — lets users fold long streamed output without scrolling back to the top */
+/* Details-area bottom "collapse/expand" - lets users fold long streamed output without scrolling back to the top */
 .progress-footer {
     display: flex;
     justify-content: flex-end;
@@ -3335,7 +3335,7 @@ header {
     line-height: 1.6;
 }
 
-/* System settings — terminal */
+/* System settings - terminal */
 .terminal-wrapper {
     border: 1px solid var(--border-color);
     border-radius: 6px;
@@ -3955,7 +3955,7 @@ header {
     background: var(--bg-primary);
     margin-top: 0;
     padding: 0;
-    /* Pagination width matches the content area — scrollbar excluded */
+    /* Pagination width matches the content area - scrollbar excluded */
     width: 100%;
     box-sizing: border-box;
     /* Keep the pagination component from extending into the scrollbar area */
@@ -3991,11 +3991,11 @@ header {
     /* Ensure both bottom corners are rounded */
     border-bottom-left-radius: 8px;
     border-bottom-right-radius: 8px;
-    /* Remove top border — the outer container already has one */
+    /* Remove top border - the outer container already has one */
     border-top: none;
 }
 
-/* Left side: info display and per-page selector — more natural design */
+/* Left side: info display and per-page selector - more natural design */
 .pagination-fixed .pagination-info {
     font-size: 0.8125rem;
     color: var(--text-secondary);
@@ -4066,7 +4066,7 @@ header {
     background: var(--bg-secondary);
 }
 
-/* Right side: pagination button group — more uniform design */
+/* Right side: pagination button group - more uniform design */
 .pagination-fixed .pagination-controls {
     display: flex;
     align-items: center;
@@ -4114,7 +4114,7 @@ header {
     padding: 5px 10px;
     white-space: nowrap;
     font-weight: 400;
-    /* Rounded-corner design — all four corners rounded */
+    /* Rounded-corner design - all four corners rounded */
     border-radius: 8px !important;
     background: var(--bg-secondary) !important;
     border: 1px solid var(--border-color) !important;
@@ -8561,7 +8561,7 @@ header {
     color: var(--text-primary);
 }
 
-/* WebShell management page styles — polished */
+/* WebShell management page styles - polished */
 .webshell-page-content {
     height: calc(100vh - 140px);
     overflow: hidden;
@@ -8997,7 +8997,7 @@ header {
     flex-direction: column;
 }
 
-/* Rounded outer frame only — no extra inner decoration that would cover text */
+/* Rounded outer frame only - no extra inner decoration that would cover text */
 .webshell-terminal-shell {
     flex: 1;
     min-height: 360px;
@@ -9884,7 +9884,7 @@ header {
     width: auto;
     max-width: 80%;
     align-self: flex-start;
-    /* Override the generic .process-details-container border/padding — avoids a double "border-card" layer */
+    /* Override the generic .process-details-container border/padding - avoids a double "border-card" layer */
     border-top: none;
     padding-top: 0;
     margin-top: 10px;
@@ -9987,7 +9987,7 @@ header {
     border-bottom: none;
 }
 .webshell-ai-process-block .webshell-ai-timeline-msg {
-    /* Avoid a nested scrollbar on every detail entry — makes the UX feel "fragmented" */
+    /* Avoid a nested scrollbar on every detail entry - makes the UX feel "fragmented" */
     max-height: none;
     overflow-y: visible;
 }
@@ -11777,7 +11777,7 @@ header {
     font-size: 1rem;
 }
 
-/* ==================== Attack-chain visualization — responsive styles ==================== */
+/* ==================== Attack-chain visualization - responsive styles ==================== */
 @media (max-width: 1200px) {
     .attack-chain-modal-content {
         width: 98vw;
@@ -13079,7 +13079,7 @@ header {
     line-height: 1.5;
 }
 
-/* Role-selection panel — responsive styles */
+/* Role-selection panel - responsive styles */
 @media (max-width: 768px) {
     .role-selection-panel,
     .agent-mode-panel {

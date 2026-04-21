@@ -9,8 +9,8 @@ Searches Certificate Transparency logs via crt.sh for:
 - Infrastructure mapping via cert SANs
 
 Two modes:
-  1. HTTP JSON API (default) — fast, no deps beyond requests
-  2. Direct PostgreSQL (--db mode) — full SQL power, slower but complete
+  1. HTTP JSON API (default) - fast, no deps beyond requests
+  2. Direct PostgreSQL (--db mode) - full SQL power, slower but complete
 
 crt.sh is free and requires no API key.
 """
@@ -32,7 +32,7 @@ def search_http(query, dedupe=True, expired=False, limit=500):
     if not expired:
         params["exclude"] = "expired"
 
-    # crt.sh returns 502 on heavy wildcard queries — retry with backoff,
+    # crt.sh returns 502 on heavy wildcard queries - retry with backoff,
     # then fallback to exact domain (strip % wildcards) if all retries fail
     import time as _time
     certs = None
@@ -242,7 +242,7 @@ def search_db(query, include_expired=False, limit=1000):
 # ── Subdomain-only mode ─────────────────────────────────────────────
 
 def subdomains_only(query):
-    """Fast subdomain extraction — returns just the list, minimal output."""
+    """Fast subdomain extraction - returns just the list, minimal output."""
     result = search_http(query, dedupe=True, expired=False)
     if result["status"] != "success":
         return result
@@ -300,9 +300,9 @@ def main():
             "status": "error",
             "message": "Missing required parameter: query (domain name)",
             "examples": [
-                "example.com — exact domain certificates",
-                "%.example.com — all subdomain certificates (wildcard)",
-                "%.%.example.com — deep subdomain discovery",
+                "example.com - exact domain certificates",
+                "%.example.com - all subdomain certificates (wildcard)",
+                "%.%.example.com - deep subdomain discovery",
             ],
             "modes": {
                 "http": "JSON API (default, fast)",

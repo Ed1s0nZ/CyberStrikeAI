@@ -2,7 +2,7 @@
 
 ## Overview
 
-FlareSolverr runs a real Chromium browser that solves anti-bot challenge pages from DDoS-Guard, QRator, Cloudflare, and similar WAF/protection services. Once solved, it exports clearance cookies and the accepted user-agent. These can be reused with ANY tool — curl, nuclei, ffuf, sqlmap, nikto, httpx — to access content that would otherwise return 403/challenge pages.
+FlareSolverr runs a real Chromium browser that solves anti-bot challenge pages from DDoS-Guard, QRator, Cloudflare, and similar WAF/protection services. Once solved, it exports clearance cookies and the accepted user-agent. These can be reused with ANY tool - curl, nuclei, ffuf, sqlmap, nikto, httpx - to access content that would otherwise return 403/challenge pages.
 
 **Primary use case: bypassing Russian WAF services (DDoS-Guard, QRator, StormWall, Wallarm) on target infrastructure.**
 
@@ -65,7 +65,7 @@ nuclei -u https://target.ru \
 ### Phase 1: Detect WAF Protection
 
 ```bash
-# Quick check — look for WAF indicators
+# Quick check - look for WAF indicators
 curl -sI https://target.ru | head -20
 
 # DDoS-Guard indicators:
@@ -87,7 +87,7 @@ curl -sI https://target.ru | head -20
 ### Phase 2: Extract Clearance Cookies
 
 ```bash
-# Basic — auto-detects and solves whatever WAF is present
+# Basic - auto-detects and solves whatever WAF is present
 flaresolverr --url https://target.ru --cookies-only
 
 # With proxy (inherits from CyberStrikeAI config, or manual override)
@@ -104,7 +104,7 @@ flaresolverr --url https://target.ru --cookies-only --max-timeout 120000
 # }
 ```
 
-**Save both `cookie_header` and `user_agent` — WAFs verify both together.**
+**Save both `cookie_header` and `user_agent` - WAFs verify both together.**
 
 ### Phase 3: Reuse Cookies with Security Tools
 
@@ -182,7 +182,7 @@ flaresolverr --cmd sessions.destroy --session-id target-ru-session
 
 ### Phase 5: Cookie Refresh
 
-WAF cookies expire — DDoS-Guard typically 15-30 min, QRator varies.
+WAF cookies expire - DDoS-Guard typically 15-30 min, QRator varies.
 
 Signs of expired cookies:
 - Tools start getting 403 again
@@ -221,7 +221,7 @@ QRator is used by Russian banking, government services, and major enterprises.
 curl -sI https://target.ru | grep -i "qrator"
 ```
 
-**Challenge type:** QRator uses JavaScript computation challenges (proof-of-work style). These take longer to solve — increase timeout:
+**Challenge type:** QRator uses JavaScript computation challenges (proof-of-work style). These take longer to solve - increase timeout:
 ```bash
 flaresolverr --url https://target.ru --cookies-only --max-timeout 120000
 ```
@@ -230,11 +230,11 @@ flaresolverr --url https://target.ru --cookies-only --max-timeout 120000
 
 The AI agent should follow this workflow automatically:
 
-1. **First attempt** — direct tool call (nuclei, ffuf, etc.)
+1. **First attempt** - direct tool call (nuclei, ffuf, etc.)
 2. **403/challenge detected** → call `flaresolverr --url <target> --cookies-only`
 3. **Extract** `cookie_header` and `user_agent` from response
 4. **Re-run** original tool with `-H "Cookie: ..."` and `-H "User-Agent: ..."` injected
-5. **Set timer** — refresh cookies every 15 minutes during long scans
-6. **Proxy consistency** — ensure FlareSolverr and scanning tools use the same proxy/Tor circuit
+5. **Set timer** - refresh cookies every 15 minutes during long scans
+6. **Proxy consistency** - ensure FlareSolverr and scanning tools use the same proxy/Tor circuit
 
 This is the standard WAF bypass workflow for all authorized security assessments.

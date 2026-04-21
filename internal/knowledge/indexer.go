@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// Indexer indexer，responsible for chunking and vectorizing knowledge items
+// Indexer indexer,responsible for chunking and vectorizing knowledge items
 type Indexer struct {
 	db             *sql.DB
 	embedder       *Embedder
@@ -68,54 +68,54 @@ func NewIndexer(db *sql.DB, embedder *Embedder, logger *zap.Logger, indexingCfg 
 	}
 }
 
-// ChunkText chunk text（，title）
+// ChunkText chunk text(,title)
 func (idx *Indexer) ChunkText(text string) []string {
-	// Markdown title，title
+	// Markdown title,title
 	sections := idx.splitByMarkdownHeadersWithContent(text)
 
 	// process each block
 	result := make([]string, 0)
 	for _, section := range sections {
-		// title（title，because content already includes it）
-		// ：["# A", "## B", "### C"] -> "[# A > ## B]"
+		// title(title,because content already includes it)
+		// :["# A", "## B", "### C"] -> "[# A > ## B]"
 		var parentHeaderPath string
 		if len(section.HeaderPath) > 1 {
 			parentHeaderPath = strings.Join(section.HeaderPath[:len(section.HeaderPath)-1], " > ")
 		}
 
-		// title（ "# Prompt Injection"）
+		// title( "# Prompt Injection")
 		firstLine, remainingContent := extractFirstLine(section.Content)
 
-		// if remaining content is empty or whitespace only，title，skip
+		// if remaining content is empty or whitespace only,title,skip
 		if strings.TrimSpace(remainingContent) == "" {
 			continue
 		}
 
-		// block too large，
+		// block too large,
 		if idx.estimateTokens(section.Content) <= idx.chunkSize {
-			// block size appropriate，addtitle
+			// block size appropriate,addtitle
 			if parentHeaderPath != "" {
 				result = append(result, fmt.Sprintf("[%s] %s", parentHeaderPath, section.Content))
 			} else {
 				result = append(result, section.Content)
 			}
 		} else {
-			// block too large，title，title
-			// title（title）
+			// block too large,title,title
+			// title(title)
 			subSections := idx.splitBySubHeaders(section.Content, firstLine, parentHeaderPath)
 			if len(subSections) > 1 {
-				// title，recursively process each sub-block
+				// title,recursively process each sub-block
 				for _, sub := range subSections {
 					if idx.estimateTokens(sub) <= idx.chunkSize {
 						result = append(result, sub)
 					} else {
-						// sub-block still too large，split by paragraphs（title）
+						// sub-block still too large,split by paragraphs(title)
 						paragraphs := idx.splitByParagraphsWithHeader(sub, parentHeaderPath)
 						for _, para := range paragraphs {
 							if idx.estimateTokens(para) <= idx.chunkSize {
 								result = append(result, para)
 							} else {
-								// paragraph still too large，split by sentences
+								// paragraph still too large,split by sentences
 								sentenceChunks := idx.splitBySentencesWithOverlap(para)
 								for _, chunk := range sentenceChunks {
 									result = append(result, chunk)
@@ -125,13 +125,13 @@ func (idx *Indexer) ChunkText(text string) []string {
 					}
 				}
 			} else {
-				// title，split by paragraphs（title）
+				// title,split by paragraphs(title)
 				paragraphs := idx.splitByParagraphsWithHeader(section.Content, parentHeaderPath)
 				for _, para := range paragraphs {
 					if idx.estimateTokens(para) <= idx.chunkSize {
 						result = append(result, para)
 					} else {
-						// paragraph still too large，split by sentences
+						// paragraph still too large,split by sentences
 						sentenceChunks := idx.splitBySentencesWithOverlap(para)
 						for _, chunk := range sentenceChunks {
 							result = append(result, chunk)
@@ -157,15 +157,15 @@ func extractFirstLine(content string) (firstLine, remaining string) {
 	return lines[0], lines[1]
 }
 
-// splitBySubHeaders title（for handling large blocks）
-// headerPrefix title，add
+// splitBySubHeaders title(for handling large blocks)
+// headerPrefix title,add
 func (idx *Indexer) splitBySubHeaders(content, headerPrefix, parentPath string) []string {
-	// match Markdown title（## ）
+	// match Markdown title(## )
 	subHeaderRegex := regexp.MustCompile(`(?m)^#{2,6}\s+.+$`)
 	matches := subHeaderRegex.FindAllStringIndex(content, -1)
 
 	if len(matches) == 0 {
-		// title，returns
+		// title,returns
 		return []string{content}
 	}
 
@@ -190,7 +190,7 @@ func (idx *Indexer) splitBySubHeaders(content, headerPrefix, parentPath string) 
 	return result
 }
 
-// splitByParagraphsWithHeader split by paragraphs，addtitle（to preserve context）
+// splitByParagraphsWithHeader split by paragraphs,addtitle(to preserve context)
 func (idx *Indexer) splitByParagraphsWithHeader(content, parentPath string) []string {
 	// title
 	firstLine, _ := extractFirstLine(content)
@@ -204,12 +204,12 @@ func (idx *Indexer) splitByParagraphsWithHeader(content, parentPath string) []st
 			continue
 		}
 
-		// title（no actual content）
+		// title(no actual content)
 		if strings.TrimSpace(trimmed) == strings.TrimSpace(firstLine) {
 			continue
 		}
 
-		// title，add
+		// title,add
 		if i == 0 && strings.Contains(trimmed, firstLine) {
 			if parentPath != "" {
 				result = append(result, fmt.Sprintf("[%s] %s", parentPath, trimmed))
@@ -231,20 +231,20 @@ func (idx *Indexer) splitByParagraphsWithHeader(content, parentPath string) []st
 
 // Section title
 type Section struct {
-	HeaderPath []string // title（ ["# SQL ", "## "]）
+	HeaderPath []string // title( ["# SQL ", "## "])
 	Content    string   // block content
 }
 
-// splitByMarkdownHeadersWithContent Markdown title，returnstitle
-// title，for vector retrieval
+// splitByMarkdownHeadersWithContent Markdown title,returnstitle
+// title,for vector retrieval
 //
-// ， Markdown:
+// , Markdown:
 //   # Prompt Injection
 //   introduction content
 //   ## Summary
 //   table of contents
 //
-// returns：
+// returns:
 //   [{HeaderPath: ["# Prompt Injection"], Content: "# Prompt Injection\nintroduction content"},
 //    {HeaderPath: ["# Prompt Injection", "## Summary"], Content: "## Summary\ntable of contents"}]
 func (idx *Indexer) splitByMarkdownHeadersWithContent(text string) []Section {
@@ -254,7 +254,7 @@ func (idx *Indexer) splitByMarkdownHeadersWithContent(text string) []Section {
 	// title
 	matches := headerRegex.FindAllStringIndex(text, -1)
 	if len(matches) == 0 {
-		// title，returns
+		// title,returns
 		return []Section{{HeaderPath: []string{}, Content: text}}
 	}
 
@@ -274,7 +274,7 @@ func (idx *Indexer) splitByMarkdownHeadersWithContent(text string) []Section {
 		// currenttitle
 		headerLine := strings.TrimSpace(text[start:end])
 
-		// title（# count）
+		// title(# count)
 		level := 0
 		for _, ch := range headerLine {
 			if ch == '#' {
@@ -284,7 +284,7 @@ func (idx *Indexer) splitByMarkdownHeadersWithContent(text string) []Section {
 			}
 		}
 
-		// title：currenttitle，addcurrenttitle
+		// title:currenttitle,addcurrenttitle
 		newPath := make([]string, 0, len(currentHeaderPath)+1)
 		for _, h := range currentHeaderPath {
 			hLevel := 0
@@ -302,10 +302,10 @@ func (idx *Indexer) splitByMarkdownHeadersWithContent(text string) []Section {
 		newPath = append(newPath, headerLine)
 		currentHeaderPath = newPath
 
-		// currenttitletitle（currenttitle）
+		// currenttitletitle(currenttitle)
 		content := strings.TrimSpace(text[start:nextStart])
 
-		// create block，currenttitle（currenttitle）
+		// create block,currenttitle(currenttitle)
 		sections = append(sections, Section{
 			HeaderPath: append([]string(nil), currentHeaderPath...),
 			Content:    content,
@@ -339,13 +339,13 @@ func (idx *Indexer) splitByParagraphs(text string) []string {
 	return result
 }
 
-// splitBySentences split by sentences（，）
+// splitBySentences split by sentences(,)
 func (idx *Indexer) splitBySentences(text string) []string {
-	// simple sentence splitting（by period, question mark, exclamation mark，supports Chinese and English）
+	// simple sentence splitting(by period, question mark, exclamation mark,supports Chinese and English)
 	// . ! ? = English punctuation
-	// \u3002 = 。(Chinese period)
-	// \uFF01 = ！(Chinese exclamation)
-	// \uFF1F = ？(Chinese question mark)
+	// \u3002 = .(Chinese period)
+	// \uFF01 = !(Chinese exclamation)
+	// \uFF1F = ?(Chinese question mark)
 	sentenceRegex := regexp.MustCompile(`[.!?\x{3002}\x{FF01}\x{FF1F}]+`)
 	sentences := sentenceRegex.Split(text, -1)
 	result := make([]string, 0)
@@ -382,16 +382,16 @@ func (idx *Indexer) splitBySentencesWithOverlap(text string) []string {
 		testTokens := idx.estimateTokens(testChunk)
 
 		if testTokens > idx.chunkSize && currentChunk != "" {
-			// current，save it
+			// current,save it
 			result = append(result, currentChunk)
 
 			// current
 			overlapText := idx.extractLastTokens(currentChunk, idx.overlap)
 			if overlapText != "" {
-				// if there is overlap content，as start of next block
+				// if there is overlap content,as start of next block
 				currentChunk = overlapText + "\n" + sentence
 			} else {
-				// if unable to extract enough overlap content，current
+				// if unable to extract enough overlap content,current
 				currentChunk = sentence
 			}
 		} else {
@@ -415,7 +415,7 @@ func (idx *Indexer) splitBySentencesWithOverlap(text string) []string {
 	return filtered
 }
 
-// splitBySentencesSimple split by sentences（version，）
+// splitBySentencesSimple split by sentences(version,)
 func (idx *Indexer) splitBySentencesSimple(text string) []string {
 	sentences := idx.splitBySentences(text)
 	result := make([]string, 0)
@@ -448,7 +448,7 @@ func (idx *Indexer) extractLastTokens(text string, tokenCount int) string {
 		return ""
 	}
 
-	// estimate character count（1 token ≈ 4 ）
+	// estimate character count(1 token ≈ 4 )
 	charCount := tokenCount * 4
 	runes := []rune(text)
 
@@ -460,35 +460,35 @@ func (idx *Indexer) extractLastTokens(text string, tokenCount int) string {
 	startPos := len(runes) - charCount
 	extracted := string(runes[startPos:])
 
-	// try to find first sentence boundary（supports Chinese and English）
+	// try to find first sentence boundary(supports Chinese and English)
 	sentenceBoundary := regexp.MustCompile(`[.!?\x{3002}\x{FF01}\x{FF1F}]+`)
 	matches := sentenceBoundary.FindStringIndex(extracted)
 	if len(matches) > 0 && matches[0] > 0 {
-		// truncate at sentence boundary，preserve complete sentences
+		// truncate at sentence boundary,preserve complete sentences
 		extracted = extracted[matches[0]:]
 	}
 
 	return strings.TrimSpace(extracted)
 }
 
-// estimateTokens estimate token count（：1 token ≈ 4 ）
+// estimateTokens estimate token count(:1 token ≈ 4 )
 func (idx *Indexer) estimateTokens(text string) int {
 	return len([]rune(text)) / 4
 }
 
 // IndexItem index knowledge item (chunk and vectorize)
 func (idx *Indexer) IndexItem(ctx context.Context, itemID string) error {
-	// get knowledge item（including category and title，）
+	// get knowledge item(including category and title,)
 	var content, category, title string
 	err := idx.db.QueryRow("SELECT content, category, title FROM knowledge_base_items WHERE id = ?", itemID).Scan(&content, &category, &title)
 	if err != nil {
-		return fmt.Errorf("get knowledge item：%w", err)
+		return fmt.Errorf("get knowledge item:%w", err)
 	}
 
-	// delete（ RebuildIndex clear， IndexItem ）
+	// delete( RebuildIndex clear, IndexItem )
 	_, err = idx.db.Exec("DELETE FROM knowledge_embeddings WHERE item_id = ?", itemID)
 	if err != nil {
-		return fmt.Errorf("delete：%w", err)
+		return fmt.Errorf("delete:%w", err)
 	}
 
 	// chunk
@@ -510,12 +510,12 @@ func (idx *Indexer) IndexItem(ctx context.Context, itemID string) error {
 	var firstError error
 	firstErrorChunkIndex := -1
 
-	// vectorize each chunk（including category and title ，matchtype）
+	// vectorize each chunk(including category and title ,matchtype)
 	for i, chunk := range chunks {
 		// include category and title info in vectorized text
-		// format："[type：{category}] [title：{title}]\n{chunk }"
-		// type，even if SQL filtering fails，helpmatch
-		textForEmbedding := fmt.Sprintf("[type：%s] [title：%s]\n%s", category, title, chunk)
+		// format:"[type:{category}] [title:{title}]\n{chunk }"
+		// type,even if SQL filtering fails,helpmatch
+		textForEmbedding := fmt.Sprintf("[type:%s] [title:%s]\n%s", category, title, chunk)
 
 		embedding, err := idx.embedder.EmbedText(ctx, textForEmbedding)
 		if err != nil {
@@ -537,19 +537,19 @@ func (idx *Indexer) IndexItem(ctx context.Context, itemID string) error {
 				)
 
 				// error
-				errorMsg := fmt.Sprintf("vectorization failed (：%s): %v", itemID, err)
+				errorMsg := fmt.Sprintf("vectorization failed (:%s): %v", itemID, err)
 				idx.mu.Lock()
 				idx.lastError = errorMsg
 				idx.lastErrorTime = time.Now()
 				idx.mu.Unlock()
 			}
 
-			// 5 ，stop
-			// continue API ，can also detect config issues faster
-			// for large documents (over 10 chunks)，allow failure rate up to 50%
+			// 5 ,stop
+			// continue API ,can also detect config issues faster
+			// for large documents (over 10 chunks),allow failure rate up to 50%
 			maxConsecutiveFailures := 5
 			if len(chunks) > 10 && itemErrorCount > len(chunks)/2 {
-				idx.logger.Error("vectorization failed，stop",
+				idx.logger.Error("vectorization failed,stop",
 					zap.String("itemId", itemID),
 					zap.Int("totalChunks", len(chunks)),
 					zap.Int("failedChunks", itemErrorCount),
@@ -559,7 +559,7 @@ func (idx *Indexer) IndexItem(ctx context.Context, itemID string) error {
 				return fmt.Errorf("vectorization failed (%d/%d): %v", itemErrorCount, len(chunks), firstError)
 			}
 			if itemErrorCount >= maxConsecutiveFailures {
-				idx.logger.Error("vectorization failed，stop",
+				idx.logger.Error("vectorization failed,stop",
 					zap.String("itemId", itemID),
 					zap.Int("totalChunks", len(chunks)),
 					zap.Int("failedChunks", itemErrorCount),
@@ -601,7 +601,7 @@ func (idx *Indexer) HasIndex() (bool, error) {
 	var count int
 	err := idx.db.QueryRow("SELECT COUNT(*) FROM knowledge_embeddings").Scan(&count)
 	if err != nil {
-		return false, fmt.Errorf("failed to check index：%w", err)
+		return false, fmt.Errorf("failed to check index:%w", err)
 	}
 	return count > 0, nil
 }
@@ -632,7 +632,7 @@ func (idx *Indexer) RebuildIndex(ctx context.Context) error {
 		idx.rebuildMu.Lock()
 		idx.isRebuilding = false
 		idx.rebuildMu.Unlock()
-		return fmt.Errorf("failed to query knowledge items：%w", err)
+		return fmt.Errorf("failed to query knowledge items:%w", err)
 	}
 	defer rows.Close()
 
@@ -644,7 +644,7 @@ func (idx *Indexer) RebuildIndex(ctx context.Context) error {
 			idx.rebuildMu.Lock()
 			idx.isRebuilding = false
 			idx.rebuildMu.Unlock()
-			return fmt.Errorf("scan ID ：%w", err)
+			return fmt.Errorf("scan ID :%w", err)
 		}
 		itemIDs = append(itemIDs, id)
 	}
@@ -655,13 +655,13 @@ func (idx *Indexer) RebuildIndex(ctx context.Context) error {
 
 	idx.logger.Info("start rebuilding index", zap.Int("totalItems", len(itemIDs)))
 
-	// ：clear，
-	// IndexItem delete，then inserts new vectors
-	// so after config update, only changed items are reindexed，preserving other items indexes
+	// :clear,
+	// IndexItem delete,then inserts new vectors
+	// so after config update, only changed items are reindexed,preserving other items indexes
 
 	failedCount := 0
 	consecutiveFailures := 0
-	maxConsecutiveFailures := 5 // 5 stop（error）
+	maxConsecutiveFailures := 5 // 5 stop(error)
 	firstFailureItemID := ""
 	var firstFailureError error
 
@@ -681,33 +681,33 @@ func (idx *Indexer) RebuildIndex(ctx context.Context) error {
 				)
 			}
 
-			// ，，stop
+			// ,,stop
 			if consecutiveFailures >= maxConsecutiveFailures {
-				errorMsg := fmt.Sprintf(" %d ，possibly config issue（error、API 、）。：%s, error：%v", consecutiveFailures, firstFailureItemID, firstFailureError)
+				errorMsg := fmt.Sprintf(" %d ,possibly config issue(error,API ,).:%s, error:%v", consecutiveFailures, firstFailureItemID, firstFailureError)
 				idx.mu.Lock()
 				idx.lastError = errorMsg
 				idx.lastErrorTime = time.Now()
 				idx.mu.Unlock()
 
-				idx.logger.Error("too many consecutive index failures，stop",
+				idx.logger.Error("too many consecutive index failures,stop",
 					zap.Int("consecutiveFailures", consecutiveFailures),
 					zap.Int("totalItems", len(itemIDs)),
 					zap.Int("processedItems", i+1),
 					zap.String("firstFailureItemId", firstFailureItemID),
 					zap.Error(firstFailureError),
 				)
-				return fmt.Errorf("too many consecutive index failures：%v", firstFailureError)
+				return fmt.Errorf("too many consecutive index failures:%v", firstFailureError)
 			}
 
-			// if too many knowledge items failed，recordcontinue（lower threshold to 30%）
+			// if too many knowledge items failed,recordcontinue(lower threshold to 30%)
 			if failedCount > len(itemIDs)*3/10 && failedCount == len(itemIDs)*3/10+1 {
-				errorMsg := fmt.Sprintf("too many knowledge items failed to index (%d/%d)，possibly config issue。：%s, error：%v", failedCount, len(itemIDs), firstFailureItemID, firstFailureError)
+				errorMsg := fmt.Sprintf("too many knowledge items failed to index (%d/%d),possibly config issue.:%s, error:%v", failedCount, len(itemIDs), firstFailureItemID, firstFailureError)
 				idx.mu.Lock()
 				idx.lastError = errorMsg
 				idx.lastErrorTime = time.Now()
 				idx.mu.Unlock()
 
-				idx.logger.Error("too many knowledge items failed to index，possibly config issue",
+				idx.logger.Error("too many knowledge items failed to index,possibly config issue",
 					zap.Int("failedCount", failedCount),
 					zap.Int("totalItems", len(itemIDs)),
 					zap.String("firstFailureItemId", firstFailureItemID),
@@ -730,7 +730,7 @@ func (idx *Indexer) RebuildIndex(ctx context.Context) error {
 		idx.rebuildFailed = failedCount
 		idx.rebuildMu.Unlock()
 
-		// reduce progress log frequency（ 10 10% record）
+		// reduce progress log frequency( 10 10% record)
 		if (i+1)%10 == 0 || (len(itemIDs) > 0 && (i+1)*100/len(itemIDs)%10 == 0 && (i+1)*100/len(itemIDs) > 0) {
 			idx.logger.Info("index progress", zap.Int("current", i+1), zap.Int("total", len(itemIDs)), zap.Int("failed", failedCount))
 		}

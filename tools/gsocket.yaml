@@ -251,14 +251,14 @@ description: |
   authenticated by a shared secret.
 
   **Capabilities:**
-  - `socks` — Start a SOCKS5 proxy through gsocket tunnel (route any tool through it)
-  - `forward` — Port forwarding: expose remote service on local port
-  - `shell` — Execute commands on remote host via gsocket shell
-  - `upload` — Upload files to remote host
-  - `download` — Download files from remote host
-  - `install` — Install gsocket on a remote host (via existing shell access)
-  - `status` — List active gsocket sessions
-  - `stop` — Stop gsocket session(s)
+  - `socks` - Start a SOCKS5 proxy through gsocket tunnel (route any tool through it)
+  - `forward` - Port forwarding: expose remote service on local port
+  - `shell` - Execute commands on remote host via gsocket shell
+  - `upload` - Upload files to remote host
+  - `download` - Download files from remote host
+  - `install` - Install gsocket on a remote host (via existing shell access)
+  - `status` - List active gsocket sessions
+  - `stop` - Stop gsocket session(s)
 
   **Routing traffic through gsocket SOCKS:**
   After starting a SOCKS tunnel, route other tools through it:

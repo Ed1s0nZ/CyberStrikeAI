@@ -23,7 +23,7 @@ type SkillsHandler struct {
 	config     *config.Config
 	configPath string
 	logger     *zap.Logger
-	db *database.DB // database connection（）
+	db *database.DB // database connection()
 }
 
 // NewSkillsHandler creates a new Skills handler
@@ -36,12 +36,12 @@ func NewSkillsHandler(manager *skills.Manager, cfg *config.Config, configPath st
 	}
 }
 
-// SetDB database connection（）
+// SetDB database connection()
 func (h *SkillsHandler) SetDB(db *database.DB) {
 	h.db = db
 }
 
-// GetSkills skillslist（）
+// GetSkills skillslist()
 func (h *SkillsHandler) GetSkills(c *gin.Context) {
 	skillList, err := h.manager.ListSkills()
 	if err != nil {
@@ -121,7 +121,7 @@ func (h *SkillsHandler) GetSkills(c *gin.Context) {
 	offset := 0
 	if limitStr := c.Query("limit"); limitStr != "" {
 		if parsed, err := parseInt(limitStr); err == nil && parsed > 0 {
-			// allow larger limit for search scenarios，set a reasonable upper limit（10000）
+			// allow larger limit for search scenarios,set a reasonable upper limit(10000)
 			if parsed <= 10000 {
 				limit = parsed
 			} else {
@@ -230,7 +230,7 @@ func (h *SkillsHandler) GetSkillBoundRoles(c *gin.Context) {
 	})
 }
 
-// getRolesBoundToSkill skillrolelist（）
+// getRolesBoundToSkill skillrolelist()
 func (h *SkillsHandler) getRolesBoundToSkill(skillName string) []string {
 	if h.config.Roles == nil {
 		return []string{}
@@ -270,7 +270,7 @@ func (h *SkillsHandler) CreateSkill(c *gin.Context) {
 		return
 	}
 
-	// skill（only allow letters, numbers, hyphens and underscores）
+	// skill(only allow letters, numbers, hyphens and underscores)
 	if !isValidSkillName(req.Name) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "skill name can only contain letters, numbers, hyphens and underscores"})
 		return
@@ -394,7 +394,7 @@ func (h *SkillsHandler) UpdateSkill(c *gin.Context) {
 		return
 	}
 
-	// parse，name
+	// parse,name
 	existingName := skillName
 	contentStr := string(existingContent)
 	if strings.HasPrefix(contentStr, "---") {
@@ -432,7 +432,7 @@ func (h *SkillsHandler) UpdateSkill(c *gin.Context) {
 	newContent.WriteString("---\n\n")
 	newContent.WriteString(req.Content)
 
-	// write file（SKILL.md）
+	// write file(SKILL.md)
 	targetFile := filepath.Join(skillDir, "SKILL.md")
 	if err := os.WriteFile(targetFile, []byte(newContent.String()), 0644); err != nil {
 		h.logger.Error("update skill", zap.String("skill", skillName), zap.Error(err))
@@ -440,7 +440,7 @@ func (h *SkillsHandler) UpdateSkill(c *gin.Context) {
 		return
 	}
 
-	// SKILL.md，delete
+	// SKILL.md,delete
 	if skillFile != targetFile {
 		os.Remove(skillFile)
 	}
@@ -460,7 +460,7 @@ func (h *SkillsHandler) DeleteSkill(c *gin.Context) {
 		return
 	}
 
-	// roleskill，if so, auto-remove binding
+	// roleskill,if so, auto-remove binding
 	affectedRoles := h.removeSkillFromRoles(skillName)
 	if len(affectedRoles) > 0 {
 		h.logger.Info("roleskill",
@@ -489,7 +489,7 @@ func (h *SkillsHandler) DeleteSkill(c *gin.Context) {
 
 	responseMsg := "skilldelete"
 	if len(affectedRoles) > 0 {
-		responseMsg = fmt.Sprintf("skilldelete，auto-removed from %d role: %s",
+		responseMsg = fmt.Sprintf("skilldelete,auto-removed from %d role: %s",
 			len(affectedRoles), strings.Join(affectedRoles, ", "))
 	}
 
@@ -533,7 +533,7 @@ func (h *SkillsHandler) GetSkillStats(c *gin.Context) {
 		skillStatsMap = make(map[string]*database.SkillStats)
 	}
 
-	// （skills，record）
+	// (skills,record)
 	statsList := make([]map[string]interface{}, 0, len(skillList))
 	totalCalls := 0
 	totalSuccess := 0
@@ -632,7 +632,7 @@ func (h *SkillsHandler) removeSkillFromRoles(skillName string) []string {
 	affectedRoles := make([]string, 0)
 	rolesToUpdate := make(map[string]config.RoleConfig)
 
-	// role，skill
+	// role,skill
 	for roleName, role := range h.config.Roles {
 		// role
 		if role.Name == "" {
@@ -658,7 +658,7 @@ func (h *SkillsHandler) removeSkillFromRoles(skillName string) []string {
 		}
 	}
 
-	// role，
+	// role,
 	if len(rolesToUpdate) > 0 {
 		// update in-memory config
 		for roleName, role := range rolesToUpdate {
@@ -673,7 +673,7 @@ func (h *SkillsHandler) removeSkillFromRoles(skillName string) []string {
 	return affectedRoles
 }
 
-// saveRolesConfig role（SkillsHandler）
+// saveRolesConfig role(SkillsHandler)
 func (h *SkillsHandler) saveRolesConfig() error {
 	configDir := filepath.Dir(h.configPath)
 	rolesDir := h.config.RolesDir
@@ -699,7 +699,7 @@ func (h *SkillsHandler) saveRolesConfig() error {
 				role.Name = roleName
 			}
 
-			// rolefilename（filename，）
+			// rolefilename(filename,)
 			safeFileName := sanitizeRoleFileName(role.Name)
 			roleFile := filepath.Join(rolesDir, safeFileName+".yaml")
 
@@ -710,10 +710,10 @@ func (h *SkillsHandler) saveRolesConfig() error {
 				continue
 			}
 
-			// process icon field：\Uicon（YAMLparseUnicode）
+			// process icon field:\Uicon(YAMLparseUnicode)
 			roleDataStr := string(roleData)
 			if role.Icon != "" && strings.HasPrefix(role.Icon, "\\U") {
-				// match icon: \UXXXXXXXX format（without quotes），exclude already quoted cases
+				// match icon: \UXXXXXXXX format(without quotes),exclude already quoted cases
 				re := regexp.MustCompile(`(?m)^(icon:\s+)(\\U[0-9A-F]{8})(\s*)$`)
 				roleDataStr = re.ReplaceAllString(roleDataStr, `${1}"${2}"${3}`)
 				roleData = []byte(roleDataStr)
@@ -758,7 +758,7 @@ func sanitizeRoleFileName(name string) string {
 	}
 
 	fileName := string(result)
-	// filename，default
+	// filename,default
 	if fileName == "" {
 		fileName = "role"
 	}

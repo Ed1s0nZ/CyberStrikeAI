@@ -53,9 +53,9 @@ When NOT to use "task":
 - Simple tool calls you can make directly
 - Tasks that depend on results from other tasks (do them sequentially)
 
-CRITICAL LANGUAGE RULE: You MUST respond ONLY in English. All output — including todo lists, task descriptions, status updates, tool arguments, reports, and every other piece of text — MUST be in English. NEVER use Chinese, Russian, or any other non-English language. This is a hard requirement with zero exceptions.
+CRITICAL LANGUAGE RULE: You MUST respond ONLY in English. All output - including todo lists, task descriptions, status updates, tool arguments, reports, and every other piece of text - MUST be in English. NEVER use Chinese, Russian, or any other non-English language. This is a hard requirement with zero exceptions.
 
-Be thorough and persistent — real vulnerability hunting requires extensive testing.`
+Be thorough and persistent - real vulnerability hunting requires extensive testing.`
 
 // subAgentDef holds a resolved sub-agent definition used at runtime.
 type subAgentDef struct {
@@ -349,7 +349,7 @@ func (o *orchestratorState) run(userMessage string, history []agent.ChatMessage)
 			}
 		}
 	}
-	// Prepend language enforcement directly in the user message — Haiku ignores system-level
+	// Prepend language enforcement directly in the user message - Haiku ignores system-level
 	// language instructions but reliably follows user-level ones.
 	messages = append(messages, agent.ChatMessage{Role: "user", Content: "[IMPORTANT: Respond ONLY in English. All output must be English.]\n\n" + userMessage})
 
@@ -499,7 +499,7 @@ func (o *orchestratorState) run(userMessage string, history []agent.ChatMessage)
 				})
 			}
 
-			// Check if this was the final iteration — force summary.
+			// Check if this was the final iteration - force summary.
 			if i == o.maxIter-1 {
 				summaryText := o.forceSummary(messages)
 				if summaryText != "" {
@@ -509,7 +509,7 @@ func (o *orchestratorState) run(userMessage string, history []agent.ChatMessage)
 			continue
 		}
 
-		// No tool calls — this is the final text response.
+		// No tool calls - this is the final text response.
 		body := strings.TrimSpace(choice.Message.Content)
 		if body != "" {
 			o.sendProgress("response_start", "", map[string]interface{}{
@@ -561,7 +561,7 @@ func (o *orchestratorState) handleTaskCall(args map[string]interface{}, toolCall
 		matched = &o.subDefs[0]
 	}
 
-	subInstruction := "You are a specialist sub-agent in CyberStrikeAI. Complete the assigned task using available tools. Be thorough and report results concisely. Always respond in English only — never use Chinese or any other language."
+	subInstruction := "You are a specialist sub-agent in CyberStrikeAI. Complete the assigned task using available tools. Be thorough and report results concisely. Always respond in English only - never use Chinese or any other language."
 	subRoleTools := o.roleTools
 	subMaxIter := 20
 	subAgentName := "general"
@@ -736,7 +736,7 @@ func (o *orchestratorState) runSubAgent(agentName, instruction, taskDesc string,
 			continue
 		}
 
-		// No tool calls — sub-agent is done.
+		// No tool calls - sub-agent is done.
 		body := strings.TrimSpace(choice.Message.Content)
 		if body != "" {
 			return body, nil

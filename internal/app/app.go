@@ -43,13 +43,13 @@ type App struct {
 	agent              *agent.Agent
 	executor           *security.Executor
 	db                 *database.DB
-	knowledgeDB *database.DB // knowledge basedatabase connection（）
+	knowledgeDB *database.DB // knowledge basedatabase connection()
 	auth               *security.AuthManager
-	knowledgeManager *knowledge.Manager // knowledge base manager（）
-	knowledgeRetriever *knowledge.Retriever // knowledge base retriever（）
-	knowledgeIndexer *knowledge.Indexer // knowledge base indexer（）
-	knowledgeHandler *handler.KnowledgeHandler // knowledge base handler（）
-	agentHandler *handler.AgentHandler // Agent handler（knowledge base manager）
+	knowledgeManager *knowledge.Manager // knowledge base manager()
+	knowledgeRetriever *knowledge.Retriever // knowledge base retriever()
+	knowledgeIndexer *knowledge.Indexer // knowledge base indexer()
+	knowledgeHandler *handler.KnowledgeHandler // knowledge base handler()
+	agentHandler *handler.AgentHandler // Agent handler(knowledge base manager)
 	robotHandler       *handler.RobotHandler     // robot handler (Telegram)
 	robotMu            sync.Mutex                // Telegram cancel guard
 	telegramCancel     context.CancelFunc        // Telegram bot cancel
@@ -110,7 +110,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 		// Health check proxy connectivity
 		if cfg.Agent.Proxy.HealthCheck {
 			if err := executor.CheckProxyHealth(); err != nil {
-				log.Logger.Error("proxy health check FAILED — tools will fail to connect through proxy",
+				log.Logger.Error("proxy health check FAILED - tools will fail to connect through proxy",
 					zap.Error(err),
 					zap.String("fix", "Check proxy is running, or disable proxy in config.yaml agent.proxy.enabled"),
 				)
@@ -154,7 +154,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	if cfg.OpenAI.BaseURL != "" {
 		if u, parseErr := url.Parse(cfg.OpenAI.BaseURL); parseErr == nil && u.Host != "" {
 			if _, lookupErr := net.LookupHost(u.Hostname()); lookupErr != nil {
-				log.Logger.Warn("DNS pre-check FAILED for API endpoint — API calls will fail until DNS is fixed",
+				log.Logger.Warn("DNS pre-check FAILED for API endpoint - API calls will fail until DNS is fixed",
 					zap.String("host", u.Hostname()),
 					zap.String("fix", "Add '"+u.Hostname()+"' IP to /etc/hosts or fix your DNS resolver (VPN?)"),
 				)
@@ -175,7 +175,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 		cfg.Auth.GeneratedPasswordPersistErr = ""
 	}
 
-	// external MCP management（MCP）
+	// external MCP management(MCP)
 	externalMCPMgr := mcp.NewExternalMCPManagerWithStorage(log.Logger, db)
 	if cfg.ExternalMCP.Servers != nil {
 		externalMCPMgr.LoadConfigs(&cfg.ExternalMCP)
@@ -210,7 +210,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	// set result storage to Agent
 	agent.SetResultStorage(resultStorage)
 
-	// set result storage to Executor（）
+	// set result storage to Executor()
 	executor.SetResultStorage(resultStorage)
 
 	// initialize knowledge base module (if enabled)
@@ -241,16 +241,16 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 			knowledgeDB = knowledgeDBConn.DB
 			log.Logger.Info("use separate knowledge base database", zap.String("path", knowledgeDBPath))
 		} else {
-			// ：
+			// :
 			knowledgeDB = db.DB
-			log.Logger.Info("use session database to store knowledge base data（knowledge_db_path）")
+			log.Logger.Info("use session database to store knowledge base data(knowledge_db_path)")
 		}
 
 		// create knowledge base manager
 		knowledgeManager = knowledge.NewManager(knowledgeDB, cfg.Knowledge.BasePath, log.Logger)
 
 		// embedder
-		// use OpenAI configured API Key（knowledge base）
+		// use OpenAI configured API Key(knowledge base)
 		if cfg.Knowledge.Embedding.APIKey == "" {
 			cfg.Knowledge.Embedding.APIKey = cfg.OpenAI.APIKey
 		}
@@ -283,7 +283,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 		knowledgeHandler = handler.NewKnowledgeHandler(knowledgeManager, knowledgeRetriever, knowledgeIndexer, db, log.Logger)
 		log.Logger.Info("knowledge base module initialization complete", zap.Bool("handler_created", knowledgeHandler != nil))
 
-		// scanknowledge base（）
+		// scanknowledge base()
 		go func() {
 			itemsToIndex, err := knowledgeManager.ScanKnowledgeBase()
 			if err != nil {
@@ -299,7 +299,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 			}
 
 			if hasIndex {
-				// ，add
+				// ,add
 				if len(itemsToIndex) > 0 {
 					log.Logger.Info("detected existing knowledge base index, starting incremental indexing", zap.Int("count", len(itemsToIndex)))
 					ctx := context.Background()
@@ -319,7 +319,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 								log.Logger.Warn("failed to index knowledge item", zap.String("itemId", itemID), zap.Error(err))
 							}
 
-							// 2，stop
+							// 2,stop
 							if consecutiveFailures >= 2 {
 								log.Logger.Error("too many consecutive index failures, stopping incremental indexing immediately",
 									zap.Int("consecutiveFailures", consecutiveFailures),
@@ -388,8 +388,8 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	markdownAgentsHandler := handler.NewMarkdownAgentsHandler(agentsDir)
 	log.Logger.Info("multi-agent Markdown sub-agent directory", zap.String("agentsDir", agentsDir))
 
-	// register Skills tools to MCP server（AI，）
-	// create an adapter，database.DBSkillStatsStorage
+	// register Skills tools to MCP server(AI,)
+	// create an adapter,database.DBSkillStatsStorage
 	var skillStatsStorage skills.SkillStatsStorage
 	if db != nil {
 		skillStatsStorage = &skillStatsDBAdapter{db: db}
@@ -400,12 +400,12 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	agentHandler := handler.NewAgentHandler(agent, db, cfg, log.Logger)
 	agentHandler.SetSkillsManager(skillsManager) // set Skills manager
 	agentHandler.SetAgentsMarkdownDir(agentsDir)
-	// knowledge base，knowledge base managerAgentHandlerrecordretrieval log
+	// knowledge base,knowledge base managerAgentHandlerrecordretrieval log
 	if knowledgeManager != nil {
 		agentHandler.SetKnowledgeManager(knowledgeManager)
 	}
 	monitorHandler := handler.NewMonitorHandler(mcpServer, executor, db, log.Logger)
-	monitorHandler.SetExternalMCPManager(externalMCPMgr) // external MCP management，get external MCPrecord
+	monitorHandler.SetExternalMCPManager(externalMCPMgr) // external MCP management,get external MCPrecord
 	groupHandler := handler.NewGroupHandler(db, log.Logger)
 	authHandler := handler.NewAuthHandler(authManager, cfg, configPath, log.Logger)
 	attackChainHandler := handler.NewAttackChainHandler(db, &cfg.OpenAI, log.Logger)
@@ -436,7 +436,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	robotHandler := handler.NewRobotHandler(cfg, db, agentHandler, log.Logger)
 	openAPIHandler := handler.NewOpenAPIHandler(db, log.Logger, resultStorage, conversationHandler, agentHandler)
 
-	// create App instance（）
+	// create App instance()
 	app := &App{
 		config:             cfg,
 		logger:             log,
@@ -458,14 +458,14 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	// Start Telegram bot (long-polling); apply config calls RestartRobotConnections
 	app.startRobotConnections()
 
-	// set vulnerability tool registrar（built-in tool, must set）
+	// set vulnerability tool registrar(built-in tool, must set)
 	vulnerabilityRegistrar := func() error {
 		registerVulnerabilityTool(mcpServer, db, log.Logger)
 		return nil
 	}
 	configHandler.SetVulnerabilityToolRegistrar(vulnerabilityRegistrar)
 
-	// set WebShell tool registrar（ApplyConfig ）
+	// set WebShell tool registrar(ApplyConfig )
 	webshellRegistrar := func() error {
 		registerWebshellTools(mcpServer, db, webshellHandler, log.Logger)
 		registerWebshellManagementTools(mcpServer, db, webshellHandler, log.Logger)
@@ -473,9 +473,9 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	}
 	configHandler.SetWebshellToolRegistrar(webshellRegistrar)
 
-	// set Skills tool registrar（built-in tool, must set）
+	// set Skills tool registrar(built-in tool, must set)
 	skillsRegistrar := func() error {
-		// create an adapter，database.DBSkillStatsStorage
+		// create an adapter,database.DBSkillStatsStorage
 		var skillStatsStorage skills.SkillStatsStorage
 		if db != nil {
 			skillStatsStorage = &skillStatsDBAdapter{db: db}
@@ -485,23 +485,23 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	}
 	configHandler.SetSkillsToolRegistrar(skillsRegistrar)
 
-	// knowledge base（， App ）
+	// knowledge base(, App )
 	configHandler.SetKnowledgeInitializer(func() (*handler.KnowledgeHandler, error) {
 		knowledgeHandler, err := initializeKnowledge(cfg, db, knowledgeDBConn, mcpServer, agentHandler, app, log.Logger)
 		if err != nil {
 			return nil, err
 		}
 
-		// ，knowledge baseretriever
+		// ,knowledge baseretriever
 		// ApplyConfig re-register tools
 		if app.knowledgeRetriever != nil && app.knowledgeManager != nil {
-			// ，knowledgeRetrieverknowledgeManager
+			// ,knowledgeRetrieverknowledgeManager
 			registrar := func() error {
 				knowledge.RegisterKnowledgeTool(mcpServer, app.knowledgeRetriever, app.knowledgeManager, log.Logger)
 				return nil
 			}
 			configHandler.SetKnowledgeToolRegistrar(registrar)
-			// retriever，ApplyConfigretriever
+			// retriever,ApplyConfigretriever
 			configHandler.SetRetrieverUpdater(app.knowledgeRetriever)
 			log.Logger.Info("knowledge baseretriever")
 		}
@@ -509,22 +509,22 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 		return knowledgeHandler, nil
 	})
 
-	// knowledge base，knowledge baseretriever
+	// knowledge base,knowledge baseretriever
 	if cfg.Knowledge.Enabled && knowledgeRetriever != nil && knowledgeManager != nil {
-		// ，knowledgeRetrieverknowledgeManager
+		// ,knowledgeRetrieverknowledgeManager
 		registrar := func() error {
 			knowledge.RegisterKnowledgeTool(mcpServer, knowledgeRetriever, knowledgeManager, log.Logger)
 			return nil
 		}
 		configHandler.SetKnowledgeToolRegistrar(registrar)
-		// retriever，ApplyConfigretriever
+		// retriever,ApplyConfigretriever
 		configHandler.SetRetrieverUpdater(knowledgeRetriever)
 	}
 
 	// set robot connection restarter for config apply (Telegram)
 	configHandler.SetRobotRestarter(app)
 
-	// set up routes（ App handler）
+	// set up routes( App handler)
 	setupRoutes(
 		router,
 		authHandler,
@@ -555,12 +555,12 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 
 }
 
-// mcpHandlerWithAuth MCP ； auth_header validate，
+// mcpHandlerWithAuth MCP ; auth_header validate,
 func (a *App) mcpHandlerWithAuth(w http.ResponseWriter, r *http.Request) {
 	cfg := a.config.MCP
 	if cfg.AuthHeader != "" {
 		if r.Header.Get(cfg.AuthHeader) != cfg.AuthHeaderValue {
-			a.logger.Logger.Debug("MCP auth failed：header match", zap.String("header", cfg.AuthHeader))
+			a.logger.Logger.Debug("MCP auth failed:header match", zap.String("header", cfg.AuthHeader))
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
 			w.Write([]byte(`{"error":"unauthorized"}`))
@@ -572,7 +572,7 @@ func (a *App) mcpHandlerWithAuth(w http.ResponseWriter, r *http.Request) {
 
 // Run start application
 func (a *App) Run() error {
-	// start MCP server（）
+	// start MCP server()
 	if a.config.MCP.Enabled {
 		go func() {
 			mcpAddr := fmt.Sprintf("%s:%d", a.config.MCP.Host, a.config.MCP.Port)
@@ -609,7 +609,7 @@ func (a *App) Shutdown() {
 		a.externalMCPMgr.StopAll()
 	}
 
-	// knowledge basedatabase connection（）
+	// knowledge basedatabase connection()
 	if a.knowledgeDB != nil {
 		if err := a.knowledgeDB.Close(); err != nil {
 			a.logger.Logger.Warn("knowledge basedatabase connection", zap.Error(err))
@@ -682,7 +682,7 @@ func setupRoutes(
 
 	// robot callback (Telegram uses long-polling, no webhook routes needed)
 
-	// Plugin static assets (no auth — loaded on page init before login)
+	// Plugin static assets (no auth - loaded on page init before login)
 	if pluginsHandler != nil {
 		api.GET("/plugins/recon-panels", pluginsHandler.GetReconPanels)
 		api.GET("/plugins/:name/i18n/:lang", pluginsHandler.GetPluginI18n)
@@ -704,8 +704,8 @@ func setupRoutes(
 		protected.GET("/agent-loop/tasks", agentHandler.ListAgentTasks)
 		protected.GET("/agent-loop/tasks/completed", agentHandler.ListCompletedTasks)
 
-		// Eino DeepAgent （ Agent ， config.multi_agent.enabled）
-		// ； h.config.MultiAgent.Enabled （apply config）
+		// Eino DeepAgent ( Agent , config.multi_agent.enabled)
+		// ; h.config.MultiAgent.Enabled (apply config)
 		protected.POST("/multi-agent", agentHandler.MultiAgentLoop)
 		protected.POST("/multi-agent/stream", agentHandler.MultiAgentLoopStream)
 		protected.GET("/multi-agent/markdown-agents", markdownAgentsHandler.ListMarkdownAgents)
@@ -714,9 +714,9 @@ func setupRoutes(
 		protected.PUT("/multi-agent/markdown-agents/:filename", markdownAgentsHandler.UpdateMarkdownAgent)
 		protected.DELETE("/multi-agent/markdown-agents/:filename", markdownAgentsHandler.DeleteMarkdownAgent)
 
-		// information gathering - FOFA （）
+		// information gathering - FOFA ()
 		protected.POST("/fofa/search", fofaHandler.Search)
-		// information gathering - parse FOFA （）
+		// information gathering - parse FOFA ()
 		protected.POST("/fofa/parse", fofaHandler.ParseNaturalLanguage)
 
 		// batch task management
@@ -766,7 +766,7 @@ func setupRoutes(
 		protected.POST("/config/test-api", configHandler.TestAPIEndpoint)
 		protected.GET("/health/model", configHandler.ModelHealthCheck)
 
-		// system settings - terminal（，）
+		// system settings - terminal(,)
 		protected.POST("/terminal/run", terminalHandler.RunCommand)
 		protected.POST("/terminal/run/stream", terminalHandler.RunCommandStream)
 		protected.GET("/terminal/ws", terminalHandler.RunCommandWS)
@@ -784,7 +784,7 @@ func setupRoutes(
 		protected.GET("/attack-chain/:conversationId", attackChainHandler.GetAttackChain)
 		protected.POST("/attack-chain/:conversationId/regenerate", attackChainHandler.RegenerateAttackChain)
 
-		// knowledge base（， App handler）
+		// knowledge base(, App handler)
 		knowledgeRoutes := protected.Group("/knowledge")
 		{
 			knowledgeRoutes.GET("/categories", func(c *gin.Context) {
@@ -937,7 +937,7 @@ func setupRoutes(
 		protected.PUT("/vulnerabilities/:id", vulnerabilityHandler.UpdateVulnerability)
 		protected.DELETE("/vulnerabilities/:id", vulnerabilityHandler.DeleteVulnerability)
 
-		// WebShell management（ + SQLite）
+		// WebShell management( + SQLite)
 		protected.GET("/webshell/connections", webshellHandler.ListConnections)
 		protected.POST("/webshell/connections", webshellHandler.CreateConnection)
 		protected.GET("/webshell/connections/:id/ai-history", webshellHandler.GetAIHistory)
@@ -949,7 +949,7 @@ func setupRoutes(
 		protected.POST("/webshell/exec", webshellHandler.Exec)
 		protected.POST("/webshell/file", webshellHandler.FileOp)
 
-		// conversation（chat_uploads）
+		// conversation(chat_uploads)
 		protected.GET("/chat-uploads", chatUploadsHandler.List)
 		protected.GET("/chat-uploads/download", chatUploadsHandler.Download)
 		protected.GET("/chat-uploads/content", chatUploadsHandler.GetContent)
@@ -998,14 +998,14 @@ func setupRoutes(
 			mcpServer.HandleHTTP(c.Writer, c.Request)
 		})
 
-		// OpenAPI（，conversation）
+		// OpenAPI(,conversation)
 		protected.GET("/conversations/:id/results", openAPIHandler.GetConversationResults)
 	}
 
-	// OpenAPI specification（auth，API）
+	// OpenAPI specification(auth,API)
 	protected.GET("/openapi/spec", openAPIHandler.GetOpenAPISpec)
 
-	// API docs page（，API）
+	// API docs page(,API)
 	router.GET("/api-docs", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "api-docs.html", nil)
 	})
@@ -1028,7 +1028,7 @@ func setupRoutes(
 func registerVulnerabilityTool(mcpServer *mcp.Server, db *database.DB, logger *zap.Logger) {
 	tool := mcp.Tool{
 		Name:             builtin.ToolRecordVulnerability,
-		Description: "recorddiscoveredvulnerability management。，record，title、description、critical、type、、、。",
+		Description: "recorddiscoveredvulnerability management.,record,title,description,critical,type,,,.",
 		ShortDescription: "recorddiscoveredvulnerability management",
 		InputSchema: map[string]interface{}{
 			"type": "object",
@@ -1043,20 +1043,20 @@ func registerVulnerabilityTool(mcpServer *mcp.Server, db *database.DB, logger *z
 				},
 				"severity": map[string]interface{}{
 					"type":        "string",
-					"description": "vulnerability severity：critical（critical）、high（）、medium（）、low（）、info（）",
+					"description": "vulnerability severity:critical(critical),high(),medium(),low(),info()",
 					"enum":        []string{"critical", "high", "medium", "low", "info"},
 				},
 				"vulnerability_type": map[string]interface{}{
 					"type":        "string",
-					"description": "vulnerability type，：SQL、XSS、CSRF、",
+					"description": "vulnerability type,:SQL,XSS,CSRF,",
 				},
 				"target": map[string]interface{}{
 					"type":        "string",
-					"description": "affected target（URL、IP、）",
+					"description": "affected target(URL,IP,)",
 				},
 				"proof": map[string]interface{}{
 					"type":        "string",
-					"description": "vulnerability proof（POC、、/）",
+					"description": "vulnerability proof(POC,,/)",
 				},
 				"impact": map[string]interface{}{
 					"type":        "string",
@@ -1072,14 +1072,14 @@ func registerVulnerabilityTool(mcpServer *mcp.Server, db *database.DB, logger *z
 	}
 
 	handler := func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
-		// get from parametersconversation_id（Agentadd）
+		// get from parametersconversation_id(Agentadd)
 		conversationID, _ := args["conversation_id"].(string)
 		if conversationID == "" {
 			return &mcp.ToolResult{
 				Content: []mcp.Content{
 					{
 						Type: "text",
-						Text: "error: conversation_id 。error，。",
+						Text: "error: conversation_id .error,.",
 					},
 				},
 				IsError: true,
@@ -1125,7 +1125,7 @@ func registerVulnerabilityTool(mcpServer *mcp.Server, db *database.DB, logger *z
 				Content: []mcp.Content{
 					{
 						Type: "text",
-						Text: fmt.Sprintf("error: severity critical、high、medium、low info ，current: %s", severity),
+						Text: fmt.Sprintf("error: severity critical,high,medium,low info ,current: %s", severity),
 					},
 				},
 				IsError: true,
@@ -1202,7 +1202,7 @@ func registerVulnerabilityTool(mcpServer *mcp.Server, db *database.DB, logger *z
 			Content: []mcp.Content{
 				{
 					Type: "text",
-					Text: fmt.Sprintf("record！\n\nvulnerability ID: %s\ntitle: %s\ncritical: %s\nstatus: %s\n\nvulnerability management。", created.ID, created.Title, created.Severity, created.Status),
+					Text: fmt.Sprintf("record!\n\nvulnerability ID: %s\ntitle: %s\ncritical: %s\nstatus: %s\n\nvulnerability management.", created.ID, created.Title, created.Severity, created.Status),
 				},
 			},
 			IsError: false,
@@ -1213,24 +1213,24 @@ func registerVulnerabilityTool(mcpServer *mcp.Server, db *database.DB, logger *z
 	logger.Info("record")
 }
 
-// registerWebshellTools register WebShell related MCP tools， AI 
+// registerWebshellTools register WebShell related MCP tools, AI 
 func registerWebshellTools(mcpServer *mcp.Server, db *database.DB, webshellHandler *handler.WebShellHandler, logger *zap.Logger) {
 	if db == nil || webshellHandler == nil {
-		logger.Warn("skip WebShell tool registration：db webshellHandler ")
+		logger.Warn("skip WebShell tool registration:db webshellHandler ")
 		return
 	}
 
 	// webshell_exec
 	execTool := mcp.Tool{
 		Name:             builtin.ToolWebshellExec,
-		Description: "execute a system command on the specified WebShell connection，returns。connection_id AI 。",
+		Description: "execute a system command on the specified WebShell connection,returns.connection_id AI .",
 		ShortDescription: "execute command on WebShell connection",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"connection_id": map[string]interface{}{
 					"type":        "string",
-					"description": "WebShell connection ID（ ws_xxx）",
+					"description": "WebShell connection ID( ws_xxx)",
 				},
 				"command": map[string]interface{}{
 					"type":        "string",
@@ -1255,7 +1255,7 @@ func registerWebshellTools(mcpServer *mcp.Server, db *database.DB, webshellHandl
 			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: errMsg}}, IsError: true}, nil
 		}
 		if !ok {
-			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "HTTP 200，:\n" + output}}, IsError: false}, nil
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "HTTP 200,:\n" + output}}, IsError: false}, nil
 		}
 		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: output}}, IsError: false}, nil
 	}
@@ -1264,13 +1264,13 @@ func registerWebshellTools(mcpServer *mcp.Server, db *database.DB, webshellHandl
 	// webshell_file_list
 	listTool := mcp.Tool{
 		Name:             builtin.ToolWebshellFileList,
-		Description: "list directory content on specified WebShell connection。path defaultcurrent（.）。",
+		Description: "list directory content on specified WebShell connection.path defaultcurrent(.).",
 		ShortDescription: "list directory on WebShell",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"connection_id": map[string]interface{}{"type": "string", "description": "WebShell connection ID"},
-				"path":          map[string]interface{}{"type": "string", "description": "directory path，default ."},
+				"path":          map[string]interface{}{"type": "string", "description": "directory path,default ."},
 			},
 			"required": []string{"connection_id"},
 		},
@@ -1296,7 +1296,7 @@ func registerWebshellTools(mcpServer *mcp.Server, db *database.DB, webshellHandl
 	// webshell_file_read
 	readTool := mcp.Tool{
 		Name:             builtin.ToolWebshellFileRead,
-		Description:      "read file content on specified WebShell connection。",
+		Description:      "read file content on specified WebShell connection.",
 		ShortDescription: "read file on WebShell",
 		InputSchema: map[string]interface{}{
 			"type": "object",
@@ -1328,7 +1328,7 @@ func registerWebshellTools(mcpServer *mcp.Server, db *database.DB, webshellHandl
 	// webshell_file_write
 	writeTool := mcp.Tool{
 		Name:             builtin.ToolWebshellFileWrite,
-		Description:      "write file content on specified WebShell connection (overwrites existing file)。",
+		Description:      "write file content on specified WebShell connection (overwrites existing file).",
 		ShortDescription: "write file on WebShell",
 		InputSchema: map[string]interface{}{
 			"type": "object",
@@ -1356,7 +1356,7 @@ func registerWebshellTools(mcpServer *mcp.Server, db *database.DB, webshellHandl
 			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: errMsg}}, IsError: true}, nil
 		}
 		if !ok {
-			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "write may have failed，:\n" + output}}, IsError: false}, nil
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "write may have failed,:\n" + output}}, IsError: false}, nil
 		}
 		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "write succeeded\n" + output}}, IsError: false}, nil
 	}
@@ -1368,14 +1368,14 @@ func registerWebshellTools(mcpServer *mcp.Server, db *database.DB, webshellHandl
 // registerWebshellManagementTools register WebShell connection management MCP tools
 func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, webshellHandler *handler.WebShellHandler, logger *zap.Logger) {
 	if db == nil {
-		logger.Warn("skip WebShell management：db ")
+		logger.Warn("skip WebShell management:db ")
 		return
 	}
 
 	// manage_webshell_list - webshell 
 	listTool := mcp.Tool{
 		Name:             builtin.ToolManageWebshellList,
-		Description: "list all saved WebShell connections，returnsID、URL、type、remark。",
+		Description: "list all saved WebShell connections,returnsID,URL,type,remark.",
 		ShortDescription: "list all WebShell connections",
 		InputSchema: map[string]interface{}{
 			"type":       "object",
@@ -1397,7 +1397,7 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 			}, nil
 		}
 		var sb strings.Builder
-		sb.WriteString(fmt.Sprintf(" %d WebShell connections：\n\n", len(connections)))
+		sb.WriteString(fmt.Sprintf(" %d WebShell connections:\n\n", len(connections)))
 		for _, conn := range connections {
 			sb.WriteString(fmt.Sprintf("ID: %s\n", conn.ID))
 			sb.WriteString(fmt.Sprintf("  URL: %s\n", conn.URL))
@@ -1420,36 +1420,36 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 	// manage_webshell_add - add webshell 
 	addTool := mcp.Tool{
 		Name:        builtin.ToolManageWebshellAdd,
-		Description: "add WebShell 。 PHP、ASP、ASPX、JSP type。",
+		Description: "add WebShell . PHP,ASP,ASPX,JSP type.",
 		ShortDescription: "add WebShell ",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"url": map[string]interface{}{
 					"type":        "string",
-					"description": "shell URL， http://target.com/shell.php（required）",
+					"description": "shell URL, http://target.com/shell.php(required)",
 				},
 				"password": map[string]interface{}{
 					"type":        "string",
-					"description": "connection password/key，/",
+					"description": "connection password/key,/",
 				},
 				"type": map[string]interface{}{
 					"type":        "string",
-					"description": "Shell type：php、asp、aspx、jsp，default php",
+					"description": "Shell type:php,asp,aspx,jsp,default php",
 					"enum":        []string{"php", "asp", "aspx", "jsp"},
 				},
 				"method": map[string]interface{}{
 					"type":        "string",
-					"description": "request method：GET POST，default POST",
+					"description": "request method:GET POST,default POST",
 					"enum":        []string{"GET", "POST"},
 				},
 				"cmd_param": map[string]interface{}{
 					"type":        "string",
-					"description": "command parameter，default cmd",
+					"description": "command parameter,default cmd",
 				},
 				"remark": map[string]interface{}{
 					"type":        "string",
-					"description": "remark，remark",
+					"description": "remark,remark",
 				},
 			},
 			"required": []string{"url"},
@@ -1502,7 +1502,7 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 		return &mcp.ToolResult{
 			Content: []mcp.Content{{
 				Type: "text",
-				Text: fmt.Sprintf("WebShell add！\n\nID: %s\nURL: %s\ntype: %s\nrequest method: %s\ncommand parameter: %s", conn.ID, conn.URL, conn.Type, conn.Method, conn.CmdParam),
+				Text: fmt.Sprintf("WebShell add!\n\nID: %s\nURL: %s\ntype: %s\nrequest method: %s\ncommand parameter: %s", conn.ID, conn.URL, conn.Type, conn.Method, conn.CmdParam),
 			}},
 			IsError: false,
 		}, nil
@@ -1512,14 +1512,14 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 	// manage_webshell_update - webshell 
 	updateTool := mcp.Tool{
 		Name:        builtin.ToolManageWebshellUpdate,
-		Description: "update existing WebShell connection info。",
+		Description: "update existing WebShell connection info.",
 		ShortDescription: "update WebShell connection",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"connection_id": map[string]interface{}{
 					"type":        "string",
-					"description": " WebShell connection ID（required）",
+					"description": " WebShell connection ID(required)",
 				},
 				"url": map[string]interface{}{
 					"type":        "string",
@@ -1531,12 +1531,12 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 				},
 				"type": map[string]interface{}{
 					"type":        "string",
-					"description": " Shell type：php、asp、aspx、jsp",
+					"description": " Shell type:php,asp,aspx,jsp",
 					"enum":        []string{"php", "asp", "aspx", "jsp"},
 				},
 				"method": map[string]interface{}{
 					"type":        "string",
-					"description": "request method：GET POST",
+					"description": "request method:GET POST",
 					"enum":        []string{"GET", "POST"},
 				},
 				"cmd_param": map[string]interface{}{
@@ -1569,7 +1569,7 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 			}, nil
 		}
 
-		// （）
+		// ()
 		if urlStr, ok := args["url"].(string); ok && urlStr != "" {
 			existing.URL = urlStr
 		}
@@ -1599,7 +1599,7 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 		return &mcp.ToolResult{
 			Content: []mcp.Content{{
 				Type: "text",
-				Text: fmt.Sprintf("WebShell update success！\n\nID: %s\nURL: %s\ntype: %s\nrequest method: %s\ncommand parameter: %s\nremark: %s", existing.ID, existing.URL, existing.Type, existing.Method, existing.CmdParam, existing.Remark),
+				Text: fmt.Sprintf("WebShell update success!\n\nID: %s\nURL: %s\ntype: %s\nrequest method: %s\ncommand parameter: %s\nremark: %s", existing.ID, existing.URL, existing.Type, existing.Method, existing.CmdParam, existing.Remark),
 			}},
 			IsError: false,
 		}, nil
@@ -1609,14 +1609,14 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 	// manage_webshell_delete - delete webshell 
 	deleteTool := mcp.Tool{
 		Name:        builtin.ToolManageWebshellDelete,
-		Description: "delete WebShell 。",
+		Description: "delete WebShell .",
 		ShortDescription: "delete WebShell ",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"connection_id": map[string]interface{}{
 					"type":        "string",
-					"description": "delete WebShell connection ID（required）",
+					"description": "delete WebShell connection ID(required)",
 				},
 			},
 			"required": []string{"connection_id"},
@@ -1651,18 +1651,18 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 	// manage_webshell_test - webshell 
 	testTool := mcp.Tool{
 		Name:        builtin.ToolManageWebshellTest,
-		Description: " WebShell ，（ whoami dir）。",
+		Description: " WebShell ,( whoami dir).",
 		ShortDescription: " WebShell ",
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"connection_id": map[string]interface{}{
 					"type":        "string",
-					"description": " WebShell connection ID（required）",
+					"description": " WebShell connection ID(required)",
 				},
 				"command": map[string]interface{}{
 					"type":        "string",
-					"description": "，default whoami（Linux） dir（Windows）",
+					"description": ",default whoami(Linux) dir(Windows)",
 				},
 			},
 			"required": []string{"connection_id"},
@@ -1701,14 +1701,14 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 		output, ok, errMsg := webshellHandler.ExecWithConnection(conn, testCmd)
 		if errMsg != "" {
 			return &mcp.ToolResult{
-				Content: []mcp.Content{{Type: "text", Text: fmt.Sprintf("！\n\nID: %s\nURL: %s\nerror: %s", connID, conn.URL, errMsg)}},
+				Content: []mcp.Content{{Type: "text", Text: fmt.Sprintf("!\n\nID: %s\nURL: %s\nerror: %s", connID, conn.URL, errMsg)}},
 				IsError: true,
 			}, nil
 		}
 
 		if !ok {
 			return &mcp.ToolResult{
-				Content: []mcp.Content{{Type: "text", Text: fmt.Sprintf("！HTTP 200\n\nID: %s\nURL: %s\n: %s", connID, conn.URL, output)}},
+				Content: []mcp.Content{{Type: "text", Text: fmt.Sprintf("!HTTP 200\n\nID: %s\nURL: %s\n: %s", connID, conn.URL, output)}},
 				IsError: true,
 			}, nil
 		}
@@ -1716,7 +1716,7 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 		return &mcp.ToolResult{
 			Content: []mcp.Content{{
 				Type: "text",
-				Text: fmt.Sprintf("！\n\nID: %s\nURL: %s\ntype: %s\n\n: %s\n:\n%s", connID, conn.URL, conn.Type, testCmd, output),
+				Text: fmt.Sprintf("!\n\nID: %s\nURL: %s\ntype: %s\n\n: %s\n:\n%s", connID, conn.URL, conn.Type, testCmd, output),
 			}},
 			IsError: false,
 		}, nil
@@ -1726,7 +1726,7 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 	logger.Info("WebShell management")
 }
 
-// initializeKnowledge knowledge base（）
+// initializeKnowledge knowledge base()
 func initializeKnowledge(
 	cfg *config.Config,
 	db *database.DB,
@@ -1755,16 +1755,16 @@ func initializeKnowledge(
 		knowledgeDB = knowledgeDBConn.DB
 		logger.Info("use separate knowledge base database", zap.String("path", knowledgeDBPath))
 	} else {
-		// ：
+		// :
 		knowledgeDB = db.DB
-		logger.Info("use session database to store knowledge base data（knowledge_db_path）")
+		logger.Info("use session database to store knowledge base data(knowledge_db_path)")
 	}
 
 	// create knowledge base manager
 	knowledgeManager := knowledge.NewManager(knowledgeDB, cfg.Knowledge.BasePath, logger)
 
 	// embedder
-	// use OpenAI configured API Key（knowledge base）
+	// use OpenAI configured API Key(knowledge base)
 	if cfg.Knowledge.Embedding.APIKey == "" {
 		cfg.Knowledge.Embedding.APIKey = cfg.OpenAI.APIKey
 	}
@@ -1799,20 +1799,20 @@ func initializeKnowledge(
 	// knowledge base managerAgentHandlerrecordretrieval log
 	agentHandler.SetKnowledgeManager(knowledgeManager)
 
-	// App knowledge base（ App nil，）
+	// App knowledge base( App nil,)
 	if app != nil {
 		app.knowledgeManager = knowledgeManager
 		app.knowledgeRetriever = knowledgeRetriever
 		app.knowledgeIndexer = knowledgeIndexer
 		app.knowledgeHandler = knowledgeHandler
-		// ， knowledgeDB
+		// , knowledgeDB
 		if knowledgeDBPath != "" {
 			app.knowledgeDB = knowledgeDBConn
 		}
 		logger.Info("App knowledge base")
 	}
 
-	// scanknowledge base（）
+	// scanknowledge base()
 	go func() {
 		itemsToIndex, err := knowledgeManager.ScanKnowledgeBase()
 		if err != nil {
@@ -1828,7 +1828,7 @@ func initializeKnowledge(
 		}
 
 		if hasIndex {
-			// ，add
+			// ,add
 			if len(itemsToIndex) > 0 {
 				logger.Info("detected existing knowledge base index, starting incremental indexing", zap.Int("count", len(itemsToIndex)))
 				ctx := context.Background()
@@ -1848,7 +1848,7 @@ func initializeKnowledge(
 							logger.Warn("failed to index knowledge item", zap.String("itemId", itemID), zap.Error(err))
 						}
 
-						// 2，stop
+						// 2,stop
 						if consecutiveFailures >= 2 {
 							logger.Error("too many consecutive index failures, stopping incremental indexing immediately",
 								zap.Int("consecutiveFailures", consecutiveFailures),

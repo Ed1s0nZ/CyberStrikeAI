@@ -1,4 +1,4 @@
-// plugin-loader.js — Loads plugin frontend assets (pages, JS, CSS, i18n)
+// plugin-loader.js - Loads plugin frontend assets (pages, JS, CSS, i18n)
 
 (function() {
     'use strict';

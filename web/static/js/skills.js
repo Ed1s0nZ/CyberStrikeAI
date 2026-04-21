@@ -12,7 +12,7 @@ let isAutoRefreshingSkills = false;
 const SKILLS_AUTO_REFRESH_INTERVAL_MS = 5000;
 let skillsPagination = {
     currentPage: 1,
- pageSize: 20, // eachpage20record（default，actualfromlocalStorageread）
+ pageSize: 20, // eachpage20record(default,actualfromlocalStorageread)
     total: 0
 };
 let skillsStats = {
@@ -89,26 +89,26 @@ function initSkillsPagination() {
     skillsPagination.pageSize = savedPageSize;
 }
 
-// loadskillslist（supportpagination）
+// loadskillslist(supportpagination)
 async function loadSkills(page = 1, pageSize = null) {
     try {
- // ifhasspecifypageSize，useSave's ordefault
+ // ifhasspecifypageSize,useSave's ordefault
         if (pageSize === null) {
             pageSize = getSkillsPageSize();
         }
         
-        // update pagination state（ensureusecorrect's pageSize）
+        // update pagination state(ensureusecorrect's pageSize)
         skillsPagination.currentPage = page;
         skillsPagination.pageSize = pageSize;
         
-        // clearsearchkeyword（Normalpaginationloadwhen）
+        // clearsearchkeyword(Normalpaginationloadwhen)
         skillsSearchKeyword = '';
         const searchInput = document.getElementById('skills-search');
         if (searchInput) {
             searchInput.value = '';
         }
         
-        // buildURL（supportpagination）
+        // buildURL(supportpagination)
         const offset = (page - 1) * pageSize;
         const url = `/api/skills?limit=${pageSize}&offset=${offset}`;
         
@@ -138,7 +138,7 @@ function renderSkillsList() {
     const skillsListEl = document.getElementById('skills-list');
     if (!skillsListEl) return;
 
-    // backendalreadycompletesearchfilter，use directlyskillsList
+    // backendalreadycompletesearchfilter,use directlyskillsList
     const filteredSkills = skillsList;
 
     if (filteredSkills.length === 0) {
@@ -169,7 +169,7 @@ function renderSkillsList() {
         `;
     }).join('');
     
- // ensurelistcontainercantoscroll，paginationcan
+ // ensurelistcontainercantoscroll,paginationcan
     // use setTimeout ensure DOM updatecompleteafterthencheck
     setTimeout(() => {
         const paginationContainer = document.getElementById('skills-pagination');
@@ -181,7 +181,7 @@ function renderSkillsList() {
     }, 0);
 }
 
-// renderpaginationcomponent（referenceMCPmanagement pagestyle）
+// renderpaginationcomponent(referenceMCPmanagement pagestyle)
 function renderSkillsPagination() {
     const paginationContainer = document.getElementById('skills-pagination');
     if (!paginationContainer) return;
@@ -191,7 +191,7 @@ function renderSkillsPagination() {
     const currentPage = skillsPagination.currentPage;
     const totalPages = Math.ceil(total / pageSize);
     
- // even ifonlyhaspagealsoShow paginationInfo（referenceMCPstyle）
+ // even ifonlyhaspagealsoShow paginationInfo(referenceMCPstyle)
     if (total === 0) {
         paginationContainer.innerHTML = '';
         return;
@@ -210,7 +210,7 @@ function renderSkillsPagination() {
     const pageOfText = _t('skillsPage.pageOf', { current: currentPage, total: totalPages || 1 });
     const nextPageText = _t('skillsPage.nextPage');
     const lastPageText = _t('skillsPage.lastPage');
-    // left side：Show rangeInfoandeachpagecountselector（referenceMCPstyle）
+    // left side:Show rangeInfoandeachpagecountselector(referenceMCPstyle)
     paginationHTML += `
         <div class="pagination-info">
             <span>${escapeHtml(paginationShowText)}</span>
@@ -226,7 +226,7 @@ function renderSkillsPagination() {
         </div>
     `;
     
-    // right side：paginationbutton（referenceMCPstyle：First、Previous、X/Ypage、Next、Last）
+    // right side:paginationbutton(referenceMCPstyle:First,Previous,X/Ypage,Next,Last)
     paginationHTML += `
         <div class="pagination-controls">
             <button class="btn-secondary" onclick="loadSkills(1, ${pageSize})" ${currentPage === 1 || total === 0 ? 'disabled' : ''}>${escapeHtml(firstPageText)}</button>
@@ -241,7 +241,7 @@ function renderSkillsPagination() {
     
     paginationContainer.innerHTML = paginationHTML;
     
-    // ensurepaginationcomponentandlistcontentareaalign（excluding scrollbar）
+    // ensurepaginationcomponentandlistcontentareaalign(excluding scrollbar)
     function alignPaginationWidth() {
         const skillsList = document.getElementById('skills-list');
         if (skillsList && paginationContainer) {
@@ -250,19 +250,19 @@ function renderSkillsPagination() {
             paginationContainer.style.visibility = 'visible';
             paginationContainer.style.opacity = '1';
             
-            // getlist's actualcontentwidth（excluding scrollbar）
-            const listClientWidth = skillsList.clientWidth; // visibleareawidth（excluding scrollbar）
+            // getlist's actualcontentwidth(excluding scrollbar)
+            const listClientWidth = skillsList.clientWidth; // visibleareawidth(excluding scrollbar)
             const listScrollHeight = skillsList.scrollHeight; // contenttotal height
             const listClientHeight = skillsList.clientHeight; // visibleareaheight
             const hasScrollbar = listScrollHeight > listClientHeight;
             
-            // iflisthasverticalscrollrecord，pagination should align with list content area（clientWidth）
-            // if no scrollbar，use100%width
+            // iflisthasverticalscrollrecord,pagination should align with list content area(clientWidth)
+            // if no scrollbar,use100%width
             if (hasScrollbar && listClientWidth > 0) {
-                // pagination should align with list content area，excluding scrollbar
+                // pagination should align with list content area,excluding scrollbar
                 paginationContainer.style.width = `${listClientWidth}px`;
             } else {
-                // if no scrollbar，use100%width
+                // if no scrollbar,use100%width
                 paginationContainer.style.width = '100%';
             }
         }
@@ -281,7 +281,7 @@ function renderSkillsPagination() {
         resizeObserver.observe(skillsList);
     }
     
- // ensurepaginationcontaineralwayscan（preventbyhide）
+ // ensurepaginationcontaineralwayscan(preventbyhide)
     paginationContainer.style.display = 'block';
     paginationContainer.style.visibility = 'visible';
 }
@@ -304,7 +304,7 @@ async function changeSkillsPageSize() {
     // update pagination state
     skillsPagination.pageSize = newPageSize;
     
-    // re-calculatecurrentpage（ensurenotexceedoutrange）
+    // re-calculatecurrentpage(ensurenotexceedoutrange)
     const totalPages = Math.ceil(skillsPagination.total / newPageSize);
     const currentPage = Math.min(skillsPagination.currentPage, totalPages || 1);
     skillsPagination.currentPage = currentPage;
@@ -343,7 +343,7 @@ async function searchSkills() {
     }
     
     if (skillsSearchKeyword) {
-        // hassearchkeywordwhen，usebackendsearchAPI（loadallmatchresult，notpagination）
+        // hassearchkeywordwhen,usebackendsearchAPI(loadallmatchresult,notpagination)
         try {
             const response = await apiFetch(`/api/skills?search=${encodeURIComponent(skillsSearchKeyword)}&limit=10000&offset=0`);
             if (!response.ok) {
@@ -358,14 +358,14 @@ async function searchSkills() {
             if (paginationContainer) {
                 paginationContainer.innerHTML = '';
             }
-            // update statistics（Show searchresultcount）
+            // update statistics(Show searchresultcount)
             updateSkillsManagementStats();
         } catch (error) {
             console.error('searchskillsFailed:', error);
             showNotification(_t('skills.searchFailed') + ': ' + error.message, 'error');
         }
     } else {
- // hassearchkeywordwhen，restorepaginationload
+ // hassearchkeywordwhen,restorepaginationload
         await loadSkills(1, skillsPagination.pageSize);
     }
 }
@@ -577,13 +577,13 @@ async function deleteSkill(skillName) {
         }
     } catch (error) {
         console.warn('checkskillbindFailed:', error);
- // ifcheckFailed，ContinuelineDelete
+ // ifcheckFailed,ContinuelineDelete
     }
 
     // buildconfirmmessage
     let confirmMessage = _t('skills.deleteConfirm', { name: skillName });
     if (boundRoles.length > 0) {
-        const rolesList = boundRoles.join('、');
+        const rolesList = boundRoles.join(',');
         confirmMessage = _t('skills.deleteConfirmWithRoles', { name: skillName, count: boundRoles.length, roles: rolesList });
     }
 
@@ -604,12 +604,12 @@ async function deleteSkill(skillName) {
         const data = await response.json();
         let successMessage = _t('skills.deleteSuccess');
         if (data.affected_roles && data.affected_roles.length > 0) {
-            const rolesList = data.affected_roles.join('、');
+            const rolesList = data.affected_roles.join(',');
             successMessage = _t('skills.deleteSuccessWithRoles', { count: data.affected_roles.length, roles: rolesList });
         }
         showNotification(successMessage, 'success');
         
- // ifcurrentpagehasdata，go back toPrevious
+ // ifcurrentpagehasdata,go back toPrevious
         const currentPage = skillsPagination.currentPage;
         const totalAfterDelete = skillsPagination.total - 1;
         const totalPages = Math.ceil(totalAfterDelete / skillsPagination.pageSize);
@@ -695,13 +695,13 @@ function renderSkillsMonitor() {
 
     const stats = skillsStats.stats || [];
     
- // ifhasstatisticsdata，show empty state
+ // ifhasstatisticsdata,show empty state
     if (stats.length === 0) {
         monitorListEl.innerHTML = '<div class="monitor-empty">' + _t('skills.noCallRecords') + '</div>';
         return;
     }
 
- // bycalltimesort（fall），ifcalltimesame，bynamesort
+ // bycalltimesort(fall),ifcalltimesame,bynamesort
     const sortedStats = [...stats].sort((a, b) => {
         const callsA = b.total_calls || 0;
         const callsB = a.total_calls || 0;
@@ -786,7 +786,7 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// languageswitchwhenre-rendercurrentpage（canlistandpaginationuse _t，needlanguageupdate）
+// languageswitchwhenre-rendercurrentpage(canlistandpaginationuse _t,needlanguageupdate)
 document.addEventListener('languagechange', function () {
     const page = document.getElementById('page-skills-management');
     if (page && page.classList.contains('active')) {

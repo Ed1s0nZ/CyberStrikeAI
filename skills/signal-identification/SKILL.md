@@ -1,7 +1,7 @@
 # Signal Modulation Identification
 
 ## Tool
-`~/combat/signal_identify.py` — automatic modulation classifier from SDR capture
+`~/combat/signal_identify.py` - automatic modulation classifier from SDR capture
 
 ## Usage
 ```bash

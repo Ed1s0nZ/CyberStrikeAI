@@ -47,7 +47,7 @@ description: |
 
   **Detection Evasion Notes:**
   - HSTS-preloaded domains cannot be stripped (Chrome/Firefox maintain preload lists)
-  - Modern browsers show "Not Secure" for HTTP — social engineering may be needed
+  - Modern browsers show "Not Secure" for HTTP - social engineering may be needed
   - Certificate Transparency logs don't apply since no fake cert is issued
   - SSLStrip2 (Leonardo Nve) adds HSTS bypass via subdomain rewriting
 
@@ -108,7 +108,7 @@ parameters:
       connections through the proxy, ensuring all traffic flows through SSLStrip
       from the start. Useful when targets already have established HTTPS sessions.
 
-      **Warning:** May cause noticeable disruption — targets may see brief disconnects.
+      **Warning:** May cause noticeable disruption - targets may see brief disconnects.
     required: false
     flag: "-k"
     format: "flag"

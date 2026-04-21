@@ -153,7 +153,7 @@ Below is a table highlighting some of the most commonly used tamper scripts:
 
 | Tamper | Description |
 | --- | --- |
-|0x2char.py | Replaces each (MySQL) 0xHEX encoded string with equivalent CONCAT(CHAR(),…) counterpart |
+|0x2char.py | Replaces each (MySQL) 0xHEX encoded string with equivalent CONCAT(CHAR(),...) counterpart |
 |apostrophemask.py | Replaces apostrophe character with its UTF-8 full width counterpart |
 |apostrophenullencode.py | Replaces apostrophe character with its illegal double unicode counterpart|
 |appendnullbyte.py | Appends encoded NULL byte character at the end of payload |

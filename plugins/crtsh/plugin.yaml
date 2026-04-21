@@ -1,10 +1,10 @@
 name: crtsh
 version: "1.0.0"
-description: "crt.sh Certificate Transparency search — subdomain discovery, cert history, infrastructure mapping. Free, no API key required."
+description: "crt.sh Certificate Transparency search - subdomain discovery, cert history, infrastructure mapping. Free, no API key required."
 author: "cybersecua"
 url: "https://github.com/crtsh"
 
-# No API key needed — crt.sh is a free public service
+# No API key needed - crt.sh is a free public service
 config: []
 
 requirements: "requirements.txt"

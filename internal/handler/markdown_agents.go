@@ -16,12 +16,12 @@ import (
 
 var markdownAgentFilenameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*\.md$`)
 
-// MarkdownAgentsHandler agents Markdown（）。
+// MarkdownAgentsHandler agents Markdown().
 type MarkdownAgentsHandler struct {
 	dir string
 }
 
-// NewMarkdownAgentsHandler dir parseabsolute path。
+// NewMarkdownAgentsHandler dir parseabsolute path.
 func NewMarkdownAgentsHandler(dir string) *MarkdownAgentsHandler {
 	return &MarkdownAgentsHandler{dir: strings.TrimSpace(dir)}
 }
@@ -38,7 +38,7 @@ func (h *MarkdownAgentsHandler) safeJoin(filename string) (string, error) {
 	return filepath.Join(h.dir, clean), nil
 }
 
-// existingOtherOrchestrator ，returnsfilename；writingBasename currentfilename。
+// existingOtherOrchestrator ,returnsfilename;writingBasename currentfilename.
 func existingOtherOrchestrator(dir, writingBasename string) (other string, err error) {
 	load, err := agents.LoadMarkdownAgentsDir(dir)
 	if err != nil {
@@ -199,7 +199,7 @@ func (h *MarkdownAgentsHandler) CreateMarkdownAgent(c *gin.Context) {
 			return
 		}
 		if other != "" {
-			c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("orchestrator definition already exists：%s，delete", other)})
+			c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("orchestrator definition already exists:%s,delete", other)})
 			return
 		}
 	}
@@ -264,7 +264,7 @@ func (h *MarkdownAgentsHandler) UpdateMarkdownAgent(c *gin.Context) {
 			return
 		}
 		if other != "" {
-			c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("orchestrator definition already exists：%s，delete", other)})
+			c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("orchestrator definition already exists:%s,delete", other)})
 			return
 		}
 	}

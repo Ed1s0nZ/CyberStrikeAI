@@ -527,7 +527,7 @@ func (m *ExternalMCPManager) cleanupOldExecutions() {
 		execs = append(execs, execTime{id: id, startTime: exec.StartTime})
 	}
 
-	// sort by time (ascending — oldest first)
+	// sort by time (ascending - oldest first)
 	sort.Slice(execs, func(i, j int) bool {
 		return execs[i].startTime.Before(execs[j].startTime)
 	})

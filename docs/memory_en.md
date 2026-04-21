@@ -1,4 +1,4 @@
-# Persistent Memory — Guide
+# Persistent Memory - Guide
 
 CyberStrikeAI can remember facts, credentials, targets, and notes **across conversation compressions and server restarts**. This page explains how memory works, how agents use it, and how to manage it through the web UI.
 
@@ -6,7 +6,7 @@ CyberStrikeAI can remember facts, credentials, targets, and notes **across conve
 
 ## How It Works
 
-Every time the agent completes a tool call it can call `store_memory` to save a fact to a small SQLite-backed store (`agent_memories` table in the main database). In addition, **tool results are automatically persisted** as `tool_run` category memory entries without any explicit agent action — so completed scans, output summaries, and execution metadata are always available for future sessions.
+Every time the agent completes a tool call it can call `store_memory` to save a fact to a small SQLite-backed store (`agent_memories` table in the main database). In addition, **tool results are automatically persisted** as `tool_run` category memory entries without any explicit agent action - so completed scans, output summaries, and execution metadata are always available for future sessions.
 
 On every subsequent request all stored entries are injected into the system prompt inside a `<persistent_memory>` block, grouped by category. This means the agent never forgets credentials, targets, or key findings even when conversation history is compressed.
 
@@ -14,9 +14,9 @@ On every subsequent request all stored entries are injected into the system prom
 
 Before every major new action the agent runs a mandatory introspection pass:
 
-1. **Memory similarity check** — queries memories semantically similar to the current user input (`retrieve_memory` with the raw query), surfacing relevant prior findings.
-2. **Entity-based lookup** — extracts IP addresses and domain names from the user input and fetches all memories tagged with those entities (`list_memories` with entity filter).
-3. **Knowledge-base preflight** — runs a focused KB query combining the user input with penetration-testing terminology to retrieve relevant exploitation techniques and tool guidance.
+1. **Memory similarity check** - queries memories semantically similar to the current user input (`retrieve_memory` with the raw query), surfacing relevant prior findings.
+2. **Entity-based lookup** - extracts IP addresses and domain names from the user input and fetches all memories tagged with those entities (`list_memories` with entity filter).
+3. **Knowledge-base preflight** - runs a focused KB query combining the user input with penetration-testing terminology to retrieve relevant exploitation techniques and tool guidance.
 
 The results are injected into the system prompt as a `<memory_similarity_context>` block:
 
@@ -78,10 +78,10 @@ Use the colour-coded filter buttons to narrow entries to a single category. Clic
 
 Click **+ Add Entry** to open the create dialog. Fill in:
 
-- **Key** — a short, unique label (e.g. `admin_password`)
-- **Value** — the fact to remember
-- **Category** — choose from the dropdown
-- **Conversation ID** — optional; links the entry to a specific conversation
+- **Key** - a short, unique label (e.g. `admin_password`)
+- **Value** - the fact to remember
+- **Category** - choose from the dropdown
+- **Conversation ID** - optional; links the entry to a specific conversation
 
 Click **Save** to store the entry. If a memory with the same key already exists it is updated in-place.
 

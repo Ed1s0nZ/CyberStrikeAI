@@ -35,13 +35,13 @@ func NewEmbedder(cfg *config.KnowledgeConfig, openAIConfig *config.OpenAIConfig,
 	var rateLimiter *rate.Limiter
 	var rateLimitDelay time.Duration
 
-	// if MaxRPM configured，calculate rate limit from RPM
+	// if MaxRPM configured,calculate rate limit from RPM
 	if cfg.Indexing.MaxRPM > 0 {
 		rpm := cfg.Indexing.MaxRPM
 		rateLimiter = rate.NewLimiter(rate.Every(time.Minute/time.Duration(rpm)), rpm)
 		logger.Info("knowledge baserate limit", zap.Int("maxRPM", rpm))
 	} else if cfg.Indexing.RateLimitDelayMs > 0 {
-		// if MaxRPM not configured but fixed delay configured，use fixed delay mode
+		// if MaxRPM not configured but fixed delay configured,use fixed delay mode
 		rateLimitDelay = time.Duration(cfg.Indexing.RateLimitDelayMs) * time.Millisecond
 		logger.Info("knowledge base", zap.Duration("delay", rateLimitDelay))
 	}
@@ -110,7 +110,7 @@ func (e *Embedder) waitRateLimiter() {
 	}
 }
 
-// EmbedText embed text（with retry and rate limiting）
+// EmbedText embed text(with retry and rate limiting)
 func (e *Embedder) EmbedText(ctx context.Context, text string) ([]float32, error) {
 	if e.openAIClient == nil {
 		return nil, fmt.Errorf("OpenAI client not initialized")
@@ -139,12 +139,12 @@ func (e *Embedder) EmbedText(ctx context.Context, text string) ([]float32, error
 
 		lastErr = err
 
-		// error（429 rate limit、5xx error、error）
+		// error(429 rate limit,5xx error,error)
 		if !e.isRetryableError(err) {
 			return nil, err
 		}
 
-		e.logger.Debug("embedding request，",
+		e.logger.Debug("embedding request,",
 			zap.Int("attempt", attempt+1),
 			zap.Int("maxRetries", e.maxRetries),
 			zap.Error(err))
@@ -153,7 +153,7 @@ func (e *Embedder) EmbedText(ctx context.Context, text string) ([]float32, error
 	return nil, fmt.Errorf("max retry count (%d): %v", e.maxRetries, lastErr)
 }
 
-// doEmbedText embedding request（）
+// doEmbedText embedding request()
 func (e *Embedder) doEmbedText(ctx context.Context, text string) ([]float32, error) {
 	// use configured embedding model
 	model := e.config.Embedding.Model
@@ -166,7 +166,7 @@ func (e *Embedder) doEmbedText(ctx context.Context, text string) ([]float32, err
 		Input: []string{text},
 	}
 
-	// clean baseURL：trim whitespace and trailing slashes
+	// clean baseURL:trim whitespace and trailing slashes
 	baseURL := strings.TrimSpace(e.config.Embedding.BaseURL)
 	baseURL = strings.TrimSuffix(baseURL, "/")
 	if baseURL == "" {
@@ -176,18 +176,18 @@ func (e *Embedder) doEmbedText(ctx context.Context, text string) ([]float32, err
 	// build request
 	body, err := json.Marshal(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to serialize request：%w", err)
+		return nil, fmt.Errorf("failed to serialize request:%w", err)
 	}
 
 	requestURL := baseURL + "/embeddings"
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, strings.NewReader(string(body)))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request：%w", err)
+		return nil, fmt.Errorf("failed to create request:%w", err)
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	// use configured API Key，if none, use OpenAI configured one
+	// use configured API Key,if none, use OpenAI configured one
 	apiKey := strings.TrimSpace(e.config.Embedding.APIKey)
 	if apiKey == "" && e.openAIConfig != nil {
 		apiKey = e.openAIConfig.APIKey
@@ -203,7 +203,7 @@ func (e *Embedder) doEmbedText(ctx context.Context, text string) ([]float32, err
 	}
 	resp, err := httpClient.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("send request：%w", err)
+		return nil, fmt.Errorf("send request:%w", err)
 	}
 	defer resp.Body.Close()
 
@@ -220,7 +220,7 @@ func (e *Embedder) doEmbedText(ctx context.Context, text string) ([]float32, err
 		}
 	}
 
-	// record（）
+	// record()
 	requestBodyPreview := string(body)
 	if len(requestBodyPreview) > 200 {
 		requestBodyPreview = requestBodyPreview[:200] + "..."
@@ -241,12 +241,12 @@ func (e *Embedder) doEmbedText(ctx context.Context, text string) ([]float32, err
 		if len(bodyPreview) > 500 {
 			bodyPreview = bodyPreview[:500] + "..."
 		}
-		return nil, fmt.Errorf("parse (URL: %s, status：%d, response length：%dbytes): %w\nrequest body：%s\nresponse content preview：%s",
+		return nil, fmt.Errorf("parse (URL: %s, status:%d, response length:%dbytes): %w\nrequest body:%s\nresponse content preview:%s",
 			requestURL, resp.StatusCode, len(bodyBytes), err, requestBodyPreview, bodyPreview)
 	}
 
 	if embeddingResp.Error != nil {
-		return nil, fmt.Errorf("OpenAI API error (status：%d): type=%s, message=%s",
+		return nil, fmt.Errorf("OpenAI API error (status:%d): type=%s, message=%s",
 			resp.StatusCode, embeddingResp.Error.Type, embeddingResp.Error.Message)
 	}
 
@@ -255,7 +255,7 @@ func (e *Embedder) doEmbedText(ctx context.Context, text string) ([]float32, err
 		if len(bodyPreview) > 500 {
 			bodyPreview = bodyPreview[:500] + "..."
 		}
-		return nil, fmt.Errorf("HTTP request failed (URL: %s, status：%d): response content=%s", requestURL, resp.StatusCode, bodyPreview)
+		return nil, fmt.Errorf("HTTP request failed (URL: %s, status:%d): response content=%s", requestURL, resp.StatusCode, bodyPreview)
 	}
 
 	if len(embeddingResp.Data) == 0 {
@@ -263,7 +263,7 @@ func (e *Embedder) doEmbedText(ctx context.Context, text string) ([]float32, err
 		if len(bodyPreview) > 500 {
 			bodyPreview = bodyPreview[:500] + "..."
 		}
-		return nil, fmt.Errorf("embedding data (status：%d, response length：%dbytes)\nresponse content：%s",
+		return nil, fmt.Errorf("embedding data (status:%d, response length:%dbytes)\nresponse content:%s",
 			resp.StatusCode, len(bodyBytes), bodyPreview)
 	}
 
@@ -314,7 +314,7 @@ func (e *Embedder) EmbedTexts(ctx context.Context, texts []string) ([][]float32,
 	for i, text := range texts {
 		embedding, err := e.EmbedText(ctx, text)
 		if err != nil {
-			return nil, fmt.Errorf("embed text [%d] ：%w", i, err)
+			return nil, fmt.Errorf("embed text [%d] :%w", i, err)
 		}
 		embeddings[i] = embedding
 	}

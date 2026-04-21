@@ -1,8 +1,8 @@
-# Ghidra Headless MCP — Interactive Binary Reverse Engineering
+# Ghidra Headless MCP - Interactive Binary Reverse Engineering
 
 ## Overview
 - **Type**: External MCP server (standalone process, ~212 tools)
-- **Binary formats**: ELF, PE, Mach-O, APK/DEX, .NET, firmware, shellcode, raw bytes — anything Ghidra supports
+- **Binary formats**: ELF, PE, Mach-O, APK/DEX, .NET, firmware, shellcode, raw bytes - anything Ghidra supports
 - **Transport**: stdio (auto-started by CyberStrikeAI) or TCP (manual start, port 8765)
 - **Backed by**: [ghidra-headless-mcp](https://github.com/mrphrazer/ghidra-headless-mcp) + pyghidra + Ghidra
 - **Auto-install**: `scripts/ghidra/start-ghidra-mcp.sh` installs all deps (Ghidra, JDK, pyghidra) if missing
@@ -11,7 +11,7 @@
 ```
 LLM (agent)
     | MCP tool call
-CyberStrikeAI (Go) — external MCP manager
+CyberStrikeAI (Go) - external MCP manager
     | stdio JSON-RPC
 ghidra-headless-mcp (Python + JVM via pyghidra)
     | Ghidra Java API (JPype bridge)
@@ -24,7 +24,7 @@ Binary file (sandboxed Ghidra project in /tmp)
 
 ### Manual start (TCP mode)
 ```bash
-# First time — installs everything:
+# First time - installs everything:
 scripts/ghidra/start-ghidra-mcp.sh --tcp
 
 # Subsequent runs:
@@ -184,13 +184,13 @@ Ghidra fully supports Android DEX bytecode:
 ```
 
 ### Key patterns to search in APKs:
-- `http://` / `https://` — API endpoints and C2 servers
-- `AES`, `DES`, `RSA`, `encrypt`, `decrypt` — crypto operations
-- `password`, `token`, `secret`, `key` — credential handling
-- `SharedPreferences`, `SQLiteDatabase` — local data storage
-- `TrustManager`, `SSLSocketFactory` — certificate pinning
-- `Runtime.exec`, `ProcessBuilder` — command execution
-- `DexClassLoader`, `PathClassLoader` — dynamic code loading
+- `http://` / `https://` - API endpoints and C2 servers
+- `AES`, `DES`, `RSA`, `encrypt`, `decrypt` - crypto operations
+- `password`, `token`, `secret`, `key` - credential handling
+- `SharedPreferences`, `SQLiteDatabase` - local data storage
+- `TrustManager`, `SSLSocketFactory` - certificate pinning
+- `Runtime.exec`, `ProcessBuilder` - command execution
+- `DexClassLoader`, `PathClassLoader` - dynamic code loading
 
 ## Malware Analysis Workflow
 

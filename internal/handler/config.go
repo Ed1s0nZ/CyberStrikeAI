@@ -34,7 +34,7 @@ type KnowledgeToolRegistrar func() error
 // VulnerabilityToolRegistrar vulnerability tool registrar interface
 type VulnerabilityToolRegistrar func() error
 
-// WebshellToolRegistrar WebShell tool registrar interface（ApplyConfig ）
+// WebshellToolRegistrar WebShell tool registrar interface(ApplyConfig )
 type WebshellToolRegistrar func() error
 
 // SkillsToolRegistrar Skills tool registrar interface
@@ -48,7 +48,7 @@ type RetrieverUpdater interface {
 // KnowledgeInitializer knowledge base
 type KnowledgeInitializer func() (*KnowledgeHandler, error)
 
-// AppUpdater App updater interface（Appknowledge base）
+// AppUpdater App updater interface(Appknowledge base)
 type AppUpdater interface {
 	UpdateKnowledgeComponents(handler *KnowledgeHandler, manager interface{}, retriever interface{}, indexer interface{})
 }
@@ -64,20 +64,20 @@ type ConfigHandler struct {
 	config                     *config.Config
 	mcpServer                  *mcp.Server
 	executor                   *security.Executor
-	agent AgentUpdater // Agent interface，update Agent config
-	attackChainHandler         AttackChainUpdater         // attack chain handler interface，for updating config
+	agent AgentUpdater // Agent interface,update Agent config
+	attackChainHandler         AttackChainUpdater         // attack chain handler interface,for updating config
 	externalMCPMgr *mcp.ExternalMCPManager // external MCP management
-	knowledgeToolRegistrar KnowledgeToolRegistrar // knowledge base（）
+	knowledgeToolRegistrar KnowledgeToolRegistrar // knowledge base()
 	vulnerabilityToolRegistrar VulnerabilityToolRegistrar // vulnerability tool registrar (optional)
 	webshellToolRegistrar      WebshellToolRegistrar      // WebShell tool registrar (optional)
 	skillsToolRegistrar        SkillsToolRegistrar        // Skills tool registrar (optional)
-	retrieverUpdater RetrieverUpdater // retriever（）
-	knowledgeInitializer KnowledgeInitializer // knowledge base（）
+	retrieverUpdater RetrieverUpdater // retriever()
+	knowledgeInitializer KnowledgeInitializer // knowledge base()
 	appUpdater                 AppUpdater                 // App updater (optional)
 	robotRestarter RobotRestarter // robot connection restarter; ApplyConfig restarts Telegram bot
 	logger                     *zap.Logger
 	mu                         sync.RWMutex
-	lastEmbeddingConfig        *config.EmbeddingConfig // previous embedding model config（for detecting changes）
+	lastEmbeddingConfig        *config.EmbeddingConfig // previous embedding model config(for detecting changes)
 }
 
 // AttackChainUpdater attack chain handler updater interface
@@ -93,7 +93,7 @@ type AgentUpdater interface {
 
 // NewConfigHandler creates a new config handler
 func NewConfigHandler(configPath string, cfg *config.Config, mcpServer *mcp.Server, executor *security.Executor, agent AgentUpdater, attackChainHandler AttackChainUpdater, externalMCPMgr *mcp.ExternalMCPManager, logger *zap.Logger) *ConfigHandler {
-	// save initial embedding model config（knowledge base）
+	// save initial embedding model config(knowledge base)
 	var lastEmbeddingConfig *config.EmbeddingConfig
 	if cfg.Knowledge.Enabled {
 		lastEmbeddingConfig = &config.EmbeddingConfig{
@@ -190,8 +190,8 @@ type ToolConfigInfo struct {
 	Description string `json:"description"`
 	Enabled     bool   `json:"enabled"`
 	IsExternal  bool   `json:"is_external,omitempty"`  // whether external MCP tool
-	ExternalMCP string `json:"external_mcp,omitempty"` // external MCP name（if external tool）
-	RoleEnabled *bool `json:"role_enabled,omitempty"` // currentrole（nilrole）
+	ExternalMCP string `json:"external_mcp,omitempty"` // external MCP name(if external tool)
+	RoleEnabled *bool `json:"role_enabled,omitempty"` // currentrole(nilrole)
 }
 
 // GetConfig current
@@ -199,7 +199,7 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
-	// list（including internal and external tools）
+	// list(including internal and external tools)
 	// first get tools from config file
 	configToolMap := make(map[string]bool)
 	tools := make([]ToolConfigInfo, 0, len(h.config.Security.Tools))
@@ -213,15 +213,15 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 		})
 	}
 
-	// get all registered tools from MCP server（including directly registered tools，such as knowledge retrieval tools）
+	// get all registered tools from MCP server(including directly registered tools,such as knowledge retrieval tools)
 	if h.mcpServer != nil {
 		mcpTools := h.mcpServer.GetAllTools()
 		for _, mcpTool := range mcpTools {
-			// skip（）
+			// skip()
 			if configToolMap[mcpTool.Name] {
 				continue
 			}
-			// addMCP（such as knowledge retrieval tools）
+			// addMCP(such as knowledge retrieval tools)
 			description := mcpTool.ShortDescription
 			if description == "" {
 				description = mcpTool.Description
@@ -281,7 +281,7 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 	})
 }
 
-// GetToolsResponse list（）
+// GetToolsResponse list()
 type GetToolsResponse struct {
 	Tools        []ToolConfigInfo `json:"tools"`
 	Total        int              `json:"total"`
@@ -291,7 +291,7 @@ type GetToolsResponse struct {
 	TotalPages   int              `json:"total_pages"`
 }
 
-// GetTools list（）
+// GetTools list()
 func (h *ConfigHandler) GetTools(c *gin.Context) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -317,14 +317,14 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 		searchTermLower = strings.ToLower(searchTerm)
 	}
 
-	// parserole，status
+	// parserole,status
 	roleName := c.Query("role")
 	var roleToolsSet map[string]bool // role
-	var roleUsesAllTools bool = true // role（defaultrole）
+	var roleUsesAllTools bool = true // role(defaultrole)
 	if roleName != "" && roleName != "default" && h.config.Roles != nil {
 		if role, exists := h.config.Roles[roleName]; exists && role.Enabled {
 			if len(role.Tools) > 0 {
-				// rolelist，
+				// rolelist,
 				roleToolsSet = make(map[string]bool)
 				for _, toolKey := range role.Tools {
 					roleToolsSet[toolKey] = true
@@ -349,7 +349,7 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 		// rolestatus
 		if roleName != "" {
 			if roleUsesAllTools {
-				// role，role_enabled=true
+				// role,role_enabled=true
 				if tool.Enabled {
 					roleEnabled := true
 					toolInfo.RoleEnabled = &roleEnabled
@@ -358,13 +358,13 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 					toolInfo.RoleEnabled = &roleEnabled
 				}
 			} else {
-				// rolelist，list
+				// rolelist,list
 				// internal tools use tool name as key
 				if roleToolsSet[tool.Name] {
 					roleEnabled := tool.Enabled // rolelist
 					toolInfo.RoleEnabled = &roleEnabled
 				} else {
-					// rolelist，mark as false
+					// rolelist,mark as false
 					roleEnabled := false
 					toolInfo.RoleEnabled = &roleEnabled
 				}
@@ -376,18 +376,18 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 			nameLower := strings.ToLower(toolInfo.Name)
 			descLower := strings.ToLower(toolInfo.Description)
 			if !strings.Contains(nameLower, searchTermLower) && !strings.Contains(descLower, searchTermLower) {
-				continue // match，skip
+				continue // match,skip
 			}
 		}
 
 		allTools = append(allTools, toolInfo)
 	}
 
-	// get all registered tools from MCP server（including directly registered tools，such as knowledge retrieval tools）
+	// get all registered tools from MCP server(including directly registered tools,such as knowledge retrieval tools)
 	if h.mcpServer != nil {
 		mcpTools := h.mcpServer.GetAllTools()
 		for _, mcpTool := range mcpTools {
-			// skip（）
+			// skip()
 			if configToolMap[mcpTool.Name] {
 				continue
 			}
@@ -410,17 +410,17 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 			// rolestatus
 			if roleName != "" {
 				if roleUsesAllTools {
-					// role，default
+					// role,default
 					roleEnabled := true
 					toolInfo.RoleEnabled = &roleEnabled
 				} else {
-					// rolelist，list
+					// rolelist,list
 					// internal tools use tool name as key
 					if roleToolsSet[mcpTool.Name] {
 						roleEnabled := true // rolelist
 						toolInfo.RoleEnabled = &roleEnabled
 					} else {
-						// rolelist，mark as false
+						// rolelist,mark as false
 						roleEnabled := false
 						toolInfo.RoleEnabled = &roleEnabled
 					}
@@ -432,7 +432,7 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 				nameLower := strings.ToLower(toolInfo.Name)
 				descLower := strings.ToLower(toolInfo.Description)
 				if !strings.Contains(nameLower, searchTermLower) && !strings.Contains(descLower, searchTermLower) {
-					continue // match，skip
+					continue // match,skip
 				}
 			}
 
@@ -453,25 +453,25 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 				nameLower := strings.ToLower(toolInfo.Name)
 				descLower := strings.ToLower(toolInfo.Description)
 				if !strings.Contains(nameLower, searchTermLower) && !strings.Contains(descLower, searchTermLower) {
-					continue // match，skip
+					continue // match,skip
 				}
 			}
 
 			// rolestatus
 			if roleName != "" {
 				if roleUsesAllTools {
-					// role，role_enabled=true
+					// role,role_enabled=true
 					roleEnabled := toolInfo.Enabled
 					toolInfo.RoleEnabled = &roleEnabled
 				} else {
-					// rolelist，list
+					// rolelist,list
 					// "mcpName::toolName" formatkey
 					externalToolKey := fmt.Sprintf("%s::%s", toolInfo.ExternalMCP, toolInfo.Name)
 					if roleToolsSet[externalToolKey] {
 						roleEnabled := toolInfo.Enabled // rolelist
 						toolInfo.RoleEnabled = &roleEnabled
 					} else {
-						// rolelist，mark as false
+						// rolelist,mark as false
 						roleEnabled := false
 						toolInfo.RoleEnabled = &roleEnabled
 					}
@@ -482,18 +482,18 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 		}
 	}
 
-	// rolelist，（list，）
-	// ：，， role_enabled status
-	// ，currentrole
+	// rolelist,(list,)
+	// :,, role_enabled status
+	// ,currentrole
 
 	total := len(allTools)
-	// count enabled tools（role）
+	// count enabled tools(role)
 	totalEnabled := 0
 	for _, tool := range allTools {
 		if tool.RoleEnabled != nil && *tool.RoleEnabled {
 			totalEnabled++
 		} else if tool.RoleEnabled == nil && tool.Enabled {
-			// role，
+			// role,
 			totalEnabled++
 		}
 	}
@@ -544,7 +544,7 @@ type ToolEnableStatus struct {
 	Name        string `json:"name"`
 	Enabled     bool   `json:"enabled"`
 	IsExternal  bool   `json:"is_external,omitempty"`  // whether external MCP tool
-	ExternalMCP string `json:"external_mcp,omitempty"` // external MCP name（if external tool）
+	ExternalMCP string `json:"external_mcp,omitempty"` // external MCP name(if external tool)
 }
 
 // UpdateConfig update config
@@ -593,7 +593,7 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 
 	// update Knowledge config
 	if req.Knowledge != nil {
-		// save old embedding model config（for detecting changes）
+		// save old embedding model config(for detecting changes)
 		if h.config.Knowledge.Enabled {
 			h.lastEmbeddingConfig = &config.EmbeddingConfig{
 				Provider: h.config.Knowledge.Embedding.Provider,
@@ -621,7 +621,7 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 		)
 	}
 
-	// multi-agent scalar（sub_agents config.yaml ）
+	// multi-agent scalar(sub_agents config.yaml )
 	if req.MultiAgent != nil {
 		h.config.MultiAgent.Enabled = req.MultiAgent.Enabled
 		dm := strings.TrimSpace(req.MultiAgent.DefaultMode)
@@ -642,12 +642,12 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 	if req.Tools != nil {
 		// separate internal and external tools
 		internalToolMap := make(map[string]bool)
-		// status：MCP -> -> status
+		// status:MCP -> -> status
 		externalMCPToolMap := make(map[string]map[string]bool)
 
 		for _, toolStatus := range req.Tools {
 			if toolStatus.IsExternal && toolStatus.ExternalMCP != "" {
-				// ：status
+				// :status
 				mcpName := toolStatus.ExternalMCP
 				if externalMCPToolMap[mcpName] == nil {
 					externalMCPToolMap[mcpName] = make(map[string]bool)
@@ -698,7 +698,7 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 					)
 				}
 
-				// ，MCP
+				// ,MCP
 				hasEnabledTool := false
 				for _, enabled := range cfg.ToolEnabled {
 					if enabled {
@@ -707,21 +707,21 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 					}
 				}
 
-				// MCP，，MCP
-				// MCP，status（）
+				// MCP,,MCP
+				// MCP,status()
 				if !cfg.ExternalMCPEnable && hasEnabledTool {
 					cfg.ExternalMCPEnable = true
-					h.logger.Info("auto-enable external MCP（）", zap.String("mcp", mcpName))
+					h.logger.Info("auto-enable external MCP()", zap.String("mcp", mcpName))
 				}
 
 				h.config.ExternalMCP.Servers[mcpName] = cfg
 			}
 
-			// sync update externalMCPMgr config， GetConfigs() returns
+			// sync update externalMCPMgr config, GetConfigs() returns
 			// update uniformly outside loop, avoid repeated calls
 			h.externalMCPMgr.LoadConfigs(&h.config.ExternalMCP)
 
-			// MCPstatus（，）
+			// MCPstatus(,)
 			for mcpName := range externalMCPToolMap {
 				cfg := h.config.ExternalMCP.Servers[mcpName]
 				// if MCP needs to be enabled, ensure client started
@@ -757,9 +757,9 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "config updated"})
 }
 
-// ApplyConfig apply config（load）
+// ApplyConfig apply config(load)
 func (h *ConfigHandler) ApplyConfig(c *gin.Context) {
-	// knowledge base（，）
+	// knowledge base(,)
 	var needInitKnowledge bool
 	var knowledgeInitializer KnowledgeInitializer
 
@@ -770,18 +770,18 @@ func (h *ConfigHandler) ApplyConfig(c *gin.Context) {
 	}
 	h.mu.RUnlock()
 
-	// knowledge base，（）
+	// knowledge base,()
 	if needInitKnowledge {
-		h.logger.Info("knowledge base，knowledge base")
+		h.logger.Info("knowledge base,knowledge base")
 		if _, err := knowledgeInitializer(); err != nil {
 			h.logger.Error("knowledge base", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "knowledge base: " + err.Error()})
 			return
 		}
-		h.logger.Info("knowledge base，")
+		h.logger.Info("knowledge base,")
 	}
 
-	// check if embedding model config changed（，）
+	// check if embedding model config changed(,)
 	var needReinitKnowledge bool
 	var reinitKnowledgeInitializer KnowledgeInitializer
 	h.mu.RLock()
@@ -794,7 +794,7 @@ func (h *ConfigHandler) ApplyConfig(c *gin.Context) {
 			currentEmbedding.APIKey != h.lastEmbeddingConfig.APIKey {
 			needReinitKnowledge = true
 			reinitKnowledgeInitializer = h.knowledgeInitializer
-			h.logger.Info("detected embedding model config change，knowledge base",
+			h.logger.Info("detected embedding model config change,knowledge base",
 				zap.String("old_model", h.lastEmbeddingConfig.Model),
 				zap.String("new_model", currentEmbedding.Model),
 				zap.String("old_base_url", h.lastEmbeddingConfig.BaseURL),
@@ -804,9 +804,9 @@ func (h *ConfigHandler) ApplyConfig(c *gin.Context) {
 	}
 	h.mu.RUnlock()
 
-	// knowledge base（），
+	// knowledge base(),
 	if needReinitKnowledge {
-		h.logger.Info("knowledge base（）")
+		h.logger.Info("knowledge base()")
 		if _, err := reinitKnowledgeInitializer(); err != nil {
 			h.logger.Error("knowledge base", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "knowledge base: " + err.Error()})
@@ -819,7 +819,7 @@ func (h *ConfigHandler) ApplyConfig(c *gin.Context) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	// knowledge base，record
+	// knowledge base,record
 	if needReinitKnowledge && h.config.Knowledge.Enabled {
 		h.lastEmbeddingConfig = &config.EmbeddingConfig{
 			Provider: h.config.Knowledge.Embedding.Provider,
@@ -830,7 +830,7 @@ func (h *ConfigHandler) ApplyConfig(c *gin.Context) {
 		h.logger.Info("record")
 	}
 
-	// re-register tools（status）
+	// re-register tools(status)
 	h.logger.Info("re-register tools")
 
 	// clear tools in MCP server
@@ -839,7 +839,7 @@ func (h *ConfigHandler) ApplyConfig(c *gin.Context) {
 	// re-register security tools
 	h.executor.RegisterTools(h.mcpServer)
 
-	// record（built-in tool, must register）
+	// record(built-in tool, must register)
 	if h.vulnerabilityToolRegistrar != nil {
 		h.logger.Info("record")
 		if err := h.vulnerabilityToolRegistrar(); err != nil {
@@ -849,7 +849,7 @@ func (h *ConfigHandler) ApplyConfig(c *gin.Context) {
 		}
 	}
 
-	// re-register WebShell tools（built-in tool, must register）
+	// re-register WebShell tools(built-in tool, must register)
 	if h.webshellToolRegistrar != nil {
 		h.logger.Info("re-register WebShell tools")
 		if err := h.webshellToolRegistrar(); err != nil {
@@ -859,7 +859,7 @@ func (h *ConfigHandler) ApplyConfig(c *gin.Context) {
 		}
 	}
 
-	// re-register Skills tools（built-in tool, must register）
+	// re-register Skills tools(built-in tool, must register)
 	if h.skillsToolRegistrar != nil {
 		h.logger.Info("re-register Skills tools")
 		if err := h.skillsToolRegistrar(); err != nil {
@@ -869,7 +869,7 @@ func (h *ConfigHandler) ApplyConfig(c *gin.Context) {
 		}
 	}
 
-	// knowledge base，knowledge base
+	// knowledge base,knowledge base
 	if h.config.Knowledge.Enabled && h.knowledgeToolRegistrar != nil {
 		h.logger.Info("knowledge base")
 		if err := h.knowledgeToolRegistrar(); err != nil {
@@ -892,7 +892,7 @@ func (h *ConfigHandler) ApplyConfig(c *gin.Context) {
 		h.logger.Info("AttackChainHandler config updated")
 	}
 
-	// retriever（knowledge base）
+	// retriever(knowledge base)
 	if h.config.Knowledge.Enabled && h.retrieverUpdater != nil {
 		retrievalConfig := &knowledge.RetrievalConfig{
 			TopK:                h.config.Knowledge.Retrieval.TopK,
@@ -907,7 +907,7 @@ func (h *ConfigHandler) ApplyConfig(c *gin.Context) {
 		)
 	}
 
-	// record（knowledge base）
+	// record(knowledge base)
 	if h.config.Knowledge.Enabled {
 		h.lastEmbeddingConfig = &config.EmbeddingConfig{
 			Provider: h.config.Knowledge.Embedding.Provider,
@@ -958,7 +958,7 @@ func (h *ConfigHandler) saveConfig() error {
 	updateKnowledgeConfig(root, h.config.Knowledge)
 	updateRobotsConfig(root, h.config.Robots)
 	updateMultiAgentConfig(root, h.config.MultiAgent)
-	// update external MCP config（external_mcp.go，）
+	// update external MCP config(external_mcp.go,)
 	// read original config for backward compatibility
 	originalConfigs := make(map[string]map[string]bool)
 	externalMCPNode := findMapValue(root, "external_mcp")
@@ -1324,7 +1324,7 @@ func setFloatInMap(mapNode *yaml.Node, key string, value float64) {
 	valueNode.Kind = yaml.ScalarNode
 	valueNode.Tag = "!!float"
 	valueNode.Style = 0
-	// for values between 0.0 and 1.0（hybrid_weight），use %.1f to ensure 0.0 is explicitly serialized as "0.0"
+	// for values between 0.0 and 1.0(hybrid_weight),use %.1f to ensure 0.0 is explicitly serialized as "0.0"
 	// for other values, use %g for auto format selection
 	if value >= 0.0 && value <= 1.0 {
 		valueNode.Value = fmt.Sprintf("%.1f", value)
@@ -1334,7 +1334,7 @@ func setFloatInMap(mapNode *yaml.Node, key string, value float64) {
 }
 
 // getExternalMCPTools get external MCP tool list (public method)
-// returns ToolConfigInfo list，statusdescription
+// returns ToolConfigInfo list,statusdescription
 func (h *ConfigHandler) getExternalMCPTools(ctx context.Context) []ToolConfigInfo {
 	var result []ToolConfigInfo
 
@@ -1342,20 +1342,20 @@ func (h *ConfigHandler) getExternalMCPTools(ctx context.Context) []ToolConfigInf
 		return result
 	}
 
-	// use shorter timeout（5），load
+	// use shorter timeout(5),load
 	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	externalTools, err := h.externalMCPMgr.GetAllTools(timeoutCtx)
 	if err != nil {
-		// record，continuereturns（）
-		h.logger.Warn("failed to get external MCP tools（），returns",
+		// record,continuereturns()
+		h.logger.Warn("failed to get external MCP tools(),returns",
 			zap.Error(err),
-			zap.String("hint", "MCP，status"),
+			zap.String("hint", "MCP,status"),
 		)
 	}
 
-	// got tools（error），continue
+	// got tools(error),continue
 	if len(externalTools) == 0 {
 		return result
 	}
@@ -1363,7 +1363,7 @@ func (h *ConfigHandler) getExternalMCPTools(ctx context.Context) []ToolConfigInf
 	externalMCPConfigs := h.externalMCPMgr.GetConfigs()
 
 	for _, externalTool := range externalTools {
-		// parse：mcpName::toolName
+		// parse:mcpName::toolName
 		mcpName, actualToolName := h.parseExternalToolName(externalTool.Name)
 		if mcpName == "" || actualToolName == "" {
 			continue // skipincorrectly formatted tool
@@ -1387,7 +1387,7 @@ func (h *ConfigHandler) getExternalMCPTools(ctx context.Context) []ToolConfigInf
 	return result
 }
 
-// parseExternalToolName parse（format：mcpName::toolName）
+// parseExternalToolName parse(format:mcpName::toolName)
 func (h *ConfigHandler) parseExternalToolName(fullName string) (mcpName, toolName string) {
 	idx := strings.Index(fullName, "::")
 	if idx > 0 {
@@ -1408,10 +1408,10 @@ func (h *ConfigHandler) calculateExternalToolEnabled(mcpName, toolName string, c
 		return false // MCP not enabled, all tools disabled
 	}
 
-	// MCP，status
-	// ToolEnabled，default（）
+	// MCP,status
+	// ToolEnabled,default()
 	if cfg.ToolEnabled == nil {
-		// status，default
+		// status,default
 	} else if toolEnabled, exists := cfg.ToolEnabled[toolName]; exists {
 		// status
 		if !toolEnabled {
@@ -1518,7 +1518,7 @@ func (h *ConfigHandler) testAnthropicAPI(c *gin.Context, client *http.Client, re
 	}
 	baseURL = strings.TrimRight(baseURL, "/")
 
-	// Minimal health-check request (1 token from Haiku — cheapest).
+	// Minimal health-check request (1 token from Haiku - cheapest).
 	body := []byte(`{"model":"claude-haiku-4-5-20251001","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}`)
 
 	httpReq, err := http.NewRequestWithContext(c.Request.Context(), http.MethodPost, baseURL+"/messages", bytes.NewReader(body))

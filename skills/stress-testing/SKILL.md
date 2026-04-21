@@ -23,9 +23,9 @@ curl -s localhost:9200/_cat/indices?v
 ```
 
 ### Cloudflare dashboard
-- Security > Events — watch for blocked requests
-- Analytics > Traffic — monitor request rate
-- Under Attack Mode — toggle during test
+- Security > Events - watch for blocked requests
+- Analytics > Traffic - monitor request rate
+- Under Attack Mode - toggle during test
 
 ## Gorgon Stress Tool
 
@@ -70,13 +70,13 @@ The tool exposes a web panel with:
 | CF variants | Cloudflare bypass resistance | Managed rules, Under Attack Mode |
 
 ### Test Phases
-1. **Baseline** (5 min) — measure normal performance metrics
-2. **Low intensity** (5 min) — single method, low concurrency
-3. **Medium intensity** (5 min) — increase workers
-4. **High intensity** (5 min) — full concurrency
-5. **Multi-vector** (5 min) — combine L4 + L7
-6. **Bypass test** (5 min) — CF/browser methods
-7. **Recovery** (10 min) — measure time to normal after stop
+1. **Baseline** (5 min) - measure normal performance metrics
+2. **Low intensity** (5 min) - single method, low concurrency
+3. **Medium intensity** (5 min) - increase workers
+4. **High intensity** (5 min) - full concurrency
+5. **Multi-vector** (5 min) - combine L4 + L7
+6. **Bypass test** (5 min) - CF/browser methods
+7. **Recovery** (10 min) - measure time to normal after stop
 
 ### Metrics to Capture Each Phase
 - Requests per second (RPS) at CDN

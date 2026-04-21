@@ -16,7 +16,7 @@ In CyberStrikeAI, `flaresolverr` is exposed as an API client wrapper that talks 
 
 ## Cookie Extraction Workflow (WAF Bypass)
 
-**Step 1 — Fetch cookies:**
+**Step 1 - Fetch cookies:**
 ```bash
 flaresolverr --url https://target.example --cookies-only
 ```
@@ -30,7 +30,7 @@ Output:
 }
 ```
 
-**Step 2 — Reuse with other tools:**
+**Step 2 - Reuse with other tools:**
 ```bash
 # curl
 curl -H "Cookie: cf_clearance=abc123; __cf_bm=xyz789" \

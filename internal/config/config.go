@@ -124,14 +124,14 @@ type OpenAIConfig struct {
 	SummaryAPIKey  string `yaml:"summary_api_key,omitempty" json:"summary_api_key,omitempty"`
 	MaxTotalTokens   int     `yaml:"max_total_tokens,omitempty" json:"max_total_tokens,omitempty"`
 	RateLimitDelayMs int     `yaml:"rate_limit_delay_ms,omitempty" json:"rate_limit_delay_ms,omitempty"`
-	// Main model sampling (orchestrator/planner — creative, exploratory)
+	// Main model sampling (orchestrator/planner - creative, exploratory)
 	Temperature      float64 `yaml:"temperature,omitempty" json:"temperature,omitempty"`               // 0.0-2.0 (0=default). Higher = more creative planning.
 	TopP             float64 `yaml:"top_p,omitempty" json:"top_p,omitempty"`                           // 0.0-1.0 (0=default).
 	TopK             int     `yaml:"top_k,omitempty" json:"top_k,omitempty"`                           // Anthropic only.
-	// Tool model sampling (executor — precise, deterministic)
+	// Tool model sampling (executor - precise, deterministic)
 	ToolTemperature  float64 `yaml:"tool_temperature,omitempty" json:"tool_temperature,omitempty"`     // 0.0-2.0 (0=inherit main). Lower = more precise tool args.
 	ToolTopP         float64 `yaml:"tool_top_p,omitempty" json:"tool_top_p,omitempty"`                 // 0.0-1.0 (0=inherit main).
-	// Summary model sampling (compressor — factual, concise)
+	// Summary model sampling (compressor - factual, concise)
 	SummaryTemperature float64 `yaml:"summary_temperature,omitempty" json:"summary_temperature,omitempty"` // 0.0-2.0 (0=inherit main). Low recommended for accurate summaries.
 	SummaryTopP        float64 `yaml:"summary_top_p,omitempty" json:"summary_top_p,omitempty"`             // 0.0-1.0 (0=inherit main).
 }
@@ -961,14 +961,14 @@ func Default() *Config {
 			},
 			Retrieval: RetrievalConfig{
 				TopK:                5,
-				SimilarityThreshold: 0.65, // lower threshold to 0.65，reduce missed detections
+				SimilarityThreshold: 0.65, // lower threshold to 0.65,reduce missed detections
 				HybridWeight:        0.7,
 			},
 			Indexing: IndexingConfig{
-				ChunkSize:        768, // increase to 768，better context preservation
+				ChunkSize:        768, // increase to 768,better context preservation
 				ChunkOverlap:     50,
 				MaxChunksPerItem: 20,  // limit each knowledge item to max 20 chunks, avoid excessive quota consumption
-				MaxRPM: 100, // default 100 RPM， 429 error
+				MaxRPM: 100, // default 100 RPM, 429 error
 				RateLimitDelayMs: 600, // 600ms interval, corresponding to 100 RPM
 				MaxRetries:       3,
 				RetryDelayMs:     1000,
@@ -986,23 +986,23 @@ type KnowledgeConfig struct {
 	Indexing  IndexingConfig  `yaml:"indexing,omitempty" json:"indexing,omitempty"` // index build config
 }
 
-// IndexingConfig index build config（knowledge base）
+// IndexingConfig index build config(knowledge base)
 type IndexingConfig struct {
 	// chunking config
-	ChunkSize        int `yaml:"chunk_size,omitempty" json:"chunk_size,omitempty"`                   // max tokens per chunk (estimated)，default 512
-	ChunkOverlap     int `yaml:"chunk_overlap,omitempty" json:"chunk_overlap,omitempty"`             // overlap tokens between chunks，default 50
-	MaxChunksPerItem int `yaml:"max_chunks_per_item,omitempty" json:"max_chunks_per_item,omitempty"` // ，0 
+	ChunkSize        int `yaml:"chunk_size,omitempty" json:"chunk_size,omitempty"`                   // max tokens per chunk (estimated),default 512
+	ChunkOverlap     int `yaml:"chunk_overlap,omitempty" json:"chunk_overlap,omitempty"`             // overlap tokens between chunks,default 50
+	MaxChunksPerItem int `yaml:"max_chunks_per_item,omitempty" json:"max_chunks_per_item,omitempty"` // ,0 
 
-	// rate limit config（to avoid API rate limits）
-	RateLimitDelayMs int `yaml:"rate_limit_delay_ms,omitempty" json:"rate_limit_delay_ms,omitempty"` // request interval time（），0 
-	MaxRPM int `yaml:"max_rpm,omitempty" json:"max_rpm,omitempty"` // ，0 
+	// rate limit config(to avoid API rate limits)
+	RateLimitDelayMs int `yaml:"rate_limit_delay_ms,omitempty" json:"rate_limit_delay_ms,omitempty"` // request interval time(),0 
+	MaxRPM int `yaml:"max_rpm,omitempty" json:"max_rpm,omitempty"` // ,0 
 
-	// retry config（error）
-	MaxRetries   int `yaml:"max_retries,omitempty" json:"max_retries,omitempty"`       // max retry count，default 3
-	RetryDelayMs int `yaml:"retry_delay_ms,omitempty" json:"retry_delay_ms,omitempty"` // retry delay（），default 1000
+	// retry config(error)
+	MaxRetries   int `yaml:"max_retries,omitempty" json:"max_retries,omitempty"`       // max retry count,default 3
+	RetryDelayMs int `yaml:"retry_delay_ms,omitempty" json:"retry_delay_ms,omitempty"` // retry delay(),default 1000
 
-	// batch processing config（，current，）
-	BatchSize int `yaml:"batch_size,omitempty" json:"batch_size,omitempty"` // ，0 
+	// batch processing config(,current,)
+	BatchSize int `yaml:"batch_size,omitempty" json:"batch_size,omitempty"` // ,0 
 }
 
 // EmbeddingConfig holds the embedding model configuration.

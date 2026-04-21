@@ -1,8 +1,8 @@
-// WebShell management（Behinder/AntSword：Virtual Terminal、File Manager、commandline）
+// WebShell management(Behinder/AntSword:Virtual Terminal,File Manager,commandline)
 
 const WEBSHELL_SIDEBAR_WIDTH_KEY = 'webshell_sidebar_width';
 const WEBSHELL_DEFAULT_SIDEBAR_WIDTH = 360;
-/** right sidearea（Terminal/File Manager）minwidth，avoidtoinbetweenwhendeformed */
+/** right sidearea(Terminal/File Manager)minwidth,avoidtoinbetweenwhendeformed */
 const WEBSHELL_MAIN_MIN_WIDTH = 380;
 const WEBSHELL_PROMPT = 'shell> ';
 let webshellConnections = [];
@@ -19,25 +19,25 @@ let webshellTerminalLogsByConn = {};
 let webshellTerminalSessionsByConn = {};
 let webshellPersistLoadedByConn = {};
 let webshellPersistSaveTimersByConn = {};
-// byconnectionSavecommandhistory，used foronunder
+// byconnectionSavecommandhistory,used foronunder
 let webshellHistoryByConn = {};
 let webshellHistoryIndex = -1;
 const WEBSHELL_HISTORY_MAX = 100;
-// clear screenin：timeclickonlylinetime（avoidmanytimebindorrepeattriggermany shell>）
+// clear screenin:timeclickonlylinetime(avoidmanytimebindorrepeattriggermany shell>)
 let webshellClearInProgress = false;
-// AI Assistant：byconnection ID Saveconversation ID，atmanyroundconversation
+// AI Assistant:byconnection ID Saveconversation ID,atmanyroundconversation
 let webshellAiConvMap = {};
 let webshellAiSending = false;
 let webshellDbConfigByConn = {};
 let webshellDirTreeByConn = {};
 let webshellDirExpandedByConn = {};
 let webshellDirLoadedByConn = {};
-// streaming：currentConversation's response ，used forinexpired's 
+// streaming:currentConversation's response ,used forinexpired's 
 let webshellStreamingTypingId = 0;
 let webshellProbeStatusById = {};
 let webshellBatchProbeRunning = false;
 
-/** andconversationpageconsistent：multi_agent.enabled andlocalmodeas multi whenuse /api/multi-agent/stream */
+/** andconversationpageconsistent:multi_agent.enabled andlocalmodeas multi whenuse /api/multi-agent/stream */
 function resolveWebshellAiStreamPath() {
     if (typeof apiFetch === 'undefined') {
         return Promise.resolve('/api/agent-loop/stream');
@@ -57,7 +57,7 @@ function resolveWebshellAiStreamPath() {
     });
 }
 
-// fromservice（SQLite）fetchConnection List
+// fromservice(SQLite)fetchConnection List
 function getWebshellConnections() {
     if (typeof apiFetch === 'undefined') {
         return Promise.resolve([]);
@@ -107,18 +107,18 @@ function wsT(key) {
         'webshell.dbPassword': 'Password',
         'webshell.dbName': 'Database Name',
         'webshell.dbSqlitePath': 'SQLite file path',
-        'webshell.dbSqlPlaceholder': 'input SQL，e.g.：SELECT version();',
+        'webshell.dbSqlPlaceholder': 'input SQL,e.g.:SELECT version();',
  'webshell.dbRunSql': 'line SQL',
         'webshell.dbTest': 'Test Connection',
         'webshell.dbOutput': 'Execution Output',
         'webshell.dbNoConn': 'Please select WebShell connection',
         'webshell.dbSqlRequired': 'Please enter SQL',
         'webshell.dbRunning': 'Database command executing, please wait',
-        'webshell.dbCliHint': 'If command not found, install the client on target host（mysql/psql/sqlite3/sqlcmd）',
+        'webshell.dbCliHint': 'If command not found, install the client on target host(mysql/psql/sqlite3/sqlcmd)',
         'webshell.dbExecFailed': 'Database execution failed',
         'webshell.dbSchema': 'Database Schema',
         'webshell.dbLoadSchema': 'load schema',
-        'webshell.dbNoSchema': 'no database schema，please load first',
+        'webshell.dbNoSchema': 'no database schema,please load first',
  'webshell.dbSelectTableHint': 'clickTablecanexpandcolumnInfogenerateQuery SQL',
  'webshell.dbNoColumns': 'nocolumnInfo',
         'webshell.dbResultTable': 'resulttable',
@@ -130,22 +130,22 @@ function wsT(key) {
         'webshell.dbSchemaLoaded': 'schema loaded',
         'webshell.dbAddProfile': 'add connection',
         'webshell.dbExecSuccess': 'SQL execution succeeded',
-        'webshell.dbNoOutput': 'execution complete（nooutput）',
+        'webshell.dbNoOutput': 'execution complete(nooutput)',
         'webshell.dbRenameProfile': 'Rename',
         'webshell.dbDeleteProfile': 'delete connection',
  'webshell.dbDeleteProfileConfirm': 'OKDeletethisdataconnectionconfiguration?',
         'webshell.dbProfileNamePrompt': 'Please enterconnection name',
         'webshell.dbProfileName': 'connection name',
  'webshell.dbProfiles': 'dataconnection',
-        'webshell.aiSystemReadyMessage': 'system ready。Enter your test requirements，System will automatically run security tests。',
-        'webshell.aiPlaceholder': 'e.g.：list files in current directory',
+        'webshell.aiSystemReadyMessage': 'system ready.Enter your test requirements,System will automatically run security tests.',
+        'webshell.aiPlaceholder': 'e.g.:list files in current directory',
         'webshell.aiSend': 'send',
         'webshell.aiMemo': 'Memo',
-        'webshell.aiMemoPlaceholder': 'record key commands、test approach、reproduction steps...',
+        'webshell.aiMemoPlaceholder': 'record key commands,test approach,reproduction steps...',
         'webshell.aiMemoClear': 'clear',
         'webshell.aiMemoSaving': 'Saving...',
         'webshell.aiMemoSaved': 'saved locally',
- 'webshell.terminalWelcome': 'WebShell Virtual Terminal — inputcommandafterbyenter keyline（Ctrl+L clear screen）',
+ 'webshell.terminalWelcome': 'WebShell Virtual Terminal - inputcommandafterbyenter keyline(Ctrl+L clear screen)',
         'webshell.quickCommands': 'quick command',
         'webshell.downloadFile': 'Download',
         'webshell.filePath': 'currentpath',
@@ -158,9 +158,9 @@ function wsT(key) {
         'webshell.parentDir': 'Updirectory',
         'webshell.execError': 'execution failed',
  'webshell.testConnectivity': 'Test',
-        'webshell.testSuccess': 'connectivity normal，Shell accessible',
+        'webshell.testSuccess': 'connectivity normal,Shell accessible',
         'webshell.testFailed': 'connectivity test failed',
- 'webshell.testNoExpectedOutput': 'Shell returnresponsebutnot yettooutput，pleasecheckconnectionPasswordandCommand Parameter Name',
+ 'webshell.testNoExpectedOutput': 'Shell returnresponsebutnot yettooutput,pleasecheckconnectionPasswordandCommand Parameter Name',
         'webshell.clearScreen': 'clear screen',
         'webshell.copyTerminalLog': 'copy log',
         'webshell.terminalIdle': 'idle',
@@ -169,7 +169,7 @@ function wsT(key) {
         'webshell.terminalCopyFail': 'Copy failed',
         'webshell.terminalNewWindow': 'newTerminal',
         'webshell.terminalWindowPrefix': 'Terminal',
-        'webshell.running': 'executing…',
+        'webshell.running': 'executing...',
         'webshell.waitFinish': 'pleasewaitcurrentcommandexecution complete',
         'webshell.newDir': 'create directory',
         'webshell.rename': 'Rename',
@@ -209,7 +209,7 @@ function wsTOr(key, fallbackText) {
     return text;
 }
 
-// globalonlybindtime：clear screen = Terminalre-create，onlyout shell>（not xterm.clear()，avoidsomethese under clear nottake effectorrepeatwrite）
+// globalonlybindtime:clear screen = Terminalre-create,onlyout shell>(not xterm.clear(),avoidsomethese under clear nottake effectorrepeatwrite)
 function bindWebshellClearOnce() {
     if (window._webshellClearBound) return;
     window._webshellClearBound = true;
@@ -235,12 +235,12 @@ function bindWebshellClearOnce() {
     }, true);
 }
 
-// WebShell linewithin/tool“Actions”under：clickmenuoutsideauto
+// WebShell linewithin/tool"Actions"under:clickmenuoutsideauto
 function bindWebshellActionMenusAutoCloseOnce() {
     if (window._webshellActionMenusAutoCloseBound) return;
     window._webshellActionMenusAutoCloseBound = true;
     document.addEventListener('click', function (e) {
- // onlyneedat details within，thenletbrowserlineswitch（open/close）
+ // onlyneedat details within,thenletbrowserlineswitch(open/close)
         var clickedInMenu = e.target && e.target.closest && (
             e.target.closest('details.webshell-conn-actions') ||
             e.target.closest('details.webshell-row-actions') ||
@@ -255,7 +255,7 @@ function bindWebshellActionMenusAutoCloseOnce() {
     }, true);
 }
 
-// initialize WebShell management page（from SQLite fetchConnection List）
+// initialize WebShell management page(from SQLite fetchConnection List)
 function initWebshellPage() {
     bindWebshellClearOnce();
     bindWebshellActionMenusAutoCloseOnce();
@@ -267,7 +267,7 @@ function initWebshellPage() {
     applyWebshellSidebarWidth();
     initWebshellSidebarResize();
 
- // connectionsearch：whenfilterConnection List
+ // connectionsearch:whenfilterConnection List
     var searchEl = document.getElementById('webshell-conn-search');
     if (searchEl && searchEl.dataset.bound !== '1') {
         searchEl.dataset.bound = '1';
@@ -352,7 +352,7 @@ function initWebshellSidebarResize() {
     });
 }
 
-// currentTerminalInstance（switchconnectionoropenpagewhen）
+// currentTerminalInstance(switchconnectionoropenpagewhen)
 function destroyWebshellTerminal() {
     if (webshellTerminalResizeObserver && webshellTerminalResizeContainer) {
         try { webshellTerminalResizeObserver.unobserve(webshellTerminalResizeContainer); } catch (e) {}
@@ -470,7 +470,7 @@ function probeWebshellConnection(conn) {
         .then(function (data) {
             var output = (data && data.output != null) ? String(data.output).trim() : '';
             var ok = !!(data && data.ok && output === '1');
-            if (ok) return { ok: true, message: wsT('webshell.testSuccess') || 'connectivity normal，Shell accessible' };
+            if (ok) return { ok: true, message: wsT('webshell.testSuccess') || 'connectivity normal,Shell accessible' };
             var msg = (data && data.error) ? data.error : (wsT('webshell.testFailed') || 'connectivity test failed');
             return { ok: false, message: msg };
         })
@@ -960,9 +960,9 @@ function webshellDbRenderTable(rawOutput) {
     }
     html += '</tbody></table>';
     if (rows.length > maxRows) {
-        html += '<div class="webshell-db-table-meta">onlydisplaybefore ' + maxRows + ' line，total ' + rows.length + ' line</div>';
+        html += '<div class="webshell-db-table-meta">onlydisplaybefore ' + maxRows + ' line,total ' + rows.length + ' line</div>';
     } else {
-        html += '<div class="webshell-db-table-meta">total ' + rows.length + ' line，' + header.length + ' column</div>';
+        html += '<div class="webshell-db-table-meta">total ' + rows.length + ' line,' + header.length + ' column</div>';
     }
     wrap.innerHTML = html;
     return true;
@@ -1223,13 +1223,13 @@ function simplifyWebshellAiError(rawMessage) {
     var lower = msg.toLowerCase();
     if ((lower.indexOf('401') !== -1 || lower.indexOf('unauthorized') !== -1) &&
         (lower.indexOf('api key') !== -1 || lower.indexOf('apikey') !== -1)) {
-        return 'authenticationFailed：API Key not yetconfigurationorinvalid（401）';
+        return 'authenticationFailed:API Key not yetconfigurationorinvalid(401)';
     }
     if (lower.indexOf('timeout') !== -1 || lower.indexOf('timed out') !== -1) {
- return 'requestexceedwhen，pleaseafterRetry';
+ return 'requestexceedwhen,pleaseafterRetry';
     }
     if (lower.indexOf('network') !== -1 || lower.indexOf('failed to fetch') !== -1) {
- return 'Abnormal，pleasecheckservice';
+ return 'Abnormal,pleasecheckservice';
     }
     return msg || 'Request failed';
 }
@@ -1261,7 +1261,7 @@ function isLikelyWebshellAiErrorMessage(content, msg) {
     var text = String(content || '').trim();
     if (!text) return false;
     var lower = text.toLowerCase();
-    if (/^(execution failed|Request failed|requestAbnormal|error)\s*[:：]/i.test(text)) return true;
+    if (/^(execution failed|Request failed|requestAbnormal|error)\s*[::]/i.test(text)) return true;
     if (/(status code\s*:\s*4\d{2}|unauthorized|forbidden|apikey|api key|invalid api key)/i.test(lower)) return true;
     if (/(noderunerror|tool[-_ ]?error|agent[-_ ]?error|execution failed)/i.test(lower)) return true;
     var details = msg && Array.isArray(msg.processDetails) ? msg.processDetails : [];
@@ -1284,7 +1284,7 @@ function webshellAgentPx(data) {
     return s ? ('[' + s + '] ') : '';
 }
 
-// based onbackendSave's processDetail buildrecordtimeitem's HTML（and appendTimelineItem displayconsistent）
+// based onbackendSave's processDetail buildrecordtimeitem's HTML(and appendTimelineItem displayconsistent)
 function buildWebshellTimelineItemFromDetail(detail) {
     var eventType = detail.eventType || '';
     var title = detail.message || '';
@@ -1343,7 +1343,7 @@ function buildWebshellTimelineItemFromDetail(detail) {
     return html;
 }
 
-// render「execution process and tool calls」collapse（collapsed by default，Refreshafterloadhistorywhenpreservecanexpand）
+// render"execution process and tool calls"collapse(collapsed by default,Refreshafterloadhistorywhenpreservecanexpand)
 function renderWebshellProcessDetailsBlock(processDetails, defaultCollapsed) {
     if (!processDetails || processDetails.length === 0) return null;
     var expandLabel = (typeof window.t === 'function') ? window.t('chat.expandDetail') : 'expand details';
@@ -1396,7 +1396,7 @@ function fetchAndRenderWebshellAiConvList(conn, listEl) {
                 delBtn.title = wsT('webshell.aiDeleteConversation') || 'delete conversation';
                 delBtn.addEventListener('click', function (e) {
                     e.stopPropagation();
-                    if (!confirm(wsT('webshell.aiDeleteConversationConfirm') || 'OKDeletethisconversation？')) return;
+                    if (!confirm(wsT('webshell.aiDeleteConversationConfirm') || 'OKDeletethisconversation?')) return;
                     var deletedId = item.id;
                     apiFetch('/api/conversations/' + encodeURIComponent(deletedId), { method: 'DELETE' })
                         .then(function (r) {
@@ -1457,7 +1457,7 @@ function webshellAiConvListSelect(conn, convId, messagesContainer, listEl) {
                 }
             });
             if (list.length === 0) {
-                var readyMsg = wsT('webshell.aiSystemReadyMessage') || 'system ready。Enter your test requirements，System will automatically run security tests。';
+                var readyMsg = wsT('webshell.aiSystemReadyMessage') || 'system ready.Enter your test requirements,System will automatically run security tests.';
                 var readyDiv = document.createElement('div');
                 readyDiv.className = 'webshell-ai-msg assistant';
                 readyDiv.textContent = readyMsg;
@@ -1468,7 +1468,7 @@ function webshellAiConvListSelect(conn, convId, messagesContainer, listEl) {
         .catch(function (e) { console.warn('failed to load conversation', e); });
 }
 
-// selectconnection：renderTerminal + File Manager Tab，initializeTerminal
+// selectconnection:renderTerminal + File Manager Tab,initializeTerminal
 function selectWebshell(id, stateReady) {
     currentWebshellId = id;
     renderWebshellList();
@@ -1560,7 +1560,7 @@ function selectWebshell(id, stateReady) {
         '<div class="webshell-ai-main">' +
         '<div id="webshell-ai-messages" class="webshell-ai-messages"></div>' +
         '<div class="webshell-ai-input-row">' +
-        '<textarea id="webshell-ai-input" class="webshell-ai-input form-control" rows="2" placeholder="' + (wsT('webshell.aiPlaceholder') || 'e.g.：list files in current directory') + '"></textarea>' +
+        '<textarea id="webshell-ai-input" class="webshell-ai-input form-control" rows="2" placeholder="' + (wsT('webshell.aiPlaceholder') || 'e.g.:list files in current directory') + '"></textarea>' +
         '<button type="button" class="btn-primary" id="webshell-ai-send">' + (wsT('webshell.aiSend') || 'send') + '</button>' +
         '</div>' +
         '</div>' +
@@ -1568,7 +1568,7 @@ function selectWebshell(id, stateReady) {
         '<div id="webshell-pane-memo" class="webshell-pane webshell-pane-memo">' +
         '<div class="webshell-memo-layout">' +
         '<div class="webshell-memo-head"><span>' + (wsT('webshell.aiMemo') || 'Memo') + '</span><button type="button" class="btn-ghost btn-sm" id="webshell-ai-memo-clear">' + (wsT('webshell.aiMemoClear') || 'clear') + '</button></div>' +
-        '<textarea id="webshell-ai-memo-input" class="webshell-memo-input form-control" rows="18" placeholder="' + (wsT('webshell.aiMemoPlaceholder') || 'record key commands、test approach、reproduction steps...') + '"></textarea>' +
+        '<textarea id="webshell-ai-memo-input" class="webshell-memo-input form-control" rows="18" placeholder="' + (wsT('webshell.aiMemoPlaceholder') || 'record key commands,test approach,reproduction steps...') + '"></textarea>' +
         '<div id="webshell-ai-memo-status" class="webshell-memo-status">' + (wsT('webshell.aiMemoSaved') || 'saved locally') + '</div>' +
         '</div>' +
         '</div>' +
@@ -1577,17 +1577,17 @@ function selectWebshell(id, stateReady) {
         '<div class="webshell-db-layout">' +
         '<aside class="webshell-db-sidebar">' +
         '<div class="webshell-db-sidebar-head"><span>' + (wsT('webshell.dbSchema') || 'Database Schema') + '</span><button type="button" class="btn-ghost btn-sm" id="webshell-db-load-schema-btn">' + (wsT('webshell.dbLoadSchema') || 'load schema') + '</button></div>' +
-        '<div id="webshell-db-schema-tree" class="webshell-db-schema-tree"><div class="webshell-empty">' + (wsT('webshell.dbNoSchema') || 'no database schema，please load first') + '</div></div>' +
+        '<div id="webshell-db-schema-tree" class="webshell-db-schema-tree"><div class="webshell-empty">' + (wsT('webshell.dbNoSchema') || 'no database schema,please load first') + '</div></div>' +
  '<div class="webshell-db-sidebar-hint">' + (wsT('webshell.dbSelectTableHint') || 'clickTablecangenerateQuery SQL') + '</div>' +
         '</aside>' +
         '<section class="webshell-db-main">' +
         '<div class="webshell-db-sql-tools"><button type="button" class="btn-ghost btn-sm" id="webshell-db-template-btn">' + (wsT('webshell.dbTemplateSql') || 'Example SQL') + '</button><button type="button" class="btn-ghost btn-sm" id="webshell-db-clear-btn">' + (wsT('webshell.dbClearSql') || 'clear SQL') + '</button></div>' +
-        '<textarea id="webshell-db-sql" class="webshell-db-sql form-control" rows="8" placeholder="' + (wsT('webshell.dbSqlPlaceholder') || 'input SQL，e.g.：SELECT version();') + '"></textarea>' +
+        '<textarea id="webshell-db-sql" class="webshell-db-sql form-control" rows="8" placeholder="' + (wsT('webshell.dbSqlPlaceholder') || 'input SQL,e.g.:SELECT version();') + '"></textarea>' +
         '<div class="webshell-db-actions">' +
         '<button type="button" class="btn-ghost" id="webshell-db-test-btn">' + (wsT('webshell.dbTest') || 'Test Connection') + '</button>' +
  '<button type="button" class="btn-primary" id="webshell-db-run-btn">' + (wsT('webshell.dbRunSql') || 'line SQL') + '</button>' +
         '</div>' +
-        '<div class="webshell-db-output-wrap"><div class="webshell-db-output-title">' + (wsT('webshell.dbOutput') || 'Execution Output') + '</div><div id="webshell-db-result-table" class="webshell-db-result-table"></div><pre id="webshell-db-output" class="webshell-db-output"></pre><div class="webshell-db-hint">' + (wsT('webshell.dbCliHint') || 'If command not found, install the client on target host（mysql/psql/sqlite3/sqlcmd）') + '</div></div>' +
+        '<div class="webshell-db-output-wrap"><div class="webshell-db-output-title">' + (wsT('webshell.dbOutput') || 'Execution Output') + '</div><div id="webshell-db-result-table" class="webshell-db-result-table"></div><pre id="webshell-db-output" class="webshell-db-output"></pre><div class="webshell-db-hint">' + (wsT('webshell.dbCliHint') || 'If command not found, install the client on target host(mysql/psql/sqlite3/sqlcmd)') + '</div></div>' +
         '<div id="webshell-db-profile-modal" class="modal">' +
         '<div class="modal-content webshell-db-profile-modal-content">' +
         '<div class="modal-header"><h2 id="webshell-db-profile-modal-title">' + (wsT('webshell.editConnectionTitle') || 'Edit Connection') + '</h2><span class="modal-close" id="webshell-db-profile-modal-close">&times;</span></div>' +
@@ -1625,10 +1625,10 @@ function selectWebshell(id, stateReady) {
         });
     });
 
-    // File Manager：columnoutdirectory、Updirectory
+    // File Manager:columnoutdirectory,Updirectory
     const pathInput = document.getElementById('webshell-file-path');
     document.getElementById('webshell-list-dir').addEventListener('click', function () {
-        // clickwhenusecurrentconnection，EditSaveafterimmediatelytake effect
+        // clickwhenusecurrentconnection,EditSaveafterimmediatelytake effect
         webshellFileListDir(webshellCurrentConn, pathInput ? pathInput.value.trim() || '.' : '.');
     });
     document.getElementById('webshell-parent-dir').addEventListener('click', function () {
@@ -1641,7 +1641,7 @@ function selectWebshell(id, stateReady) {
         webshellFileListDir(webshellCurrentConn, pathInput.value || '.');
     });
 
- // clear screen bindWebshellClearOnce unifiedeventprocess，thisno longerbind，avoidrepeatbindtimeclickoutmany shell>
+ // clear screen bindWebshellClearOnce unifiedeventprocess,thisno longerbind,avoidrepeatbindtimeclickoutmany shell>
     var terminalCopyLogBtn = document.getElementById('webshell-terminal-copy-log');
     if (terminalCopyLogBtn) {
         terminalCopyLogBtn.addEventListener('click', function () {
@@ -1670,14 +1670,14 @@ function selectWebshell(id, stateReady) {
         });
     }
     renderWebshellTerminalSessions(conn);
- // quick command：clickafterlineoutputtoTerminal
+ // quick command:clickafterlineoutputtoTerminal
     workspace.querySelectorAll('.webshell-quick-cmd').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var cmd = btn.getAttribute('data-cmd');
             if (cmd) runQuickCommand(cmd);
         });
     });
- // file：Refresh、create directory、newfile、on、batchActions
+ // file:Refresh,create directory,newfile,on,batchActions
     var filterInput = document.getElementById('webshell-file-filter');
     document.getElementById('webshell-file-refresh').addEventListener('click', function () {
         webshellFileListDir(webshellCurrentConn, pathInput ? pathInput.value.trim() || '.' : '.');
@@ -1691,7 +1691,7 @@ function selectWebshell(id, stateReady) {
     document.getElementById('webshell-batch-delete-btn').addEventListener('click', function () { webshellBatchDelete(webshellCurrentConn, pathInput); });
     document.getElementById('webshell-batch-download-btn').addEventListener('click', function () { webshellBatchDownload(webshellCurrentConn, pathInput); });
 
- // AI Assistant：sidebarconversationlist + message
+ // AI Assistant:sidebarconversationlist + message
     var aiInput = document.getElementById('webshell-ai-input');
     var aiSendBtn = document.getElementById('webshell-ai-send');
     var aiMessages = document.getElementById('webshell-ai-messages');
@@ -1747,7 +1747,7 @@ function selectWebshell(id, stateReady) {
             delete webshellAiConvMap[conn.id];
             if (aiMessages) {
                 aiMessages.innerHTML = '';
-                var readyMsg = wsT('webshell.aiSystemReadyMessage') || 'system ready。Enter your test requirements，System will automatically run security tests。';
+                var readyMsg = wsT('webshell.aiSystemReadyMessage') || 'system ready.Enter your test requirements,System will automatically run security tests.';
                 var div = document.createElement('div');
                 div.className = 'webshell-ai-msg assistant';
                 div.textContent = readyMsg;
@@ -1775,7 +1775,7 @@ function selectWebshell(id, stateReady) {
         });
     }
 
- // Database Manager：supportmanyconnection（differentDatabase Type）+ Refresh
+ // Database Manager:supportmanyconnection(differentDatabase Type)+ Refresh
     var dbTypeEl = document.getElementById('webshell-db-type');
     var dbRunBtn = document.getElementById('webshell-db-run-btn');
     var dbTestBtn = document.getElementById('webshell-db-test-btn');
@@ -1909,7 +1909,7 @@ function selectWebshell(id, stateReady) {
             openTableKeys[openDb + '::' + openTable] = true;
         });
         if (!dbs.length) {
-            dbSchemaTreeEl.innerHTML = '<div class="webshell-empty">' + escapeHtml(wsT('webshell.dbNoSchema') || 'no database schema，please load first') + '</div>';
+            dbSchemaTreeEl.innerHTML = '<div class="webshell-empty">' + escapeHtml(wsT('webshell.dbNoSchema') || 'no database schema,please load first') + '</div>';
             return;
         }
         var selectedDb = (cfg.selectedDatabase || '').trim();
@@ -2108,7 +2108,7 @@ function selectWebshell(id, stateReady) {
             webshellDbSetOutput(built.error || (wsT('webshell.dbSchemaFailed') || 'failed to load database schema'), true);
             return;
         }
-        webshellDbSetOutput(wsT('webshell.running') || 'executing…', false);
+        webshellDbSetOutput(wsT('webshell.running') || 'executing...', false);
         webshellRunning = true;
         setDbActionButtonsDisabled(true);
         execWebshellCommand(conn, built.command).then(function (out) {
@@ -2147,7 +2147,7 @@ function selectWebshell(id, stateReady) {
             webshellDbSetOutput(built.error || (wsT('webshell.dbExecFailed') || 'Database execution failed'), true);
             return;
         }
-        webshellDbSetOutput(wsT('webshell.running') || 'executing…', false);
+        webshellDbSetOutput(wsT('webshell.running') || 'executing...', false);
         webshellRunning = true;
         setDbActionButtonsDisabled(true);
         execWebshellCommand(conn, built.command).then(function (out) {
@@ -2183,7 +2183,7 @@ function selectWebshell(id, stateReady) {
                 saveWebshellDbConfig(conn, cfg);
                 webshellDbSetOutput(cfg.output, false);
             } else {
-                cfg.output = content || (wsT('webshell.dbNoOutput') || 'execution complete（nooutput）');
+                cfg.output = content || (wsT('webshell.dbNoOutput') || 'execution complete(nooutput)');
                 cfg.outputIsError = false;
                 saveWebshellDbConfig(conn, cfg);
                 webshellDbSetOutput(cfg.output, false);
@@ -2272,7 +2272,7 @@ function selectWebshell(id, stateReady) {
     initWebshellTerminal(conn);
 }
 
-// load WebShell connection's AI Assistantconversationhistory（display），return Promise for .then updatetooletc； processDetails whenrendercollapse's 「execution process and tool calls」
+// load WebShell connection's AI Assistantconversationhistory(display),return Promise for .then updatetooletc; processDetails whenrendercollapse's "execution process and tool calls"
 function loadWebshellAiHistory(conn, messagesContainer) {
     if (!conn || !conn.id || !messagesContainer) return Promise.resolve();
     if (typeof apiFetch !== 'function') return Promise.resolve();
@@ -2305,7 +2305,7 @@ function loadWebshellAiHistory(conn, messagesContainer) {
                 }
             });
             if (list.length === 0) {
-                var readyMsg = wsT('webshell.aiSystemReadyMessage') || 'system ready。Enter your test requirements，System will automatically run security tests。';
+                var readyMsg = wsT('webshell.aiSystemReadyMessage') || 'system ready.Enter your test requirements,System will automatically run security tests.';
                 var readyDiv = document.createElement('div');
                 readyDiv.className = 'webshell-ai-msg assistant';
                 readyDiv.textContent = readyMsg;
@@ -2327,7 +2327,7 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
         if (messagesContainer) {
             var errDiv = document.createElement('div');
             errDiv.className = 'webshell-ai-msg assistant';
-            errDiv.textContent = 'cannotsend：not yetloginor apiFetch notavailable';
+            errDiv.textContent = 'cannotsend:not yetloginor apiFetch notavailable';
             messagesContainer.appendChild(errDiv);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
@@ -2348,7 +2348,7 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
 
     var assistantDiv = document.createElement('div');
     assistantDiv.className = 'webshell-ai-msg assistant';
-    assistantDiv.textContent = '…';
+    assistantDiv.textContent = '...';
     messagesContainer.appendChild(timelineContainer);
     messagesContainer.appendChild(assistantDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -2379,7 +2379,7 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                         '</pre></div></div>';
                 }
             } catch (e) {
- // JSON Parse failedwhenignoreparameterdetails，avoid
+ // JSON Parse failedwhenignoreparameterdetails,avoid
             }
         } else if (type === 'eino_agent_reply' && message) {
             html += '<div class="webshell-ai-timeline-msg"><pre style="white-space:pre-wrap;">' + escapeHtml(message) + '</pre></div>';
@@ -2424,9 +2424,9 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
         conversationId: convId
     };
 
- // streamingoutput：support progress whenupdate、response ；ifbackendsendmany response then
- var streamingTarget = ''; // currentneedShow 's Target（used for）
- var streamingTypingId = 0; // in，eachtimenew response add
+ // streamingoutput:support progress whenupdate,response ;ifbackendsendmany response then
+ var streamingTarget = ''; // currentneedShow 's Target(used for)
+ var streamingTypingId = 0; // in,eachtimenew response add
 
     resolveWebshellAiStreamPath().then(function (streamPath) {
         return apiFetch(streamPath, {
@@ -2455,7 +2455,7 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                 try {
                     var eventData = JSON.parse(line.slice(6));
                     if (eventData.type === 'conversation' && eventData.data && eventData.data.conversationId) {
- // first conversationId out，avoidafterasynccallbackin eventData byaftereventoverride undefined throw error
+ // first conversationId out,avoidafterasynccallbackin eventData byaftereventoverride undefined throw error
                         var convId = eventData.data.conversationId;
                         webshellAiConvMap[conn.id] = convId;
                         var listEl = document.getElementById('webshell-ai-conv-list');
@@ -2468,7 +2468,7 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                         streamingTarget = '';
                         webshellStreamingTypingId += 1;
                         streamingTypingId = webshellStreamingTypingId;
-                        assistantDiv.textContent = '…';
+                        assistantDiv.textContent = '...';
                         messagesContainer.scrollTop = messagesContainer.scrollHeight;
                     } else if (eventData.type === 'response_delta') {
                         var deltaText = (eventData.message != null && eventData.message !== '') ? String(eventData.message) : '';
@@ -2481,7 +2481,7 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                     } else if (eventData.type === 'response') {
                         var text = (eventData.message != null && eventData.message !== '') ? eventData.message : (eventData.data && typeof eventData.data === 'string' ? eventData.data : '');
                         if (text) {
-                            // response asfinalcompletecontent：avoidandincrementalrepeatconcatenate
+                            // response asfinalcompletecontent:avoidandincrementalrepeatconcatenate
                             streamingTarget = String(text);
                             webshellStreamingTypingId += 1;
                             streamingTypingId = webshellStreamingTypingId;
@@ -2497,7 +2497,7 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                             ? window.translateProgressMessage(eventData.message)
                             : eventData.message;
                         appendTimelineItem('progress', '🔍 ' + progressMsg, '', eventData.data);
-                        if (!streamingTarget) assistantDiv.textContent = '…';
+                        if (!streamingTarget) assistantDiv.textContent = '...';
                     } else if (eventData.type === 'iteration') {
                         var iterN = (eventData.data && eventData.data.iteration) || 0;
                         var iterTitle = (typeof window.t === 'function')
@@ -2508,19 +2508,19 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                             iterMessage = window.translateProgressMessage(iterMessage);
                         }
                         appendTimelineItem('iteration', '🔍 ' + iterTitle, iterMessage, eventData.data);
-                        if (!streamingTarget) assistantDiv.textContent = '…';
+                        if (!streamingTarget) assistantDiv.textContent = '...';
                     } else if (eventData.type === 'thinking' && eventData.message) {
                         var thinkLabel = (typeof window.t === 'function') ? window.t('chat.aiThinking') : 'AI thinking';
                         var thinkD = eventData.data || {};
                         appendTimelineItem('thinking', webshellAgentPx(thinkD) + '🤔 ' + thinkLabel, eventData.message, thinkD);
-                        if (!streamingTarget) assistantDiv.textContent = '…';
+                        if (!streamingTarget) assistantDiv.textContent = '...';
                     } else if (eventData.type === 'tool_calls_detected' && eventData.data) {
                         var count = eventData.data.count || 0;
                         var detectedLabel = (typeof window.t === 'function')
                             ? window.t('chat.toolCallsDetected', { count: count })
                             : ('detected ' + count + ' tool calls');
                         appendTimelineItem('tool_calls_detected', webshellAgentPx(eventData.data) + '🔧 ' + detectedLabel, eventData.message || '', eventData.data);
-                        if (!streamingTarget) assistantDiv.textContent = '…';
+                        if (!streamingTarget) assistantDiv.textContent = '...';
                     } else if (eventData.type === 'tool_call' && eventData.data) {
                         var d = eventData.data;
                         var tn = d.toolName || 'unknown tool';
@@ -2531,7 +2531,7 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                             : ('call: ' + tn + (total ? ' (' + idx + '/' + total + ')' : ''));
                         var title = webshellAgentPx(d) + '🔧 ' + callTitle;
                         appendTimelineItem('tool_call', title, eventData.message || '', eventData.data);
-                        if (!streamingTarget) assistantDiv.textContent = '…';
+                        if (!streamingTarget) assistantDiv.textContent = '...';
                     } else if (eventData.type === 'tool_result' && eventData.data) {
                         var dr = eventData.data;
                         var success = dr.success !== false;
@@ -2542,7 +2542,7 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                         var title = webshellAgentPx(dr) + (success ? '✅ ' : '❌ ') + titleText;
                         var sub = eventData.message || (dr.result ? String(dr.result).slice(0, 300) : '');
                         appendTimelineItem('tool_result', title, sub, eventData.data);
-                        if (!streamingTarget) assistantDiv.textContent = '…';
+                        if (!streamingTarget) assistantDiv.textContent = '...';
                     } else if (eventData.type === 'eino_agent_reply_stream_start' && eventData.data && eventData.data.streamId) {
                         var rdS = eventData.data;
                         var repTS = (typeof window.t === 'function') ? window.t('chat.einoAgentReplyTitle') : 'sub-agent reply';
@@ -2553,7 +2553,7 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                         timelineContainer.appendChild(itemS);
                         timelineContainer.classList.add('has-items');
                         einoSubReplyStreams.set(rdS.streamId, { el: itemS, buf: '' });
-                        if (!streamingTarget) assistantDiv.textContent = '…';
+                        if (!streamingTarget) assistantDiv.textContent = '...';
                     } else if (eventData.type === 'eino_agent_reply_stream_delta' && eventData.data && eventData.data.streamId) {
                         var stD = einoSubReplyStreams.get(eventData.data.streamId);
                         if (stD) {
@@ -2567,7 +2567,7 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                             }
                             preD.textContent = stD.buf;
                         }
-                        if (!streamingTarget) assistantDiv.textContent = '…';
+                        if (!streamingTarget) assistantDiv.textContent = '...';
                     } else if (eventData.type === 'eino_agent_reply_stream_end' && eventData.data && eventData.data.streamId) {
                         var stE = einoSubReplyStreams.get(eventData.data.streamId);
                         if (stE) {
@@ -2586,12 +2586,12 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                             preE.textContent = fullE;
                             einoSubReplyStreams.delete(eventData.data.streamId);
                         }
-                        if (!streamingTarget) assistantDiv.textContent = '…';
+                        if (!streamingTarget) assistantDiv.textContent = '...';
                     } else if (eventData.type === 'eino_agent_reply' && eventData.message) {
                         var rd = eventData.data || {};
                         var replyT = (typeof window.t === 'function') ? window.t('chat.einoAgentReplyTitle') : 'sub-agent reply';
                         appendTimelineItem('eino_agent_reply', webshellAgentPx(rd) + '💬 ' + replyT, eventData.message, rd);
-                        if (!streamingTarget) assistantDiv.textContent = '…';
+                        if (!streamingTarget) assistantDiv.textContent = '...';
                     }
                 } catch (e) { /* ignore parse error */ }
             }
@@ -2603,11 +2603,11 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
     }).then(function () {
         webshellAiSending = false;
         if (sendBtn) sendBtn.disabled = false;
-        if (assistantDiv.textContent === '…' && !streamingTarget) {
- // has response content，maintaintexthint
+        if (assistantDiv.textContent === '...' && !streamingTarget) {
+ // has response content,maintaintexthint
             assistantDiv.textContent = 'noReplycontent';
         } else if (streamingTarget) {
- // streamingEnd：firstcurrentloop，avoidafter tick HTML overridetext
+ // streamingEnd:firstcurrentloop,avoidafter tick HTML overridetext
             webshellStreamingTypingId += 1;
             // thenuse Markdown rendercompletecontent
             if (typeof formatMarkdown === 'function') {
@@ -2616,7 +2616,7 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                 assistantDiv.textContent = streamingTarget;
             }
         }
- // generateresultafter：willlinethroughcollapsepreserve，forafterview；unifiedat「AssistantReplyunder」（andRefreshafterloadhistoryconsistent，）
+ // generateresultafter:willlinethroughcollapsepreserve,forafterview;unifiedat"AssistantReplyunder"(andRefreshafterloadhistoryconsistent,)
         if (timelineContainer && timelineContainer.classList.contains('has-items') && !timelineContainer.closest('.webshell-ai-process-block')) {
             var headerLabel = (typeof window.t === 'function') ? (window.t('chat.penetrationTestDetail') || 'execution process and tool calls') : 'execution process and tool calls';
             var wrap = document.createElement('div');
@@ -2639,7 +2639,7 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
     });
 }
 
-// ：will target /write el，onlytake effectatcurrent id 's call
+// :will target /write el,onlytake effectatcurrent id 's call
 function runWebshellAiStreamingTyping(el, target, id, scrollContainer) {
     if (!el || id === undefined) return;
     var chunkSize = 3;
@@ -2704,12 +2704,12 @@ function runQuickCommand(cmd) {
     });
 }
 
-// ---------- Virtual Terminal（xterm + bylineline） ----------
+// ---------- Virtual Terminal(xterm + bylineline) ----------
 function initWebshellTerminal(conn) {
     const container = document.getElementById('webshell-terminal-container');
     if (!container || typeof Terminal === 'undefined') {
         if (container) {
-            container.innerHTML = '<p class="terminal-error">' + escapeHtml('not loaded xterm.js，pleaseRefreshpage') + '</p>';
+            container.innerHTML = '<p class="terminal-error">' + escapeHtml('not loaded xterm.js,pleaseRefreshpage') + '</p>';
         }
         return;
     }
@@ -2738,7 +2738,7 @@ function initWebshellTerminal(conn) {
     }
 
     term.open(container);
- // first fit thencontent，avoidnot yetcalculatesizewhen/
+ // first fit thencontent,avoidnot yetcalculatesizewhen/
     try {
         if (fitAddon) fitAddon.fit();
     } catch (e) {}
@@ -2748,12 +2748,12 @@ function initWebshellTerminal(conn) {
     var terminalKey = getWebshellTerminalSessionKey(connId, sessionId);
     var cachedLog = getWebshellTerminalLog(terminalKey);
     if (cachedLog) {
- // xterm restorecontentwhenunifieduse CRLF，avoidswitchwindowafterout“”
+ // xterm restorecontentwhenunifieduse CRLF,avoidswitchwindowafterout""
         term.write(String(cachedLog).replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n/g, '\r\n'));
     }
     term.write(WEBSHELL_PROMPT);
 
- // bylinewriteoutput，andsystemsettingsTerminal writeOutput consistent，avoid ls etcoutput
+ // bylinewriteoutput,andsystemsettingsTerminal writeOutput consistent,avoid ls etcoutput
     function writeWebshellOutput(term, text, isError) {
         if (!term || !text) return;
         var s = String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -2777,7 +2777,7 @@ function initWebshellTerminal(conn) {
             clearWebshellTerminalLog(terminalKey);
             return;
         }
- // Ctrl+C：currentnotsupportin，toouthintgo back toprompt
+ // Ctrl+C:currentnotsupportin,toouthintgo back toprompt
         if (data === '\x03') {
             if (webshellTerminalRunning) {
  writeWebshellOutput(term, '^C (currentVersionnotsupportincommand)', true);
@@ -2788,13 +2788,13 @@ function initWebshellTerminal(conn) {
             term.write(WEBSHELL_PROMPT);
             return;
         }
-        // Ctrl+U：clearcurrentinputline
+        // Ctrl+U:clearcurrentinputline
         if (data === '\x15') {
             webshellLineBuffer = '';
             term.write('\x1b[2K\r' + WEBSHELL_PROMPT);
             return;
         }
- // on/under：commandhistory
+ // on/under:commandhistory
         if (data === '\x1b[A' || data === '\x1bOA') {
             var hist = getWebshellHistory(terminalKey);
             if (hist.length === 0) return;
@@ -2812,7 +2812,7 @@ function initWebshellTerminal(conn) {
             term.write('\x1b[2K\r' + WEBSHELL_PROMPT + webshellLineBuffer);
             return;
         }
- // enter key：sendcurrentlinetobackendline
+ // enter key:sendcurrentlinetobackendline
         if (data === '\r' || data === '\n') {
             term.writeln('');
             var cmd = webshellLineBuffer.trim();
@@ -2853,7 +2853,7 @@ function initWebshellTerminal(conn) {
             }
             return;
         }
- // manylinepaste：bylinetimeline
+ // manylinepaste:bylinetimeline
         if (data.indexOf('\n') !== -1 || data.indexOf('\r') !== -1) {
             var full = (webshellLineBuffer + data).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             var lines = full.split('\n');
@@ -2910,11 +2910,11 @@ function initWebshellTerminal(conn) {
 
     webshellTerminalInstance = term;
     webshellTerminalFitAddon = fitAddon;
- // delaythentime fit，ensurecontainersizeafterandnot
+ // delaythentime fit,ensurecontainersizeafterandnot
     setTimeout(function () {
         try { if (fitAddon) fitAddon.fit(); } catch (e) {}
     }, 100);
- // containersizechangewhenre- fit，avoid/by
+ // containersizechangewhenre- fit,avoid/by
     if (fitAddon && typeof ResizeObserver !== 'undefined' && container) {
         webshellTerminalResizeContainer = container;
         webshellTerminalResizeObserver = new ResizeObserver(function () {
@@ -3029,7 +3029,7 @@ function parseWebshellListItems(rawOutput) {
     for (var i = 0; i < lines.length; i++) {
         var line = lines[i];
         var trimmedLine = String(line || '').trim();
- // `ls -la` linecommon "total 12"（inas "Total 12"），notisfileitem。
+ // `ls -la` linecommon "total 12"(inas "Total 12"),notisfileitem.
         if (/^(total|Total)\s+\d+$/i.test(trimmedLine)) continue;
         var name = '';
         var isDir = false;
@@ -3109,7 +3109,7 @@ function renderFileList(listEl, currentPath, rawOutput, conn, nameFilter) {
     renderDirectoryTree(currentPath, items, conn);
     var html = '';
     if (items.length === 0) {
- // directoryasempty/filterafterasemptywhen，tooutemptystatus，avoid tbody “big”
+ // directoryasempty/filterafterasemptywhen,tooutemptystatus,avoid tbody "big"
         if (rawOutput.trim() && !nameFilter) {
             html = '<pre class="webshell-file-raw">' + escapeHtml(rawOutput) + '</pre>';
         } else {
@@ -3162,7 +3162,7 @@ function renderFileList(listEl, currentPath, rawOutput, conn, nameFilter) {
                 if (pathInput) pathInput.value = path;
                 webshellFileListDir(webshellCurrentConn, path);
             } else {
- // openfilewhenpreservecurrent“Browsedirectory”onunder，avoidreturnwhentofile
+ // openfilewhenpreservecurrent"Browsedirectory"onunder,avoidreturnwhentofile
                 webshellFileRead(webshellCurrentConn, path, listEl, currentPath);
             }
         });
@@ -3235,7 +3235,7 @@ function renderDirectoryTree(currentPath, items, conn) {
     if (!tree['.']) tree['.'] = [];
     if (expanded['.'] !== false) expanded['.'] = true;
 
- // currentdirectory's item（directory+file）synctocache
+ // currentdirectory's item(directory+file)synctocache
     var childNodes = (items || []).map(function (item) {
         var childPath = curr === '.' ? normalizeWebshellPath(item.name) : normalizeWebshellPath(curr + '/' + item.name);
         return {
@@ -3245,7 +3245,7 @@ function renderDirectoryTree(currentPath, items, conn) {
         };
     }).filter(function (n) { return !!n.path; });
     childNodes.sort(function (a, b) {
-        // directoryprefer，thenbynamesort
+        // directoryprefer,thenbynamesort
         if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
         return (a.name || '').localeCompare(b.name || '');
     });
@@ -3389,7 +3389,7 @@ function webshellFileNewFile(conn, pathInput) {
  var name = prompt(wsT('webshell.newFile') || 'newfile', 'newfile.txt');
     if (name == null || !name.trim()) return;
     var path = base === '.' ? name.trim() : base + '/' + name.trim();
-    var content = prompt('initialcontent（optional）', '');
+    var content = prompt('initialcontent(optional)', '');
     if (content === null) return;
     var listEl = document.getElementById('webshell-file-list');
     webshellFileWrite(conn, path, content || '', function () { webshellFileListDir(conn, base); }, listEl);
@@ -3455,8 +3455,8 @@ function webshellBatchDelete(conn, pathInput) {
     var checked = listEl ? listEl.querySelectorAll('.webshell-file-cb:checked') : [];
     var paths = [];
     checked.forEach(function (cb) { paths.push(cb.getAttribute('data-path')); });
- if (paths.length === 0) { alert(wsT('webshell.batchDelete') + '：pleasefirstfile'); return; }
-    if (!confirm(wsT('webshell.batchDelete') + '：OKDelete ' + paths.length + ' file？')) return;
+ if (paths.length === 0) { alert(wsT('webshell.batchDelete') + ':pleasefirstfile'); return; }
+    if (!confirm(wsT('webshell.batchDelete') + ':OKDelete ' + paths.length + ' file?')) return;
     var base = (pathInput && pathInput.value.trim()) || '.';
     var i = 0;
     function delNext() {
@@ -3472,11 +3472,11 @@ function webshellBatchDownload(conn, pathInput) {
     var checked = listEl ? listEl.querySelectorAll('.webshell-file-cb:checked') : [];
     var paths = [];
     checked.forEach(function (cb) { paths.push(cb.getAttribute('data-path')); });
- if (paths.length === 0) { alert(wsT('webshell.batchDownload') + '：pleasefirstfile'); return; }
+ if (paths.length === 0) { alert(wsT('webshell.batchDownload') + ':pleasefirstfile'); return; }
     paths.forEach(function (path) { webshellFileDownload(conn, path); });
 }
 
-// Downloadfiletolocal（readcontentaftertriggerbrowserDownload）
+// Downloadfiletolocal(readcontentaftertriggerbrowserDownload)
 function webshellFileDownload(conn, path) {
     if (typeof apiFetch === 'undefined') return;
     apiFetch('/api/webshell/file', {
@@ -3509,7 +3509,7 @@ function webshellFileRead(conn, path, listEl, browsePath) {
             const out = (data && data.output) ? data.output : (data.error || '');
             var backPath = (browsePath && String(browsePath).trim()) ? String(browsePath).trim() : ((document.getElementById('webshell-file-path') && document.getElementById('webshell-file-path').value.trim()) || '.');
             if (backPath === path) {
- // ：ifpathbyfile path，fallbacktodirectory
+ // :ifpathbyfile path,fallbacktodirectory
                 backPath = path.replace(/\/[^/]+$/, '') || '.';
             }
             listEl.innerHTML = '<div class="webshell-file-content"><pre>' + escapeHtml(out) + '</pre><button type="button" class="btn-ghost" id="webshell-file-back-btn" data-back-path="' + escapeHtml(backPath) + '">' + wsT('webshell.back') + '</button></div>';
@@ -3593,12 +3593,12 @@ function webshellFileDelete(conn, path, onDone) {
         .catch(function () { if (onDone) onDone(); });
 }
 
-// delete connection（requestserviceafter deletionRefreshlist）
+// delete connection(requestserviceafter deletionRefreshlist)
 function deleteWebshell(id) {
     if (!confirm(wsT('webshell.deleteConfirm'))) return;
     if (currentWebshellId === id) destroyWebshellTerminal();
     if (currentWebshellId === id) currentWebshellId = null;
- // cleanuplocalcache（servicewillDelete SQLite in's status）
+ // cleanuplocalcache(servicewillDelete SQLite in's status)
     delete webshellPersistLoadedByConn[id];
     if (webshellPersistSaveTimersByConn[id]) {
         clearTimeout(webshellPersistSaveTimersByConn[id]);
@@ -3646,7 +3646,7 @@ function showAddWebshellModal() {
     if (modal) modal.style.display = 'block';
 }
 
-// openEdit Connectionpopup（currentconnectionInfo）
+// openEdit Connectionpopup(currentconnectionInfo)
 function showEditWebshellModal(connId) {
     var conn = webshellConnections.find(function (c) { return c.id === connId; });
     if (!conn) return;
@@ -3672,7 +3672,7 @@ function closeWebshellModal() {
     if (modal) modal.style.display = 'none';
 }
 
-// languageswitchwhenRefresh WebShell pagewithinall JS generate's text（notrebuildTerminal）
+// languageswitchwhenRefresh WebShell pagewithinall JS generate's text(notrebuildTerminal)
 function refreshWebshellUIOnLanguageChange() {
     var page = typeof window.currentPage === 'function' ? window.currentPage() : (window.currentPage || '');
     if (page !== 'webshell') return;
@@ -3683,7 +3683,7 @@ function refreshWebshellUIOnLanguageChange() {
         if (!currentWebshellId || !webshellCurrentConn) {
             workspace.innerHTML = '<div class="webshell-workspace-placeholder" data-i18n="webshell.selectOrAdd">' + wsT('webshell.selectOrAdd') + '</div>';
         } else {
-            // onlyupdatetabtext，notrebuildTerminal
+            // onlyupdatetabtext,notrebuildTerminal
             var tabTerminal = workspace.querySelector('.webshell-tab[data-tab="terminal"]');
             var tabFile = workspace.querySelector('.webshell-tab[data-tab="file"]');
             var tabAi = workspace.querySelector('.webshell-tab[data-tab="ai"]');
@@ -3719,7 +3719,7 @@ function refreshWebshellUIOnLanguageChange() {
             if (fileMoreActionsBtn) fileMoreActionsBtn.textContent = wsT('webshell.moreActions') || 'More actions';
             if (listDirBtn) listDirBtn.textContent = wsT('webshell.listDir');
             if (parentDirBtn) parentDirBtn.textContent = wsT('webshell.parentDir');
- // File Managertoolbutton（area）：switchlanguagewhenimmediatelyupdate
+ // File Managertoolbutton(area):switchlanguagewhenimmediatelyupdate
             var refreshBtn = document.getElementById('webshell-file-refresh');
             var mkdirBtn = document.getElementById('webshell-mkdir-btn');
             var newFileBtn = document.getElementById('webshell-newfile-btn');
@@ -3735,11 +3735,11 @@ function refreshWebshellUIOnLanguageChange() {
             if (batchDownloadBtn) batchDownloadBtn.textContent = wsT('webshell.batchDownload') || 'batch download';
             if (filterInput) filterInput.placeholder = wsT('webshell.filterPlaceholder') || 'filter filenames';
 
-            // AI Assistantareatext：Tab withinbutton、placeholder、systemreadyhint
+            // AI Assistantareatext:Tab withinbutton,placeholder,systemreadyhint
             var aiNewConvBtn = document.getElementById('webshell-ai-new-conv');
             if (aiNewConvBtn) aiNewConvBtn.textContent = wsT('webshell.aiNewConversation') || 'newconversation';
             var aiInput = document.getElementById('webshell-ai-input');
-            if (aiInput) aiInput.placeholder = wsT('webshell.aiPlaceholder') || 'e.g.：list files in current directory';
+            if (aiInput) aiInput.placeholder = wsT('webshell.aiPlaceholder') || 'e.g.:list files in current directory';
             var aiSendBtn = document.getElementById('webshell-ai-send');
             if (aiSendBtn) aiSendBtn.textContent = wsT('webshell.aiSend') || 'send';
             var aiMemoTitle = document.querySelector('.webshell-memo-head span');
@@ -3747,7 +3747,7 @@ function refreshWebshellUIOnLanguageChange() {
             var aiMemoClearBtn = document.getElementById('webshell-ai-memo-clear');
             if (aiMemoClearBtn) aiMemoClearBtn.textContent = wsT('webshell.aiMemoClear') || 'clear';
             var aiMemoInput = document.getElementById('webshell-ai-memo-input');
-            if (aiMemoInput) aiMemoInput.placeholder = wsT('webshell.aiMemoPlaceholder') || 'record key commands、test approach、reproduction steps...';
+            if (aiMemoInput) aiMemoInput.placeholder = wsT('webshell.aiMemoPlaceholder') || 'record key commands,test approach,reproduction steps...';
             var aiMemoStatus = document.getElementById('webshell-ai-memo-status');
             if (aiMemoStatus && !aiMemoStatus.classList.contains('error')) {
                 var savingText = wsT('webshell.aiMemoSaving') || 'Saving...';
@@ -3783,11 +3783,11 @@ function refreshWebshellUIOnLanguageChange() {
             var dbTestBtn = document.getElementById('webshell-db-test-btn');
             if (dbTestBtn) dbTestBtn.textContent = wsT('webshell.dbTest') || 'Test Connection';
             var dbSql = document.getElementById('webshell-db-sql');
-            if (dbSql) dbSql.placeholder = wsT('webshell.dbSqlPlaceholder') || 'input SQL，e.g.：SELECT version();';
+            if (dbSql) dbSql.placeholder = wsT('webshell.dbSqlPlaceholder') || 'input SQL,e.g.:SELECT version();';
             var dbTitle = document.querySelector('.webshell-db-output-title');
             if (dbTitle) dbTitle.textContent = wsT('webshell.dbOutput') || 'Execution Output';
             var dbHint = document.querySelector('.webshell-db-hint');
-            if (dbHint) dbHint.textContent = wsT('webshell.dbCliHint') || 'If command not found, install the client on target host（mysql/psql/sqlite3/sqlcmd）';
+            if (dbHint) dbHint.textContent = wsT('webshell.dbCliHint') || 'If command not found, install the client on target host(mysql/psql/sqlite3/sqlcmd)';
             var dbTreeHint = document.querySelector('.webshell-db-sidebar-hint');
  if (dbTreeHint) dbTreeHint.textContent = wsT('webshell.dbSelectTableHint') || 'clickTablecangenerateQuery SQL';
             var dbAddProfileBtn = document.getElementById('webshell-db-add-profile-btn');
@@ -3806,16 +3806,16 @@ function refreshWebshellUIOnLanguageChange() {
             });
             var dbTree = document.getElementById('webshell-db-schema-tree');
             if (dbTree && !dbTree.querySelector('.webshell-db-group')) {
-                dbTree.innerHTML = '<div class="webshell-empty">' + escapeHtml(wsT('webshell.dbNoSchema') || 'no database schema，please load first') + '</div>';
+                dbTree.innerHTML = '<div class="webshell-empty">' + escapeHtml(wsT('webshell.dbNoSchema') || 'no database schema,please load first') + '</div>';
             }
 
- // ifcurrent AI conversationonlyhassystemreadyhint（hasusemessage），usecurrentlanguageresetthis recordhint
+ // ifcurrent AI conversationonlyhassystemreadyhint(hasusemessage),usecurrentlanguageresetthis recordhint
             var aiMessages = document.getElementById('webshell-ai-messages');
             if (aiMessages) {
                 var hasUserMsg = !!aiMessages.querySelector('.webshell-ai-msg.user');
                 var msgNodes = aiMessages.querySelectorAll('.webshell-ai-msg');
                 if (!hasUserMsg && msgNodes.length <= 1) {
-                    var readyMsg = wsT('webshell.aiSystemReadyMessage') || 'system ready。Enter your test requirements，System will automatically run security tests。';
+                    var readyMsg = wsT('webshell.aiSystemReadyMessage') || 'system ready.Enter your test requirements,System will automatically run security tests.';
                     aiMessages.innerHTML = '';
                     var readyDiv = document.createElement('div');
                     readyDiv.className = 'webshell-ai-msg assistant';
@@ -3830,7 +3830,7 @@ function refreshWebshellUIOnLanguageChange() {
                 webshellFileListDir(webshellCurrentConn, pathInput.value.trim() || '.');
             }
 
- // connectionsearchplaceholder（property：heremanualupdate）
+ // connectionsearchplaceholder(property:heremanualupdate)
             var connSearchEl = document.getElementById('webshell-conn-search');
             if (connSearchEl) {
                 var ph = wsT('webshell.searchPlaceholder') || 'searchconnection...';
@@ -3857,7 +3857,7 @@ document.addEventListener('languagechange', function () {
     refreshWebshellUIOnLanguageChange();
 });
 
-// indelete conversationaftersync：ifcurrentat WebShell AI Assistantandalreadyconnection，thenrefresh conversation list（and Chat sidebarDeletemaintainconsistent）
+// indelete conversationaftersync:ifcurrentat WebShell AI Assistantandalreadyconnection,thenrefresh conversation list(and Chat sidebarDeletemaintainconsistent)
 document.addEventListener('conversation-deleted', function (e) {
     var id = e.detail && e.detail.conversationId;
     if (!id || !currentWebshellId || !webshellCurrentConn) return;
@@ -3870,7 +3870,7 @@ document.addEventListener('conversation-deleted', function (e) {
     }
 });
 
-// Test（notSave，onlyusecurrentformparameterrequest Shell line echo 1）
+// Test(notSave,onlyusecurrentformparameterrequest Shell line echo 1)
 function testWebshellConnection() {
     var url = (document.getElementById('webshell-url') || {}).value;
     if (url && typeof url.trim === 'function') url = url.trim();
@@ -3910,15 +3910,15 @@ function testWebshellConnection() {
                 alert(wsT('webshell.testFailed') || 'connectivity test failed');
                 return;
             }
- // only HTTP 200 notvia，needis's line echo 1（response trim aftershouldas "1"）
+ // only HTTP 200 notvia,needis's line echo 1(response trim aftershouldas "1")
             var output = (data.output != null) ? String(data.output).trim() : '';
             var reallyOk = data.ok && output === '1';
             if (reallyOk) {
-                alert(wsT('webshell.testSuccess') || 'connectivity normal，Shell accessible');
+                alert(wsT('webshell.testSuccess') || 'connectivity normal,Shell accessible');
             } else {
                 var msg;
                 if (data.ok && output !== '1')
- msg = wsT('webshell.testNoExpectedOutput') || 'Shell returnresponsebutnot yettooutput，pleasecheckconnectionPasswordandCommand Parameter Name';
+ msg = wsT('webshell.testNoExpectedOutput') || 'Shell returnresponsebutnot yettooutput,pleasecheckconnectionPasswordandCommand Parameter Name';
                 else
                     msg = (data.error) ? data.error : (wsT('webshell.testFailed') || 'connectivity test failed');
                 if (data.http_code) msg += ' (HTTP ' + data.http_code + ')';
@@ -3931,7 +3931,7 @@ function testWebshellConnection() {
         });
 }
 
-// Saveconnection（neworupdate，requestservicewrite SQLite afterRefreshlist）
+// Saveconnection(neworupdate,requestservicewrite SQLite afterRefreshlist)
 function saveWebshellConnection() {
     var url = (document.getElementById('webshell-url') || {}).value;
     if (url && typeof url.trim === 'function') url = url.trim();
@@ -3966,7 +3966,7 @@ function saveWebshellConnection() {
             return refreshWebshellConnectionsFromServer();
         })
         .then(function (list) {
-            // ifEdit's iscurrentselected's connection，syncupdate webshellCurrentConn，make Terminal/File Managerimmediatelyusenewconfiguration
+            // ifEdit's iscurrentselected's connection,syncupdate webshellCurrentConn,make Terminal/File Managerimmediatelyusenewconfiguration
             if (editId && currentWebshellId === editId && Array.isArray(list)) {
                 var updated = list.find(function (c) { return c.id === editId; });
                 if (updated) webshellCurrentConn = updated;

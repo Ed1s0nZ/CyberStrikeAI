@@ -1,6 +1,6 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════════
-# CyberStrikeAI — Local Embedding Server (vLLM)
+# CyberStrikeAI - Local Embedding Server (vLLM)
 # Runs multilingual-e5-small for knowledge base embeddings
 # All LLM inference is external (configured in config.yaml)
 # ═══════════════════════════════════════════════════════════════
@@ -18,7 +18,7 @@ MODEL_NAME="multilingual-e5-small"
 PORT=8102
 HOST="0.0.0.0"
 MAX_MODEL_LEN=512
-GPU_MEM=0.5          # 50% GPU memory (~6GB) — plenty for e5-small
+GPU_MEM=0.5          # 50% GPU memory (~6GB) - plenty for e5-small
 DTYPE="half"
 LOG_FILE="/tmp/vllm_embed.log"
 
@@ -28,7 +28,7 @@ err()  { echo -e "${RED}[x]${NC} $1"; }
 info() { echo -e "${CYAN}[*]${NC} $1"; }
 
 echo "═══════════════════════════════════════════════════════════════"
-echo "  CyberStrikeAI — Local Embedding Server"
+echo "  CyberStrikeAI - Local Embedding Server"
 echo "  Model: $MODEL_NAME ($MODEL)"
 echo "  Port:  $PORT"
 echo "═══════════════════════════════════════════════════════════════"
@@ -42,7 +42,7 @@ if curl -s --connect-timeout 2 "http://127.0.0.1:$PORT/v1/models" >/dev/null 2>&
         -H "Content-Type: application/json" \
         -d "{\"model\":\"$MODEL_NAME\",\"input\":\"health check\"}" 2>/dev/null)
     DIM=$(echo "$RESULT" | python3 -c "import sys,json; print(len(json.load(sys.stdin)['data'][0]['embedding']))" 2>/dev/null || echo "?")
-    log "Health check OK — dimension: $DIM"
+    log "Health check OK - dimension: $DIM"
     exit 0
 fi
 
@@ -69,7 +69,7 @@ if command -v nvidia-smi &>/dev/null; then
         GPU_NAME=$(echo "$GPU_INFO" | cut -d',' -f1 | xargs)
         GPU_TOTAL=$(echo "$GPU_INFO" | cut -d',' -f2 | xargs)
         GPU_FREE=$(echo "$GPU_INFO" | cut -d',' -f3 | xargs)
-        log "GPU: $GPU_NAME — ${GPU_FREE}MB free / ${GPU_TOTAL}MB total"
+        log "GPU: $GPU_NAME - ${GPU_FREE}MB free / ${GPU_TOTAL}MB total"
 
         # Check if enough memory (e5-small needs ~500MB)
         if [ "$GPU_FREE" -lt 500 ]; then
@@ -82,7 +82,7 @@ if command -v nvidia-smi &>/dev/null; then
         exit 1
     fi
 else
-    err "nvidia-smi not found — CUDA GPU required for vLLM"
+    err "nvidia-smi not found - CUDA GPU required for vLLM"
     exit 1
 fi
 
@@ -173,7 +173,7 @@ if [ -n "$DIM" ] && [ "$DIM" -gt 0 ] 2>/dev/null; then
     echo "  Logs:  tail -f $LOG_FILE"
     echo "═══════════════════════════════════════════════════════════════"
 else
-    err "Health check failed — embedding response invalid"
+    err "Health check failed - embedding response invalid"
     echo "  Raw response: $RESULT"
     echo "  Check log: tail -20 $LOG_FILE"
     exit 1

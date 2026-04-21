@@ -1,7 +1,7 @@
 # IoT Pivot Reconnaissance
 
 ## Overview
-Use compromised IoT devices (smart TVs, cameras, speakers, routers) as sensor platforms to discover the physical and digital environment. WiFi, Bluetooth, microphone, camera, network — every IoT device is a recon tool.
+Use compromised IoT devices (smart TVs, cameras, speakers, routers) as sensor platforms to discover the physical and digital environment. WiFi, Bluetooth, microphone, camera, network - every IoT device is a recon tool.
 
 ## Smart TV via ADB (Most Common)
 ```bash

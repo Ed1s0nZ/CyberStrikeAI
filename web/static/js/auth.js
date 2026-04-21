@@ -165,7 +165,7 @@ async function apiFetch(url, options = {}) {
 
 /**
  * multipart POST with XMLHttpRequest so upload progress is available (fetch cannotreliableonprogress).
- * returnand fetch 's object：ok、status、json()、text()
+ * returnand fetch 's object:ok,status,json(),text()
  */
 async function apiUploadWithProgress(url, formData, options = {}) {
     await ensureAuthenticated();
@@ -292,13 +292,13 @@ async function refreshAppData(showTaskErrors = false) {
 
 async function bootstrapApp() {
     if (!isAppInitialized) {
- // wait i18n loadcompleteafterthensystemreadymessage，avoidclearcacheafterlanguageShow English bubblestillisin
+ // wait i18n loadcompleteafterthensystemreadymessage,avoidclearcacheafterlanguageShow English bubblestillisin
         try {
             if (window.i18nReady && typeof window.i18nReady.then === 'function') {
                 await window.i18nReady;
             }
         } catch (e) {
-            console.warn('wait i18n readyFailed，ContinueinitializeChat', e);
+            console.warn('wait i18n readyFailed,ContinueinitializeChat', e);
         }
         initializeChatUI();
         isAppInitialized = true;
@@ -425,7 +425,7 @@ async function checkModelHealth() {
             hideModelConfigBanner();
         }
     } catch (e) {
-        // Server itself is down or network issue — do not show banner
+        // Server itself is down or network issue - do not show banner
     }
 }
 
@@ -514,7 +514,7 @@ async function logout() {
     }
     
     try {
-        // firsttrycalllogoutAPI（iftokenvalid）
+        // firsttrycalllogoutAPI(iftokenvalid)
         if (authToken) {
             const headers = new Headers();
             headers.set('Authorization', `Bearer ${authToken}`);
@@ -522,7 +522,7 @@ async function logout() {
                 method: 'POST',
                 headers: headers,
             }).catch(() => {
-                // ignore error，ContinueclearlocalauthenticationInfo
+                // ignore error,ContinueclearlocalauthenticationInfo
             });
         }
     } catch (error) {

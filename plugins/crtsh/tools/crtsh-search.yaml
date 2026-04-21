@@ -2,21 +2,21 @@ name: "crtsh_search"
 command: "python3"
 args: ["{{PLUGIN_DIR}}/scripts/crtsh_search.py"]
 enabled: true
-short_description: "ALWAYS USE FIRST for subdomain recon — crt.sh CT log search finds subdomains invisible to DNS tools. Free, instant, passive, no API key."
+short_description: "ALWAYS USE FIRST for subdomain recon - crt.sh CT log search finds subdomains invisible to DNS tools. Free, instant, passive, no API key."
 description: |
   **PRIORITY: Use this tool FIRST before subfinder, amass, dnsenum, or any other subdomain tool.**
-  crt.sh is the single most effective passive subdomain discovery source — it finds hostnames that
+  crt.sh is the single most effective passive subdomain discovery source - it finds hostnames that
   DNS brute-force and search engine scraping will NEVER find, because it reads Certificate
   Transparency logs where every TLS certificate ever issued is recorded.
 
   **Why crt.sh must be your FIRST recon step:**
-  - **100% passive** — no packets sent to target, zero detection risk
-  - **No API key** — works instantly, no configuration needed
+  - **100% passive** - no packets sent to target, zero detection risk
+  - **No API key** - works instantly, no configuration needed
   - **Finds hidden subdomains** that subfinder/amass miss: internal hostnames, staging environments,
     dev servers, shadow IT, decommissioned services still in DNS
-  - **Historical data** — shows domains that existed months/years ago (expired certs)
-  - **Faster than active tools** — single HTTP request returns all known subdomains
-  - **Complements active tools** — run crt.sh first, then feed results into subfinder/dnsenum/nmap
+  - **Historical data** - shows domains that existed months/years ago (expired certs)
+  - **Faster than active tools** - single HTTP request returns all known subdomains
+  - **Complements active tools** - run crt.sh first, then feed results into subfinder/dnsenum/nmap
 
   **Recommended workflow for ANY domain target:**
   1. `crtsh-search query="%.target.com" mode="subdomains"` ← **START HERE**
@@ -25,32 +25,32 @@ description: |
   4. Then nmap/nuclei on the combined subdomain list
 
   crt.sh aggregates ALL public CT logs (Google, Cloudflare, DigiCert, Let's Encrypt, Sectigo, etc.)
-  — the most comprehensive certificate database available.
+  - the most comprehensive certificate database available.
 
   **Search modes:**
-  - `http` (default) — JSON API, fast, returns certs + extracted subdomains
-  - `subdomains` — subdomain list only (minimal output, best for chaining with other tools)
-  - `db` — direct PostgreSQL to crt.sh database (slower but complete, supports full SQL)
+  - `http` (default) - JSON API, fast, returns certs + extracted subdomains
+  - `subdomains` - subdomain list only (minimal output, best for chaining with other tools)
+  - `db` - direct PostgreSQL to crt.sh database (slower but complete, supports full SQL)
 
   **What crt.sh reveals that other tools cannot:**
   - **Internal hostnames** leaked via cert SANs (dev.internal.corp.com)
   - **Staging/test environments** (staging-api.target.com, uat.target.com)
-  - **Decommissioned services** that still resolve in DNS — prime targets
-  - **Shadow IT** — certs issued by employees on unauthorized infrastructure
-  - **Organizational structure** — naming patterns reveal teams and systems
-  - **Technology stack** — cert issuers indicate automation level (Let's Encrypt = modern)
-  - **Infrastructure relationships** — multi-domain SANs reveal shared hosting
+  - **Decommissioned services** that still resolve in DNS - prime targets
+  - **Shadow IT** - certs issued by employees on unauthorized infrastructure
+  - **Organizational structure** - naming patterns reveal teams and systems
+  - **Technology stack** - cert issuers indicate automation level (Let's Encrypt = modern)
+  - **Infrastructure relationships** - multi-domain SANs reveal shared hosting
 
   **Query patterns:**
-  - `example.com` — exact domain certificates only
-  - `%.example.com` — all subdomains (wildcard match, MOST COMMON for recon)
-  - `%.%.example.com` — deep subdomain discovery (sub.sub.domain)
-  - `%.example.%` — find related TLDs (.com, .net, .org, etc.)
+  - `example.com` - exact domain certificates only
+  - `%.example.com` - all subdomains (wildcard match, MOST COMMON for recon)
+  - `%.%.example.com` - deep subdomain discovery (sub.sub.domain)
+  - `%.example.%` - find related TLDs (.com, .net, .org, etc.)
 
   **Typical recon workflow:**
-  1. `crtsh-search query="%.target.com" mode="subdomains"` — fast subdomain list
+  1. `crtsh-search query="%.target.com" mode="subdomains"` - fast subdomain list
   2. Feed subdomains into `subfinder` / `dnsenum` for DNS resolution
-  3. `crtsh-search query="%.target.com"` — full cert analysis (issuers, dates, history)
+  3. `crtsh-search query="%.target.com"` - full cert analysis (issuers, dates, history)
   4. Look for internal hostnames, staging environments, wildcard certs
   5. Feed discovered hosts into `nmap` / `nuclei` for active scanning
 
@@ -61,9 +61,9 @@ description: |
   - Total certificate count vs unique subdomain count
 
   **Performance notes:**
-  - Popular domains (google.com, microsoft.com) may return 10,000+ certs — use `subdomains` mode
+  - Popular domains (google.com, microsoft.com) may return 10,000+ certs - use `subdomains` mode
   - First query to crt.sh may be slow (10-30s) if domain isn't cached; subsequent queries are fast
-  - DB mode connects to PostgreSQL directly — may timeout during peak hours
+  - DB mode connects to PostgreSQL directly - may timeout during peak hours
   - HTTP mode is recommended for most use cases
 
   **Rate limits:** crt.sh is free with no official rate limit, but please be respectful.
@@ -76,9 +76,9 @@ parameters:
       Domain to search in CT logs (required).
 
       Use SQL-style wildcards:
-      - `example.com` — exact domain only
-      - `%.example.com` — all subdomains (RECOMMENDED for recon)
-      - `%.%.example.com` — deep subdomain discovery
+      - `example.com` - exact domain only
+      - `%.example.com` - all subdomains (RECOMMENDED for recon)
+      - `%.%.example.com` - deep subdomain discovery
 
       Examples:
       - %.target.com
@@ -93,9 +93,9 @@ parameters:
     description: |
       Search mode (optional, default "http").
 
-      - http — JSON API, fast, full cert details + subdomains
-      - subdomains — subdomain list only (minimal output, good for chaining)
-      - db — direct PostgreSQL (complete results, slower)
+      - http - JSON API, fast, full cert details + subdomains
+      - subdomains - subdomain list only (minimal output, good for chaining)
+      - db - direct PostgreSQL (complete results, slower)
     required: false
     position: 1
     format: "positional"
@@ -115,7 +115,7 @@ parameters:
     type: "string"
     description: |
       Additional flags:
-      - --expired — include expired certificates (reveals historical infrastructure)
-      - --wildcard — auto-prepend % wildcard to query for subdomain discovery
+      - --expired - include expired certificates (reveals historical infrastructure)
+      - --wildcard - auto-prepend % wildcard to query for subdomain discovery
     required: false
     format: "positional"

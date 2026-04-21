@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# decompile.sh — Decompile APK/JAR/AAR using jadx, fernflower, or both
+# decompile.sh - Decompile APK/JAR/AAR using jadx, fernflower, or both
 set -euo pipefail
 
 usage() {
@@ -206,7 +206,7 @@ run_fernflower() {
     local d2j
     if ! d2j=$(find_dex2jar); then
       echo "Error: dex2jar is required to use Fernflower on .$ext_lower files." >&2
-      echo "Install dex2jar — see references/setup-guide.md" >&2
+      echo "Install dex2jar - see references/setup-guide.md" >&2
       return 1
     fi
 
@@ -235,7 +235,7 @@ run_fernflower() {
   echo "Running: java -jar $ff_jar ${ff_args[*]}"
   java -jar "$ff_jar" "${ff_args[@]}"
 
-  # Fernflower outputs a JAR containing .java files — extract it
+  # Fernflower outputs a JAR containing .java files - extract it
   local result_jar="$out_dir/$(basename "$jar_to_decompile")"
   if [[ -f "$result_jar" ]]; then
     local sources_dir="$out_dir/sources"

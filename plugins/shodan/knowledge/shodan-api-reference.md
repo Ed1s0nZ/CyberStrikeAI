@@ -45,8 +45,8 @@ GET /shodan/host/{ip}?key=API_KEY&history=true&minify=false
 Returns all services, banners, TLS certs, vulns for an IP.
 
 Parameters:
-- `history` (bool) — include historical banners
-- `minify` (bool) — return only basic host info (ports, vulns, hostnames)
+- `history` (bool) - include historical banners
+- `minify` (bool) - return only basic host info (ports, vulns, hostnames)
 
 ### Host Search (1 Credit)
 ```
@@ -56,10 +56,10 @@ GET /shodan/host/search?query=apache&facets=country:10&page=1&minify=true&key=AP
 Full search with results. Costs 1 query credit for filtered or paged queries.
 
 Parameters:
-- `query` (string, required) — Shodan query
-- `facets` (string) — comma-separated facets (e.g., "country:10,org:5")
-- `page` (int) — page number (default 1)
-- `minify` (bool) — minimal results
+- `query` (string, required) - Shodan query
+- `facets` (string) - comma-separated facets (e.g., "country:10,org:5")
+- `page` (int) - page number (default 1)
+- `minify` (bool) - minimal results
 
 ### Host Count (Free)
 ```
@@ -122,9 +122,9 @@ GET /dns/domain/{domain}?history=true&type=A&page=1&key=API_KEY
 Returns subdomains and DNS entries for a domain.
 
 Parameters:
-- `history` (bool) — include historical DNS data
-- `type` (string) — filter by record type (A, AAAA, CNAME, MX, NS, SOA, TXT)
-- `page` (int) — page number
+- `history` (bool) - include historical DNS data
+- `type` (string) - filter by record type (A, AAAA, CNAME, MX, NS, SOA, TXT)
+- `page` (int) - page number
 
 ### On-Demand Scan (Scan Credits)
 ```
@@ -166,9 +166,9 @@ GET https://exploits.shodan.io/api/search?query=apache&facets=platform&page=1&ke
 ```
 
 Parameters:
-- `query` (string, required) — search query
-- `facets` (string) — comma-separated facets (author, platform, port, source, type)
-- `page` (int) — page number
+- `query` (string, required) - search query
+- `facets` (string) - comma-separated facets (author, platform, port, source, type)
+- `page` (int) - page number
 
 Query filters: author, bid, cve, date, description, platform, port, title, type (dos, exploit, local, remote, shellcode, webapps)
 
@@ -186,7 +186,7 @@ Same as search but returns count only.
 | 401 | Invalid API key |
 | 402 | Insufficient credits (payment required) |
 | 404 | Resource not found |
-| 429 | Rate limited — slow down requests |
+| 429 | Rate limited - slow down requests |
 
 Error response format:
 ```json

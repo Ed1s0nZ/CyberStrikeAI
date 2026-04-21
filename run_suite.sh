@@ -1,6 +1,6 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════════
-# CyberStrikeAI — Full Suite Launcher
+# CyberStrikeAI - Full Suite Launcher
 # Checks dependencies, builds, and runs the main application
 # ═══════════════════════════════════════════════════════════════
 set -e
@@ -20,7 +20,7 @@ err()  { echo -e "${RED}[x]${NC} $1"; }
 info() { echo -e "${CYAN}[*]${NC} $1"; }
 
 echo "═══════════════════════════════════════════════════════════════"
-echo "  CyberStrikeAI Suite — Dependency Check, Build & Run"
+echo "  CyberStrikeAI Suite - Dependency Check, Build & Run"
 echo "═══════════════════════════════════════════════════════════════"
 echo ""
 
@@ -88,7 +88,7 @@ done
 if [ $CAPS_SET -gt 0 ]; then
     log "Network capabilities set on $CAPS_SET tools (pcap/raw sockets without root)"
 else
-    warn "Could not set network capabilities — run with sudo once, or pcap tools will fail"
+    warn "Could not set network capabilities - run with sudo once, or pcap tools will fail"
 fi
 
 # ─── 3c. Tor and proxychains (for proxy routing) ────────────────

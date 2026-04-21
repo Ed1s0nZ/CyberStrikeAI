@@ -1,20 +1,20 @@
 // settingsrelatedfunction
 let currentConfig = null;
 let allTools = [];
-// globaltool statemapping，used forSaveuseatallpage's modify
-// key: uniquetoolidentifier（toolKey），value: { enabled: boolean, is_external: boolean, external_mcp: string }
+// globaltool statemapping,used forSaveuseatallpage's modify
+// key: uniquetoolidentifier(toolKey),value: { enabled: boolean, is_external: boolean, external_mcp: string }
 let toolStateMap = new Map();
 
-// generatetool's uniqueidentifier，used fordistinguishsame namebutSourcedifferent's tool
+// generatetool's uniqueidentifier,used fordistinguishsame namebutSourcedifferent's tool
 function getToolKey(tool) {
-    // if it is an external tool，use external_mcp::tool.name asuniqueidentifier
- // if it iswithintool，use tool.name asidentifier
+    // if it is an external tool,use external_mcp::tool.name asuniqueidentifier
+ // if it iswithintool,use tool.name asidentifier
     if (tool.is_external && tool.external_mcp) {
         return `${tool.external_mcp}::${tool.name}`;
     }
     return tool.name;
 }
-// fromlocalStoragereadPer pagecount，defaults to20
+// fromlocalStoragereadPer pagecount,defaults to20
 const getToolsPageSize = () => {
     const saved = localStorage.getItem('toolsPageSize');
     return saved ? parseInt(saved, 10) : 20;
@@ -61,10 +61,10 @@ async function openSettings() {
         switchPage('settings');
     }
     
-    // eachtimeopenwhenclearglobalstatusmapping，re-loadlatestconfiguration
+    // eachtimeopenwhenclearglobalstatusmapping,re-loadlatestconfiguration
     toolStateMap.clear();
     
-    // eachtimeopenwhenre-loadlatestconfiguration（systemsettingspagenotneedloadtoollist）
+    // eachtimeopenwhenre-loadlatestconfiguration(systemsettingspagenotneedloadtoollist)
     await loadConfig(false);
     
  // clearbefore's validateerrorstatus
@@ -76,16 +76,16 @@ async function openSettings() {
     switchSettingsSection('basic');
 }
 
-// Closesettings（preservefunctiontocompatibleoldcode，butatnotneedClosefunction）
+// Closesettings(preservefunctiontocompatibleoldcode,butatnotneedClosefunction)
 function closeSettings() {
- // no longerneedClosefunction，becauseatispagenotismodal
- // ifneed，cantoswitchconversationpage
+ // no longerneedClosefunction,becauseatispagenotismodal
+ // ifneed,cantoswitchconversationpage
     if (typeof switchPage === 'function') {
         switchPage('chat');
     }
 }
 
-// click outside modal to close（onlypreserveMCPdetailsmodal）
+// click outside modal to close(onlypreserveMCPdetailsmodal)
 window.onclick = function(event) {
     const mcpModal = document.getElementById('mcp-detail-modal');
     
@@ -241,7 +241,7 @@ async function loadConfig(loadTools = true) {
             const retrievalWeightInput = document.getElementById('knowledge-retrieval-hybrid-weight');
             if (retrievalWeightInput) {
                 const hybridWeight = knowledge.retrieval?.hybrid_weight;
- // allow0.0，onlyhasundefined/nullwhenonly usedefault
+ // allow0.0,onlyhasundefined/nullwhenonly usedefault
                 retrievalWeightInput.value = (hybridWeight !== undefined && hybridWeight !== null) ? hybridWeight : 0.7;
             }
 
@@ -329,13 +329,13 @@ async function loadConfig(loadTools = true) {
             }
         });
 
-        // onlyhasatneedwhenonly loadtoollist（MCPmanagement pageneed，systemsettingspagenotneed）
+        // onlyhasatneedwhenonly loadtoollist(MCPmanagement pageneed,systemsettingspagenotneed)
         if (loadTools) {
-            // settingsPer pagecount（willatpaginationcontrolsrenderwhensettings）
+            // settingsPer pagecount(willatpaginationcontrolsrenderwhensettings)
             const savedPageSize = getToolsPageSize();
             toolsPagination.pageSize = savedPageSize;
             
-            // loadtoollist（usepagination）
+            // loadtoollist(usepagination)
             toolsSearchKeyword = '';
             await loadToolsList(1, '');
         }
@@ -354,18 +354,18 @@ async function loadConfig(loadTools = true) {
 // tool searchkeyword
 let toolsSearchKeyword = '';
 
-// loadtoollist（pagination）
+// loadtoollist(pagination)
 async function loadToolsList(page = 1, searchKeyword = '') {
     const toolsList = document.getElementById('tools-list');
     
     // show loading state
     if (toolsList) {
- // clearcontainer，includepossiblyexist's paginationcontrols
+ // clearcontainer,includepossiblyexist's paginationcontrols
         toolsList.innerHTML = '<div class="tools-list-items"><div class="loading" style="padding: 20px; text-align: center; color: var(--text-muted);">⏳ ' + (typeof window.t === 'function' ? window.t('mcp.loadingTools') : 'Loading tool list...') + '</div></div>';
     }
     
     try {
- // atloadnewpagebefore，save current page state to global mapping first
+ // atloadnewpagebefore,save current page state to global mapping first
         saveCurrentPageToolStates();
         
         const pageSize = toolsPagination.pageSize;
@@ -374,7 +374,7 @@ async function loadToolsList(page = 1, searchKeyword = '') {
             url += `&search=${encodeURIComponent(searchKeyword)}`;
         }
         
- // useshort's exceedwhentime（10second），avoidlongtimewait
+ // useshort's exceedwhentime(10second),avoidlongtimewait
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
         
@@ -396,7 +396,7 @@ async function loadToolsList(page = 1, searchKeyword = '') {
             totalPages: result.total_pages || 1
         };
         
- // initializetool statemapping（iftoolnotatmappingin，useservicereturn's status）
+ // initializetool statemapping(iftoolnotatmappingin,useservicereturn's status)
         allTools.forEach(tool => {
             const toolKey = getToolKey(tool);
             if (!toolStateMap.has(toolKey)) {
@@ -416,7 +416,7 @@ async function loadToolsList(page = 1, searchKeyword = '') {
         if (toolsList) {
             const isTimeout = error.name === 'AbortError' || error.message.includes('timeout');
             const errorMsg = isTimeout 
- ? (typeof window.t === 'function' ? window.t('mcp.loadToolsTimeout') : 'Tool list loading timed out, possibly due to externalMCPconnectionslow。pleaseclick"Refresh"buttonRetry，orcheckExternalMCPconnectionstatus。')
+ ? (typeof window.t === 'function' ? window.t('mcp.loadToolsTimeout') : 'Tool list loading timed out, possibly due to externalMCPconnectionslow.pleaseclick"Refresh"buttonRetry,orcheckExternalMCPconnectionstatus.')
                 : (typeof window.t === 'function' ? window.t('mcp.loadToolsFailed') : 'Failed to load tool list') + ': ' + escapeHtml(error.message);
             toolsList.innerHTML = `<div class="error" style="padding: 20px; text-align: center;">${errorMsg}</div>`;
         }
@@ -473,7 +473,7 @@ function renderToolsList() {
     const toolsList = document.getElementById('tools-list');
     if (!toolsList) return;
     
-    // removepossiblyexist's paginationcontrols（willat renderToolsPagination inre-add）
+    // removepossiblyexist's paginationcontrols(willat renderToolsPagination inre-add)
     const oldPagination = toolsList.querySelector('.tools-pagination');
     if (oldPagination) {
         oldPagination.remove();
@@ -487,7 +487,7 @@ function renderToolsList() {
         toolsList.appendChild(listContainer);
     }
     
-    // clearlistcontainercontent（removeloadhint）
+    // clearlistcontainercontent(removeloadhint)
     listContainer.innerHTML = '';
     
     if (allTools.length === 0) {
@@ -509,23 +509,23 @@ function renderToolsList() {
         toolItem.dataset.isExternal = tool.is_external ? 'true' : 'false';
         toolItem.dataset.externalMcp = tool.external_mcp || '';
         
- // fromglobalstatusmappinggettool state，ifnotexistthenuseservicereturn's status
+ // fromglobalstatusmappinggettool state,ifnotexistthenuseservicereturn's status
         const toolState = toolStateMap.get(toolKey) || {
             enabled: tool.enabled,
             is_external: tool.is_external || false,
             external_mcp: tool.external_mcp || ''
         };
         
-        // Externaltooltab，Show SourceInfo
+        // Externaltooltab,Show SourceInfo
         let externalBadge = '';
         if (toolState.is_external || tool.is_external) {
             const externalMcpName = toolState.external_mcp || tool.external_mcp || '';
             const badgeText = externalMcpName ? (typeof window.t === 'function' ? window.t('mcp.externalFrom', { name: escapeHtml(externalMcpName) }) : `External (${escapeHtml(externalMcpName)})`) : (typeof window.t === 'function' ? window.t('mcp.externalBadge') : 'External');
-            const badgeTitle = externalMcpName ? (typeof window.t === 'function' ? window.t('mcp.externalToolFrom', { name: escapeHtml(externalMcpName) }) : `ExternalMCPtool - Source：${escapeHtml(externalMcpName)}`) : (typeof window.t === 'function' ? window.t('mcp.externalBadge') : 'ExternalMCPtool');
+            const badgeTitle = externalMcpName ? (typeof window.t === 'function' ? window.t('mcp.externalToolFrom', { name: escapeHtml(externalMcpName) }) : `ExternalMCPtool - Source:${escapeHtml(externalMcpName)}`) : (typeof window.t === 'function' ? window.t('mcp.externalBadge') : 'ExternalMCPtool');
             externalBadge = `<span class="external-tool-badge" title="${badgeTitle}">${badgeText}</span>`;
         }
         
-        // generateunique's checkbox id，usetooluniqueidentifier
+        // generateunique's checkbox id,usetooluniqueidentifier
         const checkboxId = `tool-${escapeHtml(toolKey).replace(/::/g, '--')}`;
         
         toolItem.innerHTML = `
@@ -560,7 +560,7 @@ function renderToolsPagination() {
         oldPagination.remove();
     }
     
- // ifonlyhaspageorhasdata，hide pagination
+ // ifonlyhaspageorhasdata,hide pagination
     if (toolsPagination.totalPages <= 1) {
         return;
     }
@@ -673,7 +673,7 @@ function deselectAllTools() {
 
 // change items per page
 async function changeToolsPageSize() {
- // tryfrompositiongetselector（toporpaginationarea）
+ // tryfrompositiongetselector(toporpaginationarea)
     const pageSizeSelect = document.getElementById('tools-page-size') || document.getElementById('tools-page-size-pagination');
     if (!pageSizeSelect) return;
     
@@ -688,7 +688,7 @@ async function changeToolsPageSize() {
     // updatepaginationconfiguration
     toolsPagination.pageSize = newPageSize;
     
- // syncupdateselector（if exists）
+ // syncupdateselector(if exists)
     const otherSelect = document.getElementById('tools-page-size') || document.getElementById('tools-page-size-pagination');
     if (otherSelect && otherSelect !== pageSizeSelect) {
         otherSelect.value = newPageSize;
@@ -715,11 +715,11 @@ async function updateToolsStats() {
     let totalTools = toolsPagination.total || 0;
     
     try {
-        // ifhassearchkeyword，onlystatisticssearchresult
+        // ifhassearchkeyword,onlystatisticssearchresult
         if (toolsSearchKeyword) {
             totalTools = allTools.length;
             totalEnabled = allTools.filter(tool => {
- // preferuseglobalstatusmapping，otherwise usecheckboxstatus，afteruseservicereturn's status
+ // preferuseglobalstatusmapping,otherwise usecheckboxstatus,afteruseservicereturn's status
                 const toolKey = getToolKey(tool);
                 const savedState = toolStateMap.get(toolKey);
                 if (savedState !== undefined) {
@@ -730,11 +730,11 @@ async function updateToolsStats() {
                 return checkbox ? checkbox.checked : tool.enabled;
             }).length;
         } else {
- // hassearchwhen，needgetalltool's status
+ // hassearchwhen,needgetalltool's status
             // firstuseglobalstatusmappingandcurrentpage's checkboxstatus
             const localStateMap = new Map();
             
- // fromcurrentpage's checkboxgetstatus（ifglobalmappinginhas）
+ // fromcurrentpage's checkboxgetstatus(ifglobalmappinginhas)
             allTools.forEach(tool => {
                 const toolKey = getToolKey(tool);
                 const savedState = toolStateMap.get(toolKey);
@@ -746,27 +746,27 @@ async function updateToolsStats() {
                     if (checkbox) {
                         localStateMap.set(toolKey, checkbox.checked);
                     } else {
-                        // ifcheckboxnotexist（notatcurrentpage），usetooloriginalstatus
+                        // ifcheckboxnotexist(notatcurrentpage),usetooloriginalstatus
                         localStateMap.set(toolKey, tool.enabled);
                     }
                 }
             });
             
- // iftoolgreater thancurrentpage，needgetalltool's status
+ // iftoolgreater thancurrentpage,needgetalltool's status
             if (totalTools > allTools.length) {
                 // iterateallpagegetcompletestatus
                 let page = 1;
                 let hasMore = true;
  const pageSize = 100; // usebig's pageSizetoreducefewrequesttime
                 
- while (hasMore && page <= 10) { // limitat most10page，avoidnoloop
+ while (hasMore && page <= 10) { // limitat most10page,avoidnoloop
                     const url = `/api/config/tools?page=${page}&page_size=${pageSize}`;
                     const pageResponse = await apiFetch(url);
                     if (!pageResponse.ok) break;
                     
                     const pageResult = await pageResponse.json();
                     pageResult.tools.forEach(tool => {
- // preferuseglobalstatusmapping，otherwise useservicereturn's status
+ // preferuseglobalstatusmapping,otherwise useservicereturn's status
                         const toolKey = getToolKey(tool);
                         if (!localStateMap.has(toolKey)) {
                             const savedState = toolStateMap.get(toolKey);
@@ -786,8 +786,8 @@ async function updateToolsStats() {
             totalEnabled = Array.from(localStateMap.values()).filter(enabled => enabled).length;
         }
     } catch (error) {
-        console.warn('Failed to get tool statistics，using current page data', error);
-        // if retrieval fails，usecurrentpage's data
+        console.warn('Failed to get tool statistics,using current page data', error);
+        // if retrieval fails,usecurrentpage's data
         totalTools = totalTools || currentPageTotal;
         totalEnabled = currentPageEnabled;
     }
@@ -799,10 +799,10 @@ async function updateToolsStats() {
     `;
 }
 
-// filtertool（already，atuseservicesearch）
-// preservethisfunctiontoelsewherecall，butactualfunctionalreadysearchTools()
+// filtertool(already,atuseservicesearch)
+// preservethisfunctiontoelsewherecall,butactualfunctionalreadysearchTools()
 function filterTools() {
- // no longeruseClientfilter，astriggerservicesearch
+ // no longeruseClientfilter,astriggerservicesearch
     // cantopreserveasemptyfunctionorremoveoninputevent
 }
 
@@ -866,7 +866,7 @@ async function applySettings() {
                 })(),
                 hybrid_weight: (() => {
                     const val = parseFloat(document.getElementById('knowledge-retrieval-hybrid-weight')?.value);
- return isNaN(val) ? 0.7 : val; // allow0.0，onlyhasNaNwhenonly usedefault
+ return isNaN(val) ? 0.7 : val; // allow0.0,onlyhasNaNwhenonly usedefault
                 })()
             },
             indexing: {
@@ -946,15 +946,15 @@ async function applySettings() {
         // save current page state to global mapping first
         saveCurrentPageToolStates();
         
-        // getalltoollisttogetcompletestatus（iterateallpage）
- // note：noisatsearchstatusunder，all needgetalltool's status，toensurecompleteSave
+        // getalltoollisttogetcompletestatus(iterateallpage)
+ // note:noisatsearchstatusunder,all needgetalltool's status,toensurecompleteSave
         try {
             const allToolsMap = new Map();
             let page = 1;
             let hasMore = true;
             const pageSize = 100; // usereasonable's pageSize
             
-            // iterate all pages to get all tools（notusesearchkeyword，getAlltool）
+            // iterate all pages to get all tools(notusesearchkeyword,getAlltool)
             while (hasMore) {
                 const url = `/api/config/tools?page=${page}&page_size=${pageSize}`;
                 
@@ -966,7 +966,7 @@ async function applySettings() {
                 const pageResult = await pageResponse.json();
                 
                 // willtooladdtomappingin
- // preferuseglobalstatusmappingin's status（usemodifythrough's ），otherwise useservicereturn's status
+ // preferuseglobalstatusmappingin's status(usemodifythrough's ),otherwise useservicereturn's status
                 pageResult.tools.forEach(tool => {
                     const toolKey = getToolKey(tool);
                     const savedState = toolStateMap.get(toolKey);
@@ -996,8 +996,8 @@ async function applySettings() {
                 });
             });
         } catch (error) {
-            console.warn('Failed to get all tool list，using global state mapping only', error);
-            // if retrieval fails，useglobalstatusmapping
+            console.warn('Failed to get all tool list,using global state mapping only', error);
+            // if retrieval fails,useglobalstatusmapping
             toolStateMap.forEach((toolData, toolKey) => {
                 // toolData.name Saveoriginaltool name
                 const toolName = toolData.name || toolKey.split('::').pop();
@@ -1042,7 +1042,7 @@ async function applySettings() {
         
         const successMsg = (typeof window !== 'undefined' && typeof window.t === 'function')
             ? window.t('settings.apply.applySuccess')
-            : 'Configuration applied successfully！';
+            : 'Configuration applied successfully!';
         alert(successMsg);
         closeSettings();
     } catch (error) {
@@ -1054,13 +1054,13 @@ async function applySettings() {
     }
 }
 
-// Savetoolconfiguration（standalonefunction，used forMCPmanagement page）
+// Savetoolconfiguration(standalonefunction,used forMCPmanagement page)
 async function saveToolsConfig() {
     try {
         // save current page state to global mapping first
         saveCurrentPageToolStates();
         
- // getcurrentconfiguration（onlygettoolminute）
+ // getcurrentconfiguration(onlygettoolminute)
         const response = await apiFetch('/api/config');
         if (!response.ok) {
             throw new Error('Failed to get configuration');
@@ -1075,7 +1075,7 @@ async function saveToolsConfig() {
             tools: []
         };
         
- // collecttoolenabled state（andapplySettingsin's same）
+ // collecttoolenabled state(andapplySettingsin's same)
         try {
             const allToolsMap = new Map();
             let page = 1;
@@ -1123,8 +1123,8 @@ async function saveToolsConfig() {
                 });
             });
         } catch (error) {
-            console.warn('Failed to get all tool list，using global state mapping only', error);
-            // if retrieval fails，useglobalstatusmapping
+            console.warn('Failed to get all tool list,using global state mapping only', error);
+            // if retrieval fails,useglobalstatusmapping
             toolStateMap.forEach((toolData, toolKey) => {
                 // toolData.name Saveoriginaltool name
                 const toolName = toolData.name || toolKey.split('::').pop();
@@ -1161,7 +1161,7 @@ async function saveToolsConfig() {
             throw new Error(error.error || 'Failed to apply configuration');
         }
         
-        alert(typeof window.t === 'function' ? window.t('mcp.toolsConfigSaved') : 'Tool configuration saved successfully！');
+        alert(typeof window.t === 'function' ? window.t('mcp.toolsConfigSaved') : 'Tool configuration saved successfully!');
         
  // re-loadtoollisttolateststatus
         if (typeof loadToolsList === 'function') {
@@ -1260,7 +1260,7 @@ async function changePassword() {
 
 let currentEditingMCPName = null;
 
-// fetchExternalMCPlistdata（forpolluse，return { servers, stats }）
+// fetchExternalMCPlistdata(forpolluse,return { servers, stats })
 async function fetchExternalMCPs() {
     const response = await apiFetch('/api/external-mcp');
     if (!response.ok) throw new Error('getExternalMCPlist failed');
@@ -1283,8 +1283,8 @@ async function loadExternalMCPs() {
     }
 }
 
-// polllisttospecify MCP 's tool countalreadyupdate（eachsecondtime，toi.e.，no fixed delay）
-// name as null whenonlyby maxAttempts timepoll，notdetermine tool_count
+// polllisttospecify MCP 's tool countalreadyupdate(eachsecondtime,toi.e.,no fixed delay)
+// name as null whenonlyby maxAttempts timepoll,notdetermine tool_count
 async function pollExternalMCPToolCount(name, maxAttempts = 10) {
     const pollIntervalMs = 1000;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -1447,13 +1447,13 @@ async function editExternalMCP(name) {
         
         document.getElementById('external-mcp-modal-title').textContent = (typeof window.t === 'function' ? window.t('mcp.editExternalMCP') : 'Edit ExternalMCP');
         
-        // willconfigurationconvert toobjectformat（keyasname）
+        // willconfigurationconvert toobjectformat(keyasname)
         const config = { ...server.config };
-        // removetool_count、external_mcp_enableetcfrontendfield，butpreserveenabled/disabledused forbackward compatible
+        // removetool_count,external_mcp_enableetcfrontendfield,butpreserveenabled/disabledused forbackward compatible
         delete config.tool_count;
         delete config.external_mcp_enable;
         
- // wrapobjectformat：{ "name": { config } }
+ // wrapobjectformat:{ "name": { config } }
         const configObj = {};
         configObj[name] = config;
         
@@ -1586,7 +1586,7 @@ async function saveExternalMCP() {
             return;
         }
         
- // remove external_mcp_enable field（buttoncontrol，butpreserve enabled/disabled used forbackward compatible）
+ // remove external_mcp_enable field(buttoncontrol,butpreserve enabled/disabled used forbackward compatible)
         delete config.external_mcp_enable;
         
         // validateconfigurationcontent
@@ -1625,10 +1625,10 @@ async function saveExternalMCP() {
     jsonTextarea.classList.remove('error');
     
     try {
-        // if it isEditmode，onlyupdatecurrentEdit's configuration
+        // if it isEditmode,onlyupdatecurrentEdit's configuration
         if (currentEditingMCPName) {
             if (!configObj[currentEditingMCPName]) {
-                errorDiv.textContent = (typeof window.t === 'function' ? window.t('mcp.configEditMustContainName', { name: currentEditingMCPName }) : 'Config error: Editmodeunder，JSONmustcontainconfigurationname "' + currentEditingMCPName + '"');
+                errorDiv.textContent = (typeof window.t === 'function' ? window.t('mcp.configEditMustContainName', { name: currentEditingMCPName }) : 'Config error: Editmodeunder,JSONmustcontainconfigurationname "' + currentEditingMCPName + '"');
                 errorDiv.style.display = 'block';
                 jsonTextarea.classList.add('error');
                 return;
@@ -1647,7 +1647,7 @@ async function saveExternalMCP() {
                 throw new Error(error.error || 'Save failed');
             }
         } else {
-            // addmode：Saveallconfiguration
+            // addmode:Saveallconfiguration
             for (const name of names) {
                 const config = configObj[name];
                 const response = await apiFetch(`/api/external-mcp/${encodeURIComponent(name)}`, {
@@ -1670,7 +1670,7 @@ async function saveExternalMCP() {
         if (typeof window !== 'undefined' && typeof window.refreshMentionTools === 'function') {
             window.refreshMentionTools();
         }
- // polltimetofetchbackendasyncupdate's tool count（no fixed delay，toi.e.）
+ // polltimetofetchbackendasyncupdate's tool count(no fixed delay,toi.e.)
         pollExternalMCPToolCount(null, 5);
         alert(typeof window.t === 'function' ? window.t('mcp.saveSuccess') : 'Save successful');
     } catch (error) {
@@ -1698,7 +1698,7 @@ async function deleteExternalMCP(name) {
         }
         
         await loadExternalMCPs();
-        // refresh chat UI tool list，removealreadyDelete's MCPtool
+        // refresh chat UI tool list,removealreadyDelete's MCPtool
         if (typeof window !== 'undefined' && typeof window.refreshMentionTools === 'function') {
             window.refreshMentionTools();
         }
@@ -1715,7 +1715,7 @@ async function toggleExternalMCP(name, currentStatus) {
     const buttonId = `btn-toggle-${name}`;
     const button = document.getElementById(buttonId);
     
-    // if it isStartActions，show loading state
+    // if it isStartActions,show loading state
     if (action === 'start' && button) {
         button.disabled = true;
         button.style.opacity = '0.6';
@@ -1735,9 +1735,9 @@ async function toggleExternalMCP(name, currentStatus) {
         
         const result = await response.json();
         
- // if it isStartActions，firstimmediatelychecktimestatus
+ // if it isStartActions,firstimmediatelychecktimestatus
         if (action === 'start') {
- // immediatelychecktimestatus（possiblyalreadyconnection）
+ // immediatelychecktimestatus(possiblyalreadyconnection)
             try {
                 const statusResponse = await apiFetch(`/api/external-mcp/${encodeURIComponent(name)}`);
                 if (statusResponse.ok) {
@@ -1749,7 +1749,7 @@ async function toggleExternalMCP(name, currentStatus) {
                         if (typeof window !== 'undefined' && typeof window.refreshMentionTools === 'function') {
                             window.refreshMentionTools();
                         }
- // polltothis MCP tool countalreadyupdate（eachsecondtime，no fixed delay）
+ // polltothis MCP tool countalreadyupdate(eachsecondtime,no fixed delay)
                         pollExternalMCPToolCount(name, 10);
                         return;
                     }
@@ -1758,10 +1758,10 @@ async function toggleExternalMCP(name, currentStatus) {
                 console.error('Failed to check status:', error);
             }
             
-            // ifstillnot yetconnection，startpoll
- await pollExternalMCPStatus(name, 30); // at mostpoll30time（30second）
+            // ifstillnot yetconnection,startpoll
+ await pollExternalMCPStatus(name, 30); // at mostpoll30time(30second)
         } else {
-            // stopActions，directlyRefresh
+            // stopActions,directlyRefresh
             await loadExternalMCPs();
             // refresh chat UI tool list
             if (typeof window !== 'undefined' && typeof window.refreshMentionTools === 'function') {
@@ -1812,11 +1812,11 @@ async function pollExternalMCPStatus(name, maxAttempts = 30) {
                     if (typeof window !== 'undefined' && typeof window.refreshMentionTools === 'function') {
                         window.refreshMentionTools();
                     }
- // polltothis MCP tool countalreadyupdate（eachsecondtime，no fixed delay）
+ // polltothis MCP tool countalreadyupdate(eachsecondtime,no fixed delay)
                     pollExternalMCPToolCount(name, 10);
                     return;
                 } else if (status === 'error' || status === 'disconnected') {
- // Connection failed，Refreshlistshow error
+ // Connection failed,Refreshlistshow error
                     await loadExternalMCPs();
                     // refresh chat UI tool list
                     if (typeof window !== 'undefined' && typeof window.refreshMentionTools === 'function') {
@@ -1827,7 +1827,7 @@ async function pollExternalMCPStatus(name, maxAttempts = 30) {
                     }
                     return;
                 } else if (status === 'connecting') {
-                    // stillatConnecting，Continuepoll
+                    // stillatConnecting,Continuepoll
                     attempts++;
                     continue;
                 }
@@ -1839,7 +1839,7 @@ async function pollExternalMCPStatus(name, maxAttempts = 30) {
         attempts++;
     }
     
-    // exceedwhen，Refreshlist
+    // exceedwhen,Refreshlist
     await loadExternalMCPs();
     // refresh chat UI tool list
     if (typeof window !== 'undefined' && typeof window.refreshMentionTools === 'function') {
@@ -1958,7 +1958,7 @@ document.addEventListener('change', function(e) {
     }
 });
 
-// Provider change handler — update base URL placeholder and clear test results
+// Provider change handler - update base URL placeholder and clear test results
 function onProviderChange() {
     const provider = document.getElementById('openai-provider').value;
     const baseUrlInput = document.getElementById('openai-base-url');
@@ -2001,7 +2001,7 @@ function getSelectedModel() {
     return (modelSelect.value || '').trim();
 }
 
-// languageswitchafterre-render MCP managementpagein JS write's block（innerHTML notwill data-i18n autoupdate）
+// languageswitchafterre-render MCP managementpagein JS write's block(innerHTML notwill data-i18n autoupdate)
 document.addEventListener('languagechange', function () {
     try {
         const mcpPage = document.getElementById('page-mcp-management');

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# install-dep.sh — Install a single dependency for Android reverse engineering
+# install-dep.sh - Install a single dependency for Android reverse engineering
 # Usage: install-dep.sh <dependency>
 # Dependencies: java, jadx, vineflower, dex2jar, apktool, adb
 #
 # Exit codes:
-#   0 — installed successfully
-#   1 — installation failed
-#   2 — requires manual action (e.g. sudo needed but not available)
+#   0 - installed successfully
+#   1 - installation failed
+#   2 - requires manual action (e.g. sudo needed but not available)
 set -euo pipefail
 
 usage() {
@@ -64,7 +64,7 @@ if command -v sudo &>/dev/null; then
   if sudo -n true 2>/dev/null; then
     HAS_SUDO=true
   else
-    # sudo exists but may need password — we'll try it and let it prompt
+    # sudo exists but may need password - we'll try it and let it prompt
     HAS_SUDO=true
   fi
 fi
@@ -359,7 +359,7 @@ install_dex2jar() {
   unzip -qo "$tmp_zip" -d "$install_dir"
   rm -f "$tmp_zip"
 
-  # The zip may contain a top-level directory — find the actual bin location
+  # The zip may contain a top-level directory - find the actual bin location
   local bin_dir=""
   if [[ -f "$install_dir/d2j-dex2jar.sh" ]]; then
     bin_dir="$install_dir"

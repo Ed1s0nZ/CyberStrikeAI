@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# CyberStrikeAI — Cuttlefish (AOSP) Virtual Android Device Setup
+# CyberStrikeAI - Cuttlefish (AOSP) Virtual Android Device Setup
 # ============================================================================
 # Installs Cuttlefish host packages, downloads AOSP images, configures
 # the virtual device as a Russian-locale phone with full ADB debug access.
@@ -81,7 +81,7 @@ if [[ ! -f "$CVD_HOME/bin/launch_cvd" ]]; then
     # If cvd fetch didn't work, download manually
     if [[ ! -f "$CVD_HOME/bin/launch_cvd" ]]; then
         warn "Automatic fetch unavailable. Downloading latest nightly..."
-        # Download from Android CI — using the fetch_artifacts approach
+        # Download from Android CI - using the fetch_artifacts approach
         FETCH_URL="https://androidbuildinternal.googleapis.com/android/internal/build/v3/builds"
 
         # Alternative: use the prebuilt fetch script
@@ -135,7 +135,7 @@ mkdir -p "$CVD_HOME/config"
 
 cat > "$CVD_HOME/config/russian_phone.json" << 'RUCFG'
 {
-    "comment": "CyberStrikeAI — Russian-configured Android device",
+    "comment": "CyberStrikeAI - Russian-configured Android device",
     "instances": [
         {
             "vm": {
@@ -232,7 +232,7 @@ $ADB_CMD shell setprop ro.build.display.id "V14.0.6.0.TMOMIXM"
 # ── WiFi Country Code ───────────────────────────────────────────────────
 $ADB_CMD shell setprop wifi.country_code RU
 
-# ── Date/Time Format (24h, dd.MM.yyyy — Russian standard) ───────────────
+# ── Date/Time Format (24h, dd.MM.yyyy - Russian standard) ───────────────
 $ADB_CMD shell settings put system time_12_24 24
 $ADB_CMD shell settings put system date_format dd.MM.yyyy
 
@@ -516,7 +516,7 @@ case "$CMD" in
         PKG="${1:?Package name required}"
         echo "[+] Enabling debug for $PKG..."
         $ADB shell am set-debug-app -w "$PKG"
-        echo "[+] Start the app — it will wait for debugger."
+        echo "[+] Start the app - it will wait for debugger."
         ;;
     strace)
         PID="${1:?PID or package required}"

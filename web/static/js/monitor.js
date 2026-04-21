@@ -3,7 +3,7 @@ let activeTaskInterval = null;
 const ACTIVE_TASK_REFRESH_INTERVAL = 10000; // 10
 const TASK_FINAL_STATUSES = new Set(['failed', 'timeout', 'cancelled', 'completed']);
 
-// BCP 47 （）
+// BCP 47 ()
 function getCurrentTimeLocale() {
     if (typeof window.__locale === 'string' && window.__locale.length) {
         return window.__locale.startsWith('zh') ? 'zh-CN' : 'en-US';
@@ -14,7 +14,7 @@ function getCurrentTimeLocale() {
     return 'zh-CN';
 }
 
-// toLocaleTimeString ： 24 ， AM/PM
+// toLocaleTimeString : 24 , AM/PM
 function getTimeFormatOptions() {
     const loc = getCurrentTimeLocale();
     const base = { hour: '2-digit', minute: '2-digit', second: '2-digit' };
@@ -24,7 +24,7 @@ function getTimeFormatOptions() {
     return base;
 }
 
-// （，）
+// (,)
 function translateProgressMessage(message) {
     if (!message || typeof message !== 'string') return message;
     if (typeof window.t !== 'function') return message;
@@ -32,14 +32,14 @@ function translateProgressMessage(message) {
     const map = {
  // 
  'AI...': 'progress.callingAI',
- '：...': 'progress.lastIterSummary',
+ ':...': 'progress.lastIterSummary',
  '': 'progress.summaryDone',
  '...': 'progress.generatingFinalReply',
- '，...': 'progress.maxIterSummary',
+ ',...': 'progress.maxIterSummary',
  '...': 'progress.analyzingRequestShort',
  '': 'progress.analyzingRequestPlanning',
  ' Eino DeepAgent...': 'progress.startingEinoDeepAgent',
- // （ en-US.json ，/）
+ // ( en-US.json ,/)
         'Calling AI model...': 'progress.callingAI',
         'Last iteration: generating summary and next steps...': 'progress.lastIterSummary',
         'Summary complete': 'progress.summaryDone',
@@ -71,32 +71,32 @@ if (typeof window !== 'undefined') {
     window.translateProgressMessage = translateProgressMessage;
 }
 
-// IDDOM，
+// IDDOM,
 const toolCallStatusMap = new Map();
 
-// ：progressId -> { assistantId, buffer }
+// :progressId -> { assistantId, buffer }
 const responseStreamStateByProgressId = new Map();
 
-// AI ：progressId -> Map(streamId -> { itemId, buffer })
+// AI :progressId -> Map(streamId -> { itemId, buffer })
 const thinkingStreamStateByProgressId = new Map();
 
-// Eino ：progressId -> Map(streamId -> { itemId, buffer })
+// Eino :progressId -> Map(streamId -> { itemId, buffer })
 const einoAgentReplyStreamStateByProgressId = new Map();
 
-// ：progressId::toolCallId -> { itemId, buffer }
+// :progressId::toolCallId -> { itemId, buffer }
 const toolResultStreamStateByKey = new Map();
 function toolResultStreamKey(progressId, toolCallId) {
     return String(progressId) + '::' + String(toolCallId);
 }
 
-/** Eino ： [agentId]，// */
+/** Eino : [agentId],// */
 function timelineAgentBracketPrefix(data) {
     if (!data || data.einoAgent == null) return '';
     const s = String(data.einoAgent).trim();
     return s ? ('[' + s + '] ') : '';
 }
 
-/** /：（/） */
+/** /:(/) */
 function applyEinoTimelineRole(item, data) {
     if (!item || !data) return;
     const role = data.einoRole;
@@ -111,7 +111,7 @@ function applyEinoTimelineRole(item, data) {
     }
 }
 
-// markdown （；）
+// markdown (;)
 const assistantMarkdownSanitizeConfig = {
     ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'code', 'pre', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'a', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'hr'],
     ALLOWED_ATTR: ['href', 'title', 'alt', 'src', 'class'],
@@ -148,7 +148,7 @@ function updateAssistantBubbleContent(assistantMessageId, content, renderMarkdow
     const bubble = assistantElement.querySelector('.message-bubble');
     if (!bubble) return;
 
- // ：addMessage append message-bubble 
+ // :addMessage append message-bubble 
     const copyBtn = bubble.querySelector('.message-copy-btn');
     if (copyBtn) copyBtn.remove();
 
@@ -159,7 +159,7 @@ function updateAssistantBubbleContent(assistantMessageId, content, renderMarkdow
 
     bubble.innerHTML = html;
 
- // （）
+ // ()
     assistantElement.dataset.originalContent = newContent;
 
     if (typeof wrapTablesInBubble === 'function') {
@@ -191,10 +191,10 @@ function isConversationTaskRunning(conversationId) {
     return conversationExecutionTracker.isRunning(conversationId);
 }
 
-/** 「」；， */
+/** "";, */
 const CHAT_SCROLL_PIN_THRESHOLD_PX = 120;
 
-/** wasPinned DOM ， scrollHeight */
+/** wasPinned DOM , scrollHeight */
 function scrollChatMessagesToBottomIfPinned(wasPinned) {
     const messagesDiv = document.getElementById('chat-messages');
     if (!messagesDiv || !wasPinned) return;
@@ -321,7 +321,7 @@ function toggleProgressDetails(progressId) {
     }
 }
 
-// （；）
+// (;)
 function hideProgressMessageForFinalReply(progressId) {
     if (!progressId) return;
     const el = document.getElementById(progressId);
@@ -339,7 +339,7 @@ function collapseAllProgressDetails(assistantMessageId, progressId) {
         if (detailsContainer) {
             const timeline = detailsContainer.querySelector('.progress-timeline');
             if (timeline) {
- // expanded（）
+ // expanded()
                 timeline.classList.remove('expanded');
                 document.querySelectorAll(`#${assistantMessageId} .process-detail-btn`).forEach((btn) => {
  btn.innerHTML = '<span>' + (typeof window.t === 'function' ? window.t('chat.expandDetail') : '') + '</span>';
@@ -348,7 +348,7 @@ function collapseAllProgressDetails(assistantMessageId, progressId) {
         }
     }
     
- // （convertProgressToDetails）
+ // (convertProgressToDetails)
  // details-
     const allDetails = document.querySelectorAll('[id^="details-"]');
     allDetails.forEach(detail => {
@@ -361,7 +361,7 @@ function collapseAllProgressDetails(assistantMessageId, progressId) {
         }
     });
     
- // （）
+ // ()
     if (progressId) {
         const progressTimeline = document.getElementById(progressId + '-timeline');
         const progressToggleBtns = document.querySelectorAll(`#${progressId} .progress-toggle`);
@@ -373,7 +373,7 @@ function collapseAllProgressDetails(assistantMessageId, progressId) {
     }
 }
 
-// ID（done）
+// ID(done)
 function getAssistantId() {
  // ID
     const messages = document.querySelectorAll('.message.assistant');
@@ -383,7 +383,7 @@ function getAssistantId() {
     return null;
 }
 
-// （ mcp ，， MCP ）
+// ( mcp ,, MCP )
 function integrateProgressToMCPSection(progressId, assistantMessageId, mcpExecutionIds) {
     const progressElement = document.getElementById(progressId);
     if (!progressElement) return;
@@ -460,7 +460,7 @@ function integrateProgressToMCPSection(progressId, assistantMessageId, mcpExecut
         buttonsContainer.appendChild(progressDetailBtn);
     }
     
- // ，MCP（）
+ // ,MCP()
     const detailsId = 'process-details-' + assistantMessageId;
     let detailsContainer = document.getElementById(detailsId);
     
@@ -476,18 +476,18 @@ function integrateProgressToMCPSection(progressId, assistantMessageId, mcpExecut
         }
     }
     
- // （，；）
+ // (,;)
     detailsContainer.innerHTML = `
         <div class="process-details-content">
- ${hasContent ? `<div class="progress-timeline" id="${detailsId}-timeline">${timelineHTML}</div>` : '<div class="progress-timeline-empty">' + (typeof window.t === 'function' ? window.t('chat.noProcessDetail') : '（）') + '</div>'}
+ ${hasContent ? `<div class="progress-timeline" id="${detailsId}-timeline">${timelineHTML}</div>` : '<div class="progress-timeline-empty">' + (typeof window.t === 'function' ? window.t('chat.noProcessDetail') : '()') + '</div>'}
         </div>
     `;
     
- // （，）
+ // (,)
     if (hasContent) {
         const timeline = document.getElementById(detailsId + '-timeline');
         if (timeline) {
- // ，；
+ // ,;
             timeline.classList.remove('expanded');
         }
         
@@ -507,36 +507,36 @@ function toggleProcessDetails(progressId, assistantMessageId) {
     const detailsContainer = document.getElementById(detailsId);
     if (!detailsContainer) return;
 
- // ：
+ // :
     const maybeLazy = detailsContainer.dataset && detailsContainer.dataset.lazyNotLoaded === '1' && detailsContainer.dataset.loaded !== '1';
     if (maybeLazy) {
         const messageEl = document.getElementById(assistantMessageId);
         const backendMessageId = messageEl && messageEl.dataset ? messageEl.dataset.backendMessageId : '';
         if (backendMessageId && typeof apiFetch === 'function' && typeof renderProcessDetails === 'function') {
             if (detailsContainer.dataset.loading === '1') {
- // ，
+ // ,
             } else {
                 detailsContainer.dataset.loading = '1';
- // ，
+ // ,
                 const timeline = detailsContainer.querySelector('.progress-timeline');
                 if (timeline) {
- timeline.innerHTML = '<div class="progress-timeline-empty">' + ((typeof window.t === 'function') ? window.t('common.loading') : '…') + '</div>';
+ timeline.innerHTML = '<div class="progress-timeline-empty">' + ((typeof window.t === 'function') ? window.t('common.loading') : '...') + '</div>';
                 }
                 apiFetch(`/api/messages/${encodeURIComponent(String(backendMessageId))}/process-details`)
                     .then(async (res) => {
                         const j = await res.json().catch(() => ({}));
                         if (!res.ok) throw new Error((j && j.error) ? j.error : res.status);
                         const details = (j && Array.isArray(j.processDetails)) ? j.processDetails : [];
- // （renderProcessDetails lazy loaded）
+ // (renderProcessDetails lazy loaded)
                         renderProcessDetails(assistantMessageId, details);
                     })
                     .catch((e) => {
  console.error(':', e);
                         const tl = detailsContainer.querySelector('.progress-timeline');
                         if (tl) {
- tl.innerHTML = '<div class="progress-timeline-empty">' + ((typeof window.t === 'function') ? window.t('chat.noProcessDetail') : '（）') + '</div>';
+ tl.innerHTML = '<div class="progress-timeline-empty">' + ((typeof window.t === 'function') ? window.t('chat.noProcessDetail') : '()') + '</div>';
                         }
- // lazy ，
+ // lazy ,
                         detailsContainer.dataset.lazyNotLoaded = '1';
                         detailsContainer.dataset.loaded = '0';
                     })
@@ -574,7 +574,7 @@ function toggleProcessDetails(progressId, assistantMessageId) {
         }
     }
     
- // ，
+ // ,
     if (timeline && timeline.classList.contains('expanded')) {
         setTimeout(() => {
  // scrollIntoView 
@@ -595,7 +595,7 @@ async function cancelProgressTask(progressId) {
                 stopBtn.disabled = false;
             }, 1500);
         }
- alert(typeof window.t === 'function' ? window.t('tasks.taskInfoNotSynced') : '，。');
+ alert(typeof window.t === 'function' ? window.t('tasks.taskInfoNotSynced') : ',.');
         return;
     }
 
@@ -633,7 +633,7 @@ function convertProgressToDetails(progressId, assistantMessageId) {
     
  // 
     const timeline = document.getElementById(progressId + '-timeline');
- // ，（）
+ // ,()
     let timelineHTML = '';
     if (timeline) {
         timelineHTML = timeline.innerHTML;
@@ -664,14 +664,14 @@ function convertProgressToDetails(progressId, assistantMessageId) {
  // 
     const hasError = timeline && timeline.querySelector('.timeline-item-error');
     
- // ，；
+ // ,;
     const shouldExpand = !hasError;
     const expandedClass = shouldExpand ? 'expanded' : '';
  const collapseDetailText = typeof window.t === 'function' ? window.t('tasks.collapseDetail') : '';
  const expandDetailText = typeof window.t === 'function' ? window.t('chat.expandDetail') : '';
     const toggleText = shouldExpand ? collapseDetailText : expandDetailText;
  const penetrationDetailText = typeof window.t === 'function' ? window.t('chat.penetrationTestDetail') : '';
- const noProcessDetailText = typeof window.t === 'function' ? window.t('chat.noProcessDetail') : '（）';
+ const noProcessDetailText = typeof window.t === 'function' ? window.t('chat.noProcessDetail') : '()';
     bubble.innerHTML = `
         <div class="progress-header">
             <span class="progress-title">📋 ${penetrationDetailText}</span>
@@ -686,11 +686,11 @@ function convertProgressToDetails(progressId, assistantMessageId) {
  // 
     const messagesDiv = document.getElementById('chat-messages');
     const insertWasPinned = isChatMessagesPinnedToBottom();
- // assistantElement div，
+ // assistantElement div,
     if (assistantElement.nextSibling) {
         messagesDiv.insertBefore(detailsDiv, assistantElement.nextSibling);
     } else {
- // ，
+ // ,
         messagesDiv.appendChild(detailsDiv);
     }
     
@@ -707,7 +707,7 @@ function handleStreamEvent(event, progressElement, progressId,
     const timeline = document.getElementById(progressId + '-timeline');
     if (!timeline) return;
 
- // （error/cancelled），
+ // (error/cancelled),
     const upsertTerminalAssistantMessage = (message, preferredMessageId = null) => {
         const preferredIds = [];
         if (preferredMessageId) preferredIds.push(preferredMessageId);
@@ -732,22 +732,22 @@ function handleStreamEvent(event, progressElement, progressId,
     
     switch (event.type) {
         case 'heartbeat':
- // SSE ， UI
+ // SSE , UI
             break;
         case 'conversation':
             if (event.data && event.data.conversationId) {
- // ，ID
+ // ,ID
                 const taskState = progressTaskState.get(progressId);
                 const originalConversationId = taskState?.conversationId;
                 
  // 
                 updateProgressConversation(progressId, event.data.conversationId);
                 
- // （currentConversationId null），
- // conversation ， currentConversationId
+ // (currentConversationId null),
+ // conversation , currentConversationId
                 if (currentConversationId === null && originalConversationId !== null) {
- // ， conversation 
- // ，
+ // , conversation 
+ // ,
                     break;
                 }
                 
@@ -756,9 +756,9 @@ function handleStreamEvent(event, progressElement, progressId,
                 updateActiveConversation();
                 addAttackChainButton(currentConversationId);
                 loadActiveTasks();
- // ，，updated_at
+ // ,,updated_at
  // 
- // loadConversationsWithGroups，
+ // loadConversationsWithGroups,
                 setTimeout(() => {
                     if (typeof loadConversationsWithGroups === 'function') {
                         loadConversationsWithGroups();
@@ -805,7 +805,7 @@ function handleStreamEvent(event, progressElement, progressId,
                 state = new Map();
                 thinkingStreamStateByProgressId.set(progressId, state);
             }
- // ， buffer
+ // , buffer
  const thinkBase = typeof window.t === 'function' ? window.t('chat.aiThinking') : 'AI';
             const title = timelineAgentBracketPrefix(d) + '🤔 ' + thinkBase;
             const itemId = addTimelineItem(timeline, 'thinking', {
@@ -844,7 +844,7 @@ function handleStreamEvent(event, progressElement, progressId,
         }
 
         case 'thinking':
- // thinking thinking_stream_* （ streamId）， timeline item
+ // thinking thinking_stream_* ( streamId), timeline item
             if (event.data && event.data.streamId) {
                 const streamId = event.data.streamId;
                 const state = thinkingStreamStateByProgressId.get(progressId);
@@ -904,7 +904,7 @@ function handleStreamEvent(event, progressElement, progressId,
                 expanded: false
             });
             
- // toolCallId，
+ // toolCallId,
             if (toolCallId && toolCallItemId) {
                 toolCallStatusMap.set(toolCallId, {
                     itemId: toolCallItemId,
@@ -928,7 +928,7 @@ function handleStreamEvent(event, progressElement, progressId,
             if (!deltaText) break;
 
             if (!state) {
- // ： tool_result ， pre 
+ // : tool_result , pre 
  const runningLabel = typeof window.t === 'function' ? window.t('timeline.running') : '...';
                 const title = timelineAgentBracketPrefix(deltaInfo) + '⏳ ' + (typeof window.t === 'function'
                     ? window.t('timeline.running')
@@ -975,7 +975,7 @@ function handleStreamEvent(event, progressElement, progressId,
             const resultToolCallId = resultInfo.toolCallId || null;
  const resultExecText = success ? (typeof window.t === 'function' ? window.t('chat.toolExecComplete', { name: escapeHtml(resultToolName) }) : ' ' + escapeHtml(resultToolName) + ' ') : (typeof window.t === 'function' ? window.t('chat.toolExecFailed', { name: escapeHtml(resultToolName) }) : ' ' + escapeHtml(resultToolName) + ' ');
 
- // tool ，，
+ // tool ,,
             if (resultToolCallId) {
                 const key = toolResultStreamKey(progressId, resultToolCallId);
                 const state = toolResultStreamStateByKey.get(key);
@@ -1125,7 +1125,7 @@ function handleStreamEvent(event, progressElement, progressId,
         case 'progress':
             const progressTitle = document.querySelector(`#${progressId} .progress-title`);
             if (progressTitle) {
- // ， translateProgressMessage 
+ // , translateProgressMessage 
                 const progressEl = document.getElementById(progressId);
                 if (progressEl) {
                     progressEl.dataset.progressRawMessage = event.message || '';
@@ -1154,7 +1154,7 @@ function handleStreamEvent(event, progressElement, progressId,
  finalizeProgressTask(progressId, typeof window.t === 'function' ? window.t('tasks.statusCancelled') : '');
             }
             
- // （），
+ // (),
             {
                 const preferredMessageId = event.data && event.data.messageId ? event.data.messageId : null;
                 const { assistantId, assistantElement } = upsertTerminalAssistantMessage(event.message, preferredMessageId);
@@ -1182,7 +1182,7 @@ function handleStreamEvent(event, progressElement, progressId,
             setMcpIds(mcpIds);
 
             if (responseData.conversationId) {
- // （currentConversationId null），，
+ // (currentConversationId null),,
                 if (currentConversationId === null && responseOriginalConversationId !== null) {
                     updateProgressConversation(progressId, responseData.conversationId);
                     break;
@@ -1194,7 +1194,7 @@ function handleStreamEvent(event, progressElement, progressId,
                 loadActiveTasks();
             }
 
- // ，，
+ // ,,
  // 
             const agentPrefix = timelineAgentBracketPrefix(responseData);
  const title = agentPrefix + '📝 ' + (typeof window.t === 'function' ? window.t('chat.planning') : '');
@@ -1219,7 +1219,7 @@ function handleStreamEvent(event, progressElement, progressId,
                 }
             }
 
- // ，
+ // ,
  // 
             let state = responseStreamStateByProgressId.get(progressId);
             if (!state) {
@@ -1248,7 +1248,7 @@ function handleStreamEvent(event, progressElement, progressId,
         }
 
         case 'response':
- // ，ID
+ // ,ID
             const responseTaskState = progressTaskState.get(progressId);
             const responseOriginalConversationId = responseTaskState?.conversationId;
 
@@ -1271,7 +1271,7 @@ function handleStreamEvent(event, progressElement, progressId,
                 loadActiveTasks();
             }
 
- // response_start/response_delta ，
+ // response_start/response_delta ,
             const streamState = responseStreamStateByProgressId.get(progressId);
             const existingAssistantId = streamState?.assistantId || getAssistantId();
             let assistantIdFinal = existingAssistantId;
@@ -1284,10 +1284,10 @@ function handleStreamEvent(event, progressElement, progressId,
                 updateAssistantBubbleContent(assistantIdFinal, event.message, true);
             }
 
- // （，）
+ // (,)
             hideProgressMessageForFinalReply(progressId);
 
- // （ response ，）
+ // ( response ,)
             integrateProgressToMCPSection(progressId, assistantIdFinal, mcpIds);
             responseStreamStateByProgressId.delete(progressId);
 
@@ -1314,18 +1314,18 @@ function handleStreamEvent(event, progressElement, progressId,
  errorTitle.textContent = '❌ ' + (typeof window.t === 'function' ? window.t('chat.executionFailed') : '');
             }
             
- // （completed）
+ // (completed)
             const progressContainer = document.querySelector(`#${progressId} .progress-container`);
             if (progressContainer) {
                 progressContainer.classList.add('completed');
             }
             
- // （）
+ // ()
             if (progressTaskState.has(progressId)) {
  finalizeProgressTask(progressId, typeof window.t === 'function' ? window.t('tasks.statusFailed') : '');
             }
             
- // （），
+ // (),
             {
                 const preferredMessageId = event.data && event.data.messageId ? event.data.messageId : null;
                 const { assistantId, assistantElement } = upsertTerminalAssistantMessage(event.message, preferredMessageId);
@@ -1340,7 +1340,7 @@ function handleStreamEvent(event, progressElement, progressId,
                 }
             }
             
- // （）
+ // ()
             loadActiveTasks();
             break;
             
@@ -1356,7 +1356,7 @@ function handleStreamEvent(event, progressElement, progressId,
                     toolResultStreamStateByKey.delete(key);
                 }
             }
- // ，（）
+ // ,()
             const doneTitle = document.querySelector(`#${progressId} .progress-title`);
             if (doneTitle) {
  doneTitle.textContent = '✅ ' + (typeof window.t === 'function' ? window.t('chat.penetrationTestComplete') : '');
@@ -1375,27 +1375,27 @@ function handleStreamEvent(event, progressElement, progressId,
  // 
             const hasError = timeline && timeline.querySelector('.timeline-item-error');
             
- // （）
+ // ()
             loadActiveTasks();
             
- // （）
+ // ()
             setTimeout(() => {
                 loadActiveTasks();
             }, 200);
             
- // （response）
+ // (response)
             setTimeout(() => {
                 const assistantIdFromDone = getAssistantId();
                 if (assistantIdFromDone) {
                     collapseAllProgressDetails(assistantIdFromDone, progressId);
                 } else {
- // ID，
+ // ID,
                     collapseAllProgressDetails(null, progressId);
                 }
                 
- // ，（）
+ // ,()
                 if (hasError) {
- // （DOM）
+ // (DOM)
                     setTimeout(() => {
                         collapseAllProgressDetails(assistantIdFromDone || null, progressId);
                     }, 200);
@@ -1404,7 +1404,7 @@ function handleStreamEvent(event, progressElement, progressId,
             break;
     }
     
- // （）
+ // ()
     scrollChatMessagesToBottomIfPinned(streamScrollWasPinned);
 }
 
@@ -1437,7 +1437,7 @@ function updateToolCallStatus(toolCallId, status) {
         statusText = ' <span class="tool-status-badge tool-status-failed">❌ ' + escapeHtml(failedLabel) + '</span>';
     }
     
- // （，）
+ // (,)
     const originalText = titleElement.innerHTML;
  // 
     const cleanText = originalText.replace(/\s*<span class="tool-status-badge[^>]*>.*?<\/span>/g, '');
@@ -1451,7 +1451,7 @@ function addTimelineItem(timeline, type, options) {
     const itemId = 'timeline-item-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
     item.id = itemId;
     item.className = `timeline-item timeline-item-${type}`;
- // ， languagechange 
+ // , languagechange 
     item.dataset.timelineType = type;
     if (type === 'iteration') {
         const n = options.iterationN != null ? options.iterationN : (options.data && options.data.iteration != null ? options.data.iteration : 1);
@@ -1481,7 +1481,7 @@ function addTimelineItem(timeline, type, options) {
         item.dataset.einoAgent = String(options.data.einoAgent).trim();
     }
 
- // createdAt，（）
+ // createdAt,()
     let eventTime;
     if (options.createdAt) {
  // Date
@@ -1492,14 +1492,14 @@ function addTimelineItem(timeline, type, options) {
         } else {
             eventTime = new Date(options.createdAt);
         }
- // ，
+ // ,
         if (isNaN(eventTime.getTime())) {
             eventTime = new Date();
         }
     } else {
         eventTime = new Date();
     }
- // ISO，
+ // ISO,
     try {
         item.dataset.createdAtIso = eventTime.toISOString();
     } catch (e) { /* ignore */ }
@@ -1579,7 +1579,7 @@ function addTimelineItem(timeline, type, options) {
  // 
     const expanded = timeline.classList.contains('expanded');
     if (!expanded && (type === 'tool_call' || type === 'tool_result')) {
- // ，
+ // ,
     }
     
  // item ID
@@ -1602,7 +1602,7 @@ async function loadActiveTasks(showErrors = false) {
  console.error(':', error);
         if (showErrors && bar) {
             bar.style.display = 'block';
- const cannotGetStatus = typeof window.t === 'function' ? window.t('tasks.cannotGetTaskStatus') : '：';
+ const cannotGetStatus = typeof window.t === 'function' ? window.t('tasks.cannotGetTaskStatus') : ':';
             bar.innerHTML = `<div class="active-task-error">${escapeHtml(cannotGetStatus)}${escapeHtml(error.message)}</div>`;
         }
     }
@@ -1704,7 +1704,7 @@ const monitorState = {
     pagination: {
         page: 1,
         pageSize: (() => {
- // localStorage ， 20
+ // localStorage , 20
             const saved = localStorage.getItem('monitorPageSize');
             return saved ? parseInt(saved, 10) : 20;
         })(),
@@ -1754,8 +1754,8 @@ function changeMonitorPageSize() {
 }
 
 function closeMonitorPanel() {
- // ，
- // ，
+ // ,
+ // ,
     if (typeof switchPage === 'function') {
         switchPage('chat');
     }
@@ -1766,7 +1766,7 @@ async function refreshMonitorPanel(page = null) {
     const execContainer = document.getElementById('monitor-executions');
 
     try {
- // ，，
+ // ,,
         const currentPage = page !== null ? page : monitorState.pagination.page;
         const pageSize = monitorState.pagination.pageSize;
         
@@ -1814,15 +1814,15 @@ async function refreshMonitorPanel(page = null) {
     } catch (error) {
  console.error(':', error);
         if (statsContainer) {
- statsContainer.innerHTML = `<div class="monitor-error">${escapeHtml(typeof window.t === 'function' ? window.t('mcpMonitor.loadStatsError') : '')}：${escapeHtml(error.message)}</div>`;
+ statsContainer.innerHTML = `<div class="monitor-error">${escapeHtml(typeof window.t === 'function' ? window.t('mcpMonitor.loadStatsError') : '')}:${escapeHtml(error.message)}</div>`;
         }
         if (execContainer) {
- execContainer.innerHTML = `<div class="monitor-error">${escapeHtml(typeof window.t === 'function' ? window.t('mcpMonitor.loadExecutionsError') : '')}：${escapeHtml(error.message)}</div>`;
+ execContainer.innerHTML = `<div class="monitor-error">${escapeHtml(typeof window.t === 'function' ? window.t('mcpMonitor.loadExecutionsError') : '')}:${escapeHtml(error.message)}</div>`;
         }
     }
 }
 
-// （）
+// ()
 let toolFilterDebounceTimer = null;
 function handleToolFilterInput() {
  // 
@@ -1830,7 +1830,7 @@ function handleToolFilterInput() {
         clearTimeout(toolFilterDebounceTimer);
     }
     
- // ，500ms
+ // ,500ms
     toolFilterDebounceTimer = setTimeout(() => {
         applyMonitorFilters();
     }, 500);
@@ -1841,7 +1841,7 @@ async function applyMonitorFilters() {
     const toolFilter = document.getElementById('monitor-tool-filter');
     const status = statusFilter ? statusFilter.value : 'all';
     const tool = toolFilter ? (toolFilter.value.trim() || 'all') : 'all';
- // ，
+ // ,
     await refreshMonitorPanelWithFilter(status, tool);
 }
 
@@ -1891,10 +1891,10 @@ async function refreshMonitorPanelWithFilter(statusFilter = 'all', toolFilter = 
     } catch (error) {
  console.error(':', error);
         if (statsContainer) {
- statsContainer.innerHTML = `<div class="monitor-error">${escapeHtml(typeof window.t === 'function' ? window.t('mcpMonitor.loadStatsError') : '')}：${escapeHtml(error.message)}</div>`;
+ statsContainer.innerHTML = `<div class="monitor-error">${escapeHtml(typeof window.t === 'function' ? window.t('mcpMonitor.loadStatsError') : '')}:${escapeHtml(error.message)}</div>`;
         }
         if (execContainer) {
- execContainer.innerHTML = `<div class="monitor-error">${escapeHtml(typeof window.t === 'function' ? window.t('mcpMonitor.loadExecutionsError') : '')}：${escapeHtml(error.message)}</div>`;
+ execContainer.innerHTML = `<div class="monitor-error">${escapeHtml(typeof window.t === 'function' ? window.t('mcpMonitor.loadExecutionsError') : '')}:${escapeHtml(error.message)}</div>`;
         }
     }
 }
@@ -1954,11 +1954,11 @@ function renderMonitorStats(statsMap = {}, lastFetchedAt = null) {
         <div class="monitor-stat-card">
             <h4>${escapeHtml(lastCallLabel)}</h4>
             <div class="monitor-stat-value" style="font-size:1rem;">${escapeHtml(lastCallText)}</div>
-            <div class="monitor-stat-meta">${escapeHtml(lastRefreshLabel)}：${escapeHtml(lastUpdatedText)}</div>
+            <div class="monitor-stat-meta">${escapeHtml(lastRefreshLabel)}:${escapeHtml(lastUpdatedText)}</div>
         </div>
     `;
 
- // 4（ totalCalls 0 ）
+ // 4( totalCalls 0 )
     const topTools = entries
         .filter(tool => (tool.totalCalls || 0) > 0)
         .slice()
@@ -2009,8 +2009,8 @@ function renderMonitorExecutions(executions = [], statusFilter = 'all') {
         return;
     }
 
- // ，
- // ，
+ // ,
+ // ,
  const unknownLabel = typeof window.t === 'function' ? window.t('mcpMonitor.unknown') : '';
  const unknownToolLabel = typeof window.t === 'function' ? window.t('mcpMonitor.unknownTool') : '';
  const viewDetailLabel = typeof window.t === 'function' ? window.t('mcpMonitor.viewDetail') : '';
@@ -2048,7 +2048,7 @@ function renderMonitorExecutions(executions = [], statusFilter = 'all') {
         })
         .join('');
 
- // （）
+ // ()
     const oldTableContainer = container.querySelector('.monitor-table-container');
     if (oldTableContainer) {
         oldTableContainer.remove();
@@ -2085,7 +2085,7 @@ function renderMonitorExecutions(executions = [], statusFilter = 'all') {
         </table>
     `;
     
- // （）
+ // ()
     const existingPagination = container.querySelector('.monitor-pagination');
     if (existingPagination) {
         container.insertBefore(tableContainer, existingPagination);
@@ -2158,7 +2158,7 @@ async function deleteExecution(executionId) {
         return;
     }
     
- const deleteConfirmMsg = typeof window.t === 'function' ? window.t('mcpMonitor.deleteExecConfirmSingle') : '？。';
+ const deleteConfirmMsg = typeof window.t === 'function' ? window.t('mcpMonitor.deleteExecConfirmSingle') : '?.';
     if (!confirm(deleteConfirmMsg)) {
         return;
     }
@@ -2265,7 +2265,7 @@ async function batchDeleteExecutions() {
     
     const ids = Array.from(checkboxes).map(cb => cb.value);
     const count = ids.length;
- const batchConfirmMsg = typeof window.t === 'function' ? window.t('mcpMonitor.batchDeleteConfirm', { count: count }) : ` ${count} ？。`;
+ const batchConfirmMsg = typeof window.t === 'function' ? window.t('mcpMonitor.batchDeleteConfirm', { count: count }) : ` ${count} ?.`;
     if (!confirm(batchConfirmMsg)) {
         return;
     }
@@ -2333,7 +2333,7 @@ function formatExecutionDuration(start, end) {
 }
 
 /**
- * 、（ AM/PM）
+ * ,( AM/PM)
  */
 function refreshProgressAndTimelineI18n() {
     const _t = function (k, o) {
@@ -2342,7 +2342,7 @@ function refreshProgressAndTimelineI18n() {
     const timeLocale = getCurrentTimeLocale();
     const timeOpts = getTimeFormatOptions();
 
- // ：「」（ Stop task）
+ // :""( Stop task)
     document.querySelectorAll('.progress-message .progress-stop').forEach(function (btn) {
         if (!btn.disabled && btn.id && btn.id.indexOf('-stop-btn') !== -1) {
             const cancelling = _t('tasks.cancelling');
@@ -2364,13 +2364,13 @@ function refreshProgressAndTimelineI18n() {
             titleEl.textContent = '\uD83D\uDD0D ' + translateProgressMessage(raw);
         }
     });
- // 「」： .progress-message progress 
+ // "": .progress-message progress 
     document.querySelectorAll('.progress-container .progress-header .progress-title').forEach(function (titleEl) {
         if (titleEl.closest('.progress-message')) return;
         titleEl.textContent = '\uD83D\uDCCB ' + _t('chat.penetrationTestDetail');
     });
 
- // ：，
+ // :,
     document.querySelectorAll('.timeline-item').forEach(function (item) {
         const type = item.dataset.timelineType;
         const titleSpan = item.querySelector('.timeline-item-title');
@@ -2418,7 +2418,7 @@ function refreshProgressAndTimelineI18n() {
         }
     });
 
- // 「/」
+ // "/"
     document.querySelectorAll('.process-detail-btn span').forEach(function (span) {
         const btn = span.closest('.process-detail-btn');
         const assistantId = btn && btn.closest('.message.assistant') && btn.closest('.message.assistant').id;

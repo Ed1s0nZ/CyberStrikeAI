@@ -745,7 +745,7 @@ func (pm *PersistentMemory) Delete(id string) error {
 // suitable for injection into a system prompt. It organizes memories by category
 // and entity, highlights status, and separates dismissed findings from active ones.
 // When conversationID is non-empty, only memories belonging to that conversation
-// (or entity-scoped global memories) are included — this prevents cross-conversation
+// (or entity-scoped global memories) are included - this prevents cross-conversation
 // bleed where old targets from unrelated threads confuse the current session.
 // Returns an empty string when there are no memories.
 func (pm *PersistentMemory) BuildContextBlock(conversationID ...string) string {
@@ -845,7 +845,7 @@ func (pm *PersistentMemory) BuildContextBlock(conversationID ...string) string {
 
 	// ── Tool runs: compact list to prevent repeated execution ───────────────
 	if len(toolRunEntries) > 0 {
-		sb.WriteString("\n[COMPLETED TOOL RUNS — do not repeat these unless necessary]\n")
+		sb.WriteString("\n[COMPLETED TOOL RUNS - do not repeat these unless necessary]\n")
 		maxToolRuns := 12
 		if len(toolRunEntries) < maxToolRuns {
 			maxToolRuns = len(toolRunEntries)
@@ -895,7 +895,7 @@ func (pm *PersistentMemory) BuildContextBlock(conversationID ...string) string {
 
 	// ── Dismissed / disproven findings ──────────────────────────────────────
 	if len(dismissed) > 0 {
-		sb.WriteString("\n[DISMISSED FINDINGS — false positives and disproven entries, do not re-investigate]\n")
+		sb.WriteString("\n[DISMISSED FINDINGS - false positives and disproven entries, do not re-investigate]\n")
 		maxDismissed := 20
 		if len(dismissed) < maxDismissed {
 			maxDismissed = len(dismissed)

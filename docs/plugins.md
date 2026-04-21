@@ -2,16 +2,16 @@
 
 ## Overview
 
-The plugin system allows extending CyberStrikeAI with new tools, skills, agents, roles, and knowledge — **without modifying any Go source code**. Each plugin is a self-contained directory with a manifest, and gets hot-loaded at runtime.
+The plugin system allows extending CyberStrikeAI with new tools, skills, agents, roles, and knowledge - **without modifying any Go source code**. Each plugin is a self-contained directory with a manifest, and gets hot-loaded at runtime.
 
 Plugins can provide:
-- **Tools** — security tool integrations (nmap wrappers, API clients, custom scanners)
-- **Skills** — methodology documents the AI agent loads on demand
-- **Agents** — multi-agent sub-agent definitions for the orchestrator
-- **Roles** — predefined security testing roles with tool/skill configurations
-- **Knowledge** — documents indexed into the RAG knowledge base
-- **Scripts** — Python/shell scripts executed by plugin tools
-- **MCP Servers** — standalone MCP protocol servers (stdio/SSE)
+- **Tools** - security tool integrations (nmap wrappers, API clients, custom scanners)
+- **Skills** - methodology documents the AI agent loads on demand
+- **Agents** - multi-agent sub-agent definitions for the orchestrator
+- **Roles** - predefined security testing roles with tool/skill configurations
+- **Knowledge** - documents indexed into the RAG knowledge base
+- **Scripts** - Python/shell scripts executed by plugin tools
+- **MCP Servers** - standalone MCP protocol servers (stdio/SSE)
 
 ## Quick Start
 
@@ -88,7 +88,7 @@ curl -X POST http://localhost:8080/api/plugins/my-plugin/enable \
   -H "Authorization: Bearer TOKEN"
 ```
 
-The tool is now available to the AI agent — no restart needed.
+The tool is now available to the AI agent - no restart needed.
 
 ---
 
@@ -120,7 +120,7 @@ plugins/
         └── config.yaml
 ```
 
-All subdirectories are optional — a plugin can provide any combination.
+All subdirectories are optional - a plugin can provide any combination.
 
 ---
 
@@ -187,10 +187,10 @@ args: ["{{PLUGIN_DIR}}/scripts/scanner.py"]
 
 ### Environment Variables
 
-All plugin `config` variables are automatically injected as environment variables when the tool runs. You don't need to handle env var passing — the plugin system does it.
+All plugin `config` variables are automatically injected as environment variables when the tool runs. You don't need to handle env var passing - the plugin system does it.
 
 ```python
-# In your script — just read the env var
+# In your script - just read the env var
 import os
 api_key = os.environ["MY_API_KEY"]  # Set by plugin system
 ```
@@ -309,7 +309,7 @@ curl -X POST http://localhost:8080/api/plugins/my-plugin/install \
   -H "Authorization: Bearer TOKEN"
 ```
 
-Dependencies install into a `.venv` directory inside the plugin folder, keeping the system clean. Scripts should be invoked with the system Python — the venv is activated automatically if present.
+Dependencies install into a `.venv` directory inside the plugin folder, keeping the system clean. Scripts should be invoked with the system Python - the venv is activated automatically if present.
 
 ---
 
@@ -472,7 +472,7 @@ curl -X POST http://localhost:8080/api/plugins/censys/config \
 # 3. Enable
 curl -X POST http://localhost:8080/api/plugins/censys/enable -H "Authorization: Bearer TOKEN"
 
-# 4. Test — the AI agent now has access to censys-search tool
+# 4. Test - the AI agent now has access to censys-search tool
 ```
 
 ---
@@ -519,7 +519,7 @@ parameters:
     flag: "--target"
 ```
 
-No `{{PLUGIN_DIR}}` needed — just reference the binary directly.
+No `{{PLUGIN_DIR}}` needed - just reference the binary directly.
 
 ---
 
@@ -530,7 +530,7 @@ No `{{PLUGIN_DIR}}` needed — just reference the binary directly.
 - Plugin scripts run with the same permissions as the CyberStrikeAI process
 - Python dependencies install into isolated `.venv` per plugin
 - All plugin API endpoints require authentication
-- Plugin upload (ZIP) should be restricted to trusted sources — a malicious plugin has full system access
+- Plugin upload (ZIP) should be restricted to trusted sources - a malicious plugin has full system access
 
 ---
 
@@ -564,7 +564,7 @@ cd plugins/my-plugin && python3 -m venv .venv && .venv/bin/pip install -r requir
 
 ## Plugin Frontend Development
 
-Plugins can extend the CyberStrikeAI web UI with custom pages, navigation items, JavaScript, CSS, and translations — all without modifying core code.
+Plugins can extend the CyberStrikeAI web UI with custom pages, navigation items, JavaScript, CSS, and translations - all without modifying core code.
 
 ### Frontend Directory Structure
 
@@ -624,7 +624,7 @@ When CyberStrikeAI starts and a plugin is enabled:
 `plugins/my-plugin/web/pages/my-page.html`:
 
 ```html
-<!-- Page content fragment — no <html>/<head>/<body> wrappers needed -->
+<!-- Page content fragment - no <html>/<head>/<body> wrappers needed -->
 <!-- The page ID is derived from filename: my-page.html → page-my-page -->
 
 <div class="page-header">
@@ -648,11 +648,11 @@ When CyberStrikeAI starts and a plugin is enabled:
 ```javascript
 // Plugin JS runs after the page HTML is in the DOM.
 // You have access to all CyberStrikeAI globals:
-//   - apiFetch(url, opts)    — authenticated API calls
-//   - showNotification(msg, type) — toast notifications
-//   - switchPage(pageId)     — navigate to a page
-//   - window.t(key)          — i18n translation
-//   - CyberStrikePlugins     — plugin loader API
+//   - apiFetch(url, opts)    - authenticated API calls
+//   - showNotification(msg, type) - toast notifications
+//   - switchPage(pageId)     - navigate to a page
+//   - window.t(key)          - i18n translation
+//   - CyberStrikePlugins     - plugin loader API
 
 (function() {
     'use strict';
@@ -681,7 +681,7 @@ When CyberStrikeAI starts and a plugin is enabled:
     const wrappedSwitchPage = function(pageId) {
         origSwitchPage(pageId);
         if (pageId === 'my-page') {
-            // Page became active — refresh data
+            // Page became active - refresh data
             myPluginSearch();
         }
     };
@@ -694,7 +694,7 @@ When CyberStrikeAI starts and a plugin is enabled:
 `plugins/my-plugin/web/css/my-plugin.css`:
 
 ```css
-/* Plugin styles — use specific selectors to avoid conflicts */
+/* Plugin styles - use specific selectors to avoid conflicts */
 #page-my-page .page-header {
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 12px;
@@ -748,13 +748,13 @@ Translations merge into the global i18n bundle at load time. Use `data-i18n="myP
 
 Plugin assets are served at:
 ```
-/api/plugins/<name>/web/<path>    — CSS, JS, HTML, images, data files
-/api/plugins/<name>/i18n/<lang>   — Translation JSON files
+/api/plugins/<name>/web/<path>    - CSS, JS, HTML, images, data files
+/api/plugins/<name>/i18n/<lang>   - Translation JSON files
 ```
 
 These routes do NOT require authentication (they load before login on page init).
 
-**Security**: path traversal is blocked — `..` in paths returns 403.
+**Security**: path traversal is blocked - `..` in paths returns 403.
 
 ### Accessing Plugin Config in Frontend
 
@@ -910,9 +910,9 @@ frontend:
                     role: 'Information_Gathering'
                 })
             });
-            // The agent runs async — switch to chat to see progress
+            // The agent runs async - switch to chat to see progress
             switchPage('chat');
-            showNotification('Recon started for ' + target + ' — see chat for progress', 'success');
+            showNotification('Recon started for ' + target + ' - see chat for progress', 'success');
         } catch (err) {
             content.innerHTML = '<p style="color:red;">' + err.message + '</p>';
         }
@@ -920,7 +920,7 @@ frontend:
 })();
 ```
 
-This example demonstrates: a plugin with its own sidebar page, custom UI, i18n support, and integration with the agent API — all without touching any Go source code.
+This example demonstrates: a plugin with its own sidebar page, custom UI, i18n support, and integration with the agent API - all without touching any Go source code.
 
 ---
 

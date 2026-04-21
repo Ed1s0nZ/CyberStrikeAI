@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// multiAgentPrepared Eino message。
+// multiAgentPrepared Eino message.
 type multiAgentPrepared struct {
 	ConversationID     string
 	CreatedNew         bool
@@ -69,14 +69,14 @@ func (h *AgentHandler) prepareMultiAgentSession(req *ChatRequest) (*multiAgentPr
 	if req.WebShellConnectionID != "" {
 		conn, errConn := h.db.GetWebshellConnection(strings.TrimSpace(req.WebShellConnectionID))
 		if errConn != nil || conn == nil {
-			h.logger.Warn("WebShell AI ：", zap.String("id", req.WebShellConnectionID), zap.Error(errConn))
+			h.logger.Warn("WebShell AI :", zap.String("id", req.WebShellConnectionID), zap.Error(errConn))
 			return nil, fmt.Errorf("WebShell not found ")
 		}
 		remark := conn.Remark
 		if remark == "" {
 			remark = conn.URL
 		}
-		finalMessage = fmt.Sprintf("[WebShell ] currentconnection ID：%s，remark：%s。（，connection_id \"%s\"）：webshell_exec、webshell_file_list、webshell_file_read、webshell_file_write、record_vulnerability、list_knowledge_risk_types、search_knowledge_base、list_skills、read_skill。：、，，invoke tool；、、、recordknowledge base/ Skills 。\n\n：%s",
+		finalMessage = fmt.Sprintf("[WebShell ] currentconnection ID:%s,remark:%s.(,connection_id \"%s\"):webshell_exec,webshell_file_list,webshell_file_read,webshell_file_write,record_vulnerability,list_knowledge_risk_types,search_knowledge_base,list_skills,read_skill.:,,,invoke tool;,,,recordknowledge base/ Skills .\n\n:%s",
 			conn.ID, remark, conn.ID, req.Message)
 		roleTools = []string{
 			builtin.ToolWebshellExec,

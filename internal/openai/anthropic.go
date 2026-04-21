@@ -40,7 +40,7 @@ func (c *Client) doAnthropicWithRetry(ctx context.Context, endpoint string, body
 			return resp, nil
 		}
 
-		// 429 — parse retry-after from headers
+		// 429 - parse retry-after from headers
 		retryAfter := parseRetryAfter(resp)
 		if retryAfter <= 0 {
 			// Fallback: exponential backoff 10s, 20s, 40s, 60s, 60s
@@ -87,7 +87,7 @@ type anthropicContentBlock struct {
 	Name      string          `json:"name,omitempty"`       // tool_use
 	Input     json.RawMessage `json:"input,omitempty"`      // tool_use
 	ToolUseID string          `json:"tool_use_id,omitempty"` // tool_result
-	Content   interface{}     `json:"content,omitempty"`     // tool_result (string or blocks) — will be set explicitly
+	Content   interface{}     `json:"content,omitempty"`     // tool_result (string or blocks) - will be set explicitly
 }
 
 type anthropicTool struct {
@@ -211,7 +211,7 @@ func openaiToAnthropicRequest(payload interface{}) (*anthropicRequest, error) {
 		req.MaxTokens = 8192
 	}
 
-	// Convert messages — extract system messages to top-level field
+	// Convert messages - extract system messages to top-level field
 	var systemParts []string
 	for _, rawMsg := range oai.Messages {
 		var msg struct {
@@ -265,7 +265,7 @@ func openaiToAnthropicRequest(payload interface{}) (*anthropicRequest, error) {
 				var argObj json.RawMessage
 				var argStr string
 				if json.Unmarshal(tc.Function.Arguments, &argStr) == nil {
-					// It's a JSON string — parse it
+					// It's a JSON string - parse it
 					argObj = json.RawMessage(argStr)
 				} else {
 					argObj = tc.Function.Arguments
@@ -301,7 +301,7 @@ func openaiToAnthropicRequest(payload interface{}) (*anthropicRequest, error) {
 				"tool_use_id": msg.ToolCallID,
 				"content":     resultText,
 			}
-			// Check if the previous message is a user message with tool_result blocks — merge
+			// Check if the previous message is a user message with tool_result blocks - merge
 			if len(req.Messages) > 0 {
 				last := &req.Messages[len(req.Messages)-1]
 				if last.Role == "user" {
@@ -324,7 +324,7 @@ func openaiToAnthropicRequest(payload interface{}) (*anthropicRequest, error) {
 					Content: textContent,
 				})
 			} else {
-				// Array content blocks — pass through
+				// Array content blocks - pass through
 				var blocks []interface{}
 				if json.Unmarshal(msg.Content, &blocks) == nil {
 					req.Messages = append(req.Messages, anthropicMessage{
@@ -618,7 +618,7 @@ func (c *Client) anthropicChatCompletionStreamWithToolCalls(
 
 		switch currentEvent {
 		case "message_start":
-			// Contains initial message info — skip for now
+			// Contains initial message info - skip for now
 			continue
 
 		case "content_block_start":
@@ -657,7 +657,7 @@ func (c *Client) anthropicChatCompletionStreamWithToolCalls(
 			}
 
 		case "content_block_stop":
-			// Block finished — nothing special to do
+			// Block finished - nothing special to do
 			continue
 
 		case "message_delta":

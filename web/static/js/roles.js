@@ -6,7 +6,7 @@ let currentRole = localStorage.getItem('currentRole') || '';
 let roles = [];
 let rolesSearchKeyword = ''; // role searchkeyword
 let rolesSearchTimeout = null; // search debounce timer
-let allRoleTools = []; // storagealltoollist（used forroletool selection）
+let allRoleTools = []; // storagealltoollist(used forroletool selection)
 let roleToolsPagination = {
     page: 1,
     pageSize: 20,
@@ -14,31 +14,31 @@ let roleToolsPagination = {
     totalPages: 1
 };
 let roleToolsSearchKeyword = ''; // tool searchkeyword
-let roleToolStateMap = new Map(); // tool statemapping：toolKey -> { enabled: boolean, ... }
-let roleUsesAllTools = false; // markroleisusealltool（hasconfigurationtoolswhen）
-let totalEnabledToolsInMCP = 0; // Enabled's tooltotal（fromMCPmanagementinget，fromAPIresponseinget）
-let roleConfiguredTools = new Set(); // role configuration's toollist（used forOKthese toolshouldthisbyselected）
+let roleToolStateMap = new Map(); // tool statemapping:toolKey -> { enabled: boolean, ... }
+let roleUsesAllTools = false; // markroleisusealltool(hasconfigurationtoolswhen)
+let totalEnabledToolsInMCP = 0; // Enabled's tooltotal(fromMCPmanagementinget,fromAPIresponseinget)
+let roleConfiguredTools = new Set(); // role configuration's toollist(used forOKthese toolshouldthisbyselected)
 
 // Skillsrelated
 let allRoleSkills = []; // storageallskillslist
 let roleSkillsSearchKeyword = ''; // Skillssearchkeyword
 let roleSelectedSkills = new Set(); // selected's skills
 
-// forrolelistenterlinesort：default roleat，others sorted by name
+// forrolelistenterlinesort:default roleat,others sorted by name
 function sortRoles(rolesArray) {
     const sortedRoles = [...rolesArray];
  // will"default"roleseparateout
     const defaultRole = sortedRoles.find(r => r.name === 'default');
     const otherRoles = sortedRoles.filter(r => r.name !== 'default');
     
-    // otherrolebynamesort，maintainfixedorder
+    // otherrolebynamesort,maintainfixedorder
     otherRoles.sort((a, b) => {
         const nameA = a.name || '';
         const nameB = b.name || '';
         return nameA.localeCompare(nameB, 'zh-CN');
     });
     
- // will"default"roleat，otherrolebysortafter's orderatafter
+ // will"default"roleat,otherrolebysortafter's orderatafter
     const result = defaultRole ? [defaultRole, ...otherRoles] : otherRoles;
     return result;
 }
@@ -57,7 +57,7 @@ async function loadRoles() {
         return roles;
     } catch (error) {
         console.error('Failed to load roles:', error);
- // hinttextuse i18n；ifthiswhen i18n not yetinitialize，thenfallbackascanin，notisexpose key（roles.loadFailed）
+ // hinttextuse i18n;ifthiswhen i18n not yetinitialize,thenfallbackascanin,notisexpose key(roles.loadFailed)
         var loadFailedLabel = (typeof window !== 'undefined' && typeof window.t === 'function')
             ? window.t('roles.loadFailed')
             : 'Failed to load roles';
@@ -74,7 +74,7 @@ function handleRoleChange(roleName) {
     updateRoleSelectorDisplay();
     renderRoleSelectionSidebar(); // updatesidebarselectedstatus
     
- // roleswitchwhen，iftoollistalreadyload，markasneedre-load
+ // roleswitchwhen,iftoollistalreadyload,markasneedre-load
  // this undertimetrigger@toolsuggestwhenwillusenew's rolere-loadtoollist
     if (oldRole !== currentRole && typeof window !== 'undefined') {
  // viasettingsmarknotificationchat.jsneedre-loadtoollist
@@ -98,9 +98,9 @@ function updateRoleSelectorDisplay() {
     }
 
     if (selectedRole) {
- // useconfigurationin's icon，ifhasthenuse default icon
+ // useconfigurationin's icon,ifhasthenuse default icon
         let icon = selectedRole.icon || '🔵';
-        // if icon is Unicode escape format（\U0001F3C6），needconvert to emoji
+        // if icon is Unicode escape format(\U0001F3C6),needconvert to emoji
         if (icon && typeof icon === 'string') {
             const unicodeMatch = icon.match(/^"?\\U([0-9A-F]{8})"?$/i);
             if (unicodeMatch) {
@@ -108,7 +108,7 @@ function updateRoleSelectorDisplay() {
                     const codePoint = parseInt(unicodeMatch[1], 16);
                     icon = String.fromCodePoint(codePoint);
                 } catch (e) {
-                    // if conversion fails，use default icon
+                    // if conversion fails,use default icon
                     console.warn('convert icon Unicode escape failed:', icon, e);
                     icon = '🔵';
                 }
@@ -118,7 +118,7 @@ function updateRoleSelectorDisplay() {
         const isDefaultRole = selectedRole.name === 'default' || !selectedRole.name;
         const displayName = isDefaultRole && typeof window.t === 'function'
             ? window.t('chat.defaultRole') : (selectedRole.name || (typeof window.t === 'function' ? window.t('chat.defaultRole') : 'default'));
- // default rolewhenavoidby i18n 's data-i18n override“default”
+ // default rolewhenavoidby i18n 's data-i18n override"default"
         roleSelectorText.setAttribute('data-i18n-skip-text', isDefaultRole ? 'false' : 'true');
         roleSelectorText.textContent = displayName;
     } else {
@@ -137,30 +137,30 @@ function renderRoleSelectionSidebar() {
     // clearlist
     roleList.innerHTML = '';
 
- // based onrole configurationgeticon，ifhasconfigurationthenuse default icon
+ // based onrole configurationgeticon,ifhasconfigurationthenuse default icon
     function getRoleIcon(role) {
         if (role.icon) {
-            // if icon is Unicode escape format（\U0001F3C6），needconvert to emoji
+            // if icon is Unicode escape format(\U0001F3C6),needconvert to emoji
             let icon = role.icon;
-            // check if it is Unicode escape format（may contain quotes）
+            // check if it is Unicode escape format(may contain quotes)
             const unicodeMatch = icon.match(/^"?\\U([0-9A-F]{8})"?$/i);
             if (unicodeMatch) {
                 try {
                     const codePoint = parseInt(unicodeMatch[1], 16);
                     icon = String.fromCodePoint(codePoint);
                 } catch (e) {
- // if conversion fails，use
+ // if conversion fails,use
                     console.warn('convert icon Unicode escape failed:', icon, e);
                 }
             }
             return icon;
         }
- // ifhasconfigurationicon，based onrolename's charactergeneratedefaulticon
+ // ifhasconfigurationicon,based onrolename's charactergeneratedefaulticon
  // usethese common's defaulticon
         return '👤';
     }
     
- // forroleenterlinesort：default role，others sorted by name
+ // forroleenterlinesort:default role,others sorted by name
     const sortedRoles = sortRoles(roles);
     
     // onlyShow Enabled's role
@@ -197,7 +197,7 @@ function renderRoleSelectionSidebar() {
 
 // selectrole
 function selectRole(roleName) {
-    // will"default"mappingasemptystring（indicatesdefault role）
+    // will"default"mappingasemptystring(indicatesdefault role)
     if (roleName === 'default') {
         roleName = '';
     }
@@ -231,7 +231,7 @@ function toggleRoleSelectionPanel() {
                 const panelHeight = panel.offsetHeight || 400;
                 const viewportHeight = window.innerHeight;
                 
- // ifpaneltopexceedoutviewport，scrolltoposition
+ // ifpaneltopexceedoutviewport,scrolltoposition
                 if (rect.top - panelHeight < 0) {
                     const scrollY = window.scrollY + rect.top - panelHeight - 20;
                     window.scrollTo({ top: Math.max(0, scrollY), behavior: 'smooth' });
@@ -247,7 +247,7 @@ function toggleRoleSelectionPanel() {
     }
 }
 
-// Closerole selectionpanel（selectroleafterautocall）
+// Closerole selectionpanel(selectroleafterautocall)
 function closeRoleSelectionPanel() {
     const panel = document.getElementById('role-selection-panel');
     const roleSelectorBtn = document.getElementById('role-selector-btn');
@@ -284,7 +284,7 @@ function renderRolesList() {
     const rolesList = document.getElementById('roles-list');
     if (!rolesList) return;
 
-    // filterrole（based onsearchkeyword）
+    // filterrole(based onsearchkeyword)
     let filteredRoles = roles;
     if (rolesSearchKeyword) {
         const keyword = rolesSearchKeyword.toLowerCase();
@@ -301,21 +301,21 @@ function renderRolesList() {
         return;
     }
 
- // forroleenterlinesort：default role，others sorted by name
+ // forroleenterlinesort:default role,others sorted by name
     const sortedRoles = sortRoles(filteredRoles);
     
     rolesList.innerHTML = sortedRoles.map(role => {
-        // getroleicon，if it isUnicodeescape formatthenconvert toemoji
+        // getroleicon,if it isUnicodeescape formatthenconvert toemoji
         let roleIcon = role.icon || '👤';
         if (roleIcon && typeof roleIcon === 'string') {
-            // check if it is Unicode escape format（may contain quotes）
+            // check if it is Unicode escape format(may contain quotes)
             const unicodeMatch = roleIcon.match(/^"?\\U([0-9A-F]{8})"?$/i);
             if (unicodeMatch) {
                 try {
                     const codePoint = parseInt(unicodeMatch[1], 16);
                     roleIcon = String.fromCodePoint(codePoint);
                 } catch (e) {
-                    // if conversion fails，use default icon
+                    // if conversion fails,use default icon
                     console.warn('convert icon Unicode escape failed:', roleIcon, e);
                     roleIcon = '👤';
                 }
@@ -331,7 +331,7 @@ function renderRolesList() {
             toolsCount = role.tools.length;
             // Show before5tool name
             const toolNames = role.tools.slice(0, 5).map(tool => {
- // if it is an external tool，formatas external_mcp::tool_name，onlyShow tool
+ // if it is an external tool,formatas external_mcp::tool_name,onlyShow tool
                 const toolName = tool.includes('::') ? tool.split('::')[1] : tool;
                 return escapeHtml(toolName);
             });
@@ -408,9 +408,9 @@ function clearRolesSearch() {
     renderRolesList();
 }
 
-// generatetooluniqueidentifier（andsettings.jsin's getToolKeymaintainconsistent）
+// generatetooluniqueidentifier(andsettings.jsin's getToolKeymaintainconsistent)
 function getToolKey(tool) {
-    // if it is an external tool，use external_mcp::tool.name asuniqueidentifier
+    // if it is an external tool,use external_mcp::tool.name asuniqueidentifier
     if (tool.is_external && tool.external_mcp) {
         return `${tool.external_mcp}::${tool.name}`;
     }
@@ -439,10 +439,10 @@ function saveCurrentRolePageToolStates() {
     });
 }
 
-// loadalltoollist（used forroletool selection）
+// loadalltoollist(used forroletool selection)
 async function loadRoleTools(page = 1, searchKeyword = '') {
     try {
- // atloadnewpagebefore，save current page state to global mapping first
+ // atloadnewpagebefore,save current page state to global mapping first
         saveCurrentRolePageToolStates();
         
         const pageSize = roleToolsPagination.pageSize;
@@ -465,23 +465,23 @@ async function loadRoleTools(page = 1, searchKeyword = '') {
             totalPages: result.total_pages || 1
         };
         
-        // updateEnabled's tooltotal（fromAPIresponseinget）
+        // updateEnabled's tooltotal(fromAPIresponseinget)
         if (result.total_enabled !== undefined) {
             totalEnabledToolsInMCP = result.total_enabled;
         }
         
- // initializetool statemapping（iftoolnotatmappingin，useservicereturn's status）
- // butneednote：iftoolalreadyatmappingin（likeEditrolewhenfirstsettings's selectedtool），thenpreservemappingin's status
+ // initializetool statemapping(iftoolnotatmappingin,useservicereturn's status)
+ // butneednote:iftoolalreadyatmappingin(likeEditrolewhenfirstsettings's selectedtool),thenpreservemappingin's status
         allRoleTools.forEach(tool => {
             const toolKey = getToolKey(tool);
             if (!roleToolStateMap.has(toolKey)) {
                 // toolnotatmappingin
                 let enabled = false;
                 if (roleUsesAllTools) {
-                    // if using all tools，and tool is inMCPenabled in management，mark as selected
+                    // if using all tools,and tool is inMCPenabled in management,mark as selected
                     enabled = tool.enabled ? true : false;
                 } else {
-                    // if not using all tools，onlyhastoolatrole configuration's toollistinonly markasselected
+                    // if not using all tools,onlyhastoolatrole configuration's toollistinonly markasselected
                     enabled = roleConfiguredTools.has(toolKey);
                 }
                 roleToolStateMap.set(toolKey, {
@@ -492,15 +492,15 @@ async function loadRoleTools(page = 1, searchKeyword = '') {
                     mcpEnabled: tool.enabled // SaveMCPoriginal enabled state in management
                 });
             } else {
- // toolalreadyatmappingin（possiblyisfirstsettings's selectedtoolorusemanualselect's ），preservemappingin's status
- // note：even ifusealltool，alsonotneedforceoverrideusealreadyCancel's tool selection
+ // toolalreadyatmappingin(possiblyisfirstsettings's selectedtoolorusemanualselect's ),preservemappingin's status
+ // note:even ifusealltool,alsonotneedforceoverrideusealreadyCancel's tool selection
                 const state = roleToolStateMap.get(toolKey);
-                // if using all tools，and tool is inMCPenabled in management，ensuremarkasselected
+                // if using all tools,and tool is inMCPenabled in management,ensuremarkasselected
                 if (roleUsesAllTools && tool.enabled) {
-                    // usealltoolwhen，ensureallEnabled's toolall byselected
+                    // usealltoolwhen,ensureallEnabled's toolall byselected
                     state.enabled = true;
                 }
-                // if not using all tools，preservemappingin's status（notneedoverride，becausestatusalreadyatinitializewhencorrectsettings）
+                // if not using all tools,preservemappingin's status(notneedoverride,becausestatusalreadyatinitializewhencorrectsettings)
                 state.is_external = tool.is_external || false;
                 state.external_mcp = tool.external_mcp || '';
                 state.mcpEnabled = tool.enabled; // updateMCPoriginal enabled state in management
@@ -561,7 +561,7 @@ function renderRoleToolsList() {
         if (toolState.is_external || tool.is_external) {
             const externalMcpName = toolState.external_mcp || tool.external_mcp || '';
             const badgeText = externalMcpName ? `External (${escapeHtml(externalMcpName)})` : 'External';
-            const badgeTitle = externalMcpName ? `ExternalMCPtool - Source：${escapeHtml(externalMcpName)}` : 'ExternalMCPtool';
+            const badgeTitle = externalMcpName ? `ExternalMCPtool - Source:${escapeHtml(externalMcpName)}` : 'ExternalMCPtool';
             externalBadge = `<span class="external-tool-badge" title="${badgeTitle}">${badgeText}</span>`;
         }
         
@@ -596,7 +596,7 @@ function renderRoleToolsPagination() {
         oldPagination.remove();
     }
     
- // ifonlyhaspageorhasdata，hide pagination
+ // ifonlyhaspageorhasdata,hide pagination
     if (roleToolsPagination.totalPages <= 1) {
         return;
     }
@@ -719,26 +719,26 @@ function updateRoleToolsStats() {
  // statisticscurrentpagealreadyselected's tool
     const currentPageEnabled = Array.from(document.querySelectorAll('#role-tools-list input[type="checkbox"]:checked')).length;
     
- // statisticscurrentpageEnabled's tool（atMCPtools enabled in management）
- // preferfromstatusmappinginget，ifhasthenfromtooldatainget
+ // statisticscurrentpageEnabled's tool(atMCPtools enabled in management)
+ // preferfromstatusmappinginget,ifhasthenfromtooldatainget
     let currentPageEnabledInMCP = 0;
     allRoleTools.forEach(tool => {
         const toolKey = getToolKey(tool);
         const state = roleToolStateMap.get(toolKey);
- // if tool is inMCPenabled in management（fromstatusmappingortooldatainget），incurrentpageEnabledtool
+ // if tool is inMCPenabled in management(fromstatusmappingortooldatainget),incurrentpageEnabledtool
         const mcpEnabled = state ? (state.mcpEnabled !== false) : (tool.enabled !== false);
         if (mcpEnabled) {
             currentPageEnabledInMCP++;
         }
     });
     
-    // if using all tools，usefromAPIget's Enabledtooltotal
+    // if using all tools,usefromAPIget's Enabledtooltotal
     if (roleUsesAllTools) {
         // usefromAPIresponseinget's Enabledtooltotal
         const totalEnabled = totalEnabledToolsInMCP || 0;
- // currentpagedenominatorshouldthisiscurrentpage's tool（eachpage20），notiscurrentpageEnabled's tool
+ // currentpagedenominatorshouldthisiscurrentpage's tool(eachpage20),notiscurrentpageEnabled's tool
         const currentPageTotal = document.querySelectorAll('#role-tools-list input[type="checkbox"]').length;
- // tool（alltool，includeEnabledandNot enabled's ）
+ // tool(alltool,includeEnabledandNot enabled's )
         const totalTools = roleToolsPagination.total || 0;
         statsEl.innerHTML = `
             <span title="${_t('roleModal.currentPageSelectedTitle')}">✅ ${_t('roleModal.currentPageSelected', { current: currentPageEnabled, total: currentPageTotal })}</span>
@@ -747,7 +747,7 @@ function updateRoleToolsStats() {
         return;
     }
     
- // statisticsroleactualselected's tool（only count inMCPtools enabled in management）
+ // statisticsroleactualselected's tool(only count inMCPtools enabled in management)
     let totalSelected = 0;
     roleToolStateMap.forEach(state => {
         // only count inMCPenabled in managementandbyroleselected's tool
@@ -756,14 +756,14 @@ function updateRoleToolsStats() {
         }
     });
     
-    // ifcurrentpagehasnot yetSave's status，needmergecalculate
+    // ifcurrentpagehasnot yetSave's status,needmergecalculate
     document.querySelectorAll('#role-tools-list input[type="checkbox"]').forEach(checkbox => {
         const toolItem = checkbox.closest('.role-tool-item');
         if (toolItem) {
             const toolKey = toolItem.dataset.toolKey;
             const savedState = roleToolStateMap.get(toolKey);
             if (savedState && savedState.enabled !== checkbox.checked && savedState.mcpEnabled !== false) {
-                // statusnotconsistent，usecheckboxstatus（butonlystatisticsMCPtools enabled in management）
+                // statusnotconsistent,usecheckboxstatus(butonlystatisticsMCPtools enabled in management)
                 if (checkbox.checked && !savedState.enabled) {
                     totalSelected++;
                 } else if (!checkbox.checked && savedState.enabled) {
@@ -773,23 +773,23 @@ function updateRoleToolsStats() {
         }
     });
     
- // rolecanselect's allEnabledtooltotal（shouldthisatMCPmanagementin's total，notisstatusmapping）
- // becauserolecantoselectEnabled's tool，sototalshouldthisisallEnabledtool's total
+ // rolecanselect's allEnabledtooltotal(shouldthisatMCPmanagementin's total,notisstatusmapping)
+ // becauserolecantoselectEnabled's tool,sototalshouldthisisallEnabledtool's total
     let totalEnabledForRole = totalEnabledToolsInMCP || 0;
     
- // ifAPIreturn's totalas0ornot yetsettings，tryfromstatusmappinginstatistics（as）
+ // ifAPIreturn's totalas0ornot yetsettings,tryfromstatusmappinginstatistics(as)
     if (totalEnabledForRole === 0) {
         roleToolStateMap.forEach(state => {
             // only count inMCPtools enabled in management
-            if (state.mcpEnabled !== false) { // mcpEnabled as true or undefined（not yetsettingswhendefaults toenable）
+            if (state.mcpEnabled !== false) { // mcpEnabled as true or undefined(not yetsettingswhendefaults toenable)
                 totalEnabledForRole++;
             }
         });
     }
     
- // currentpagedenominatorshouldthisiscurrentpage's tool（eachpage20），notiscurrentpageEnabled's tool
+ // currentpagedenominatorshouldthisiscurrentpage's tool(eachpage20),notiscurrentpageEnabled's tool
     const currentPageTotal = document.querySelectorAll('#role-tools-list input[type="checkbox"]').length;
- // tool（alltool，includeEnabledandNot enabled's ）
+ // tool(alltool,includeEnabledandNot enabled's )
     const totalTools = roleToolsPagination.total || 0;
     
     statsEl.innerHTML = `
@@ -798,20 +798,20 @@ function updateRoleToolsStats() {
     `;
 }
 
-// getselected's toollist（returntoolKeyarray）
+// getselected's toollist(returntoolKeyarray)
 async function getSelectedRoleTools() {
     // firstSavecurrentpage's status
     saveCurrentRolePageToolStates();
     
- // ifhassearchkeyword，needloadallpage's toolensurestatusmappingcomplete
- // butin order tocan，s cantoonlyfromstatusmappingingetalreadyselected's tool
- // is：ifuseonlyatsomethese pageselecttool，otherpage's tool statepossiblynotatmappingin
+ // ifhassearchkeyword,needloadallpage's toolensurestatusmappingcomplete
+ // butin order tocan,s cantoonlyfromstatusmappingingetalreadyselected's tool
+ // is:ifuseonlyatsomethese pageselecttool,otherpage's tool statepossiblynotatmappingin
     
- // iftoolgreater thanalreadyload's tool，s needensureallnot loadedpage's toolalsoby
- // butforroletool selection，s onlyneedgetuseselectthrough's tool
+ // iftoolgreater thanalreadyload's tool,s needensureallnot loadedpage's toolalsoby
+ // butforroletool selection,s onlyneedgetuseselectthrough's tool
     // sodirectlyfromstatusmappinggetalreadyselected's toolsuffice
     
-    // fromstatusmappinggetallselected's tool（onlyreturnatMCPtools enabled in management）
+    // fromstatusmappinggetallselected's tool(onlyreturnatMCPtools enabled in management)
     const selectedTools = [];
     roleToolStateMap.forEach((state, toolKey) => {
         // onlyreturnatMCPenabled in managementandbyroleselected's tool
@@ -820,13 +820,13 @@ async function getSelectedRoleTools() {
         }
     });
     
- // ifusepossiblyatotherpageselecttool，s needensurecurrentpage's statusalsobySave
+ // ifusepossiblyatotherpageselecttool,s needensurecurrentpage's statusalsobySave
  // butstatusmappingshouldthisalreadycontainallthrough's page's status
     
     return selectedTools;
 }
 
-// settingsselected's tool（used forEditrolewhen）
+// settingsselected's tool(used forEditrolewhen)
 function setSelectedRoleTools(selectedToolKeys) {
     const selectedSet = new Set(selectedToolKeys || []);
     
@@ -860,7 +860,7 @@ async function showAddRoleModal() {
     document.getElementById('role-user-prompt').value = '';
     document.getElementById('role-enabled').checked = true;
 
-    // addrolewhen：Show tool selectioninterface，hidedefault rolehint
+    // addrolewhen:Show tool selectioninterface,hidedefault rolehint
     const toolsSection = document.getElementById('role-tools-section');
     const defaultHint = document.getElementById('role-tools-default-hint');
     const toolsControls = document.querySelector('.role-tools-controls');
@@ -894,7 +894,7 @@ async function showAddRoleModal() {
         clearBtn.style.display = 'none';
     }
     
-    // cleartoollist DOM，avoid loadRoleTools in's  saveCurrentRolePageToolStates readoldstatus
+    // cleartoollist DOM,avoid loadRoleTools in's  saveCurrentRolePageToolStates readoldstatus
     if (toolsList) {
         toolsList.innerHTML = '';
     }
@@ -919,7 +919,7 @@ async function showAddRoleModal() {
         toolsList.style.display = 'block';
     }
     
-    // ensurestatisticsInfocorrectupdate（Show 0/108）
+    // ensurestatisticsInfocorrectupdate(Show 0/108)
     updateRoleToolsStats();
 
  // loadrenderskillslist
@@ -943,15 +943,15 @@ async function editRole(roleName) {
     document.getElementById('role-name').value = role.name;
     document.getElementById('role-name').disabled = true; // Editwhennotallowmodifyname
     document.getElementById('role-description').value = role.description || '';
-    // processiconfield：if it isUnicodeescape format，convert toemoji；otherwiseuse directly
+    // processiconfield:if it isUnicodeescape format,convert toemoji;otherwiseuse directly
     let iconValue = role.icon || '';
     if (iconValue && iconValue.startsWith('\\U')) {
-        // convertUnicodeescape format（like \U0001F3C6）asemoji
+        // convertUnicodeescape format(like \U0001F3C6)asemoji
         try {
             const codePoint = parseInt(iconValue.substring(2), 16);
             iconValue = String.fromCodePoint(codePoint);
         } catch (e) {
- // if conversion fails，use
+ // if conversion fails,use
         }
     }
     document.getElementById('role-icon').value = iconValue;
@@ -967,7 +967,7 @@ async function editRole(roleName) {
     const formHint = toolsSection ? toolsSection.querySelector('.form-hint') : null;
     
     if (isDefaultRole) {
-        // default role：hidetool selectioninterface，Show hintInfo
+        // default role:hidetool selectioninterface,Show hintInfo
         if (defaultHint) {
             defaultHint.style.display = 'block';
         }
@@ -981,7 +981,7 @@ async function editRole(roleName) {
             formHint.style.display = 'none';
         }
     } else {
- // default role：Show tool selectioninterface，hidehintInfo
+ // default role:Show tool selectioninterface,hidehintInfo
         if (defaultHint) {
             defaultHint.style.display = 'none';
         }
@@ -1008,10 +1008,10 @@ async function editRole(roleName) {
             clearBtn.style.display = 'none';
         }
 
- // preferusetoolsfield，ifhasthenusemcpsfield（backward compatible）
+ // preferusetoolsfield,ifhasthenusemcpsfield(backward compatible)
         const selectedTools = role.tools || (role.mcps && role.mcps.length > 0 ? role.mcps : []);
         
- // determineisusealltool：ifhasconfigurationtools（ortoolsasemptyarray），indicatesusealltool
+ // determineisusealltool:ifhasconfigurationtools(ortoolsasemptyarray),indicatesusealltool
         roleUsesAllTools = !role.tools || role.tools.length === 0;
         
         // Saverole configuration's toollist
@@ -1021,12 +1021,12 @@ async function editRole(roleName) {
             });
         }
         
-        // ifhasselected's tool，firstinitializestatusmapping
+        // ifhasselected's tool,firstinitializestatusmapping
         if (selectedTools.length > 0) {
-            roleUsesAllTools = false; // hasconfigurationtool，notusealltool
-            // willselected's tooladdtostatusmapping（markasselected）
+            roleUsesAllTools = false; // hasconfigurationtool,notusealltool
+            // willselected's tooladdtostatusmapping(markasselected)
             selectedTools.forEach(toolKey => {
- // ifmappinginstillhasthis tools，firstcreate adefaultstatus（enabledastrue）
+ // ifmappinginstillhasthis tools,firstcreate adefaultstatus(enabledastrue)
                 if (!roleToolStateMap.has(toolKey)) {
                     roleToolStateMap.set(toolKey, {
                         enabled: true,
@@ -1035,17 +1035,17 @@ async function editRole(roleName) {
                         name: toolKey.split('::').pop() || toolKey // fromtoolKeyinextracttool name
                     });
                 } else {
-                    // ifalready exists，updateasselectedstatus
+                    // ifalready exists,updateasselectedstatus
                     const state = roleToolStateMap.get(toolKey);
                     state.enabled = true;
                 }
             });
         }
 
- // loadtoollist（page）
+ // loadtoollist(page)
         await loadRoleTools(1, '');
         
-        // if using all tools，markcurrentpageallEnabled's toolasselected
+        // if using all tools,markcurrentpageallEnabled's toolasselected
         if (roleUsesAllTools) {
             // markcurrentpageallatMCPtools enabled in managementasselected
             document.querySelectorAll('#role-tools-list input[type="checkbox"]').forEach(checkbox => {
@@ -1058,28 +1058,28 @@ async function editRole(roleName) {
                     if (toolKey) {
                         const state = roleToolStateMap.get(toolKey);
                         // onlyselectedatMCPtools enabled in management
- // ifstatusexist，usestatusin's mcpEnabled；otherwiseEnabled（because loadRoleTools shouldthisalreadyinitializealltool）
+ // ifstatusexist,usestatusin's mcpEnabled;otherwiseEnabled(because loadRoleTools shouldthisalreadyinitializealltool)
                         const shouldEnable = state ? (state.mcpEnabled !== false) : true;
                         checkbox.checked = shouldEnable;
                         if (state) {
                             state.enabled = shouldEnable;
                         } else {
- // ifstatusnotexist，createnewstatus（this typecasenotshouldthis，because loadRoleTools shouldthisalreadyinitialize）
+ // ifstatusnotexist,createnewstatus(this typecasenotshouldthis,because loadRoleTools shouldthisalreadyinitialize)
                             roleToolStateMap.set(toolKey, {
                                 enabled: shouldEnable,
                                 is_external: isExternal,
                                 external_mcp: externalMcp,
                                 name: toolName,
- mcpEnabled: true // Enabled，actualwillatloadRoleToolsinupdate
+ mcpEnabled: true // Enabled,actualwillatloadRoleToolsinupdate
                             });
                         }
                     }
                 }
             });
-            // update statistics，ensureShow correct's selectedcount
+            // update statistics,ensureShow correct's selectedcount
             updateRoleToolsStats();
         } else if (selectedTools.length > 0) {
-            // loadcompleteafter，thentimesettingsselectedstatus（ensurecurrentpage's toolalsobycorrectsettings）
+            // loadcompleteafter,thentimesettingsselectedstatus(ensurecurrentpage's toolalsobycorrectsettings)
             setSelectedRoleTools(selectedTools);
         }
     }
@@ -1105,19 +1105,19 @@ function closeRoleModal() {
     }
 }
 
-// getallselected's tool（includenot yetatMCPtools enabled in management）
+// getallselected's tool(includenot yetatMCPtools enabled in management)
 function getAllSelectedRoleTools() {
     // firstSavecurrentpage's status
     saveCurrentRolePageToolStates();
     
- // fromstatusmappinggetallselected's tool（notisatMCPenabled in management）
+ // fromstatusmappinggetallselected's tool(notisatMCPenabled in management)
     const selectedTools = [];
     roleToolStateMap.forEach((state, toolKey) => {
         if (state.enabled) {
             selectedTools.push({
                 key: toolKey,
                 name: state.name || toolKey.split('::').pop() || toolKey,
-                mcpEnabled: state.mcpEnabled !== false // mcpEnabled as false whenisNot enabled，othercasetreated asEnabled
+                mcpEnabled: state.mcpEnabled !== false // mcpEnabled as false whenisNot enabled,othercasetreated asEnabled
             });
         }
     });
@@ -1129,12 +1129,12 @@ function getAllSelectedRoleTools() {
 function getDisabledTools(selectedTools) {
     return selectedTools.filter(tool => {
         const state = roleToolStateMap.get(tool.key);
- // if mcpEnabled as false，thenasisNot enabled
+ // if mcpEnabled as false,thenasisNot enabled
         return state && state.mcpEnabled === false;
     });
 }
 
-// loadalltooltostatusmappingin（used forfromuseAlltoolswitchtominutetoolwhen）
+// loadalltooltostatusmappingin(used forfromuseAlltoolswitchtominutetoolwhen)
 async function loadAllToolsToStateMap() {
     try {
  const pageSize = 100; // usebig's pageSizetoreducefewrequesttime
@@ -1155,13 +1155,13 @@ async function loadAllToolsToStateMap() {
             result.tools.forEach(tool => {
                 const toolKey = getToolKey(tool);
                 if (!roleToolStateMap.has(toolKey)) {
-                    // toolnotatmappingin，based oncurrentmodeinitialize
+                    // toolnotatmappingin,based oncurrentmodeinitialize
                     let enabled = false;
                     if (roleUsesAllTools) {
-                        // if using all tools，and tool is inMCPenabled in management，mark as selected
+                        // if using all tools,and tool is inMCPenabled in management,mark as selected
                         enabled = tool.enabled ? true : false;
                     } else {
-                        // if not using all tools，onlyhastoolatrole configuration's toollistinonly markasselected
+                        // if not using all tools,onlyhastoolatrole configuration's toollistinonly markasselected
                         enabled = roleConfiguredTools.has(toolKey);
                     }
                     roleToolStateMap.set(toolKey, {
@@ -1172,7 +1172,7 @@ async function loadAllToolsToStateMap() {
                         mcpEnabled: tool.enabled // SaveMCPoriginal enabled state in management
                     });
                 } else {
-                    // toolalreadyatmappingin，updateotherpropertybutpreserveenabledstatus
+                    // toolalreadyatmappingin,updateotherpropertybutpreserveenabledstatus
                     const state = roleToolStateMap.get(toolKey);
                     state.is_external = tool.is_external || false;
                     state.external_mcp = tool.external_mcp || '';
@@ -1206,12 +1206,12 @@ async function saveRole() {
 
     const description = document.getElementById('role-description').value.trim();
     let icon = document.getElementById('role-icon').value.trim();
-    // willemojiconvert toUnicodeescape formattomatchYAMLformat（like \U0001F3C6）
+    // willemojiconvert toUnicodeescape formattomatchYAMLformat(like \U0001F3C6)
     if (icon) {
- // getcharacter's Unicodecode（processemojipossiblyismanycharacter's case）
+ // getcharacter's Unicodecode(processemojipossiblyismanycharacter's case)
         const codePoint = icon.codePointAt(0);
         if (codePoint && codePoint > 0x7F) {
- // convert to8enterformat（\U0001F3C6）
+ // convert to8enterformat(\U0001F3C6)
             icon = '\\U' + codePoint.toString(16).toUpperCase().padStart(8, '0');
         }
     }
@@ -1223,11 +1223,11 @@ async function saveRole() {
  // checkisasdefault role
     const isDefaultRole = name === 'default';
     
- // check if it isfirst timeaddrole（excludedefault roleafter，hasusecreate's role）
+ // check if it isfirst timeaddrole(excludedefault roleafter,hasusecreate's role)
     const isFirstUserRole = !isEdit && !isDefaultRole && roles.filter(r => r.name !== 'default').length === 0;
     
-    // default rolenotSavetoolsfield（usealltool）
- // default role：if using all tools（roleUsesAllToolsastrue），alsonotSavetoolsfield
+    // default rolenotSavetoolsfield(usealltool)
+ // default role:if using all tools(roleUsesAllToolsastrue),alsonotSavetoolsfield
     let tools = [];
     let disabledTools = []; // storagenot yetatMCPtools enabled in management
     
@@ -1235,34 +1235,34 @@ async function saveRole() {
         // Savecurrentpage's status
         saveCurrentRolePageToolStates();
         
-        // collectallselected's tool（includenot yetatMCPenabled in management's ）
+        // collectallselected's tool(includenot yetatMCPenabled in management's )
         let allSelectedTools = getAllSelectedRoleTools();
         
- // if it isfirst timeaddroleandhasselecttool，defaultuseAlltool
+ // if it isfirst timeaddroleandhasselecttool,defaultuseAlltool
         if (isFirstUserRole && allSelectedTools.length === 0) {
             roleUsesAllTools = true;
             showNotification(_t('roleModal.firstRoleNoToolsHint'), 'info');
         } else if (roleUsesAllTools) {
- // ifcurrentusealltool，needcheckuseisCancelthese tool
+ // ifcurrentusealltool,needcheckuseisCancelthese tool
  // checkstatusmappinginishasnot yetselected's Enabledtool
             let hasUnselectedTools = false;
             roleToolStateMap.forEach((state) => {
- // if tool is inMCPenabled in managementbutnot yetselected，DescriptionuseCancelthistool
+ // if tool is inMCPenabled in managementbutnot yetselected,DescriptionuseCancelthistool
                 if (state.mcpEnabled !== false && !state.enabled) {
                     hasUnselectedTools = true;
                 }
             });
             
- // ifuseCancelthese Enabled's tool，switchtominutetoolmode
+ // ifuseCancelthese Enabled's tool,switchtominutetoolmode
             if (hasUnselectedTools) {
- // atswitchbefore，needloadalltooltostatusmappingin
- // this s cantocorrectSavealltool's status（useCancel's that these ）
+ // atswitchbefore,needloadalltooltostatusmappingin
+ // this s cantocorrectSavealltool's status(useCancel's that these )
                 await loadAllToolsToStateMap();
                 
- // willallEnabled's toolmarkasselected（usealreadyCancel's that these ）
- // usealreadyCancel's toolatstatusmappinginenabledasfalse，maintainnot
+ // willallEnabled's toolmarkasselected(usealreadyCancel's that these )
+ // usealreadyCancel's toolatstatusmappinginenabledasfalse,maintainnot
                 roleToolStateMap.forEach((state, toolKey) => {
- // if tool is inMCPenabled in management，andstatusmappinginhasmarkasnot yetselected（i.e.enablednotisfalse）
+ // if tool is inMCPenabled in management,andstatusmappinginhasmarkasnot yetselected(i.e.enablednotisfalse)
                     // mark as selected
                     if (state.mcpEnabled !== false && state.enabled !== false) {
                         state.enabled = true;
@@ -1271,11 +1271,11 @@ async function saveRole() {
                 
                 roleUsesAllTools = false;
             } else {
- // even ifusealltool，alsoneedloadalltooltostatusmappingin，so thatcheckishasNot enabled's toolbyselected
+ // even ifusealltool,alsoneedloadalltooltostatusmappingin,so thatcheckishasNot enabled's toolbyselected
  // this cantouseismanualselectthese Not enabled's tool
                 await loadAllToolsToStateMap();
                 
- // checkishasNot enabled's toolbymanualselected（enabledastruebutmcpEnabledasfalse）
+ // checkishasNot enabled's toolbymanualselected(enabledastruebutmcpEnabledasfalse)
                 let hasDisabledToolsSelected = false;
                 roleToolStateMap.forEach((state) => {
                     if (state.enabled && state.mcpEnabled === false) {
@@ -1283,7 +1283,7 @@ async function saveRole() {
                     }
                 });
                 
- // ifhasNot enabled's toolbyselected，willallEnabled's toolmarkasselected（this isusealltool's defaultlineas）
+ // ifhasNot enabled's toolbyselected,willallEnabled's toolmarkasselected(this isusealltool's defaultlineas)
                 if (!hasDisabledToolsSelected) {
                     roleToolStateMap.forEach((state) => {
                         if (state.mcpEnabled !== false) {
@@ -1292,27 +1292,27 @@ async function saveRole() {
                     });
                 }
                 
- // update allSelectedTools，becauseatstatusmappingincontainalltool
+ // update allSelectedTools,becauseatstatusmappingincontainalltool
                 allSelectedTools = getAllSelectedRoleTools();
             }
         }
         
- // checkthese toolnot yetatMCPenabled in management（noisusealltoolall needcheck）
+ // checkthese toolnot yetatMCPenabled in management(noisusealltoolall needcheck)
         disabledTools = getDisabledTools(allSelectedTools);
         
- // ifhasNot enabled's tool，hintuse
+ // ifhasNot enabled's tool,hintuse
         if (disabledTools.length > 0) {
-            const toolNames = disabledTools.map(t => t.name).join('、');
- const message = `below ${disabledTools.length} toolsnot yetatMCPenabled in management，cannotatroleinconfiguration：\n\n${toolNames}\n\npleasefirstat"MCPmanagement"inenablethis these tool，afterthenatroleinconfiguration。\n\nisContinueSave？（willonlySaveEnabled's tool）`;
+            const toolNames = disabledTools.map(t => t.name).join(',');
+ const message = `below ${disabledTools.length} toolsnot yetatMCPenabled in management,cannotatroleinconfiguration:\n\n${toolNames}\n\npleasefirstat"MCPmanagement"inenablethis these tool,afterthenatroleinconfiguration.\n\nisContinueSave?(willonlySaveEnabled's tool)`;
             
             if (!confirm(message)) {
  return; // usecancel save
             }
         }
         
-        // if using all tools，notneedgettoollist
+        // if using all tools,notneedgettoollist
         if (!roleUsesAllTools) {
-            // getselected's toollist（onlycontainatMCPtools enabled in management）
+            // getselected's toollist(onlycontainatMCPtools enabled in management)
             tools = await getSelectedRoleTools();
         }
     }
@@ -1323,9 +1323,9 @@ async function saveRole() {
     const roleData = {
         name: name,
         description: description,
-        icon: icon || undefined, // ifasemptystring，thennotsendthisfield
+        icon: icon || undefined, // ifasemptystring,thennotsendthisfield
         user_prompt: userPrompt,
-        tools: tools, // default roleasemptyarray，indicatesusealltool
+        tools: tools, // default roleasemptyarray,indicatesusealltool
         skills: skills, // Skillslist
         enabled: enabled
     };
@@ -1346,15 +1346,15 @@ async function saveRole() {
             throw new Error(error.error || 'Failed to save role');
         }
 
- // ifhasNot enabled's toolbyfilter，hintuse
+ // ifhasNot enabled's toolbyfilter,hintuse
         if (disabledTools.length > 0) {
-            let toolNames = disabledTools.map(t => t.name).join('、');
- // iftool namelistlong，truncateShow 
+            let toolNames = disabledTools.map(t => t.name).join(',');
+ // iftool namelistlong,truncateShow 
             if (toolNames.length > 100) {
                 toolNames = toolNames.substring(0, 100) + '...';
             }
             showNotification(
- `${isEdit ? 'Role updated' : 'Role created'}，butalreadyfilter ${disabledTools.length} not yetatMCPtools enabled in management：${toolNames}。pleasefirstat"MCPmanagement"inenablethis these tool，afterthenatroleinconfiguration。`,
+ `${isEdit ? 'Role updated' : 'Role created'},butalreadyfilter ${disabledTools.length} not yetatMCPtools enabled in management:${toolNames}.pleasefirstat"MCPmanagement"inenablethis these tool,afterthenatroleinconfiguration.`,
                 'warning'
             );
         } else {
@@ -1376,7 +1376,7 @@ async function deleteRole(roleName) {
         return;
     }
 
- if (!confirm(`OKneedDeleterole"${roleName}"?thisActionsnot 。`)) {
+ if (!confirm(`OKneedDeleterole"${roleName}"?thisActionsnot .`)) {
         return;
     }
 
@@ -1427,7 +1427,7 @@ document.addEventListener('click', (e) => {
         closeRoleModal();
     }
 
-    // clickrole selectionpanelExternalClosepanel（butnotincluderole selectionbuttonandpanelitself）
+    // clickrole selectionpanelExternalClosepanel(butnotincluderole selectionbuttonandpanelitself)
     const roleSelectionPanel = document.getElementById('role-selection-panel');
     const roleSelectorWrapper = document.querySelector('.role-selector-wrapper');
     if (roleSelectionPanel && roleSelectionPanel.style.display !== 'none' && roleSelectionPanel.style.display) {
@@ -1444,12 +1444,12 @@ document.addEventListener('DOMContentLoaded', () => {
     updateRoleSelectorDisplay();
 });
 
-// languageswitchafterRefreshrole selectionShow （default/customrole）
+// languageswitchafterRefreshrole selectionShow (default/customrole)
 document.addEventListener('languagechange', () => {
     updateRoleSelectorDisplay();
 });
 
-// getcurrentselected's role（forchat.jsuse）
+// getcurrentselected's role(forchat.jsuse)
 function getCurrentRole() {
     return currentRole || '';
 }
@@ -1461,7 +1461,7 @@ if (typeof window !== 'undefined') {
     window.closeRoleSelectionPanel = closeRoleSelectionPanel;
     window.currentSelectedRole = getCurrentRole();
     
-    // listenrolechange，updateglobalvariable
+    // listenrolechange,updateglobalvariable
     const originalHandleRoleChange = handleRoleChange;
     handleRoleChange = function(roleName) {
         originalHandleRoleChange(roleName);

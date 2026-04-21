@@ -8,12 +8,12 @@ Auth: Bearer token (Personal Access Token), NOT the old API ID/Secret.
 Generate token: https://accounts.censys.io/settings/personal-access-tokens
 
 Endpoints used:
-  POST /v3/global/search/query     — search hosts/certs/web properties (1 credit)
-  GET  /v3/global/asset/host/{ip}  — host detail lookup (free)
-  GET  /v3/global/asset/certificate/{fp} — cert detail (free)
-  POST /v3/global/search/aggregate — field aggregation (1 credit)
-  GET  /v3/accounts/users/credits  — check credit balance (free)
-  GET  /v3/global/asset/host/{ip}/names — get hostnames for IP (free)
+  POST /v3/global/search/query     - search hosts/certs/web properties (1 credit)
+  GET  /v3/global/asset/host/{ip}  - host detail lookup (free)
+  GET  /v3/global/asset/certificate/{fp} - cert detail (free)
+  POST /v3/global/search/aggregate - field aggregation (1 credit)
+  GET  /v3/accounts/users/credits  - check credit balance (free)
+  GET  /v3/global/asset/host/{ip}/names - get hostnames for IP (free)
 """
 
 import os
@@ -233,7 +233,7 @@ def main():
         print(json.dumps({
             "status": "error",
             "message": "Missing required parameter: query",
-            "special_commands": ["validate — check token validity and credit balance"],
+            "special_commands": ["validate - check token validity and credit balance"],
             "search_examples": {
                 "host": [
                     'port: 22',

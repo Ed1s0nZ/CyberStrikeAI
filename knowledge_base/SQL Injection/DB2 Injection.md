@@ -69,7 +69,7 @@ select xmlagg(xmlrow(table_schema)) from sysibm.tables
 select xmlagg(xmlrow(table_schema)) from (select distinct(table_schema) from sysibm.tables)
 
 -- Returns all in one xml-formatted string.
--- May need CAST(xml2clob(… AS varchar(500)) to display the result.
+-- May need CAST(xml2clob(... AS varchar(500)) to display the result.
 select xml2clob(xmelement(name t, table_schema)) from sysibm.tables 
 ```
 
@@ -122,7 +122,7 @@ SELECT chr(65)||chr(68)||chr(82)||chr(73) FROM sysibm.sysdummy1
 | List users | `select distinct(authid) from sysibmadm.privileges` |
 | List users | `select grantee from syscat.dbauth` |
 | List privileges | `select * from syscat.tabauth` |
-| List privileges | `select * from SYSIBM.SYSUSERAUTH — List db2 system privilegies` |
+| List privileges | `select * from SYSIBM.SYSUSERAUTH - List db2 system privilegies` |
 | List DBA accounts | `select distinct(grantee) from sysibm.systabauth where CONTROLAUTH='Y'` |
 | List DBA accounts | `select name from SYSIBM.SYSUSERAUTH where SYSADMAUTH = 'Y' or SYSADMAUTH = 'G'` |
 | Location of DB files | `select * from sysibmadm.reg_variables where reg_var_name='DB2PATH'` |

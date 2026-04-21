@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# find-api-calls.sh — Search decompiled source for API calls and HTTP endpoints
+# find-api-calls.sh - Search decompiled source for API calls and HTTP endpoints
 set -euo pipefail
 
 usage() {

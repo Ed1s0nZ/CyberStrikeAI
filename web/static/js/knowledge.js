@@ -3,7 +3,7 @@ function _t(key, opts) {
     return typeof window.t === 'function' ? window.t(key, opts) : key;
 }
 
-// 「」 HTML（ data-i18n ）
+// "" HTML( data-i18n )
 function getKnowledgeNotEnabledHTML() {
     return `
         <div class="empty-state" style="text-align: center; padding: 40px 20px;">
@@ -23,7 +23,7 @@ function getKnowledgeNotEnabledHTML() {
     `;
 }
 
-// 「」，
+// "",
 function renderKnowledgeNotEnabledState(container) {
     if (!container) return;
     container.innerHTML = getKnowledgeNotEnabledHTML();
@@ -36,10 +36,10 @@ let knowledgeCategories = [];
 let knowledgeItems = [];
 let currentEditingItemId = null;
 let isSavingKnowledgeItem = false; // 
-let retrievalLogsData = []; // ，
+let retrievalLogsData = []; // ,
 let knowledgePagination = {
     currentPage: 1,
- pageSize: 10, // （）
+ pageSize: 10, // ()
     total: 0,
     currentCategory: ''
 };
@@ -65,7 +65,7 @@ async function loadKnowledgeCategories() {
         
  // 
         if (data.enabled === false) {
- // ，（ data-i18n，）
+ // ,( data-i18n,)
             renderKnowledgeNotEnabledState(document.getElementById('knowledge-items-list'));
             return [];
         }
@@ -99,7 +99,7 @@ async function loadKnowledgeCategories() {
     }
 }
 
-// （，）
+// (,)
 async function loadKnowledgeItems(category = '', page = 1, pageSize = 10) {
     try {
  // 
@@ -107,7 +107,7 @@ async function loadKnowledgeItems(category = '', page = 1, pageSize = 10) {
         knowledgePagination.currentPage = page;
         knowledgePagination.pageSize = pageSize;
         
- // URL（，）
+ // URL(,)
         const timestamp = Date.now();
         const offset = (page - 1) * pageSize;
         let url = `/api/knowledge/items?categoryPage=true&limit=${pageSize}&offset=${offset}&_t=${timestamp}`;
@@ -131,7 +131,7 @@ async function loadKnowledgeItems(category = '', page = 1, pageSize = 10) {
         
  // 
         if (data.enabled === false) {
- // ，（； data-i18n，）
+ // ,(; data-i18n,)
             const container = document.getElementById('knowledge-items-list');
             if (container && !container.querySelector('.empty-state')) {
                 renderKnowledgeNotEnabledState(container);
@@ -148,7 +148,7 @@ async function loadKnowledgeItems(category = '', page = 1, pageSize = 10) {
         
         renderKnowledgeItemsByCategories(categoriesWithItems);
         
- // ，（）
+ // ,()
         if (category) {
             const paginationContainer = document.getElementById('knowledge-pagination');
             if (paginationContainer) {
@@ -168,7 +168,7 @@ async function loadKnowledgeItems(category = '', page = 1, pageSize = 10) {
     }
 }
 
-// （）
+// ()
 function renderKnowledgeItemsByCategories(categoriesWithItems) {
     const container = document.getElementById('knowledge-items-list');
     if (!container) return;
@@ -212,7 +212,7 @@ function renderKnowledgeItemsByCategories(categoriesWithItems) {
     container.innerHTML = html;
 }
 
-// （，）
+// (,)
 function renderKnowledgeItems(items) {
     const container = document.getElementById('knowledge-items-list');
     if (!container) return;
@@ -262,7 +262,7 @@ function renderKnowledgeItems(items) {
     container.innerHTML = html;
 }
 
-// （）
+// ()
 function renderKnowledgePagination() {
     const container = document.getElementById('knowledge-pagination');
     if (!container) return;
@@ -280,8 +280,8 @@ function renderKnowledgePagination() {
  // 
  html += `<button class="pagination-btn" onclick="loadKnowledgePage(${currentPage - 1})" ${currentPage <= 1 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}></button>`;
     
- // （）
- html += `<span style="padding: 0 12px;"> ${currentPage} ， ${totalPages} （ ${total} ）</span>`;
+ // ()
+ html += `<span style="padding: 0 12px;"> ${currentPage} , ${totalPages} ( ${total} )</span>`;
     
  // 
  html += `<button class="pagination-btn" onclick="loadKnowledgePage(${currentPage + 1})" ${currentPage >= totalPages ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}></button>`;
@@ -304,10 +304,10 @@ function loadKnowledgePage(page) {
 
 // 
 function renderKnowledgeItemCard(item) {
- // （itemcontent，，）
+ // (itemcontent,,)
     let previewText = '';
     if (item.content) {
- // markdown，150
+ // markdown,150
         let preview = item.content;
  // markdown
         preview = preview.replace(/^#+\s+/gm, '');
@@ -331,11 +331,11 @@ function renderKnowledgeItemCard(item) {
     const createdTime = formatTime(item.createdAt);
     const updatedTime = formatTime(item.updatedAt);
     
- // ，
+ // ,
     const displayTime = updatedTime || createdTime;
  const timeLabel = updatedTime ? '' : '';
     
- // （7）
+ // (7)
     let isRecent = false;
     if (item.updatedAt && updatedTime) {
         const updateDate = new Date(item.updatedAt);
@@ -380,7 +380,7 @@ function renderKnowledgeItemCard(item) {
     `;
 }
 
-// （）
+// ()
 function updateKnowledgeStats(data, categoryCount) {
     const statsContainer = document.getElementById('knowledge-stats');
     if (!statsContainer) return;
@@ -393,12 +393,12 @@ function updateKnowledgeStats(data, categoryCount) {
  // 
             currentPageItemCount = data.reduce((sum, cat) => sum + (cat.items?.length || 0), 0);
         } else {
- // （）
+ // ()
             currentPageItemCount = data.length;
         }
     }
     
- // （，）
+ // (,)
     const totalCategories = (knowledgePagination.total != null) ? knowledgePagination.total : categoryCount;
     
     statsContainer.innerHTML = `
@@ -435,7 +435,7 @@ async function updateIndexProgress() {
         });
         
         if (!response.ok) {
- return; // ，
+ return; // ,
         }
         
         const status = await response.json();
@@ -444,7 +444,7 @@ async function updateIndexProgress() {
         
  // 
         if (status.enabled === false) {
- // ，
+ // ,
             progressContainer.style.display = 'none';
             if (indexProgressInterval) {
                 clearInterval(indexProgressInterval);
@@ -459,11 +459,11 @@ async function updateIndexProgress() {
         const isComplete = status.is_complete || false;
         const lastError = status.last_error || '';
         
- // （）
+ // ()
         const isRebuilding = status.is_rebuilding || false;
         
         if (totalItems === 0) {
- // ，
+ // ,
             progressContainer.style.display = 'none';
             if (indexProgressInterval) {
                 clearInterval(indexProgressInterval);
@@ -475,7 +475,7 @@ async function updateIndexProgress() {
  // 
         progressContainer.style.display = 'block';
         
- // ，
+ // ,
         if (lastError) {
             progressContainer.innerHTML = `
                 <div class="knowledge-index-progress-error" style="
@@ -493,7 +493,7 @@ async function updateIndexProgress() {
                         ${escapeHtml(lastError)}
                     </div>
                     <div style="color: #999; font-size: 12px; margin-bottom: 12px;">
- ：、API、。。
+ :,API,..
                     </div>
                     <div style="display: flex; gap: 8px;">
                         <button onclick="rebuildKnowledgeIndex()" style="
@@ -537,7 +537,7 @@ async function updateIndexProgress() {
             const rebuildLastChunks = status.rebuild_last_chunks || 0;
             const rebuildStartTime = status.rebuild_start_time || '';
 
- // （）
+ // ()
             let rebuildProgress = progressPercent;
             if (rebuildTotal > 0) {
                 rebuildProgress = (rebuildCurrent / rebuildTotal) * 100;
@@ -547,14 +547,14 @@ async function updateIndexProgress() {
                 <div class="knowledge-index-progress">
                     <div class="progress-header">
                         <span class="progress-icon">🔨</span>
- <span class="progress-text">：${rebuildCurrent}/${rebuildTotal} (${rebuildProgress.toFixed(1)}%) - ：${rebuildFailed}</span>
+ <span class="progress-text">:${rebuildCurrent}/${rebuildTotal} (${rebuildProgress.toFixed(1)}%) - :${rebuildFailed}</span>
                     </div>
                     <div class="progress-bar-container">
                         <div class="progress-bar" style="width: ${rebuildProgress}%"></div>
                     </div>
                     <div class="progress-hint">
- ${rebuildLastItemID ? `：${escapeHtml(rebuildLastItemID.substring(0, 36))}... (${rebuildLastChunks} chunks)` : '...'}
- ${rebuildStartTime ? `<br>：${new Date(rebuildStartTime).toLocaleString()}` : ''}
+ ${rebuildLastItemID ? `:${escapeHtml(rebuildLastItemID.substring(0, 36))}... (${rebuildLastChunks} chunks)` : '...'}
+ ${rebuildStartTime ? `<br>:${new Date(rebuildStartTime).toLocaleString()}` : ''}
                     </div>
                 </div>
             `;
@@ -588,11 +588,11 @@ async function updateIndexProgress() {
                     <div class="progress-bar-container">
                         <div class="progress-bar" style="width: ${progressPercent}%"></div>
                     </div>
- <div class="progress-hint">，</div>
+ <div class="progress-hint">,</div>
                 </div>
             `;
             
- // ，
+ // ,
             if (!indexProgressInterval) {
  indexProgressInterval = setInterval(updateIndexProgress, 3000); // 3
             }
@@ -616,7 +616,7 @@ async function updateIndexProgress() {
  <span style="font-weight: bold; color: #c00;"></span>
                     </div>
                     <div style="color: #666; font-size: 14px;">
- ，。
+ ,.
                     </div>
                 </div>
             `;
@@ -660,7 +660,7 @@ function selectKnowledgeCategory(category) {
             }
         });
     }
- // （，API）
+ // (,API)
     loadKnowledgeItems(category, 1, knowledgePagination.pageSize);
 }
 
@@ -675,7 +675,7 @@ function filterKnowledgeItems() {
     }
 }
 
-// （）
+// ()
 function handleKnowledgeSearchInput() {
     const searchInput = document.getElementById('knowledge-search');
     const searchTerm = searchInput?.value.trim() || '';
@@ -685,7 +685,7 @@ function handleKnowledgeSearchInput() {
         clearTimeout(knowledgeSearchTimeout);
     }
     
- // ，
+ // ,
     if (!searchTerm) {
         const wrapper = document.getElementById('knowledge-category-filter-wrapper');
         let category = '';
@@ -697,19 +697,19 @@ function handleKnowledgeSearchInput() {
         return;
     }
     
- // ，500ms（）
+ // ,500ms()
     knowledgeSearchTimeout = setTimeout(() => {
         searchKnowledgeItems();
     }, 500);
 }
 
-// （，）
+// (,)
 async function searchKnowledgeItems() {
     const searchInput = document.getElementById('knowledge-search');
     const searchTerm = searchInput?.value.trim() || '';
     
     if (!searchTerm) {
- // （）
+ // ()
         const wrapper = document.getElementById('knowledge-category-filter-wrapper');
         let category = '';
         if (wrapper) {
@@ -770,7 +770,7 @@ async function searchKnowledgeItems() {
                     <div style="font-size: 48px; margin-bottom: 20px;">🔍</div>
  <h3 style="margin-bottom: 10px;"></h3>
  <p style="color: #999;"> "<strong>${escapeHtml(searchTerm)}</strong>" </p>
- <p style="color: #999; margin-top: 10px; font-size: 0.9em;">，</p>
+ <p style="color: #999; margin-top: 10px; font-size: 0.9em;">,</p>
                 </div>
             `;
         } else {
@@ -785,7 +785,7 @@ async function searchKnowledgeItems() {
             renderKnowledgeItemsByCategories(categoriesWithItems);
         }
         
- // （）
+ // ()
         const paginationContainer = document.getElementById('knowledge-pagination');
         if (paginationContainer) {
             paginationContainer.innerHTML = '';
@@ -810,11 +810,11 @@ async function refreshKnowledgeBase() {
         const data = await response.json();
  // 
         if (data.items_to_index && data.items_to_index > 0) {
- showNotification(`， ${data.items_to_index} `, 'success');
+ showNotification(`, ${data.items_to_index} `, 'success');
         } else {
- showNotification(data.message || '，', 'success');
+ showNotification(data.message || ',', 'success');
         }
- // （）
+ // ()
         await loadKnowledgeCategories();
         await loadKnowledgeItems(knowledgePagination.currentCategory, 1, knowledgePagination.pageSize);
         
@@ -824,16 +824,16 @@ async function refreshKnowledgeBase() {
             indexProgressInterval = null;
         }
         
- // ，
+ // ,
         if (data.items_to_index && data.items_to_index > 0) {
             await new Promise(resolve => setTimeout(resolve, 500));
             updateIndexProgress();
- // （2）
+ // (2)
             if (!indexProgressInterval) {
                 indexProgressInterval = setInterval(updateIndexProgress, 2000);
             }
         } else {
- // ，
+ // ,
             updateIndexProgress();
         }
     } catch (error) {
@@ -845,7 +845,7 @@ async function refreshKnowledgeBase() {
 // 
 async function rebuildKnowledgeIndex() {
     try {
- if (!confirm('？。')) {
+ if (!confirm('?.')) {
             return;
         }
  showNotification('...', 'info');
@@ -856,7 +856,7 @@ async function rebuildKnowledgeIndex() {
             indexProgressInterval = null;
         }
         
- // ""，
+ // "",
         const progressContainer = document.getElementById('knowledge-index-progress');
         if (progressContainer) {
             progressContainer.style.display = 'block';
@@ -869,7 +869,7 @@ async function rebuildKnowledgeIndex() {
                     <div class="progress-bar-container">
                         <div class="progress-bar" style="width: 0%"></div>
                     </div>
- <div class="progress-hint">，</div>
+ <div class="progress-hint">,</div>
                 </div>
             `;
         }
@@ -880,15 +880,15 @@ async function rebuildKnowledgeIndex() {
         if (!response.ok) {
  throw new Error('');
         }
- showNotification('，', 'success');
+ showNotification(',', 'success');
         
- // ，
+ // ,
         await new Promise(resolve => setTimeout(resolve, 500));
         
  // 
         updateIndexProgress();
         
- // （2，3）
+ // (2,3)
         if (!indexProgressInterval) {
             indexProgressInterval = setInterval(updateIndexProgress, 2000);
         }
@@ -933,7 +933,7 @@ async function editKnowledgeItem(id) {
 async function saveKnowledgeItem() {
  // 
     if (isSavingKnowledgeItem) {
- showNotification('，...', 'warning');
+ showNotification(',...', 'warning');
         return;
     }
     
@@ -1002,7 +1002,7 @@ async function saveKnowledgeItem() {
  const action = currentEditingItemId ? '' : '';
  const newItemCategory = item.category || category; // 
         
- // ，
+ // ,
         const currentCategory = document.getElementById('knowledge-category-filter-wrapper');
         let selectedCategory = '';
         if (currentCategory) {
@@ -1012,10 +1012,10 @@ async function saveKnowledgeItem() {
             }
         }
         
- // ，
+ // ,
         closeKnowledgeItemModal();
         
- // （）
+ // ()
         const itemsListContainer = document.getElementById('knowledge-items-list');
         const originalContent = itemsListContainer ? itemsListContainer.innerHTML : '';
         
@@ -1024,17 +1024,17 @@ async function saveKnowledgeItem() {
         }
         
         try {
- // ，
+ // ,
  console.log('...');
             await loadKnowledgeCategories();
- console.log('，...');
+ console.log(',...');
             
- // ，
+ // ,
             let categoryToShow = selectedCategory;
             if (!currentEditingItemId && selectedCategory && selectedCategory !== '' && newItemCategory !== selectedCategory) {
- // ，，
+ // ,,
                 categoryToShow = newItemCategory;
- // （，）
+ // (,)
                 const trigger = document.getElementById('knowledge-category-filter-trigger');
                 const wrapper = document.getElementById('knowledge-category-filter-wrapper');
                 const dropdown = document.getElementById('knowledge-category-filter-dropdown');
@@ -1047,31 +1047,31 @@ async function saveKnowledgeItem() {
                         }
                     });
                 }
- showNotification(`✅ ${action}！"${newItemCategory}"。`, 'success');
+ showNotification(`✅ ${action}!"${newItemCategory}".`, 'success');
             }
             
- // （）
+ // ()
             await loadKnowledgeItems(categoryToShow, 1, knowledgePagination.pageSize);
  console.log('');
         } catch (err) {
  console.error(':', err);
- // ，
+ // ,
             if (itemsListContainer && originalContent) {
                 itemsListContainer.innerHTML = originalContent;
             }
- showNotification('⚠️ ，，', 'warning');
+ showNotification('⚠️ ,,', 'warning');
         }
         
     } catch (error) {
  console.error(':', error);
  showNotification('❌ : ' + error.message, 'error');
         
- // ，alert
+ // ,alert
         if (typeof window.showNotification !== 'function') {
  alert('❌ : ' + error.message);
         }
         
- // （，）
+ // (,)
         if (categoryInput) categoryInput.disabled = false;
         if (titleInput) titleInput.disabled = false;
         if (contentInput) contentInput.disabled = false;
@@ -1090,7 +1090,7 @@ async function saveKnowledgeItem() {
 
 // 
 async function deleteKnowledgeItem(id) {
- if (!confirm('？')) {
+ if (!confirm('?')) {
         return;
     }
     
@@ -1116,7 +1116,7 @@ async function deleteKnowledgeItem(id) {
         }
     }
     
- // UI（）
+ // UI()
     if (itemCard) {
         originalDisplay = itemCard.style.display;
         originalOpacity = itemCard.style.opacity;
@@ -1129,7 +1129,7 @@ async function deleteKnowledgeItem(id) {
             if (itemCard.parentElement) {
                 itemCard.remove();
                 
- // ，
+ // ,
                 if (categorySection) {
                     const remainingItems = categorySection.querySelectorAll('.knowledge-item-card');
                     if (remainingItems.length === 0) {
@@ -1150,7 +1150,7 @@ async function deleteKnowledgeItem(id) {
                     }
                 }
                 
- // ，
+ // ,
             }
         }, 300);
     }
@@ -1166,25 +1166,25 @@ async function deleteKnowledgeItem(id) {
         }
         
  // 
- showNotification('✅ ！。', 'success');
+ showNotification('✅ !.', 'success');
         
- // （）
+ // ()
         await loadKnowledgeCategories();
         await loadKnowledgeItems(knowledgePagination.currentCategory, knowledgePagination.currentPage, knowledgePagination.pageSize);
         
     } catch (error) {
  console.error(':', error);
         
- // ，
+ // ,
         if (itemCard && originalDisplay !== 'none') {
             itemCard.style.display = originalDisplay || '';
             itemCard.style.opacity = originalOpacity || '1';
             itemCard.style.transform = '';
             itemCard.style.transition = '';
             
- // ，
+ // ,
             if (categorySection && !categorySection.parentElement) {
- // （）
+ // ()
                 await loadKnowledgeItems(knowledgePagination.currentCategory, knowledgePagination.currentPage, knowledgePagination.pageSize);
             }
         }
@@ -1204,7 +1204,7 @@ async function deleteKnowledgeItem(id) {
     }
 }
 
-// （）
+// ()
 function updateKnowledgeStatsAfterDelete() {
     const statsContainer = document.getElementById('knowledge-stats');
     if (!statsContainer) return;
@@ -1215,7 +1215,7 @@ function updateKnowledgeStatsAfterDelete() {
     const totalItems = allItems.length;
     const categoryCount = allCategories.length;
     
- // （，）
+ // (,)
     const statsItems = statsContainer.querySelectorAll('.knowledge-stat-item');
     if (statsItems.length >= 2) {
         const totalItemsSpan = statsItems[0].querySelector('.knowledge-stat-value');
@@ -1290,9 +1290,9 @@ async function loadRetrievalLogs(conversationId = '', messageId = '') {
         renderRetrievalLogs(data.logs || []);
     } catch (error) {
  console.error(':', error);
- // ，"..."
+ // ,"..."
         renderRetrievalLogs([]);
- // （）
+ // ()
         if (conversationId || messageId) {
             showNotification(_t('retrievalLogs.loadError') + ': ' + error.message, 'error');
         }
@@ -1304,7 +1304,7 @@ function renderRetrievalLogs(logs) {
     const container = document.getElementById('retrieval-logs-list');
     if (!container) return;
     
- // （）
+ // ()
     updateRetrievalStats(logs);
     
     if (logs.length === 0) {
@@ -1317,7 +1317,7 @@ function renderRetrievalLogs(logs) {
     retrievalLogsData = logs;
     
     container.innerHTML = logs.map((log, index) => {
- // retrievedItems：、，
+ // retrievedItems:,,
         let itemCount = 0;
         let hasResults = false;
         
@@ -1326,10 +1326,10 @@ function renderRetrievalLogs(logs) {
  // 
                 const realItems = log.retrievedItems.filter(id => id !== '_has_results');
                 itemCount = realItems.length;
- // ，ID，""
+ // ,ID,""
                 if (log.retrievedItems.includes('_has_results')) {
                     hasResults = true;
- // ID，；""（）
+ // ID,;""()
                     if (itemCount === 0) {
  itemCount = -1; // -1 
                     }
@@ -1337,7 +1337,7 @@ function renderRetrievalLogs(logs) {
                     hasResults = itemCount > 0;
                 }
             } else if (typeof log.retrievedItems === 'string') {
- // ，JSON
+ // ,JSON
                 try {
                     const parsed = JSON.parse(log.retrievedItems);
                     if (Array.isArray(parsed)) {
@@ -1353,7 +1353,7 @@ function renderRetrievalLogs(logs) {
                         }
                     }
                 } catch (e) {
- // ，
+ // ,
                 }
             }
         }
@@ -1440,7 +1440,7 @@ function updateRetrievalStats(logs) {
     if (!statsContainer) return;
     
     const totalLogs = logs.length;
- // ：retrievedItems，>0，
+ // :retrievedItems,>0,
     const successfulLogs = logs.filter(log => {
         if (!log.retrievedItems) return false;
         if (Array.isArray(log.retrievedItems)) {
@@ -1449,7 +1449,7 @@ function updateRetrievalStats(logs) {
         }
         return false;
     }).length;
- // （ID，）
+ // (ID,)
     const totalItems = logs.reduce((sum, log) => {
         if (!log.retrievedItems) return sum;
         if (Array.isArray(log.retrievedItems)) {
@@ -1487,19 +1487,19 @@ function updateRetrievalStats(logs) {
 function getTimeAgo(timeStr) {
     if (!timeStr) return '';
     
- // ，
+ // ,
     let date;
     if (typeof timeStr === 'string') {
- // （RFC3339/ISO8601）
+ // (RFC3339/ISO8601)
         date = new Date(timeStr);
         
- // ，
+ // ,
         if (isNaN(date.getTime())) {
  // SQLite: "2006-01-02 15:04:05" 
             const sqliteMatch = timeStr.match(/(\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)?)/);
             if (sqliteMatch) {
                 let timeStr2 = sqliteMatch[1].replace(' ', 'T');
- // ，ZUTC
+ // ,ZUTC
                 if (!timeStr2.includes('Z') && !timeStr2.match(/[+-]\d{2}:\d{2}$/)) {
                     timeStr2 += 'Z';
                 }
@@ -1507,7 +1507,7 @@ function getTimeAgo(timeStr) {
             }
         }
         
- // ，
+ // ,
         if (isNaN(date.getTime())) {
  // "YYYY-MM-DD HH:MM:SS" 
             const match = timeStr.match(/(\d{4})-(\d{2})-(\d{2})[\sT](\d{2}):(\d{2}):(\d{2})/);
@@ -1531,7 +1531,7 @@ function getTimeAgo(timeStr) {
         return formatTime(timeStr);
     }
     
- // （1970，）
+ // (1970,)
     const year = date.getFullYear();
     if (year < 1970 || year > 2100) {
         return formatTime(timeStr);
@@ -1540,7 +1540,7 @@ function getTimeAgo(timeStr) {
     const now = new Date();
     const diff = now - date;
     
- // （），
+ // (),
  if (diff < 0 || diff > 365 * 24 * 60 * 60 * 1000 * 10) { // 10
         return formatTime(timeStr);
     }
@@ -1601,7 +1601,7 @@ async function deleteRetrievalLog(id, index) {
         }
     }
     
- // UI（）
+ // UI()
     if (logCard) {
         logCard.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out';
         logCard.style.opacity = '0';
@@ -1612,7 +1612,7 @@ async function deleteRetrievalLog(id, index) {
             if (logCard.parentElement) {
                 logCard.remove();
                 
- // （，）
+ // (,)
                 updateRetrievalStatsAfterDelete();
             }
         }, 300);
@@ -1629,7 +1629,7 @@ async function deleteRetrievalLog(id, index) {
         }
         
  // 
- showNotification('✅ ！。', 'success');
+ showNotification('✅ !.', 'success');
         
  // 
         if (retrievalLogsData && index >= 0 && index < retrievalLogsData.length) {
@@ -1644,7 +1644,7 @@ async function deleteRetrievalLog(id, index) {
     } catch (error) {
  console.error(':', error);
         
- // ，
+ // ,
         if (logCard) {
             logCard.style.opacity = '1';
             logCard.style.transform = '';
@@ -1666,7 +1666,7 @@ async function deleteRetrievalLog(id, index) {
     }
 }
 
-// （）
+// ()
 function updateRetrievalStatsAfterDelete() {
     const statsContainer = document.getElementById('retrieval-stats');
     if (!statsContainer) return;
@@ -1679,7 +1679,7 @@ function updateRetrievalStatsAfterDelete() {
         return card.classList.contains('has-results');
     }).length;
     
- // （，）
+ // (,)
     const totalItems = Array.from(allLogs).reduce((sum, card) => {
         const badge = card.querySelector('.retrieval-log-result-badge');
         if (badge && badge.classList.contains('success')) {
@@ -1688,7 +1688,7 @@ function updateRetrievalStatsAfterDelete() {
             if (match) {
                 return sum + parseInt(match[1], 10);
             }
- return sum + 1; // （ "Has results" / ""）
+ return sum + 1; // ( "Has results" / "")
         }
         return sum;
     }, 0);
@@ -1900,7 +1900,7 @@ window.addEventListener('click', function(event) {
     }
 });
 
-// ，；「」 data-i18n， applyTranslations(document) 
+// ,;"" data-i18n, applyTranslations(document) 
 document.addEventListener('languagechange', function () {
     var cur = typeof window.currentPage === 'function' ? window.currentPage() : (window.currentPage || '');
     if (cur === 'knowledge-retrieval-logs') {
@@ -1908,7 +1908,7 @@ document.addEventListener('languagechange', function () {
             renderRetrievalLogs(retrievalLogsData);
         }
     } else if (cur === 'knowledge-management') {
- // 「」： data-i18n，applyTranslations ； DOM
+ // "": data-i18n,applyTranslations ; DOM
         var listEl = document.getElementById('knowledge-items-list');
         if (listEl && typeof window.applyTranslations === 'function') {
             window.applyTranslations(listEl);
@@ -1961,19 +1961,19 @@ function escapeHtml(text) {
 function formatTime(timeStr) {
     if (!timeStr) return '';
     
- // ，
+ // ,
     let date;
     if (typeof timeStr === 'string') {
- // （RFC3339/ISO8601）
+ // (RFC3339/ISO8601)
         date = new Date(timeStr);
         
- // ，
+ // ,
         if (isNaN(date.getTime())) {
  // SQLite: "2006-01-02 15:04:05" 
             const sqliteMatch = timeStr.match(/(\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)?)/);
             if (sqliteMatch) {
                 let timeStr2 = sqliteMatch[1].replace(' ', 'T');
- // ，ZUTC
+ // ,ZUTC
                 if (!timeStr2.includes('Z') && !timeStr2.match(/[+-]\d{2}:\d{2}$/)) {
                     timeStr2 += 'Z';
                 }
@@ -1981,7 +1981,7 @@ function formatTime(timeStr) {
             }
         }
         
- // ，
+ // ,
         if (isNaN(date.getTime())) {
  // "YYYY-MM-DD HH:MM:SS" 
             const match = timeStr.match(/(\d{4})-(\d{2})-(\d{2})[\sT](\d{2}):(\d{2}):(\d{2})/);
@@ -2000,7 +2000,7 @@ function formatTime(timeStr) {
         date = new Date(timeStr);
     }
     
- // ，
+ // ,
     if (isNaN(date.getTime())) {
  // 
         if (typeof timeStr === 'string' && (timeStr.includes('0001-01-01') || timeStr.startsWith('0001'))) {
@@ -2010,10 +2010,10 @@ function formatTime(timeStr) {
         return '';
     }
     
- // （1970，）
+ // (1970,)
     const year = date.getFullYear();
     if (year < 1970 || year > 2100) {
- // （0001-01-01），，
+ // (0001-01-01),,
         if (year === 1) {
             return '';
         }
@@ -2034,7 +2034,7 @@ function formatTime(timeStr) {
 
 // 
 function showNotification(message, type = 'info') {
- // （），
+ // (),
     if (typeof window.showNotification === 'function' && window.showNotification !== showNotification) {
         window.showNotification(message, type);
         return;
@@ -2046,7 +2046,7 @@ function showNotification(message, type = 'info') {
 
 // Toast
 function showToastNotification(message, type = 'info') {
- // （）
+ // ()
     let container = document.getElementById('toast-notification-container');
     if (!container) {
         container = document.createElement('div');
@@ -2135,7 +2135,7 @@ function showToastNotification(message, type = 'info') {
     
     container.appendChild(toast);
     
- // （5，7，4）
+ // (5,7,4)
     const duration = type === 'success' ? 5000 : type === 'error' ? 7000 : 4000;
     setTimeout(() => {
         if (toast.parentElement) {
@@ -2149,7 +2149,7 @@ function showToastNotification(message, type = 'info') {
     }, duration);
 }
 
-// CSS（）
+// CSS()
 if (!document.getElementById('toast-notification-styles')) {
     const style = document.createElement('style');
     style.id = 'toast-notification-styles';
@@ -2186,19 +2186,19 @@ window.addEventListener('click', function(event) {
     }
 });
 
-// （）
+// ()
 function switchToSettings() {
     if (typeof switchPage === 'function') {
         switchPage('settings');
- // ，
+ // ,
         setTimeout(() => {
             if (typeof switchSettingsSection === 'function') {
- // （）
+ // ()
                 const knowledgeSection = document.querySelector('[data-section="knowledge"]');
                 if (knowledgeSection) {
                     switchSettingsSection('knowledge');
                 } else {
- // ，
+ // ,
                     switchSettingsSection('basic');
  // 
                     setTimeout(() => {

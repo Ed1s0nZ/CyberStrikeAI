@@ -130,7 +130,7 @@ The status grid shows at a glance:
 
 1. Set the **Lines** input to the number of log lines to retrieve (default: 300).
 2. Click **Refresh Logs** to fetch once.
-3. Click **Start Stream** to poll every 2.5 seconds — the button changes to **Stop Stream** to pause.
+3. Click **Start Stream** to poll every 2.5 seconds - the button changes to **Stop Stream** to pause.
 
 Logs are sourced from `docker logs --tail N cyberstrikeai` when the Docker CLI is available, falling back to `logs/suite.log` otherwise.
 
@@ -148,14 +148,14 @@ The **Actions** panel lets you run any `run_docker.sh` action with optional para
 | `status` | Refresh status information |
 | `logs` | Fetch recent log lines |
 | `test` | Run the container runtime test suite |
-| `remove` | **Destructive** — remove containers, network, and volumes (prompts for confirmation) |
+| `remove` | **Destructive** - remove containers, network, and volumes (prompts for confirmation) |
 
 Configure optional parameters before running an action:
 
-- **Proxy Mode** — `direct`, `socks`, `http`, `tor`, or `vpn`
-- **Proxy URL** — URL for `socks` or `http` modes
-- **VPN Container** — container name for `vpn` mode
-- **Git Ref** — branch or tag for `update` (default: `main`)
+- **Proxy Mode** - `direct`, `socks`, `http`, `tor`, or `vpn`
+- **Proxy URL** - URL for `socks` or `http` modes
+- **VPN Container** - container name for `vpn` mode
+- **Git Ref** - branch or tag for `update` (default: `main`)
 
 Action output is streamed into the output panel and the status grid refreshes automatically on completion.
 

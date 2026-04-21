@@ -1,6 +1,6 @@
 name: dnsdumpster
 version: "1.0.0"
-description: "DNSdumpster DNS reconnaissance — subdomain enumeration, DNS records, host IP resolution, GeoIP data, reverse DNS, technology detection, network mapping"
+description: "DNSdumpster DNS reconnaissance - subdomain enumeration, DNS records, host IP resolution, GeoIP data, reverse DNS, technology detection, network mapping"
 author: "cybersecua"
 url: "https://dnsdumpster.com/developer/"
 

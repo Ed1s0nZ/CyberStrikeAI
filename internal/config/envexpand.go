@@ -22,7 +22,7 @@ func expandEnvVar(s string) string {
 
 		end := strings.IndexByte(s[i:], '}')
 		if end < 0 {
-			// No closing brace — preserve the literal ${ and stop scanning.
+			// No closing brace - preserve the literal ${ and stop scanning.
 			b.WriteString("${")
 			continue
 		}

@@ -6,19 +6,19 @@
 | 1209:4f54 | Joystick | /dev/input/js0 | Read 8+ RC channels |
 | 0483:5740 | Serial VCP | /dev/ttyACM0 | CLI, passthrough, module control |
 | 0483:5720 | Storage | /dev/sd* | SD card access (configs, Lua, firmware) |
-| 0483:df11 | DFU | — | Flash firmware via dfu-util |
+| 0483:df11 | DFU | - | Flash firmware via dfu-util |
 | 10c4:ea60 | ELRS USB | /dev/ttyUSB0 | Direct ESP32 module (esptool) |
 
 Auto-controller: `~/combat/tx12_auto.py`
 
 ## CLI Commands (Serial VCP Mode)
 ```
-set pulses 0/1              — freeze/resume RF output
-set rfmod 0 power off/on    — module power
-set rfmod 0 bootpin 1/0     — ESP32 boot mode
-serialpassthrough rfmod 0 <baud> — direct UART bridge
-ls /path                    — SD card listing
-reboot                      — reboot (DFU if USB connected)
+set pulses 0/1              - freeze/resume RF output
+set rfmod 0 power off/on    - module power
+set rfmod 0 bootpin 1/0     - ESP32 boot mode
+serialpassthrough rfmod 0 <baud> - direct UART bridge
+ls /path                    - SD card listing
+reboot                      - reboot (DFU if USB connected)
 ```
 
 ## Firmware (TX12 MkII, EdgeTX 2.9.4)
@@ -31,7 +31,7 @@ reboot                      — reboot (DFU if USB connected)
 ## CRSF Access
 - NOT available as AUX serial mode in EdgeTX 2.9.4
 - Use Lua API: `crossfireTelemetryPush/Pop()` + `serialWrite/Read()`
-- Or Telemetry Mirror (S.Port format, 57600 baud — re-encoded, not raw)
+- Or Telemetry Mirror (S.Port format, 57600 baud - re-encoded, not raw)
 - Or serialpassthrough for direct module UART access
 
 ## Joystick Channel Reading
@@ -45,7 +45,7 @@ while True:
 ```
 
 ## Safety
-- NEVER scan baud rates on serial port — locks EdgeTX, kills RC link
+- NEVER scan baud rates on serial port - locks EdgeTX, kills RC link
 - NEVER write before confirming data flow from radio
 - Model must have internalModule configured for CRSF
 - USB disconnect recovers stuck radio

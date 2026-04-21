@@ -1,6 +1,6 @@
 name: censys
 version: "3.0.0"
-description: "Censys Platform API v3 — host/cert/web property search, threat hunting, attack surface mapping"
+description: "Censys Platform API v3 - host/cert/web property search, threat hunting, attack surface mapping"
 author: "cybersecua"
 url: "https://github.com/cybersecua/cyberstrike-plugin-censys"
 

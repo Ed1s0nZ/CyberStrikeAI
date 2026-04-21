@@ -1,4 +1,4 @@
-// beforeInitialize（ i18next BrowserVersion）
+// beforeInitialize( i18next BrowserVersion)
 (function () {
     const DEFAULT_LANG = 'zh-CN';
     const STORAGE_KEY = 'csai_lang';
@@ -6,7 +6,7 @@
 
     const loadedLangs = {};
 
- // bootstrap ： chat in t() not yetthen middleEncoderender，and languageTagnot 
+ // bootstrap : chat in t() not yetthen middleEncoderender,and languageTagnot 
     let i18nReadyResolve;
     window.i18nReady = new Promise(function (resolve) {
         i18nReadyResolve = resolve;
@@ -67,7 +67,7 @@
             const isFormControl = (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA');
             const attrList = el.getAttribute('data-i18n-attr');
             const text = i18next.t(key);
- // elementNoneelement（textor Empty）only replacetext，inside's 、node；input/textarea not Set textContent
+ // elementNoneelement(textor Empty)only replacetext,inside's ,node;input/textarea not Set textContent
             const hasNoElementChildren = !el.querySelector('*');
             if (!skipText && !isFormControl && hasNoElementChildren && text && typeof text === 'string') {
                 el.textContent = text;
@@ -89,7 +89,7 @@
             }
         });
 
- // ConversationInput： value and placeholder same，Clear value ShowplaceholderNotice
+ // ConversationInput: value and placeholder same,Clear value ShowplaceholderNotice
         try {
             const chatInput = document.getElementById('chat-input');
             if (chatInput && chatInput.tagName === 'TEXTAREA') {
@@ -164,7 +164,7 @@
 
     async function initI18n() {
         if (typeof i18next === 'undefined') {
- console.warn('i18next not yetLoad，beforeInitialize');
+ console.warn('i18next not yetLoad,beforeInitialize');
             if (typeof i18nReadyResolve === 'function') i18nReadyResolve();
             return;
         }
@@ -184,7 +184,7 @@
             window.__locale = i18next.language || initialLang;
         } catch (e) { /* ignore */ }
 
- // Exportits Call（Parameter， _t('key', { count: 2 })）
+ // Exportits Call(Parameter, _t('key', { count: 2 }))
         window.t = function (key, opts) {
             if (typeof i18next === 'undefined') return key;
             return i18next.t(key, opts);
@@ -209,7 +209,7 @@
 
         document.addEventListener('click', handleGlobalClickForLangDropdown);
 
- // chat alreadyin i18n Completebeforeaftermiddlerender systemthen Message，this by Currentlanguagetime
+ // chat alreadyin i18n Completebeforeaftermiddlerender systemthen Message,this by Currentlanguagetime
         try {
             if (typeof refreshSystemReadyMessageBubbles === 'function') {
                 refreshSystemReadyMessageBubbles();

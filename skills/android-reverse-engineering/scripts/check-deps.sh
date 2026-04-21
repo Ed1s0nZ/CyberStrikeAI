@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check-deps.sh — Verify dependencies and report what's missing
+# check-deps.sh - Verify dependencies and report what's missing
 # Output includes machine-readable INSTALL:<dep> lines for each missing dependency.
 # The install-dep.sh script can install each one.
 set -euo pipefail
@@ -72,7 +72,7 @@ else
   done
 fi
 if [[ "$ff_found" == false ]]; then
-  echo "[MISSING] Fernflower/Vineflower not found (optional — better output on complex Java code)"
+  echo "[MISSING] Fernflower/Vineflower not found (optional - better output on complex Java code)"
   missing_optional+=("vineflower")
 fi
 
@@ -80,7 +80,7 @@ fi
 if command -v d2j-dex2jar &>/dev/null || command -v d2j-dex2jar.sh &>/dev/null; then
   echo "[OK] dex2jar detected"
 else
-  echo "[MISSING] dex2jar not found (optional — needed to use Fernflower on APK/DEX files)"
+  echo "[MISSING] dex2jar not found (optional - needed to use Fernflower on APK/DEX files)"
   missing_optional+=("dex2jar")
 fi
 
@@ -88,7 +88,7 @@ fi
 if command -v apktool &>/dev/null; then
   echo "[OK] apktool detected (optional)"
 else
-  echo "[MISSING] apktool not found (optional — useful for resource decoding)"
+  echo "[MISSING] apktool not found (optional - useful for resource decoding)"
   missing_optional+=("apktool")
 fi
 
@@ -96,7 +96,7 @@ fi
 if command -v adb &>/dev/null; then
   echo "[OK] adb detected (optional)"
 else
-  echo "[MISSING] adb not found (optional — useful for pulling APKs from devices)"
+  echo "[MISSING] adb not found (optional - useful for pulling APKs from devices)"
   missing_optional+=("adb")
 fi
 

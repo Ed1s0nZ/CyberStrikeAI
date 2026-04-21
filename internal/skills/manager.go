@@ -14,7 +14,7 @@ import (
 type Manager struct {
 	skillsDir string
 	logger    *zap.Logger
-	skills map[string]*cachedSkill // loadskills（status）
+	skills map[string]*cachedSkill // loadskills(status)
 	mu        sync.RWMutex            // protects skills map concurrent access
 }
 
@@ -65,7 +65,7 @@ func (m *Manager) LoadSkill(skillName string) (*Skill, error) {
 	}
 	modTime := fileInfo.ModTime().UnixNano()
 
-	// first try read lock cache hit（file path）
+	// first try read lock cache hit(file path)
 	m.mu.RLock()
 	if cached, exists := m.skills[skillName]; exists &&
 		cached.filePath == skillFile &&
@@ -197,7 +197,7 @@ func (m *Manager) InvalidateAll() {
 }
 
 // parseSkillContent parseskill
-// YAML front matterformat，goskills
+// YAML front matterformat,goskills
 func (m *Manager) parseSkillContent(content, skillName, skillPath string) *Skill {
 	skill := &Skill{
 		Name: skillName,
@@ -208,7 +208,7 @@ func (m *Manager) parseSkillContent(content, skillName, skillPath string) *Skill
 	if strings.HasPrefix(content, "---") {
 		parts := strings.SplitN(content, "---", 3)
 		if len(parts) >= 3 {
-			// parsefront matter（simple implementation, only extract name and description）
+			// parsefront matter(simple implementation, only extract name and description)
 			frontMatter := parts[1]
 			lines := strings.Split(frontMatter, "\n")
 			for _, line := range lines {
@@ -259,7 +259,7 @@ func (m *Manager) GetSkillContent(skillNames []string) (string, error) {
 
 	var builder strings.Builder
 	builder.WriteString("## available Skills\n\n")
-	builder.WriteString("before executing tasks, please read the following skills content, which contains relevant professional knowledge and methods：\n\n")
+	builder.WriteString("before executing tasks, please read the following skills content, which contains relevant professional knowledge and methods:\n\n")
 
 	for _, skill := range skills {
 		builder.WriteString(fmt.Sprintf("### Skill: %s\n", skill.Name))

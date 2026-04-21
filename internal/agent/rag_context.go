@@ -335,7 +335,7 @@ func (r *RAGContextInjector) ToolGuidanceHint(ctx context.Context, query string)
 		return ""
 	}
 
-	hint := fmt.Sprintf("\nKnowledge base hint: Relevant attack categories detected — %s. "+
+	hint := fmt.Sprintf("\nKnowledge base hint: Relevant attack categories detected - %s. "+
 		"Use search_knowledge_base for detailed exploitation techniques.",
 		strings.Join(categories, ", "))
 

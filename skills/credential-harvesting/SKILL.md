@@ -1,7 +1,7 @@
 # Credential Harvesting & Password Reuse
 
 ## Overview
-Harvest credentials from compromised devices and spray across all network targets. WiFi passwords from IoT devices are the highest-value source — people reuse them everywhere.
+Harvest credentials from compromised devices and spray across all network targets. WiFi passwords from IoT devices are the highest-value source - people reuse them everywhere.
 
 ## Harvest Sources (by value)
 
@@ -24,7 +24,7 @@ grep -rl "token\|password\|session" /data/data/*/shared_prefs/*.xml
 ```
 
 ### 4. OSINT-Derived Passwords
-From social media, accounts, birth dates — generate targeted password lists.
+From social media, accounts, birth dates - generate targeted password lists.
 
 ## Password Generation from OSINT
 ```python

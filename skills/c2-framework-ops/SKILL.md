@@ -13,18 +13,18 @@ Command & Control frameworks provide persistent, encrypted, evasive access to co
 - Config: `c2_handler: "0.0.0.0:8443"`
 
 ### Listener
-- HTTP/HTTPS (primary — looks like web traffic)
+- HTTP/HTTPS (primary - looks like web traffic)
 - SMB named pipes (lateral movement, no network traffic)
 - TCP (pivot through compromised hosts)
 - DNS (extremely covert, slow)
-- External C2 (Slack, Teams, cloud APIs — most evasive)
+- External C2 (Slack, Teams, cloud APIs - most evasive)
 
 ### Badger/Beacon (Implant)
 - Runs on compromised host
 - Calls back to listener on sleep interval + jitter
 - Encrypted comms with profile-defined encoding
-- Kill date — auto-terminates after specified date
-- Key strategy — locks to specific host (hostname/username/domain)
+- Kill date - auto-terminates after specified date
+- Key strategy - locks to specific host (hostname/username/domain)
 
 ### Profile
 Defines how C2 traffic looks on the wire:
@@ -59,14 +59,14 @@ Defines how C2 traffic looks on the wire:
 - **Empty response**: Return realistic "no task" response
 
 ### Sleep Obfuscation
-- **APC** — Queue APC to sleep, encrypts memory during sleep
-- **Pooling** — Uses thread pool timers
-- **Timer** — Uses waitable timers
+- **APC** - Queue APC to sleep, encrypts memory during sleep
+- **Pooling** - Uses thread pool timers
+- **Timer** - Uses waitable timers
 - Purpose: Encrypted in-memory while sleeping, no scannable strings
 
 ### Module Stomping
-- `"stomp": "chakra.dll"` — Overwrite a legitimate DLL's .text section with badger code
-- Makes memory forensics harder — looks like legit DLL
+- `"stomp": "chakra.dll"` - Overwrite a legitimate DLL's .text section with badger code
+- Makes memory forensics harder - looks like legit DLL
 
 ### Stack Spoofing
 - `"stack_chain": "user32.dll!GetMessageW+0x2E,SHCore.dll!..."`
@@ -75,10 +75,10 @@ Defines how C2 traffic looks on the wire:
 
 ### Key Strategy
 - Lock badger to specific host: `"key_strategy_type": "hostname", "key_strategy_value": "DESKTOP-XYZ"`
-- Badger won't run on wrong machine — anti-sandbox, anti-analysis
+- Badger won't run on wrong machine - anti-sandbox, anti-analysis
 
 ### Kill Date
-- `"killdate": "01 Dec 24 00:00 IST"` — Auto-terminates after date
+- `"killdate": "01 Dec 24 00:00 IST"` - Auto-terminates after date
 - Limits exposure window
 
 ## Payload Types
@@ -99,10 +99,10 @@ Direct TCP connection. Used for:
 
 ### External C2 (Adaptive C2)
 Route C2 through legitimate services:
-- **Slack** — Messages as C2 channel (split large payloads into chunks)
-- **Teams** — Similar approach
-- **Cloud APIs** — AWS, Azure as C2 redirectors
-- **DNS over HTTPS** — DoH as covert channel
+- **Slack** - Messages as C2 channel (split large payloads into chunks)
+- **Teams** - Similar approach
+- **Cloud APIs** - AWS, Azure as C2 redirectors
+- **DNS over HTTPS** - DoH as covert channel
 
 ## Lateral Movement
 
@@ -131,9 +131,9 @@ revtoken
 ## Post-Exploitation
 
 ### Credential Harvesting
-- `dcsync` — DCSync attack for domain hashes
-- `monologue` — Internal Monologue (NTLM downgrade)
-- `seatbelt` — System enumeration
+- `dcsync` - DCSync attack for domain hashes
+- `monologue` - Internal Monologue (NTLM downgrade)
+- `seatbelt` - System enumeration
 
 ### BOF (Beacon Object Files)
 Custom compiled object files executed in-memory:

@@ -25,7 +25,7 @@ const (
 	telegramAPIBase          = "https://api.telegram.org"
 )
 
-// ——— Telegram API types ———
+// --- Telegram API types ---
 
 type tgResponse struct {
 	OK          bool            `json:"ok"`
@@ -79,7 +79,7 @@ type tgBot struct {
 	allowedSet  map[int64]bool
 }
 
-// ——— Public entrypoint ———
+// --- Public entrypoint ---
 
 // StartTelegram starts the Telegram bot using long polling (no public IP required).
 // Automatically reconnects on errors; exits when ctx is cancelled.
@@ -90,7 +90,7 @@ func StartTelegram(ctx context.Context, cfg config.RobotTelegramConfig, h Messag
 	go runTelegramLoop(ctx, cfg, h, logger)
 }
 
-// ——— Connection loop ———
+// --- Connection loop ---
 
 func runTelegramLoop(ctx context.Context, cfg config.RobotTelegramConfig, h MessageHandler, logger *zap.Logger) {
 	backoff := telegramReconnectInitial
@@ -135,7 +135,7 @@ func runTelegramLoop(ctx context.Context, cfg config.RobotTelegramConfig, h Mess
 	}
 }
 
-// ——— Polling loop ———
+// --- Polling loop ---
 
 func (b *tgBot) runPollLoop(ctx context.Context) error {
 	// Fetch bot info (username) for group mention detection
@@ -168,7 +168,7 @@ func (b *tgBot) runPollLoop(ctx context.Context) error {
 	}
 }
 
-// ——— Bot API helpers ———
+// --- Bot API helpers ---
 
 func (b *tgBot) fetchBotInfo(ctx context.Context) error {
 	var user tgUser
@@ -251,7 +251,7 @@ func (b *tgBot) sendChatAction(ctx context.Context, chatID int64, action string)
 	_ = b.apiPost(ctx, "sendChatAction", params, &result)
 }
 
-// ——— Message handling ———
+// --- Message handling ---
 
 func (b *tgBot) handleUpdate(ctx context.Context, msg *tgMessage) {
 	if msg.From == nil || msg.From.IsBot {
@@ -389,7 +389,7 @@ func (b *tgBot) handleUpdate(ctx context.Context, msg *tgMessage) {
 	}
 }
 
-// ——— Low-level API ———
+// --- Low-level API ---
 
 func (b *tgBot) apiGet(ctx context.Context, method string, params map[string]interface{}, out interface{}) error {
 	url := b.apiURL + "/" + method
@@ -439,7 +439,7 @@ func (b *tgBot) doRequest(ctx context.Context, httpMethod, url string, body io.R
 	return nil
 }
 
-// ——— Helpers ———
+// --- Helpers ---
 
 // isMentioned returns true if the bot (@username) is mentioned in a group message.
 func (b *tgBot) isMentioned(msg *tgMessage) bool {

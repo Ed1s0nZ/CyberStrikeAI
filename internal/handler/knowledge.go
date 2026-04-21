@@ -51,12 +51,12 @@ func (h *KnowledgeHandler) GetCategories(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"categories": categories})
 }
 
-// GetItems get knowledge itemlist（paginate by category，defaultreturns）
+// GetItems get knowledge itemlist(paginate by category,defaultreturns)
 func (h *KnowledgeHandler) GetItems(c *gin.Context) {
 	category := c.Query("category")
 	searchKeyword := c.Query("search") // 
 
-	// ，（search across all data）
+	// ,(search across all data)
 	if searchKeyword != "" {
 		items, err := h.manager.SearchItemsByKeyword(searchKeyword, category)
 		if err != nil {
@@ -103,11 +103,11 @@ func (h *KnowledgeHandler) GetItems(c *gin.Context) {
 		return
 	}
 
-	// ：categoryPage=true paginate by category，（）
+	// :categoryPage=true paginate by category,()
 	categoryPageMode := c.Query("categoryPage") != "false" // default
 
 	// pagination params
-	limit := 50 // default 50 （，）
+	limit := 50 // default 50 (,)
 	offset := 0
 	if limitStr := c.Query("limit"); limitStr != "" {
 		if parsed, err := parseInt(limitStr); err == nil && parsed > 0 && parsed <= 500 {
@@ -120,9 +120,9 @@ func (h *KnowledgeHandler) GetItems(c *gin.Context) {
 		}
 	}
 
-	// category ，，returns
+	// category ,,returns
 	if category != "" && categoryPageMode {
-		// ：returns（）
+		// :returns()
 		items, total, err := h.manager.GetItemsSummary(category, 0, 0)
 		if err != nil {
 			h.logger.Error("get knowledge item", zap.Error(err))
@@ -149,8 +149,8 @@ func (h *KnowledgeHandler) GetItems(c *gin.Context) {
 	}
 
 	if categoryPageMode {
-		// paginate by category（default）
-		// limit ， 5-10 
+		// paginate by category(default)
+		// limit , 5-10 
 		if limit <= 0 || limit > 100 {
 			limit = 10 // default 10 
 		}
@@ -171,12 +171,12 @@ func (h *KnowledgeHandler) GetItems(c *gin.Context) {
 		return
 	}
 
-	// （）
-	// whether to include full content（default false，returns）
+	// ()
+	// whether to include full content(default false,returns)
 	includeContent := c.Query("includeContent") == "true"
 
 	if includeContent {
-		// returns（）
+		// returns()
 		items, err := h.manager.GetItemsWithOptions(category, limit, offset, true)
 		if err != nil {
 			h.logger.Error("get knowledge item", zap.Error(err))
@@ -198,7 +198,7 @@ func (h *KnowledgeHandler) GetItems(c *gin.Context) {
 			"offset": offset,
 		})
 	} else {
-		// returns（，）
+		// returns(,)
 		items, total, err := h.manager.GetItemsSummary(category, limit, offset)
 		if err != nil {
 			h.logger.Error("get knowledge item", zap.Error(err))
@@ -316,7 +316,7 @@ func (h *KnowledgeHandler) RebuildIndex(c *gin.Context) {
 		}
 	}()
 
-	c.JSON(http.StatusOK, gin.H{"message": "，"})
+	c.JSON(http.StatusOK, gin.H{"message": ","})
 }
 
 // ScanKnowledgeBase scanknowledge base
@@ -329,11 +329,11 @@ func (h *KnowledgeHandler) ScanKnowledgeBase(c *gin.Context) {
 	}
 
 	if len(itemsToIndex) == 0 {
-		c.JSON(http.StatusOK, gin.H{"message": "scan，"})
+		c.JSON(http.StatusOK, gin.H{"message": "scan,"})
 		return
 	}
 
-	// add（）
+	// add()
 	go func() {
 		ctx := context.Background()
 		h.logger.Info("", zap.Int("count", len(itemsToIndex)))
@@ -358,7 +358,7 @@ func (h *KnowledgeHandler) ScanKnowledgeBase(c *gin.Context) {
 					)
 				}
 
-				// 2 ，stop
+				// 2 ,stop
 				if consecutiveFailures >= 2 {
 					h.logger.Error("too many consecutive index failures, stopping incremental indexing immediately",
 						zap.Int("consecutiveFailures", consecutiveFailures),
@@ -388,7 +388,7 @@ func (h *KnowledgeHandler) ScanKnowledgeBase(c *gin.Context) {
 	}()
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": fmt.Sprintf("scan， %d add", len(itemsToIndex)),
+		"message": fmt.Sprintf("scan, %d add", len(itemsToIndex)),
 		"items_to_index": len(itemsToIndex),
 	})
 }
@@ -441,7 +441,7 @@ func (h *KnowledgeHandler) GetIndexStatus(c *gin.Context) {
 	if h.indexer != nil {
 		lastError, lastErrorTime := h.indexer.GetLastError()
 		if lastError != "" {
-			// error（5 ），returnserror
+			// error(5 ),returnserror
 			if time.Since(lastErrorTime) < 5*time.Minute {
 				status["last_error"] = lastError
 				status["last_error_time"] = lastErrorTime.Format(time.RFC3339)
@@ -462,7 +462,7 @@ func (h *KnowledgeHandler) GetIndexStatus(c *gin.Context) {
 			if lastChunks > 0 {
 				status["rebuild_last_chunks"] = lastChunks
 			}
-			// ，is_complete false
+			// ,is_complete false
 			status["is_complete"] = false
 			// 
 			if totalItems > 0 {
@@ -474,7 +474,7 @@ func (h *KnowledgeHandler) GetIndexStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, status)
 }
 
-// Search knowledge base（ API ，Agent Retriever）
+// Search knowledge base( API ,Agent Retriever)
 func (h *KnowledgeHandler) Search(c *gin.Context) {
 	var req knowledge.SearchRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -508,7 +508,7 @@ func (h *KnowledgeHandler) GetStats(c *gin.Context) {
 	})
 }
 
-// ：parse
+// :parse
 func parseInt(s string) (int, error) {
 	var result int
 	_, err := fmt.Sscanf(s, "%d", &result)

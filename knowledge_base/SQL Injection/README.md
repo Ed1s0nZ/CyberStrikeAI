@@ -184,7 +184,7 @@ sql1 = "SELECT * FROM admin WHERE pass = ''or'6�]��!r,��b'";
 
 ### Hashed Passwords
 
-By 2025, applications almost never store plaintext passwords. Authentication systems instead use a representation of the password (a hash derived by a key-derivation function, often with a salt). That evolution changes the mechanics of some classic SQL injection (SQLi) bypasses: an attacker who injects rows via `UNION` must now supply values that match the stored representation the application expects, not the user’s raw password.
+By 2025, applications almost never store plaintext passwords. Authentication systems instead use a representation of the password (a hash derived by a key-derivation function, often with a salt). That evolution changes the mechanics of some classic SQL injection (SQLi) bypasses: an attacker who injects rows via `UNION` must now supply values that match the stored representation the application expects, not the user's raw password.
 
 Many naïve authentication flows perform these high-level steps:
 
@@ -382,7 +382,7 @@ In short, the result of the first SQL query is used to build the second SQL quer
 ## Second Order SQL Injection
 
 Second Order SQL Injection is a subtype of SQL injection where the malicious SQL payload is primarily stored in the application's database and later executed by a different functionality of the same application.
-Unlike first-order SQLi, the injection doesn’t happen right away. It is **triggered in a separate step**, often in a different part of the application.
+Unlike first-order SQLi, the injection doesn't happen right away. It is **triggered in a separate step**, often in a different part of the application.
 
 1. User submits input that is stored (e.g., during registration or profile update).
 
@@ -581,7 +581,7 @@ Bypass using keywords case insensitive or an equivalent operator.
 
 ## References
 
-* [A Novel Technique for SQL Injection in PDO’s Prepared Statements - Adam Kues - July 21, 2025](https://slcyber.io/assetnote-security-research-center/a-novel-technique-for-sql-injection-in-pdos-prepared-statements)
+* [A Novel Technique for SQL Injection in PDO's Prepared Statements - Adam Kues - July 21, 2025](https://slcyber.io/assetnote-security-research-center/a-novel-technique-for-sql-injection-in-pdos-prepared-statements)
 * [Analyzing CVE-2018-6376 – Joomla!, Second Order SQL Injection - Not So Secure - February 9, 2018](https://web.archive.org/web/20180209143119/https://www.notsosecure.com/analyzing-cve-2018-6376/)
 * [Implement a Blind Error-Based SQLMap payload for SQLite - soka - August 24, 2023](https://sokarepo.github.io/web/2023/08/24/implement-blind-sqlite-sqlmap.html)
 * [Manual SQL Injection Discovery Tips - Gerben Javado - August 26, 2017](https://gerbenjavado.com/manual-sql-injection-discovery-tips/)

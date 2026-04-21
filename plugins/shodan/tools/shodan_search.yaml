@@ -2,7 +2,7 @@ name: "shodan_search"
 command: "python3"
 args: ["{{PLUGIN_DIR}}/scripts/shodan_search.py"]
 enabled: true
-short_description: "Shodan internet search — host discovery, service fingerprinting, vulnerability detection, DNS, exploit search. Requires API key."
+short_description: "Shodan internet search - host discovery, service fingerprinting, vulnerability detection, DNS, exploit search. Requires API key."
 description: |
   Shodan is the world's first search engine for Internet-connected devices. It crawls the entire
   IPv4 space and indexes banners, services, TLS certificates, vulnerabilities, and metadata for
@@ -14,93 +14,93 @@ description: |
   **Commands:**
 
   **Free tier (no credits consumed):**
-  - `validate` — check API key validity, plan info, remaining credits
-  - `host` — look up all services on a specific IP (`query`=IP address)
-  - `count` — count matching hosts without returning results
-  - `dns` — resolve hostnames to IPs (`query`=comma-separated hostnames)
-  - `reverse` — reverse DNS lookup (`query`=comma-separated IPs)
-  - `myip` — show your current public IP address
-  - `ports` — list all ports Shodan crawls
-  - `filters` — list all available search filters
-  - `facets` — list all available search facets
+  - `validate` - check API key validity, plan info, remaining credits
+  - `host` - look up all services on a specific IP (`query`=IP address)
+  - `count` - count matching hosts without returning results
+  - `dns` - resolve hostnames to IPs (`query`=comma-separated hostnames)
+  - `reverse` - reverse DNS lookup (`query`=comma-separated IPs)
+  - `myip` - show your current public IP address
+  - `ports` - list all ports Shodan crawls
+  - `filters` - list all available search filters
+  - `facets` - list all available search facets
 
   **Paid tier (uses query credits):**
-  - `search` — full search with results (1 credit for filtered/paged queries)
-  - `domain` — get subdomains and DNS entries for a domain (1 credit)
-  - `exploits` — search the exploits database
+  - `search` - full search with results (1 credit for filtered/paged queries)
+  - `domain` - get subdomains and DNS entries for a domain (1 credit)
+  - `exploits` - search the exploits database
 
   **Query syntax (for search and count):**
-  - `apache` — keyword search in banner text
-  - `port:22` — filter by port number
-  - `org:"Google"` — filter by organization name
-  - `country:UA` — filter by 2-letter country code
-  - `city:"Kyiv"` — filter by city name
-  - `net:1.2.3.0/24` — filter by CIDR network range
-  - `os:"Windows"` — filter by operating system
-  - `product:"nginx"` — filter by product name
-  - `version:"1.0"` — filter by software version
-  - `hostname:"example.com"` — filter by hostname
-  - `asn:"AS15169"` — filter by ASN
+  - `apache` - keyword search in banner text
+  - `port:22` - filter by port number
+  - `org:"Google"` - filter by organization name
+  - `country:UA` - filter by 2-letter country code
+  - `city:"Kyiv"` - filter by city name
+  - `net:1.2.3.0/24` - filter by CIDR network range
+  - `os:"Windows"` - filter by operating system
+  - `product:"nginx"` - filter by product name
+  - `version:"1.0"` - filter by software version
+  - `hostname:"example.com"` - filter by hostname
+  - `asn:"AS15169"` - filter by ASN
 
   **TLS/SSL filters:**
-  - `ssl:true` — hosts with TLS/SSL
-  - `ssl.cert.subject.cn:"example.com"` — by certificate Common Name
-  - `ssl.cert.issuer.o:"Let's Encrypt"` — by certificate issuer organization
-  - `ssl.cert.expired:true` — expired certificates
-  - `ssl.jarm:"hash"` — by JARM fingerprint (C2 hunting)
-  - `ssl.version:"tlsv1"` — by TLS version (outdated protocol detection)
+  - `ssl:true` - hosts with TLS/SSL
+  - `ssl.cert.subject.cn:"example.com"` - by certificate Common Name
+  - `ssl.cert.issuer.o:"Let's Encrypt"` - by certificate issuer organization
+  - `ssl.cert.expired:true` - expired certificates
+  - `ssl.jarm:"hash"` - by JARM fingerprint (C2 hunting)
+  - `ssl.version:"tlsv1"` - by TLS version (outdated protocol detection)
 
   **HTTP filters:**
-  - `http.title:"Dashboard"` — by web page title
-  - `http.status:200` — by HTTP response status code
-  - `http.component:"WordPress"` — by detected web component
-  - `http.html:"login"` — by HTML content
-  - `http.favicon.hash:116323821` — by favicon hash (fingerprinting)
+  - `http.title:"Dashboard"` - by web page title
+  - `http.status:200` - by HTTP response status code
+  - `http.component:"WordPress"` - by detected web component
+  - `http.html:"login"` - by HTML content
+  - `http.favicon.hash:116323821` - by favicon hash (fingerprinting)
 
   **Vulnerability filters (paid plans):**
-  - `vuln:CVE-2021-44228` — by specific CVE identifier
-  - `has_vuln:true` — any host with known vulnerabilities
-  - `tag:"ics"` — tagged as ICS/SCADA
-  - `tag:"honeypot"` — identified honeypots
+  - `vuln:CVE-2021-44228` - by specific CVE identifier
+  - `has_vuln:true` - any host with known vulnerabilities
+  - `tag:"ics"` - tagged as ICS/SCADA
+  - `tag:"honeypot"` - identified honeypots
 
   **Boolean operators:**
-  - `apache AND port:443` — both conditions
-  - `nginx OR apache` — either condition
-  - `port:22 -country:CN` — exclude (NOT)
-  - `"exact phrase"` — exact match in banner
+  - `apache AND port:443` - both conditions
+  - `nginx OR apache` - either condition
+  - `port:22 -country:CN` - exclude (NOT)
+  - `"exact phrase"` - exact match in banner
 
   **Common pentest patterns:**
-  - `port:22 product:"OpenSSH" version:"7."` — outdated SSH servers
-  - `port:3306 -product:"MySQL" country:UA` — exposed MySQL
-  - `port:27017 -auth` — MongoDB without authentication
-  - `port:6379 -auth` — Redis without authentication
-  - `port:9200 http.title:"Kibana"` — exposed Elasticsearch/Kibana
-  - `port:5900 -auth` — VNC without authentication
-  - `port:3389 country:UA` — exposed RDP
-  - `http.title:"Dashboard" -http.title:"Cloudflare"` — admin dashboards
-  - `ssl.cert.expired:true port:443` — expired TLS certificates
-  - `http.component:"Jenkins"` — exposed Jenkins
-  - `http.component:"Grafana"` — exposed Grafana
-  - `net:1.2.3.0/24 port:80,443` — enumerate web services in a range
-  - `org:"Target Corp" has_vuln:true` — vulnerable hosts in an org
+  - `port:22 product:"OpenSSH" version:"7."` - outdated SSH servers
+  - `port:3306 -product:"MySQL" country:UA` - exposed MySQL
+  - `port:27017 -auth` - MongoDB without authentication
+  - `port:6379 -auth` - Redis without authentication
+  - `port:9200 http.title:"Kibana"` - exposed Elasticsearch/Kibana
+  - `port:5900 -auth` - VNC without authentication
+  - `port:3389 country:UA` - exposed RDP
+  - `http.title:"Dashboard" -http.title:"Cloudflare"` - admin dashboards
+  - `ssl.cert.expired:true port:443` - expired TLS certificates
+  - `http.component:"Jenkins"` - exposed Jenkins
+  - `http.component:"Grafana"` - exposed Grafana
+  - `net:1.2.3.0/24 port:80,443` - enumerate web services in a range
+  - `org:"Target Corp" has_vuln:true` - vulnerable hosts in an org
 
   **IoT/ICS patterns:**
-  - `tag:"ics"` — industrial control systems
-  - `port:502` — Modbus
-  - `port:47808` — BACnet
-  - `port:20000 product:"DNP3"` — DNP3 SCADA
-  - `http.title:"webcamXP"` — exposed webcams
-  - `port:554 has_screenshot:true` — RTSP cameras with screenshots
-  - `product:"MikroTik"` — MikroTik routers
-  - `http.title:"RouterOS"` — MikroTik web interface
+  - `tag:"ics"` - industrial control systems
+  - `port:502` - Modbus
+  - `port:47808` - BACnet
+  - `port:20000 product:"DNP3"` - DNP3 SCADA
+  - `http.title:"webcamXP"` - exposed webcams
+  - `port:554 has_screenshot:true` - RTSP cameras with screenshots
+  - `product:"MikroTik"` - MikroTik routers
+  - `http.title:"RouterOS"` - MikroTik web interface
 
   **Facets** (for aggregation with count):
   Use `facets` parameter with search or count. Examples:
-  - `facets="country"` — break down by country
-  - `facets="org"` — break down by organization
-  - `facets="port"` — break down by port
-  - `facets="asn"` — break down by ASN
-  - `facets="country:10"` — top 10 countries
+  - `facets="country"` - break down by country
+  - `facets="org"` - break down by organization
+  - `facets="port"` - break down by port
+  - `facets="asn"` - break down by ASN
+  - `facets="country:10"` - top 10 countries
 
   **Rate limits:**
   - Free tier: 1 request/second
@@ -131,18 +131,18 @@ parameters:
     type: "string"
     description: |
       Command to execute (default: auto-detected from query).
-      - search — full search with results (may cost 1 credit)
-      - host — detailed host lookup by IP (free)
-      - count — count results only (free)
-      - dns — resolve hostnames to IPs (free)
-      - reverse — reverse DNS lookup (free)
-      - domain — get subdomains/DNS entries for domain (1 credit)
-      - exploits — search exploits database
-      - validate — check API key and credits (free)
-      - myip — show your public IP (free)
-      - ports — list all crawled ports (free)
-      - filters — list search filters (free)
-      - facets — list search facets (free)
+      - search - full search with results (may cost 1 credit)
+      - host - detailed host lookup by IP (free)
+      - count - count results only (free)
+      - dns - resolve hostnames to IPs (free)
+      - reverse - reverse DNS lookup (free)
+      - domain - get subdomains/DNS entries for domain (1 credit)
+      - exploits - search exploits database
+      - validate - check API key and credits (free)
+      - myip - show your public IP (free)
+      - ports - list all crawled ports (free)
+      - filters - list search filters (free)
+      - facets - list search facets (free)
     required: false
     position: 1
     format: "positional"
@@ -172,9 +172,9 @@ parameters:
     type: "string"
     description: |
       Additional flags:
-      - --history — include historical data for host lookup
-      - --minify — return minimal host information
-      - --type A|AAAA|CNAME|MX|NS|SOA|TXT — DNS record type filter (for domain command)
-      - --facets "country,org" — add facets to search/count
+      - --history - include historical data for host lookup
+      - --minify - return minimal host information
+      - --type A|AAAA|CNAME|MX|NS|SOA|TXT - DNS record type filter (for domain command)
+      - --facets "country,org" - add facets to search/count
     required: false
     format: "positional"

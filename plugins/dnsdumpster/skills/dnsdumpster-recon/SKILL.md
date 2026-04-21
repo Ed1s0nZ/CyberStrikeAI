@@ -39,7 +39,7 @@ dnsdumpster_search query="target.com" type="NS"
 # IP address investigation
 dnsdumpster_search query="203.0.113.10" command="host"
 
-# Reverse IP — find co-hosted domains
+# Reverse IP - find co-hosted domains
 dnsdumpster_search query="203.0.113.10" command="reverse"
 
 # Subdomain enumeration (alternative source)
@@ -58,10 +58,10 @@ Start with passive techniques that don't touch the target directly.
 ```
 # 1. Certificate Transparency logs (crt.sh)
 #    Finds subdomains from SSL certificate issuance records.
-#    Covers historical certs — finds deprecated/removed subdomains.
+#    Covers historical certs - finds deprecated/removed subdomains.
 
 # 2. DNSdumpster domain lookup
-#    Active DNS enumeration — finds subdomains by querying DNS.
+#    Active DNS enumeration - finds subdomains by querying DNS.
 dnsdumpster_search query="target.com"
 
 # 3. Shodan domain DNS (if available)
@@ -127,27 +127,27 @@ Feed DNSdumpster results into active tools.
 
 | Finding | Significance |
 |---------|-------------|
-| Multiple A records | Load balancing / CDN — may need to find origin |
-| Internal-looking hostnames | `dev.`, `staging.`, `admin.`, `vpn.` — high-value targets |
+| Multiple A records | Load balancing / CDN - may need to find origin |
+| Internal-looking hostnames | `dev.`, `staging.`, `admin.`, `vpn.` - high-value targets |
 | Different subnets | Multiple hosting providers or data centers |
-| Cloud provider IPs | AWS, Azure, GCP — check for cloud misconfigurations |
+| Cloud provider IPs | AWS, Azure, GCP - check for cloud misconfigurations |
 
 ### MX Records (Mail)
 
 | Finding | Significance |
 |---------|-------------|
-| Google Workspace MX | `ASPMX.L.GOOGLE.COM` — target uses Google mail |
-| Microsoft 365 MX | `*.mail.protection.outlook.com` — target uses O365 |
-| Self-hosted MX | Own mail server — check for vulns, open relay |
-| No MX records | Domain may not receive email — less phishing concern |
+| Google Workspace MX | `ASPMX.L.GOOGLE.COM` - target uses Google mail |
+| Microsoft 365 MX | `*.mail.protection.outlook.com` - target uses O365 |
+| Self-hosted MX | Own mail server - check for vulns, open relay |
+| No MX records | Domain may not receive email - less phishing concern |
 
 ### NS Records (DNS Infrastructure)
 
 | Finding | Significance |
 |---------|-------------|
-| Cloud DNS (Route53, CloudFlare) | Managed DNS — zone transfer unlikely |
+| Cloud DNS (Route53, CloudFlare) | Managed DNS - zone transfer unlikely |
 | Self-hosted NS | Check for zone transfer (AXFR), DNS cache poisoning |
-| Single NS | No redundancy — DoS vector |
+| Single NS | No redundancy - DoS vector |
 | Mismatched NS | Possible misconfiguration or stale delegation |
 
 ### TXT Records (SPF/DKIM/DMARC)
@@ -156,7 +156,7 @@ Feed DNSdumpster results into active tools.
 |--------|--------------|
 | SPF (`v=spf1`) | Overly permissive `+all` or `~all` enables spoofing |
 | DKIM (`v=DKIM1`) | Key strength, selector enumeration |
-| DMARC (`v=DMARC1`) | `p=none` means no enforcement — spoofing possible |
+| DMARC (`v=DMARC1`) | `p=none` means no enforcement - spoofing possible |
 | Verification tokens | Cloud services in use (Google, Microsoft, etc.) |
 | No SPF/DMARC | Email spoofing wide open |
 
@@ -165,8 +165,8 @@ Feed DNSdumpster results into active tools.
 | Finding | Significance |
 |---------|-------------|
 | Points to cloud service | Check if service is still active (takeover risk) |
-| Points to CDN | Cloudflare, Akamai, Fastly — origin IP hunting |
-| Dangling CNAME | Target no longer exists — subdomain takeover |
+| Points to CDN | Cloudflare, Akamai, Fastly - origin IP hunting |
+| Dangling CNAME | Target no longer exists - subdomain takeover |
 | Long CNAME chains | Potential misconfiguration, performance issues |
 
 ## Technology Identification from DNS
@@ -194,10 +194,10 @@ Feed DNSdumpster results into active tools.
 
 For maximum coverage, use multiple subdomain enumeration techniques:
 
-1. **Certificate Transparency (crt.sh)** — passive, historical, covers wildcard certs
-2. **DNSdumpster** — active DNS enumeration, banner data, network mapping
-3. **Shodan/Censys** — passive host data with `ssl.cert.subject.cn` or `hostname` filters
-4. **Brute-force** — subfinder/amass with wordlists for common subdomain patterns
+1. **Certificate Transparency (crt.sh)** - passive, historical, covers wildcard certs
+2. **DNSdumpster** - active DNS enumeration, banner data, network mapping
+3. **Shodan/Censys** - passive host data with `ssl.cert.subject.cn` or `hostname` filters
+4. **Brute-force** - subfinder/amass with wordlists for common subdomain patterns
 
 ### Subdomain Patterns to Watch
 
@@ -234,11 +234,11 @@ For maximum coverage, use multiple subdomain enumeration techniques:
 
 ## Tips
 
-- **Combine DNSdumpster + crt.sh** for maximum subdomain coverage — they use different techniques
-- **Reverse IP** is invaluable for shared hosting — reveals other targets on same infrastructure
-- **TXT records** leak cloud service usage — look for verification tokens
+- **Combine DNSdumpster + crt.sh** for maximum subdomain coverage - they use different techniques
+- **Reverse IP** is invaluable for shared hosting - reveals other targets on same infrastructure
+- **TXT records** leak cloud service usage - look for verification tokens
 - **MX records** immediately tell you the email platform (Google, O365, self-hosted)
 - **CNAME chains** can reveal CDN origin IPs when combined with historical data
-- **Banner data** from domain lookup includes HTTP server headers — quick tech fingerprinting
-- **Rate limit**: 1 request per 2 seconds — be patient, space out requests
-- **ASN data** groups IPs by organization — reveals the target's network footprint
+- **Banner data** from domain lookup includes HTTP server headers - quick tech fingerprinting
+- **Rate limit**: 1 request per 2 seconds - be patient, space out requests
+- **ASN data** groups IPs by organization - reveals the target's network footprint

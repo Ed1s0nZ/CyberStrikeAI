@@ -285,7 +285,7 @@
                                 <span style="font-size:13px;color:var(--text-secondary, #aaa);">Model Status</span>
                                 <span id="dashboard-model-status-value" style="font-size:13px;">Checking...</span>
                             </div>
- <!-- ： KPI（：） -->
+ <!-- : KPI(:) -->
                             <div class="dashboard-kpi-row" id="dashboard-cards">
  <div class="dashboard-kpi-card" role="button" tabindex="0" onclick="switchPage('tasks')" onkeydown="if(event.key==='Enter'||event.key===' ') { event.preventDefault(); switchPage('tasks'); }" data-i18n="dashboard.clickToViewTasks" data-i18n-attr="title" title=""> <div class="dashboard-kpi-value" id="dashboard-running-tasks">-</div><div class="dashboard-kpi-label" data-i18n="dashboard.runningTasks"></div></div>
  <div class="dashboard-kpi-card" role="button" tabindex="0" onclick="switchPage('vulnerabilities')" onkeydown="if(event.key==='Enter'||event.key===' ') { event.preventDefault(); switchPage('vulnerabilities'); }" data-i18n="dashboard.clickToViewVuln" data-i18n-attr="title" title=""><div class="dashboard-kpi-value" id="dashboard-vuln-total">-</div><div class="dashboard-kpi-label" data-i18n="dashboard.vulnTotal"></div></div>
@@ -430,7 +430,7 @@
                                     </div>
                                     <div class="dashboard-cta-copy">
  <p class="dashboard-cta-text" data-i18n="dashboard.ctaTitle"></p>
- <p class="dashboard-cta-sub" data-i18n="dashboard.ctaSub">，AI </p>
+ <p class="dashboard-cta-sub" data-i18n="dashboard.ctaSub">,AI </p>
                                     </div>
                                 </div>
                                 <button class="dashboard-cta-btn" onclick="switchPage('chat')">
@@ -445,9 +445,9 @@
  <!-- -->
                 <div id="page-chat" class="page">
                     <div class="chat-page-layout">
- <!-- （，） -->
+ <!-- (,) -->
                         <aside class="conversation-sidebar" id="conversation-sidebar">
- <!-- ：「」，（flex ） -->
+ <!-- :"",(flex ) -->
                             <div class="sidebar-header conversation-sidebar-header">
                                 <button type="button" class="new-chat-btn" onclick="startNewConversation()">
  <span>+</span> <span data-i18n="chat.newChat"></span>
@@ -553,7 +553,7 @@
 
  <!-- -->
                         <div class="chat-container">
- <!-- （） -->
+ <!-- () -->
                             <div id="conversation-header" class="conversation-header" style="display: none;">
                                 <div class="conversation-header-content">
  <button id="attack-chain-btn" class="attack-chain-btn" data-i18n="chat.viewAttackChain" data-i18n-attr="title" data-i18n-skip-text="true" title="" disabled>
@@ -611,7 +611,7 @@
                                                     <div class="role-selection-item-icon-main" aria-hidden="true">🤖</div>
                                                     <div class="role-selection-item-content-main">
  <div class="role-selection-item-name-main" data-i18n="chat.agentModeSingle"></div>
- <div class="role-selection-item-description-main" data-i18n="chat.agentModeSingleHint"> ReAct ，</div>
+ <div class="role-selection-item-description-main" data-i18n="chat.agentModeSingleHint"> ReAct ,</div>
                                                     </div>
                                                     <div class="role-selection-checkmark-main agent-mode-check" data-agent-mode-check="single">✓</div>
                                                 </button>
@@ -619,7 +619,7 @@
                                                     <div class="role-selection-item-icon-main" aria-hidden="true">🧩</div>
                                                     <div class="role-selection-item-content-main">
  <div class="role-selection-item-name-main" data-i18n="chat.agentModeMulti"></div>
- <div class="role-selection-item-description-main" data-i18n="chat.agentModeMultiHint">Eino DeepAgent ，</div>
+ <div class="role-selection-item-description-main" data-i18n="chat.agentModeMultiHint">Eino DeepAgent ,</div>
                                                     </div>
                                                     <div class="role-selection-checkmark-main agent-mode-check" data-agent-mode-check="multi">✓</div>
                                                 </button>
@@ -635,12 +635,12 @@
                                         <span class="chat-upload-progress-label" id="chat-attachment-progress-label"></span>
                                     </div>
                                     <div class="chat-input-field">
- <textarea id="chat-input" data-i18n="chat.inputPlaceholder" data-i18n-attr="placeholder" data-i18n-skip-text="true" placeholder="... ( @ | Shift+Enter ，Enter )" rows="1"></textarea>
+ <textarea id="chat-input" data-i18n="chat.inputPlaceholder" data-i18n-attr="placeholder" data-i18n-skip-text="true" placeholder="... ( @ | Shift+Enter ,Enter )" rows="1"></textarea>
  <div id="mention-suggestions" class="mention-suggestions" role="listbox" aria-label=""></div>
                                     </div>
                                 </div>
  <input type="file" id="chat-file-input" class="chat-file-input-hidden" multiple accept="*" data-i18n="chat.selectFile" data-i18n-attr="title" title="">
- <button type="button" class="chat-upload-btn" onclick="document.getElementById('chat-file-input').click()" data-i18n="chat.uploadFile" data-i18n-attr="title" title="（）">
+ <button type="button" class="chat-upload-btn" onclick="document.getElementById('chat-file-input').click()" data-i18n="chat.uploadFile" data-i18n-attr="title" title="()">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                     </svg>
@@ -838,11 +838,11 @@
                             <div class="retrieval-logs-filters">
                                 <label>
  <span data-i18n="retrievalLogs.conversationId">ID</span>
- <input type="text" id="retrieval-logs-conversation-id" data-i18n="retrievalLogs.optionalConversation" data-i18n-attr="placeholder" placeholder="：" />
+ <input type="text" id="retrieval-logs-conversation-id" data-i18n="retrievalLogs.optionalConversation" data-i18n-attr="placeholder" placeholder=":" />
                                 </label>
                                 <label>
  <span data-i18n="retrievalLogs.messageId">ID</span>
- <input type="text" id="retrieval-logs-message-id" data-i18n="retrievalLogs.optionalMessage" data-i18n-attr="placeholder" placeholder="：" />
+ <input type="text" id="retrieval-logs-message-id" data-i18n="retrievalLogs.optionalMessage" data-i18n-attr="placeholder" placeholder=":" />
                                 </label>
  <button class="btn-secondary" onclick="filterRetrievalLogs()" data-i18n="retrievalLogs.filter"></button>
                             </div>
@@ -862,7 +862,7 @@
  <button class="btn-primary" onclick="submitCurrentReconSearch()" data-i18n="infoCollectPage.confirm"></button>
                         </div>
                     </div>
-                    <!-- Recon source tabs — FOFA is built-in, plugins add more -->
+                    <!-- Recon source tabs - FOFA is built-in, plugins add more -->
                     <div class="info-collect-tabs" id="recon-tabs">
                         <button class="recon-tab active" data-panel="fofa" onclick="switchReconTab('fofa')">FOFA</button>
                         <!-- Plugin tabs injected here by JS -->
@@ -874,8 +874,8 @@
                             <div class="info-collect-form">
                                 <div class="form-group">
  <label for="fofa-query" data-i18n="infoCollectPage.fofaQuerySyntax">FOFA </label>
- <textarea id="fofa-query" class="info-collect-query-input" rows="1" data-i18n="infoCollect.queryPlaceholder" data-i18n-attr="placeholder" placeholder='：app="Apache" && country="CN"'></textarea>
- <small class="form-hint" data-i18n="infoCollectPage.formHint"> FOFA ， && / || / () 。</small>
+ <textarea id="fofa-query" class="info-collect-query-input" rows="1" data-i18n="infoCollect.queryPlaceholder" data-i18n-attr="placeholder" placeholder=':app="Apache" && country="CN"'></textarea>
+ <small class="form-hint" data-i18n="infoCollectPage.formHint"> FOFA , && / || / () .</small>
  <div class="info-collect-presets" aria-label="FOFA " data-i18n="infoCollectPage.queryPresetsAria" data-i18n-attr="aria-label" data-i18n-skip-text="true">
  <button class="preset-chip" type="button" onclick="applyFofaQueryPreset('app=&quot;Apache&quot; &amp;&amp; country=&quot;CN&quot;')" data-i18n="infoCollectPage.presetApache" data-i18n-attr="title" data-i18n-title="infoCollectPage.fillExample" title="">Apache + </button>
  <button class="preset-chip" type="button" onclick="applyFofaQueryPreset('title=&quot;&quot; &amp;&amp; country=&quot;CN&quot;')" data-i18n="infoCollectPage.presetLogin" data-i18n-attr="title" data-i18n-title="infoCollectPage.fillExample" title=""> + </button>
@@ -884,13 +884,13 @@
                                     </div>
                                 </div>
                                 <div class="form-group">
- <label for="fofa-nl" data-i18n="infoCollectPage.naturalLanguage">（AI FOFA ）</label>
+ <label for="fofa-nl" data-i18n="infoCollectPage.naturalLanguage">(AI FOFA )</label>
                                     <div class="info-collect-nl-row">
- <textarea id="fofa-nl" class="info-collect-query-input" rows="1" data-i18n="infoCollectPage.nlPlaceholder" data-i18n-attr="placeholder" placeholder="： Missouri Apache ， Home"></textarea>
+ <textarea id="fofa-nl" class="info-collect-query-input" rows="1" data-i18n="infoCollectPage.nlPlaceholder" data-i18n-attr="placeholder" placeholder=": Missouri Apache , Home"></textarea>
  <button id="fofa-nl-parse-btn" class="btn-secondary" type="button" onclick="parseFofaNaturalLanguage()" data-i18n="infoCollectPage.parseBtn" data-i18n-attr="title" data-i18n-title="infoCollectPage.parseBtnTitle" title=" FOFA ">AI </button>
                                     </div>
                                     <div id="fofa-nl-status" class="fofa-nl-status muted" style="display: none;" aria-live="polite"></div>
- <small class="form-hint" data-i18n="infoCollectPage.parseHint"> FOFA （），。</small>
+ <small class="form-hint" data-i18n="infoCollectPage.parseHint"> FOFA (),.</small>
                                 </div>
                                 <div class="info-collect-form-row">
                                     <div class="form-group">
@@ -910,7 +910,7 @@
                                     </div>
                                 </div>
                                 <div class="form-group">
- <label for="fofa-fields" data-i18n="infoCollectPage.returnFields">（）</label>
+ <label for="fofa-fields" data-i18n="infoCollectPage.returnFields">()</label>
                                     <input type="text" id="fofa-fields" value="host,ip,port,domain,title,protocol,country,province,city,server" />
  <div class="info-collect-presets" aria-label="FOFA " data-i18n="infoCollectPage.fieldsPresetsAria" data-i18n-attr="aria-label" data-i18n-skip-text="true">
  <button class="preset-chip" type="button" onclick="applyFofaFieldsPreset('host,ip,port,domain')" data-i18n="infoCollectPage.minFields" data-i18n-attr="title" data-i18n-title="infoCollectPage.minFieldsTitle" title=""></button>
@@ -930,7 +930,7 @@
  <div class="info-collect-results-toolbar" aria-label="" data-i18n="infoCollectPage.resultsToolbarAria" data-i18n-attr="aria-label" data-i18n-skip-text="true">
  <div class="info-collect-selected" id="fofa-selected-meta" data-i18n="infoCollectPage.selectedRowsZero"> 0 </div>
  <button class="btn-secondary btn-small" type="button" onclick="toggleFofaColumnsPanel()" data-i18n="infoCollectPage.showHideColumns" data-i18n-attr="title" title="/"><span data-i18n="infoCollectPage.columns"></span></button>
- <button class="btn-secondary btn-small" type="button" onclick="exportFofaResults('csv')" data-i18n="infoCollectPage.exportCsvTitle" data-i18n-attr="title" title=" CSV（UTF-8，）"><span data-i18n="infoCollectPage.exportCsv"> CSV</span></button>
+ <button class="btn-secondary btn-small" type="button" onclick="exportFofaResults('csv')" data-i18n="infoCollectPage.exportCsvTitle" data-i18n-attr="title" title=" CSV(UTF-8,)"><span data-i18n="infoCollectPage.exportCsv"> CSV</span></button>
  <button class="btn-secondary btn-small" type="button" onclick="exportFofaResults('json')" data-i18n="infoCollectPage.exportJsonTitle" data-i18n-attr="title" title=" JSON"><span data-i18n="infoCollectPage.exportJson"> JSON</span></button>
  <button class="btn-secondary btn-small" type="button" onclick="exportFofaResults('xlsx')" data-i18n="infoCollectPage.exportXlsxTitle" data-i18n-attr="title" title=" Excel"><span data-i18n="infoCollectPage.exportXlsx"> XLSX</span></button>
  <button class="btn-primary btn-small" type="button" onclick="batchScanSelectedFofaRows()" data-i18n="infoCollectPage.batchScanTitle" data-i18n-attr="title" title=""><span data-i18n="infoCollectPage.batchScan"></span></button>
@@ -1074,13 +1074,13 @@
  <button type="button" class="btn-ghost btn-sm" id="webshell-batch-probe-btn" data-i18n="webshell.batchProbe"></button>
                                 </div>
                                 <div id="webshell-list" class="webshell-list">
- <div class="webshell-empty" data-i18n="webshell.noConnections">，「」</div>
+ <div class="webshell-empty" data-i18n="webshell.noConnections">,""</div>
                                 </div>
                             </div>
  <div id="webshell-resize-handle" class="webshell-resize-handle" title=""></div>
                             <div class="webshell-main">
                                 <div id="webshell-workspace" class="webshell-workspace">
- <div class="webshell-workspace-placeholder" data-i18n="webshell.selectOrAdd">， WebShell </div>
+ <div class="webshell-workspace-placeholder" data-i18n="webshell.selectOrAdd">, WebShell </div>
                                 </div>
                             </div>
                         </div>
@@ -1098,7 +1098,7 @@
                         </div>
                     </div>
                     <div class="page-content">
- <p class="chat-files-intro" data-i18n="chatFilesPage.intro">。 AI ，「」，。</p>
+ <p class="chat-files-intro" data-i18n="chatFilesPage.intro">. AI ,"",.</p>
                         <div class="tasks-filters chat-files-filters">
                             <label>
  <span data-i18n="chatFilesPage.conversationFilter"> ID</span>
@@ -1124,7 +1124,7 @@
                             <span class="chat-upload-progress-label" id="chat-files-upload-progress-label"></span>
                         </div>
                         <div id="chat-files-list-wrap" class="chat-files-table-wrap">
- <div class="loading-spinner" data-i18n="common.loading">…</div>
+ <div class="loading-spinner" data-i18n="common.loading">...</div>
                         </div>
                     </div>
                 </div>
@@ -1159,7 +1159,7 @@
                                     </select>
                                 </label>
                                 <label style="flex: 1; max-width: 300px;">
- <span data-i18n="tasksPage.searchQueuePlaceholder">ID、</span>
+ <span data-i18n="tasksPage.searchQueuePlaceholder">ID,</span>
  <input type="text" id="batch-queues-search" data-i18n="tasksPage.searchKeywordPlaceholder" data-i18n-attr="placeholder" placeholder="..." 
                                            oninput="filterBatchQueues()">
                                 </label>
@@ -1259,7 +1259,7 @@
                     </div>
                 </div>
 
- <!-- Agent（Markdown） -->
+ <!-- Agent(Markdown) -->
                 <div id="page-agents-management" class="page">
                     <div class="page-header">
  <h2 data-i18n="agentsPage.title">Agent </h2>
@@ -1269,7 +1269,7 @@
                         </div>
                     </div>
                     <div class="page-content">
- <p class="agents-page-hint" data-i18n="agentsPage.hint"> Agent agents .md 。</p>
+ <p class="agents-page-hint" data-i18n="agentsPage.hint"> Agent agents .md .</p>
                         <div id="agents-md-dir" class="agents-dir-label"></div>
                         <div id="agents-md-list" class="skills-grid">
  <div class="loading-spinner" data-i18n="agentsPage.loading">...</div>
@@ -1287,19 +1287,19 @@
                         <div class="modal-body" style="overflow-y: auto; max-height: calc(92vh - 130px);">
                             <input type="hidden" id="agent-md-filename-current" value="">
                             <div class="form-group" id="agent-md-filename-row">
- <label data-i18n="agentsPage.filename">（.md）</label>
+ <label data-i18n="agentsPage.filename">(.md)</label>
  <input type="text" id="agent-md-filename" data-i18n="agentsPage.filenamePlaceholder" data-i18n-attr="placeholder" placeholder=" code-reviewer.md" autocomplete="off" />
                             </div>
                             <div class="form-group">
  <label data-i18n="agentsPage.fieldRole"></label>
                                 <select id="agent-md-role" class="form-select">
  <option value="sub" data-i18n="agentsPage.roleSub"></option>
- <option value="orchestrator" data-i18n="agentsPage.roleOrchestrator">（Deep ）</option>
+ <option value="orchestrator" data-i18n="agentsPage.roleOrchestrator">(Deep )</option>
                                 </select>
- <p class="form-hint muted" data-i18n="agentsPage.roleHint"> orchestrator.md；。</p>
+ <p class="form-hint muted" data-i18n="agentsPage.roleHint"> orchestrator.md;.</p>
                             </div>
                             <div class="form-group">
- <label data-i18n="agentsPage.fieldId">Agent ID（）</label>
+ <label data-i18n="agentsPage.fieldId">Agent ID()</label>
                                 <input type="text" id="agent-md-id" placeholder="code-reviewer" autocomplete="off" />
                             </div>
                             <div class="form-group">
@@ -1311,19 +1311,19 @@
  <textarea id="agent-md-description" rows="2" data-i18n="agentsPage.descPlaceholder" data-i18n-attr="placeholder" placeholder=""></textarea>
                             </div>
                             <div class="form-group">
- <label data-i18n="agentsPage.fieldTools">（， key ）</label>
+ <label data-i18n="agentsPage.fieldTools">(, key )</label>
                                 <input type="text" id="agent-md-tools" placeholder="tool_a, tool_b" autocomplete="off" />
                             </div>
                             <div class="form-group">
- <label data-i18n="agentsPage.fieldBindRole">（）</label>
+ <label data-i18n="agentsPage.fieldBindRole">()</label>
                                 <input type="text" id="agent-md-bind-role" placeholder="" autocomplete="off" />
                             </div>
                             <div class="form-group">
- <label data-i18n="agentsPage.fieldMaxIter">（0=）</label>
+ <label data-i18n="agentsPage.fieldMaxIter">(0=)</label>
                                 <input type="number" id="agent-md-max-iter" min="0" value="0" />
                             </div>
                             <div class="form-group">
- <label data-i18n="agentsPage.fieldInstruction">（Markdown ）</label>
+ <label data-i18n="agentsPage.fieldInstruction">(Markdown )</label>
                                 <textarea id="agent-md-instruction" rows="14" data-i18n="agentsPage.instructionPlaceholder" data-i18n-attr="placeholder" placeholder="You are a specialist agent..."></textarea>
                             </div>
                         </div>
@@ -1410,7 +1410,7 @@
                                             <div id="api-rate-limits" style="margin-top: 4px; font-size: 11px; color: var(--text-muted); display: none;"></div>
                                         </div>
                                         <div class="settings-subsection-header" style="margin-top: 16px;">
-                                            <h5>Tool Model <span style="color: var(--text-muted); font-weight: normal;" data-i18n="settingsBasic.toolModelHint">(optional — leave empty to use main model)</span></h5>
+                                            <h5>Tool Model <span style="color: var(--text-muted); font-weight: normal;" data-i18n="settingsBasic.toolModelHint">(optional - leave empty to use main model)</span></h5>
                                         </div>
                                         <div class="form-group">
                                             <label for="openai-tool-model" data-i18n="settingsBasic.toolModel">Model</label>
@@ -1436,7 +1436,7 @@
                                             </div>
                                         </div>
                                         <div class="settings-subsection-header" style="margin-top: 16px;">
-                                            <h5>Summary Model <span style="color: var(--text-muted); font-weight: normal;" data-i18n="settingsBasic.summaryModelHint">(optional — leave empty to use main model)</span></h5>
+                                            <h5>Summary Model <span style="color: var(--text-muted); font-weight: normal;" data-i18n="settingsBasic.summaryModelHint">(optional - leave empty to use main model)</span></h5>
                                         </div>
                                         <div class="form-group">
                                             <label for="openai-summary-model" data-i18n="settingsBasic.summaryModel">Model</label>
@@ -1488,8 +1488,8 @@
                                     <div class="settings-form">
                                         <div class="form-group">
                                             <label for="fofa-base-url">Base URL</label>
- <input type="text" id="fofa-base-url" data-i18n="settingsBasic.fofaBaseUrlPlaceholder" data-i18n-attr="placeholder" placeholder="https://fofa.info/api/v1/search/all（）" />
- <small class="form-hint" data-i18n="settingsBasic.fofaBaseUrlHint">。</small>
+ <input type="text" id="fofa-base-url" data-i18n="settingsBasic.fofaBaseUrlPlaceholder" data-i18n-attr="placeholder" placeholder="https://fofa.info/api/v1/search/all()" />
+ <small class="form-hint" data-i18n="settingsBasic.fofaBaseUrlHint">.</small>
                                         </div>
                                         <div class="form-group">
                                             <label for="fofa-email" data-i18n="settingsBasic.email">Email</label>
@@ -1498,7 +1498,7 @@
                                         <div class="form-group">
                                             <label for="fofa-api-key">API Key</label>
  <input type="password" id="fofa-api-key" data-i18n="settingsBasic.fofaApiKeyPlaceholder" data-i18n-attr="placeholder" placeholder=" FOFA API Key" autocomplete="off" />
- <small class="form-hint" data-i18n="settingsBasic.fofaApiKeyHint">（`config.yaml`）。</small>
+ <small class="form-hint" data-i18n="settingsBasic.fofaApiKeyHint">(`config.yaml`).</small>
                                         </div>
                                     </div>
                                 </div>
@@ -1515,15 +1515,15 @@
                                             <label class="checkbox-label">
                                                 <input type="checkbox" id="multi-agent-enabled" class="modern-checkbox" />
                                                 <span class="checkbox-custom"></span>
- <span class="checkbox-text" data-i18n="settingsBasic.enableMultiAgent"> Eino （DeepAgent）</span>
+ <span class="checkbox-text" data-i18n="settingsBasic.enableMultiAgent"> Eino (DeepAgent)</span>
                                             </label>
- <small class="form-hint" data-i18n="settingsBasic.enableMultiAgentHint">「」； config.yaml multi_agent.sub_agents 。</small>
+ <small class="form-hint" data-i18n="settingsBasic.enableMultiAgentHint">""; config.yaml multi_agent.sub_agents .</small>
                                         </div>
                                         <div class="form-group">
  <label for="multi-agent-default-mode" data-i18n="settingsBasic.multiAgentDefaultMode"></label>
                                             <select id="multi-agent-default-mode">
- <option value="single" data-i18n="settingsBasic.multiAgentModeSingle">（ReAct）</option>
- <option value="multi" data-i18n="settingsBasic.multiAgentModeMulti">（Eino）</option>
+ <option value="single" data-i18n="settingsBasic.multiAgentModeSingle">(ReAct)</option>
+ <option value="multi" data-i18n="settingsBasic.multiAgentModeMulti">(Eino)</option>
                                             </select>
                                         </div>
                                         <div class="form-group">
@@ -1532,7 +1532,7 @@
                                                 <span class="checkbox-custom"></span>
  <span class="checkbox-text" data-i18n="settingsBasic.multiAgentRobotUse"> / / </span>
                                             </label>
- <small class="form-hint" data-i18n="settingsBasic.multiAgentRobotUseHint">「」；。</small>
+ <small class="form-hint" data-i18n="settingsBasic.multiAgentRobotUseHint">"";.</small>
                                         </div>
                                         <div class="form-group">
                                             <label class="checkbox-label">
@@ -1540,7 +1540,7 @@
                                                 <span class="checkbox-custom"></span>
  <span class="checkbox-text" data-i18n="settingsBasic.multiAgentBatchUse"></span>
                                             </label>
- <small class="form-hint" data-i18n="settingsBasic.multiAgentBatchUseHint">， Eino DeepAgent（）。</small>
+ <small class="form-hint" data-i18n="settingsBasic.multiAgentBatchUseHint">, Eino DeepAgent().</small>
                                         </div>
                                     </div>
                                 </div>
@@ -1607,51 +1607,51 @@
                                         <div class="form-group">
  <label for="knowledge-retrieval-similarity-threshold" data-i18n="settingsBasic.similarityThreshold"></label>
                                             <input type="number" id="knowledge-retrieval-similarity-threshold" min="0" max="1" step="0.1" data-i18n="settingsBasic.similarityPlaceholder" data-i18n-attr="placeholder" placeholder="0.7" />
- <small class="form-hint" data-i18n="settingsBasic.similarityHint">（0-1），</small>
+ <small class="form-hint" data-i18n="settingsBasic.similarityHint">(0-1),</small>
                                         </div>
                                         <div class="form-group">
  <label for="knowledge-retrieval-hybrid-weight" data-i18n="settingsBasic.hybridWeight"></label>
                                             <input type="number" id="knowledge-retrieval-hybrid-weight" min="0" max="1" step="0.1" data-i18n="settingsBasic.hybridPlaceholder" data-i18n-attr="placeholder" placeholder="0.7" />
- <small class="form-hint" data-i18n="settingsBasic.hybridHint">（0-1），1.0，0.0</small>
+ <small class="form-hint" data-i18n="settingsBasic.hybridHint">(0-1),1.0,0.0</small>
                                         </div>
 
                                         <div class="settings-subsection-header">
  <h5 data-i18n="settingsBasic.indexConfig"></h5>
                                         </div>
                                         <div class="form-group">
- <label for="knowledge-indexing-chunk-size" data-i18n="settingsBasic.chunkSize">（Chunk Size）</label>
+ <label for="knowledge-indexing-chunk-size" data-i18n="settingsBasic.chunkSize">(Chunk Size)</label>
                                             <input type="number" id="knowledge-indexing-chunk-size" min="128" max="4096" data-i18n="settingsBasic.chunkSizePlaceholder" data-i18n-attr="placeholder" placeholder="512" />
- <small class="form-hint" data-i18n="settingsBasic.chunkSizeHint"> token （ 512），</small>
+ <small class="form-hint" data-i18n="settingsBasic.chunkSizeHint"> token ( 512),</small>
                                         </div>
                                         <div class="form-group">
- <label for="knowledge-indexing-chunk-overlap" data-i18n="settingsBasic.chunkOverlap">（Chunk Overlap）</label>
+ <label for="knowledge-indexing-chunk-overlap" data-i18n="settingsBasic.chunkOverlap">(Chunk Overlap)</label>
                                             <input type="number" id="knowledge-indexing-chunk-overlap" min="0" max="512" data-i18n="settingsBasic.chunkOverlapPlaceholder" data-i18n-attr="placeholder" placeholder="50" />
- <small class="form-hint" data-i18n="settingsBasic.chunkOverlapHint"> token （ 50），</small>
+ <small class="form-hint" data-i18n="settingsBasic.chunkOverlapHint"> token ( 50),</small>
                                         </div>
                                         <div class="form-group">
  <label for="knowledge-indexing-max-chunks-per-item" data-i18n="settingsBasic.maxChunksPerItem"></label>
                                             <input type="number" id="knowledge-indexing-max-chunks-per-item" min="0" max="1000" data-i18n="settingsBasic.maxChunksPlaceholder" data-i18n-attr="placeholder" placeholder="0" />
- <small class="form-hint" data-i18n="settingsBasic.maxChunksHint">（0 ）， API </small>
+ <small class="form-hint" data-i18n="settingsBasic.maxChunksHint">(0 ), API </small>
                                         </div>
                                         <div class="form-group">
- <label for="knowledge-indexing-max-rpm" data-i18n="settingsBasic.maxRpm">（Max RPM）</label>
+ <label for="knowledge-indexing-max-rpm" data-i18n="settingsBasic.maxRpm">(Max RPM)</label>
                                             <input type="number" id="knowledge-indexing-max-rpm" min="0" max="1000" data-i18n="settingsBasic.maxRpmPlaceholder" data-i18n-attr="placeholder" placeholder="0" />
- <small class="form-hint" data-i18n="settingsBasic.maxRpmHint">（ 0 ）， OpenAI 200 RPM</small>
+ <small class="form-hint" data-i18n="settingsBasic.maxRpmHint">( 0 ), OpenAI 200 RPM</small>
                                         </div>
                                         <div class="form-group">
- <label for="knowledge-indexing-rate-limit-delay-ms" data-i18n="settingsBasic.rateLimitDelay">（）</label>
+ <label for="knowledge-indexing-rate-limit-delay-ms" data-i18n="settingsBasic.rateLimitDelay">()</label>
                                             <input type="number" id="knowledge-indexing-rate-limit-delay-ms" min="0" max="10000" data-i18n="settingsBasic.rateLimitPlaceholder" data-i18n-attr="placeholder" placeholder="300" />
- <small class="form-hint" data-i18n="settingsBasic.rateLimitHint">（ 300）， API ， 0 </small>
+ <small class="form-hint" data-i18n="settingsBasic.rateLimitHint">( 300), API , 0 </small>
                                         </div>
                                         <div class="form-group">
  <label for="knowledge-indexing-max-retries" data-i18n="settingsBasic.maxRetries"></label>
                                             <input type="number" id="knowledge-indexing-max-retries" min="0" max="10" data-i18n="settingsBasic.maxRetriesPlaceholder" data-i18n-attr="placeholder" placeholder="3" />
- <small class="form-hint" data-i18n="settingsBasic.maxRetriesHint">（ 3），</small>
+ <small class="form-hint" data-i18n="settingsBasic.maxRetriesHint">( 3),</small>
                                         </div>
                                         <div class="form-group">
- <label for="knowledge-indexing-retry-delay-ms" data-i18n="settingsBasic.retryDelay">（）</label>
+ <label for="knowledge-indexing-retry-delay-ms" data-i18n="settingsBasic.retryDelay">()</label>
                                             <input type="number" id="knowledge-indexing-retry-delay-ms" min="0" max="10000" data-i18n="settingsBasic.retryDelayPlaceholder" data-i18n-attr="placeholder" placeholder="1000" />
- <small class="form-hint" data-i18n="settingsBasic.retryDelayHint">（ 1000），</small>
+ <small class="form-hint" data-i18n="settingsBasic.retryDelayHint">( 1000),</small>
                                         </div>
                                     </div>
                                 </div>
@@ -1665,7 +1665,7 @@
                             <div id="settings-section-robots" class="settings-section-content">
                                 <div class="settings-section-header">
  <h3 data-i18n="settings.robots.title"></h3>
- <p class="settings-description" data-i18n="settings.robots.description">、、， CyberStrikeAI ，。</p>
+ <p class="settings-description" data-i18n="settings.robots.description">,,, CyberStrikeAI ,.</p>
                                 </div>
 
                                 <!-- Telegram -->
@@ -1694,21 +1694,21 @@
 
                                 <div class="settings-subsection">
  <h4 data-i18n="settingsRobotsExtra.botCommandsTitle"></h4>
- <p class="settings-description" data-i18n="settingsRobotsExtra.botCommandsDesc">（）：</p>
+ <p class="settings-description" data-i18n="settingsRobotsExtra.botCommandsDesc">():</p>
                                     <ul style="color: var(--text-muted); font-size: 13px; line-height: 1.8; margin: 8px 0 0 16px;">
- <li><code></code> <code>help</code> — <span data-i18n="settingsRobotsExtra.botCmdHelp"> | Show this help</span></li>
- <li><code></code> <code>list</code> — <span data-i18n="settingsRobotsExtra.botCmdList"> ID | List conversations</span></li>
- <li><code> &lt;ID&gt;</code> <code>switch &lt;ID&gt;</code> — <span data-i18n="settingsRobotsExtra.botCmdSwitch"> | Switch to conversation</span></li>
- <li><code></code> <code>new</code> — <span data-i18n="settingsRobotsExtra.botCmdNew"> | Start new conversation</span></li>
- <li><code></code> <code>clear</code> — <span data-i18n="settingsRobotsExtra.botCmdClear"> | Clear context</span></li>
- <li><code></code> <code>current</code> — <span data-i18n="settingsRobotsExtra.botCmdCurrent"> ID | Show current conversation</span></li>
- <li><code></code> <code>stop</code> — <span data-i18n="settingsRobotsExtra.botCmdStop"> | Stop running task</span></li>
- <li><code></code> <code>roles</code> — <span data-i18n="settingsRobotsExtra.botCmdRoles"> | List roles</span></li>
- <li><code> &lt;&gt;</code> <code>role &lt;name&gt;</code> — <span data-i18n="settingsRobotsExtra.botCmdRole"> | Switch role</span></li>
- <li><code> &lt;ID&gt;</code> <code>delete &lt;ID&gt;</code> — <span data-i18n="settingsRobotsExtra.botCmdDelete"> | Delete conversation</span></li>
- <li><code></code> <code>version</code> — <span data-i18n="settingsRobotsExtra.botCmdVersion"> | Show version</span></li>
+ <li><code></code> <code>help</code> - <span data-i18n="settingsRobotsExtra.botCmdHelp"> | Show this help</span></li>
+ <li><code></code> <code>list</code> - <span data-i18n="settingsRobotsExtra.botCmdList"> ID | List conversations</span></li>
+ <li><code> &lt;ID&gt;</code> <code>switch &lt;ID&gt;</code> - <span data-i18n="settingsRobotsExtra.botCmdSwitch"> | Switch to conversation</span></li>
+ <li><code></code> <code>new</code> - <span data-i18n="settingsRobotsExtra.botCmdNew"> | Start new conversation</span></li>
+ <li><code></code> <code>clear</code> - <span data-i18n="settingsRobotsExtra.botCmdClear"> | Clear context</span></li>
+ <li><code></code> <code>current</code> - <span data-i18n="settingsRobotsExtra.botCmdCurrent"> ID | Show current conversation</span></li>
+ <li><code></code> <code>stop</code> - <span data-i18n="settingsRobotsExtra.botCmdStop"> | Stop running task</span></li>
+ <li><code></code> <code>roles</code> - <span data-i18n="settingsRobotsExtra.botCmdRoles"> | List roles</span></li>
+ <li><code> &lt;&gt;</code> <code>role &lt;name&gt;</code> - <span data-i18n="settingsRobotsExtra.botCmdRole"> | Switch role</span></li>
+ <li><code> &lt;ID&gt;</code> <code>delete &lt;ID&gt;</code> - <span data-i18n="settingsRobotsExtra.botCmdDelete"> | Delete conversation</span></li>
+ <li><code></code> <code>version</code> - <span data-i18n="settingsRobotsExtra.botCmdVersion"> | Show version</span></li>
                                     </ul>
- <p class="settings-description" style="margin-top: 8px;" data-i18n="settingsRobotsExtra.botCommandsFooter">， AI /。Otherwise, send any text for AI penetration testing / security analysis.</p>
+ <p class="settings-description" style="margin-top: 8px;" data-i18n="settingsRobotsExtra.botCommandsFooter">, AI /.Otherwise, send any text for AI penetration testing / security analysis.</p>
                                 </div>
 
                                 <div class="settings-actions">
@@ -1720,7 +1720,7 @@
                             <div id="settings-section-terminal" class="settings-section-content">
                                 <div class="settings-section-header">
  <h3 data-i18n="settingsTerminal.title"></h3>
- <p class="settings-description" data-i18n="settingsTerminal.description">，。，。</p>
+ <p class="settings-description" data-i18n="settingsTerminal.description">,.,.</p>
                                 </div>
                                 <div class="terminal-wrapper">
                                     <div class="terminal-tabs">
@@ -1821,7 +1821,7 @@
 
                                 <div class="settings-subsection">
  <h4 data-i18n="settingsSecurity.changePasswordTitle"></h4>
- <p class="settings-description" data-i18n="settingsSecurity.changePasswordDesc">，。</p>
+ <p class="settings-description" data-i18n="settingsSecurity.changePasswordDesc">,.</p>
                                     <div class="settings-form">
                                         <div class="form-group">
  <label for="auth-current-password" data-i18n="settingsSecurity.currentPassword"></label>
@@ -1829,7 +1829,7 @@
                                         </div>
                                         <div class="form-group">
  <label for="auth-new-password" data-i18n="settingsSecurity.newPassword"></label>
- <input type="password" id="auth-new-password" data-i18n="settingsSecurity.newPasswordPlaceholder" data-i18n-attr="placeholder" placeholder="（ 8 ）" autocomplete="new-password" />
+ <input type="password" id="auth-new-password" data-i18n="settingsSecurity.newPasswordPlaceholder" data-i18n-attr="placeholder" placeholder="( 8 )" autocomplete="new-password" />
                                         </div>
                                         <div class="form-group">
  <label for="auth-confirm-password" data-i18n="settingsSecurity.confirmPassword"></label>
@@ -1846,7 +1846,7 @@
                             <div id="settings-section-plugins" class="settings-section-content">
                                 <div class="settings-section-header">
                                     <h3 data-i18n="settingsPlugins.title">Plugins</h3>
-                                    <p class="settings-section-desc" data-i18n="settingsPlugins.description">Manage plugin extensions — enable/disable, configure API keys</p>
+                                    <p class="settings-section-desc" data-i18n="settingsPlugins.description">Manage plugin extensions - enable/disable, configure API keys</p>
                                 </div>
                                 <div id="plugins-list" class="plugins-container">
                                     <div style="text-align: center; padding: 20px; color: var(--text-muted);">Loading plugins...</div>
@@ -1943,9 +1943,9 @@
  <label for="external-mcp-json"><span data-i18n="externalMcpModal.configJson">JSON</span> <span style="color: red;">*</span></label>
                     <textarea id="external-mcp-json" rows="15" data-i18n="externalMcpModal.placeholder" data-i18n-attr="placeholder" style="font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 0.875rem; line-height: 1.5;"></textarea>
                     <div class="password-hint">
- <strong data-i18n="externalMcpModal.formatLabel">：</strong><span data-i18n="externalMcpModal.formatDesc">JSON，key，value。"/"，JSON。</span><br>
- <strong data-i18n="externalMcpModal.configExample">：</strong><br>
- <strong data-i18n="externalMcpModal.stdioMode">stdio：</strong><br>
+ <strong data-i18n="externalMcpModal.formatLabel">:</strong><span data-i18n="externalMcpModal.formatDesc">JSON,key,value."/",JSON.</span><br>
+ <strong data-i18n="externalMcpModal.configExample">:</strong><br>
+ <strong data-i18n="externalMcpModal.stdioMode">stdio:</strong><br>
                         <code data-i18n="externalMcpModal.exampleStdio" style="display: block; margin: 8px 0; padding: 8px; background: var(--bg-secondary); border-radius: 4px; white-space: pre-wrap;">{
   "hexstrike-ai": {
     "command": "python3",
@@ -1954,14 +1954,14 @@
     "timeout": 300
   }
 }</code>
- <strong data-i18n="externalMcpModal.httpMode">HTTP：</strong><br>
+ <strong data-i18n="externalMcpModal.httpMode">HTTP:</strong><br>
                         <code data-i18n="externalMcpModal.exampleHttp" style="display: block; margin: 8px 0; padding: 8px; background: var(--bg-secondary); border-radius: 4px; white-space: pre-wrap;">{
   "cyberstrike-ai-http": {
     "transport": "http",
     "url": "http://127.0.0.1:8081/mcp"
   }
 }</code>
- <strong data-i18n="externalMcpModal.sseMode">SSE：</strong><br>
+ <strong data-i18n="externalMcpModal.sseMode">SSE:</strong><br>
                         <code data-i18n="externalMcpModal.exampleSse" style="display: block; margin: 8px 0; padding: 8px; background: var(--bg-secondary); border-radius: 4px; white-space: pre-wrap;">{
   "cyberstrike-ai-sse": {
     "transport": "sse",
@@ -1989,7 +1989,7 @@
             <div class="modal-header">
  <h2 data-i18n="attackChainModal.title"></h2>
                 <div class="modal-header-actions">
- <button class="btn-primary attack-chain-action-btn" onclick="regenerateAttackChain()" data-i18n="attackChainModal.regenerateTitle" data-i18n-attr="title" data-i18n-skip-text="true" title="（）">
+ <button class="btn-primary attack-chain-action-btn" onclick="regenerateAttackChain()" data-i18n="attackChainModal.regenerateTitle" data-i18n-attr="title" data-i18n-skip-text="true" title="()">
  🔄 <span data-i18n="attackChainModal.regenerate"></span>
                     </button>
  <button class="btn-secondary attack-chain-action-btn" onclick="exportAttackChain('png')" data-i18n="attackChainModal.exportPng" data-i18n-attr="title" title="PNG">
@@ -1998,7 +1998,7 @@
  <button class="btn-secondary attack-chain-action-btn" onclick="exportAttackChain('svg')" data-i18n="attackChainModal.exportSvg" data-i18n-attr="title" title="SVG">
                         📥 SVG
                     </button>
- <button class="btn-secondary attack-chain-action-btn" onclick="refreshAttackChain()" data-i18n="attackChainModal.refreshTitle" data-i18n-attr="title" title="（）">
+ <button class="btn-secondary attack-chain-action-btn" onclick="refreshAttackChain()" data-i18n="attackChainModal.refreshTitle" data-i18n-attr="title" title="()">
  ↻ <span data-i18n="common.refresh"></span>
                     </button>
                     <span class="modal-close" onclick="closeAttackChainModal()">&times;</span>
@@ -2064,15 +2064,15 @@
  <div class="legend-title" data-i18n="attackChainModal.lineMeaning"></div>
                                     <div class="legend-item">
                                         <span class="legend-line" style="border-top: 2px solid #42a5f5;"></span>
- <span data-i18n="attackChainModal.blueLine">：</span>
+ <span data-i18n="attackChainModal.blueLine">:</span>
                                     </div>
                                     <div class="legend-item">
                                         <span class="legend-line" style="border-top: 2px solid #e53935;"></span>
- <span data-i18n="attackChainModal.redLine">：/</span>
+ <span data-i18n="attackChainModal.redLine">:/</span>
                                     </div>
                                     <div class="legend-item">
                                         <span class="legend-line" style="border-top: 2px solid #616161;"></span>
- <span data-i18n="attackChainModal.grayLine">：</span>
+ <span data-i18n="attackChainModal.grayLine">:</span>
                                     </div>
                                 </div>
                                 <div id="attack-chain-details" class="legend-section attack-chain-details" style="display: none;">
@@ -2148,7 +2148,7 @@
                         <svg class="chat-files-mkdir-field-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
  <span data-i18n="chatFilesPage.newFolderNameLabel"></span>
                     </span>
- <input type="text" id="chat-files-mkdir-input" class="form-control chat-files-mkdir-input" data-i18n="chatFilesPage.newFolderNamePlaceholder" data-i18n-attr="placeholder" placeholder="， /" autocomplete="off" />
+ <input type="text" id="chat-files-mkdir-input" class="form-control chat-files-mkdir-input" data-i18n="chatFilesPage.newFolderNamePlaceholder" data-i18n-attr="placeholder" placeholder=", /" autocomplete="off" />
                 </label>
             </div>
             <div class="modal-footer chat-files-mkdir-footer">
@@ -2186,16 +2186,16 @@
                 <div class="form-group">
  <label for="skill-name"><span data-i18n="skillModal.skillName">Skill</span> <span style="color: red;">*</span></label>
  <input type="text" id="skill-name" data-i18n="skillModal.skillNamePlaceholder" data-i18n-attr="placeholder" placeholder=": sql-injection-testing" required />
- <small class="form-hint" data-i18n="skillModal.skillNameHint">、、</small>
+ <small class="form-hint" data-i18n="skillModal.skillNameHint">,,</small>
                 </div>
                 <div class="form-group">
  <label for="skill-description" data-i18n="skillModal.description"></label>
  <input type="text" id="skill-description" data-i18n="skillModal.descriptionPlaceholder" data-i18n-attr="placeholder" placeholder="Skill" />
                 </div>
                 <div class="form-group">
- <label for="skill-content"><span data-i18n="skillModal.contentLabel">（Markdown）</span> <span style="color: red;">*</span></label>
- <textarea id="skill-content" rows="20" data-i18n="skillModal.contentPlaceholder" data-i18n-attr="placeholder" placeholder="skill，Markdown..." style="font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 0.875rem; line-height: 1.5;" required></textarea>
- <small class="form-hint"><span data-i18n="skillModal.contentHint">YAML front matter（），：</span><br>
+ <label for="skill-content"><span data-i18n="skillModal.contentLabel">(Markdown)</span> <span style="color: red;">*</span></label>
+ <textarea id="skill-content" rows="20" data-i18n="skillModal.contentPlaceholder" data-i18n-attr="placeholder" placeholder="skill,Markdown..." style="font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 0.875rem; line-height: 1.5;" required></textarea>
+ <small class="form-hint"><span data-i18n="skillModal.contentHint">YAML front matter(),:</span><br>
 ---<br>
 name: skill-name<br>
 description: Skill<br>
@@ -2220,16 +2220,16 @@ skill...</small>
             </div>
             <div class="modal-body">
                 <div class="form-group">
- <label for="knowledge-item-category">（）<span style="color: red;">*</span></label>
- <input type="text" id="knowledge-item-category" placeholder="：SQL" required />
+ <label for="knowledge-item-category">()<span style="color: red;">*</span></label>
+ <input type="text" id="knowledge-item-category" placeholder=":SQL" required />
                 </div>
                 <div class="form-group">
  <label for="knowledge-item-title"><span style="color: red;">*</span></label>
  <input type="text" id="knowledge-item-title" placeholder="" required />
                 </div>
                 <div class="form-group">
- <label for="knowledge-item-content">（Markdown）<span style="color: red;">*</span></label>
- <textarea id="knowledge-item-content" rows="20" placeholder="，Markdown..." style="font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 0.875rem; line-height: 1.5;" required></textarea>
+ <label for="knowledge-item-content">(Markdown)<span style="color: red;">*</span></label>
+ <textarea id="knowledge-item-content" rows="20" placeholder=",Markdown..." style="font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 0.875rem; line-height: 1.5;" required></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -2287,7 +2287,7 @@ skill...</small>
                 <span class="modal-close" onclick="closeCreateGroupModal()">&times;</span>
             </div>
             <div class="modal-body create-group-body">
- <p class="create-group-description" data-i18n="createGroupModal.description">，。</p>
+ <p class="create-group-description" data-i18n="createGroupModal.description">,.</p>
                 <div class="create-group-input-wrapper">
  <button type="button" class="group-icon-input" id="create-group-icon-btn" onclick="toggleGroupIconPicker()" data-i18n="createGroupModal.selectIcon" data-i18n-attr="title" title="">📁</button>
  <input type="text" id="create-group-name-input" data-i18n="createGroupModal.groupNamePlaceholder" data-i18n-attr="placeholder" placeholder="" />
@@ -2445,20 +2445,20 @@ skill...</small>
             <div class="modal-body">
                 <div class="form-group">
  <label for="batch-queue-title" data-i18n="batchImportModal.queueTitle"></label>
- <input type="text" id="batch-queue-title" data-i18n="batchImportModal.queueTitlePlaceholder" data-i18n-attr="placeholder" placeholder="（，）" />
- <div class="form-hint" style="margin-top: 4px;" data-i18n="batchImportModal.queueTitleHint">，。</div>
+ <input type="text" id="batch-queue-title" data-i18n="batchImportModal.queueTitlePlaceholder" data-i18n-attr="placeholder" placeholder="(,)" />
+ <div class="form-hint" style="margin-top: 4px;" data-i18n="batchImportModal.queueTitleHint">,.</div>
                 </div>
                 <div class="form-group">
  <label for="batch-queue-role" data-i18n="batchImportModal.role"></label>
                     <select id="batch-queue-role" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.875rem;">
  <option value="" data-i18n="batchImportModal.defaultRole"></option>
                     </select>
- <div class="form-hint" style="margin-top: 4px;" data-i18n="batchImportModal.roleHint">，（）。</div>
+ <div class="form-hint" style="margin-top: 4px;" data-i18n="batchImportModal.roleHint">,().</div>
                 </div>
                 <div class="form-group">
- <label for="batch-tasks-input"><span data-i18n="batchImportModal.tasksList">（）</span><span style="color: red;">*</span></label>
- <textarea id="batch-tasks-input" rows="15" data-i18n="batchImportModal.tasksListPlaceholderExample" data-i18n-attr="placeholder" placeholder="，，：&#10; 192.168.1.1 &#10; https://example.com SQL&#10; example.com " style="font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 0.875rem; line-height: 1.5;"></textarea>
- <div class="form-hint" style="margin-top: 8px;" data-i18n="batchImportModal.tasksListHintFull">：，。。</div>
+ <label for="batch-tasks-input"><span data-i18n="batchImportModal.tasksList">()</span><span style="color: red;">*</span></label>
+ <textarea id="batch-tasks-input" rows="15" data-i18n="batchImportModal.tasksListPlaceholderExample" data-i18n-attr="placeholder" placeholder=",,:&#10; 192.168.1.1 &#10; https://example.com SQL&#10; example.com " style="font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 0.875rem; line-height: 1.5;"></textarea>
+ <div class="form-hint" style="margin-top: 8px;" data-i18n="batchImportModal.tasksListHintFull">:,..</div>
                 </div>
                 <div class="form-group">
                     <div id="batch-import-stats" class="batch-import-stats"></div>
@@ -2574,15 +2574,15 @@ skill...</small>
                 </div>
                 <div class="form-group">
  <label for="vulnerability-type" data-i18n="vulnerabilityModal.type"></label>
- <input type="text" id="vulnerability-type" data-i18n="vulnerabilityModal.typePlaceholder" data-i18n-attr="placeholder" placeholder="：SQL、XSS、CSRF" />
+ <input type="text" id="vulnerability-type" data-i18n="vulnerabilityModal.typePlaceholder" data-i18n-attr="placeholder" placeholder=":SQL,XSS,CSRF" />
                 </div>
                 <div class="form-group">
  <label for="vulnerability-target" data-i18n="vulnerabilityModal.target"></label>
- <input type="text" id="vulnerability-target" data-i18n="vulnerabilityModal.targetPlaceholder" data-i18n-attr="placeholder" placeholder="（URL、IP）" />
+ <input type="text" id="vulnerability-target" data-i18n="vulnerabilityModal.targetPlaceholder" data-i18n-attr="placeholder" placeholder="(URL,IP)" />
                 </div>
                 <div class="form-group">
- <label for="vulnerability-proof" data-i18n="vulnerabilityModal.proof">（POC）</label>
- <textarea id="vulnerability-proof" rows="5" data-i18n="vulnerabilityModal.proofPlaceholder" data-i18n-attr="placeholder" placeholder="，/、"></textarea>
+ <label for="vulnerability-proof" data-i18n="vulnerabilityModal.proof">(POC)</label>
+ <textarea id="vulnerability-proof" rows="5" data-i18n="vulnerabilityModal.proofPlaceholder" data-i18n-attr="placeholder" placeholder=",/,"></textarea>
                 </div>
                 <div class="form-group">
  <label for="vulnerability-impact" data-i18n="vulnerabilityModal.impact"></label>
@@ -2636,7 +2636,7 @@ skill...</small>
                 </div>
                 <div class="form-group">
  <label for="webshell-cmd-param" data-i18n="webshell.cmdParam"></label>
- <input type="text" id="webshell-cmd-param" data-i18n="webshell.cmdParamPlaceholder" data-i18n-attr="placeholder" placeholder=" cmd， xxx xxx=" />
+ <input type="text" id="webshell-cmd-param" data-i18n="webshell.cmdParamPlaceholder" data-i18n-attr="placeholder" placeholder=" cmd, xxx xxx=" />
                 </div>
                 <div class="form-group">
  <label for="webshell-remark" data-i18n="webshell.remark"></label>
@@ -2682,22 +2682,22 @@ skill...</small>
                 </div>
                 <div class="form-group">
  <label for="role-icon" data-i18n="roleModal.roleIcon"></label>
- <input type="text" id="role-icon" data-i18n="roleModal.roleIconPlaceholder" data-i18n-attr="placeholder" placeholder="emoji，: 🏆" maxlength="10" />
- <small class="form-hint" data-i18n="roleModal.roleIconHint">emoji，。</small>
+ <input type="text" id="role-icon" data-i18n="roleModal.roleIconPlaceholder" data-i18n-attr="placeholder" placeholder="emoji,: 🏆" maxlength="10" />
+ <small class="form-hint" data-i18n="roleModal.roleIconHint">emoji,.</small>
                 </div>
                 <div class="form-group">
  <label for="role-user-prompt" data-i18n="roleModal.userPrompt"></label>
- <textarea id="role-user-prompt" rows="10" data-i18n="roleModal.userPromptPlaceholder" data-i18n-attr="placeholder" placeholder="，..."></textarea>
- <small class="form-hint" data-i18n="roleModal.userPromptHint">，AI。：。</small>
+ <textarea id="role-user-prompt" rows="10" data-i18n="roleModal.userPromptPlaceholder" data-i18n-attr="placeholder" placeholder=",..."></textarea>
+ <small class="form-hint" data-i18n="roleModal.userPromptHint">,AI.:.</small>
                 </div>
                 <div class="form-group" id="role-tools-section">
- <label data-i18n="roleModal.relatedTools">（）</label>
+ <label data-i18n="roleModal.relatedTools">()</label>
                     <div id="role-tools-default-hint" class="role-tools-default-hint" style="display: none;">
                         <div class="role-tools-default-info">
                             <span class="role-tools-default-icon">ℹ️</span>
                             <div class="role-tools-default-content">
  <div class="role-tools-default-title" data-i18n="roleModal.defaultRoleToolsTitle"></div>
- <div class="role-tools-default-desc" data-i18n="roleModal.defaultRoleToolsDesc">MCP，。</div>
+ <div class="role-tools-default-desc" data-i18n="roleModal.defaultRoleToolsDesc">MCP,.</div>
                             </div>
                         </div>
                     </div>
@@ -2723,10 +2723,10 @@ skill...</small>
                     <div id="role-tools-list" class="role-tools-list">
  <div class="tools-loading" data-i18n="roleModal.loadingTools">...</div>
                     </div>
- <small class="form-hint" data-i18n="roleModal.relatedToolsHint">，MCP。</small>
+ <small class="form-hint" data-i18n="roleModal.relatedToolsHint">,MCP.</small>
                 </div>
                 <div class="form-group" id="role-skills-section">
- <label data-i18n="roleModal.relatedSkills">Skills（）</label>
+ <label data-i18n="roleModal.relatedSkills">Skills()</label>
                     <div class="role-skills-controls">
                         <div class="role-skills-actions">
  <button type="button" class="btn-secondary" onclick="selectAllRoleSkills()" data-i18n="roleModal.selectAll"></button>
@@ -2749,7 +2749,7 @@ skill...</small>
                     <div id="role-skills-list" class="role-skills-list">
  <div class="skills-loading" data-i18n="roleModal.loadingSkills">skills...</div>
                     </div>
- <small class="form-hint" data-i18n="roleModal.relatedSkillsHint">skills，skills，AI。</small>
+ <small class="form-hint" data-i18n="roleModal.relatedSkillsHint">skills,skills,AI.</small>
                 </div>
                 <div class="form-group">
                     <label class="checkbox-label">

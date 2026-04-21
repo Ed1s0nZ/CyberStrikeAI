@@ -461,7 +461,7 @@ func (e *Executor) ExecuteTool(ctx context.Context, toolName string, args map[st
 		}
 	}
 
-	// execute command — wrap with proxychains for tools that don't respect env proxy vars
+	// execute command - wrap with proxychains for tools that don't respect env proxy vars
 	var cmd *exec.Cmd
 	proxied := false
 	if e.shouldUseProxyChains(toolName) {
@@ -694,7 +694,7 @@ func looksMalformedArgValue(value interface{}) bool {
 		return false
 	}
 	trimmed := strings.TrimSpace(s)
-	// Skip multiline values — these are likely script content, not malformed args
+	// Skip multiline values - these are likely script content, not malformed args
 	if strings.Count(trimmed, "\n") > 2 {
 		return false
 	}

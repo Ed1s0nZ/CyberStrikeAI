@@ -10,7 +10,7 @@ import (
 
 // rateLimiter serializes API requests and enforces minimum intervals.
 // On 429 responses, it backs off based on the retry-after header.
-// Thread-safe — all API calls go through this single limiter.
+// Thread-safe - all API calls go through this single limiter.
 type rateLimiter struct {
 	mu          sync.Mutex
 	minInterval time.Duration // minimum time between requests (configurable)

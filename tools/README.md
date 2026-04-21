@@ -26,7 +26,7 @@ Each tool configuration file is a YAML file. The table below lists supported top
 ### Short Description (`short_description`)
 
 - **Purpose**: Used in tool lists to reduce tokens sent to the model.
-- **Guideline**: One sentence (20–50 characters) describing the tool’s main use.
+- **Guideline**: One sentence (20–50 characters) describing the tool's main use.
 - **Example**: `"Network scanner for discovering hosts, open ports, and services"`
 
 ### Detailed Description (`description`)
@@ -121,7 +121,7 @@ Some tools (e.g. `nmap`) support `scan_type` to override the default scan argume
 - `scan_type: "-A"` → aggressive scan.
 
 **Notes:**
-- If set, it replaces the tool’s default scan arguments.
+- If set, it replaces the tool's default scan arguments.
 - Multiple options separated by spaces.
 
 ### Parameter Description Guidelines
@@ -364,15 +364,15 @@ Restart the service to load the new tool.
    - Remind users to use only in authorized environments.
 
 6. **Execution duration and timeout**
-   - If a tool often runs very long (e.g. still “running” after 10–30 minutes), treat it as abnormal and:
+   - If a tool often runs very long (e.g. still "running" after 10–30 minutes), treat it as abnormal and:
      - Set **config.yaml** → `agent.tool_timeout_minutes` (default 10) so long runs are stopped and resources freed.
      - Increase it (e.g. 20, 30) only when longer runs are needed; avoid `0` (no limit).
-     - Use “Stop task” on the task monitor to cancel the whole run.
+     - Use "Stop task" on the task monitor to cancel the whole run.
      - Prefer tools that support cancellation or an internal timeout so they align with the global timeout.
 
 ## Disabling a Tool
 
-Set `enabled: false` in the tool’s config, or remove/rename the file. Disabled tools are not listed and cannot be called by the AI.
+Set `enabled: false` in the tool's config, or remove/rename the file. Disabled tools are not listed and cannot be called by the AI.
 
 ## Tool Configuration Validation
 
@@ -389,15 +389,15 @@ Invalid configs produce startup warnings but do not prevent the server from star
 
 A: Array parameters are turned into comma-separated strings. For multiple separate arguments, use `additional_args`.
 
-### Q: How do I override a tool’s default arguments?
+### Q: How do I override a tool's default arguments?
 
 A: Some tools (e.g. `nmap`) support a `scan_type` parameter. Otherwise use `additional_args`.
 
-### Q: A tool has been “running” for over 30 minutes. What should I do?
+### Q: A tool has been "running" for over 30 minutes. What should I do?
 
-A: That usually means it’s stuck. You can:
+A: That usually means it's stuck. You can:
 1. Set `agent.tool_timeout_minutes` in **config.yaml** (default 10) so single tool runs are stopped after that many minutes.
-2. Use “Stop task” on the task monitor to stop the run immediately.
+2. Use "Stop task" on the task monitor to stop the run immediately.
 3. If the tool legitimately needs more time, increase `tool_timeout_minutes` (avoid setting it to 0).
 
 ### Q: What if tool execution fails?
@@ -417,7 +417,7 @@ go run cmd/test-config/main.go
 
 ### Q: How is parameter order controlled?
 
-A: Use the `position` field for positional arguments. **Position 0** (e.g. gobuster’s `dir` subcommand) is placed right after the command, before any flag arguments, so CLIs that expect “subcommand + options” work. Other flags are added in the order they appear in `parameters`, then position 1, 2, …; `additional_args` is appended last.
+A: Use the `position` field for positional arguments. **Position 0** (e.g. gobuster's `dir` subcommand) is placed right after the command, before any flag arguments, so CLIs that expect "subcommand + options" work. Other flags are added in the order they appear in `parameters`, then position 1, 2, ...; `additional_args` is appended last.
 
 ## Tool Configuration Templates
 

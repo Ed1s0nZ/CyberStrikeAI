@@ -21,7 +21,7 @@ const (
 	maxChatUploadEditBytes = 2 * 1024 * 1024 // text edit limit
 )
 
-// ChatUploadsHandler conversation（chat_uploads ） API
+// ChatUploadsHandler conversation(chat_uploads ) API
 type ChatUploadsHandler struct {
 	logger *zap.Logger
 }
@@ -39,7 +39,7 @@ func (h *ChatUploadsHandler) absRoot() (string, error) {
 	return filepath.Abs(filepath.Join(cwd, chatUploadsRootDirName))
 }
 
-// resolveUnderChatUploads validate relativePath（ / ） chat_uploads 
+// resolveUnderChatUploads validate relativePath( / ) chat_uploads 
 func (h *ChatUploadsHandler) resolveUnderChatUploads(relativePath string) (abs string, err error) {
 	root, err := h.absRoot()
 	if err != nil {
@@ -68,13 +68,13 @@ func (h *ChatUploadsHandler) resolveUnderChatUploads(relativePath string) (abs s
 // ChatUploadFileItem list
 type ChatUploadFileItem struct {
 	RelativePath   string `json:"relativePath"`
-	AbsolutePath string `json:"absolutePath"` // absolute path，conversation（）
+	AbsolutePath string `json:"absolutePath"` // absolute path,conversation()
 	Name           string `json:"name"`
 	Size           int64  `json:"size"`
 	ModifiedUnix   int64  `json:"modifiedUnix"`
 	Date           string `json:"date"`
 	ConversationID string `json:"conversationId"`
-	// SubPath 、sub-path（filename）， date/conv/a/b/file "a/b"； ""。
+	// SubPath ,sub-path(filename), date/conv/a/b/file "a/b"; "".
 	SubPath string `json:"subPath"`
 }
 
@@ -86,7 +86,7 @@ func (h *ChatUploadsHandler) List(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	// ensure root directory exists，「」 mkdir，list
+	// ensure root directory exists,"" mkdir,list
 	if err := os.MkdirAll(root, 0755); err != nil {
 		h.logger.Warn("failed to create chat_uploads root directory", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -212,7 +212,7 @@ type chatUploadMkdirBody struct {
 	Name   string `json:"name"`
 }
 
-// Mkdir POST /api/chat-uploads/mkdir — parent （parent chat_uploads ，；name ）
+// Mkdir POST /api/chat-uploads/mkdir - parent (parent chat_uploads ,;name )
 func (h *ChatUploadsHandler) Mkdir(c *gin.Context) {
 	var body chatUploadMkdirBody
 	if err := c.ShouldBindJSON(&body); err != nil {
@@ -391,7 +391,7 @@ func chatUploadShortRand(n int) string {
 	return string(b)
 }
 
-// Upload POST /api/chat-uploads multipart: file；conversationId ；relativeDir （chat_uploads ，）
+// Upload POST /api/chat-uploads multipart: file;conversationId ;relativeDir (chat_uploads ,)
 func (h *ChatUploadsHandler) Upload(c *gin.Context) {
 	fh, err := c.FormFile("file")
 	if err != nil || fh == nil {

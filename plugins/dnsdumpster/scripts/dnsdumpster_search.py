@@ -403,7 +403,7 @@ def cmd_host(ip):
 
 
 def cmd_reverse(ip):
-    """Reverse IP lookup via HackerTarget — find all domains hosted on an IP."""
+    """Reverse IP lookup via HackerTarget - find all domains hosted on an IP."""
     data = _get(f"{HT_BASE}/reverseiplookup/", params={"q": ip}, use_header_auth=False)
 
     if isinstance(data, dict) and data.get("status") == "error":
@@ -432,7 +432,7 @@ def cmd_reverse(ip):
 
 
 def cmd_dns_lookup(domain):
-    """DNS lookup via HackerTarget — returns all DNS records for a domain."""
+    """DNS lookup via HackerTarget - returns all DNS records for a domain."""
     data = _get(f"{HT_BASE}/dnslookup/", params={"q": domain}, use_header_auth=False)
 
     if isinstance(data, dict) and data.get("status") == "error":
@@ -475,7 +475,7 @@ def cmd_dns_lookup(domain):
 
 
 def cmd_hostsearch(domain):
-    """Subdomain/host search via HackerTarget — find hosts related to a domain."""
+    """Subdomain/host search via HackerTarget - find hosts related to a domain."""
     data = _get(f"{HT_BASE}/hostsearch/", params={"q": domain}, use_header_auth=False)
 
     if isinstance(data, dict) and data.get("status") == "error":

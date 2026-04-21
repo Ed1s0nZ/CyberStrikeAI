@@ -1,6 +1,6 @@
 name: shodan
 version: "1.0.0"
-description: "Shodan internet search engine — host discovery, service fingerprinting, vulnerability detection, network intelligence"
+description: "Shodan internet search engine - host discovery, service fingerprinting, vulnerability detection, network intelligence"
 author: "cybersecua"
 url: "https://developer.shodan.io"
 

@@ -1,4 +1,4 @@
-// Memory panel — view, search, create, edit, and delete persistent memory entries
+// Memory panel - view, search, create, edit, and delete persistent memory entries
 
 (function () {
     'use strict';
@@ -317,7 +317,7 @@
     function openEditMemoryModal(id) {
         const entry = allEntries.find(e => e.id === id);
         if (!entry) {
-            showMemoryNotification('Entry not found in local cache. Refreshing…', 'warning');
+            showMemoryNotification('Entry not found in local cache. Refreshing...', 'warning');
             loadMemoryEntries(true);
             return;
         }
@@ -384,7 +384,7 @@
         }
 
         const saveBtn = document.getElementById('memory-modal-save');
-        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
 
         try {
             if (mode === 'create') {

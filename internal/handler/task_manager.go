@@ -19,12 +19,12 @@ type AgentTask struct {
 	Message        string    `json:"message,omitempty"`
 	StartedAt      time.Time `json:"startedAt"`
 	Status         string    `json:"status"`
-	CancellingAt time.Time `json:"-"` // cancelling status，for cleaning up long-stuck tasks
+	CancellingAt time.Time `json:"-"` // cancelling status,for cleaning up long-stuck tasks
 
 	cancel func(error)
 }
 
-// CompletedTask （record）
+// CompletedTask (record)
 type CompletedTask struct {
 	ConversationID string    `json:"conversationId"`
 	Message        string    `json:"message,omitempty"`
@@ -43,12 +43,12 @@ type AgentTaskManager struct {
 }
 
 const (
-	// cancellingStuckThreshold 「」list。currentreturns，
-	// exceed means stuck，release session ASAP。common practice is release within 30-60s。
+	// cancellingStuckThreshold ""list.currentreturns,
+	// exceed means stuck,release session ASAP.common practice is release within 30-60s.
 	cancellingStuckThreshold = 45 * time.Second
 	// cancellingStuckThresholdLegacy record CancellingAt StartedAt 
 	cancellingStuckThresholdLegacy = 2 * time.Minute
-	cleanupInterval = 15 * time.Second // paired with above threshold， 60s 
+	cleanupInterval = 15 * time.Second // paired with above threshold, 60s 
 )
 
 // NewAgentTaskManager create task manager
@@ -63,7 +63,7 @@ func NewAgentTaskManager() *AgentTaskManager {
 	return m
 }
 
-// runStuckCancellingCleanup periodically force-end tasks stuck in cancelling state，message
+// runStuckCancellingCleanup periodically force-end tasks stuck in cancelling state,message
 func (m *AgentTaskManager) runStuckCancellingCleanup() {
 	ticker := time.NewTicker(cleanupInterval)
 	defer ticker.Stop()
@@ -125,7 +125,7 @@ func (m *AgentTaskManager) StartTask(conversationID, message string, cancel cont
 	return task, nil
 }
 
-// CancelTask cancel task for specified session。，returns (true, nil) for interface idempotency, frontend no error。
+// CancelTask cancel task for specified session.,returns (true, nil) for interface idempotency, frontend no error.
 func (m *AgentTaskManager) CancelTask(conversationID string, cause error) (bool, error) {
 	m.mu.Lock()
 	task, exists := m.tasks[conversationID]
@@ -134,7 +134,7 @@ func (m *AgentTaskManager) CancelTask(conversationID string, cause error) (bool,
 		return false, nil
 	}
 
-	// if already in cancellation flow，treat as success (idempotent)，avoid frontend showing task not found on repeat clicks
+	// if already in cancellation flow,treat as success (idempotent),avoid frontend showing task not found on repeat clicks
 	if task.Status == "cancelling" {
 		m.mu.Unlock()
 		return true, nil
@@ -154,7 +154,7 @@ func (m *AgentTaskManager) CancelTask(conversationID string, cause error) (bool,
 	return true, nil
 }
 
-// UpdateTaskStatus statusdelete（status）
+// UpdateTaskStatus statusdelete(status)
 func (m *AgentTaskManager) UpdateTaskStatus(conversationID string, status string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -215,10 +215,10 @@ func (m *AgentTaskManager) cleanupHistory() {
 		}
 	}
 	
-	// if still exceeds max count，keep only newest
+	// if still exceeds max count,keep only newest
 	if len(validTasks) > m.maxHistorySize {
-		// sort by completion time，
-		// since appended, newest at end，take last N directly
+		// sort by completion time,
+		// since appended, newest at end,take last N directly
 		start := len(validTasks) - m.maxHistorySize
 		validTasks = validTasks[start:]
 	}
@@ -248,8 +248,8 @@ func (m *AgentTaskManager) GetCompletedTasks() []*CompletedTask {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	
-	// record（，）
-	// ：cannot directly call cleanupHistory here，because write lock needed
+	// record(,)
+	// :cannot directly call cleanupHistory here,because write lock needed
 	// returnsrecord
 	now := time.Now()
 	cutoffTime := now.Add(-m.historyRetention)
@@ -261,8 +261,8 @@ func (m *AgentTaskManager) GetCompletedTasks() []*CompletedTask {
 		}
 	}
 	
-	// sort by completion time descending（newest first）
-	// since appended, newest at end，need to reverse
+	// sort by completion time descending(newest first)
+	// since appended, newest at end,need to reverse
 	for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
 		result[i], result[j] = result[j], result[i]
 	}

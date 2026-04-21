@@ -101,7 +101,7 @@ file shell.php
 shell.php: SQLite 3.x database, last written using SQLite version 3051000, file counter 2, database pages 2, cookie 0x1, schema 4, UTF-8, version-valid-for 2
 ```
 
-If uploading a PHP web shell isn’t possible but the service runs with root privileges, an attacker can use the same technique to create a cron job that triggers a reverse shell:
+If uploading a PHP web shell isn't possible but the service runs with root privileges, an attacker can use the same technique to create a cron job that triggers a reverse shell:
 
 ```sql
 ATTACH DATABASE '/etc/cron.d/pwn.task' AS cron;

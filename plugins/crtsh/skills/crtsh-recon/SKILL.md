@@ -2,7 +2,7 @@
 
 ## Overview
 
-crt.sh is a free Certificate Transparency (CT) log search engine. Every TLS certificate issued by a trusted CA is logged in public CT logs. This means **every HTTPS hostname an organization has ever used** is discoverable — including internal names, staging environments, and shadow IT.
+crt.sh is a free Certificate Transparency (CT) log search engine. Every TLS certificate issued by a trusted CA is logged in public CT logs. This means **every HTTPS hostname an organization has ever used** is discoverable - including internal names, staging environments, and shadow IT.
 
 ## Why CT Logs are Gold for Recon
 
@@ -11,10 +11,10 @@ When an organization gets a TLS certificate, the CA submits it to CT logs. This 
 - **Internal hostnames** (dev.internal.corp.com) leaked via cert SANs
 - **Staging/test environments** (staging-api.target.com)
 - **Decommissioned services** that still resolve in DNS
-- **Shadow IT** — certs issued by employees on unauthorized services
-- **Organizational structure** — naming patterns reveal team structure
-- **Technology stack** — cert issuers indicate automation level
-- **Timeline** — when services were deployed/decommissioned
+- **Shadow IT** - certs issued by employees on unauthorized services
+- **Organizational structure** - naming patterns reveal team structure
+- **Technology stack** - cert issuers indicate automation level
+- **Timeline** - when services were deployed/decommissioned
 
 ## Quick Start
 
@@ -43,14 +43,14 @@ crtsh-search query="%.target.%"
 # Start with broad wildcard search
 crtsh-search query="%.target.com" mode="subdomains"
 
-# Output: clean list of subdomains — feed into further tools
+# Output: clean list of subdomains - feed into further tools
 # Example output: api.target.com, mail.target.com, vpn.target.com, dev.target.com
 ```
 
 ### Phase 2: Certificate Analysis
 
 ```
-# Full cert details — look for patterns
+# Full cert details - look for patterns
 crtsh-search query="%.target.com"
 
 # What to look for in output:
@@ -146,8 +146,8 @@ crtsh-search query="%.target.com" mode="subdomains"
 
 ## Tips
 
-- **Wildcard certs** (`*.target.com`) mean all subdomains share one cert — can't enumerate from CT alone, but the cert's SAN field may list specific names
+- **Wildcard certs** (`*.target.com`) mean all subdomains share one cert - can't enumerate from CT alone, but the cert's SAN field may list specific names
 - **Multi-domain certs** (SAN lists) reveal which services share infrastructure
-- **Newly issued certs** may indicate infrastructure changes — monitor over time
+- **Newly issued certs** may indicate infrastructure changes - monitor over time
 - **Expired certs** on still-resolvable hosts are prime targets (forgotten, unpatched)
 - **Certificate serial numbers** can be used to find the same cert in other CT logs or search engines

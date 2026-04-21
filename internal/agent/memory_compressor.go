@@ -65,17 +65,17 @@ Conversation segments to compress:
 %s
 
 Output format requirements (strict):
-1) [TOOLS_EXECUTED] — list of tools run with key parameters and execution references, e.g.:
+1) [TOOLS_EXECUTED] - list of tools run with key parameters and execution references, e.g.:
    - nmap -sV -sC 10.0.0.1 → 3 open ports (22,80,443) [ref:exec-abc123]
    - sqlmap -u http://... → no injection found [ref:exec-def456]
-2) [TASK_STATUS] — objective progress and current state in 2-4 bullets.
-3) [KEY_TECHNICAL_FINDINGS] — critical findings only (vulns, credentials, exploitable paths, decisive errors).
-4) [NEXT_BEST_ACTIONS] — concrete next actions (max 5 bullets), aligned to current objective.
+2) [TASK_STATUS] - objective progress and current state in 2-4 bullets.
+3) [KEY_TECHNICAL_FINDINGS] - critical findings only (vulns, credentials, exploitable paths, decisive errors).
+4) [NEXT_BEST_ACTIONS] - concrete next actions (max 5 bullets), aligned to current objective.
 
 Rules:
 - Keep it compact and actionable; remove duplicate details.
 - Preserve exact indicators when available (host/IP/URL/port/CVE/payload/parameter/path).
-- ALWAYS preserve [ref:execution_id] markers — these are the agent's lifeline to retrieve full outputs.
+- ALWAYS preserve [ref:execution_id] markers - these are the agent's lifeline to retrieve full outputs.
 - Do not include narrative filler.
 - If no findings exist, explicitly state "No confirmed findings yet".`
 )

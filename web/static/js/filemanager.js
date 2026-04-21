@@ -1,4 +1,4 @@
-// File Manager — view, upload, register, edit, and delete managed files
+// File Manager - view, upload, register, edit, and delete managed files
 
 (function () {
     'use strict';

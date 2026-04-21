@@ -61,4 +61,4 @@ true) GROUP BY column_name LIMIT 1 UNION ALL SELECT (SELECT @@project_id),1,1,1,
 * [BigQuery SQL Injection Cheat Sheet - Ozgur Alp - February 14, 2022](https://ozguralp.medium.com/bigquery-sql-injection-cheat-sheet-65ad70e11eac)
 * [BigQuery Documentation - Query Syntax - October 30, 2024](https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax)
 * [BigQuery Documentation - Functions and Operators - October 30, 2024](https://cloud.google.com/bigquery/docs/reference/standard-sql/functions-and-operators)
-* [Akamai Web Application Firewall Bypass Journey: Exploiting “Google BigQuery” SQL Injection Vulnerability - Duc Nguyen - March 31, 2020](https://hackemall.live/index.php/2020/03/31/akamai-web-application-firewall-bypass-journey-exploiting-google-bigquery-sql-injection-vulnerability/)
+* [Akamai Web Application Firewall Bypass Journey: Exploiting "Google BigQuery" SQL Injection Vulnerability - Duc Nguyen - March 31, 2020](https://hackemall.live/index.php/2020/03/31/akamai-web-application-firewall-bypass-journey-exploiting-google-bigquery-sql-injection-vulnerability/)

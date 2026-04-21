@@ -405,7 +405,7 @@ func (h *RobotHandler) handleRobotCommand(platform, userID, text string) (string
 	}
 }
 
-// —————— test endpoint ——————
+// ------ test endpoint ------
 
 // RobotTestRequest is the test message request.
 type RobotTestRequest struct {

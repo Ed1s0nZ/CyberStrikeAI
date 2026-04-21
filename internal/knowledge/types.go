@@ -16,26 +16,26 @@ func formatTime(t time.Time) string {
 // KnowledgeItem knowledge base
 type KnowledgeItem struct {
 	ID        string    `json:"id"`
-	Category string `json:"category"` // type（folder name）
-	Title     string    `json:"title"`    // title（filename）
+	Category string `json:"category"` // type(folder name)
+	Title     string    `json:"title"`    // title(filename)
 	FilePath  string    `json:"filePath"` // file path
 	Content   string    `json:"content"`  // file content
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-// KnowledgeItemSummary knowledge base（list，）
+// KnowledgeItemSummary knowledge base(list,)
 type KnowledgeItemSummary struct {
 	ID        string    `json:"id"`
 	Category  string    `json:"category"`
 	Title     string    `json:"title"`
 	FilePath  string    `json:"filePath"`
-	Content string `json:"content,omitempty"` // optional: content preview（， 150 ）
+	Content string `json:"content,omitempty"` // optional: content preview(, 150 )
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-// MarshalJSON custom JSON serialization，time format
+// MarshalJSON custom JSON serialization,time format
 func (k *KnowledgeItemSummary) MarshalJSON() ([]byte, error) {
 	type Alias KnowledgeItemSummary
 	aux := &struct {
@@ -50,7 +50,7 @@ func (k *KnowledgeItemSummary) MarshalJSON() ([]byte, error) {
 	return json.Marshal(aux)
 }
 
-// MarshalJSON custom JSON serialization，time format
+// MarshalJSON custom JSON serialization,time format
 func (k *KnowledgeItem) MarshalJSON() ([]byte, error) {
 	type Alias KnowledgeItem
 	aux := &struct {
@@ -94,7 +94,7 @@ type RetrievalLog struct {
 	CreatedAt      time.Time `json:"createdAt"`
 }
 
-// MarshalJSON custom JSON serialization，time format
+// MarshalJSON custom JSON serialization,time format
 func (r *RetrievalLog) MarshalJSON() ([]byte, error) {
 	type Alias RetrievalLog
 	return json.Marshal(&struct {
@@ -106,7 +106,7 @@ func (r *RetrievalLog) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// CategoryWithItems category and its knowledge items（paginate by category）
+// CategoryWithItems category and its knowledge items(paginate by category)
 type CategoryWithItems struct {
 	Category  string                `json:"category"`           // category name
 	ItemCount int                   `json:"itemCount"`          // total knowledge items in this category
@@ -116,7 +116,7 @@ type CategoryWithItems struct {
 // SearchRequest search request
 type SearchRequest struct {
 	Query     string  `json:"query"`
-	RiskType string `json:"riskType,omitempty"` // ：type
-	TopK      int     `json:"topK,omitempty"`      // return Top-K results，default 5
-	Threshold float64 `json:"threshold,omitempty"` // similarity threshold，default 0.7
+	RiskType string `json:"riskType,omitempty"` // :type
+	TopK      int     `json:"topK,omitempty"`      // return Top-K results,default 5
+	Threshold float64 `json:"threshold,omitempty"` // similarity threshold,default 0.7
 }

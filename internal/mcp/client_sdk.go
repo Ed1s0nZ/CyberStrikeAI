@@ -439,7 +439,7 @@ func (c *simpleHTTPClient) Close() error {
 // returning a *sdkClient implementing ExternalMCPClient.
 // Returns (nil, error) on connection failure. ctx is used for connection timeout and cancellation.
 func createSDKClient(ctx context.Context, serverCfg config.ExternalMCPServerConfig, logger *zap.Logger) (ExternalMCPClient, error) {
-	// Resolve ${VAR} / ${VAR:-default} env refs on the local copy only — keeping the
+	// Resolve ${VAR} / ${VAR:-default} env refs on the local copy only - keeping the
 	// template strings in the caller's stored config is what prevents saveConfig()
 	// from persisting resolved secrets back to config.yaml on subsequent writes.
 	config.ExpandConfigEnv(&serverCfg)

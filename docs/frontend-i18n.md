@@ -13,7 +13,7 @@ Current goals:
 
 - **Frontend-driven client-side i18n**: every UI string is rendered in the browser according to the active language. The Go backend stays agnostic of locale and only serves structure and data.
 - **Single HTML template**: keep one `index.html`; do not fork per-language templates.
-- **Text separated from logic**: every visible string lives in a key/value catalog (per-language JSON). HTML / JS reference keys only — never hard-coded Chinese / English / Ukrainian literals.
+- **Text separated from logic**: every visible string lives in a key/value catalog (per-language JSON). HTML / JS reference keys only - never hard-coded Chinese / English / Ukrainian literals.
 - **Progressive migration**: cover header, login, sidebar, and system settings first, then migrate the remaining pages by module. Avoid one giant rewrite.
 - **Fallback language**: if the target language is incomplete, fall back to the default language instead of exposing raw keys to users.
 
@@ -23,7 +23,7 @@ Current goals:
 
 ### 2.1 Technology Choice
 
-- **i18n engine**: the browser UMD build of [i18next](https://www.i18next.com/), loaded via CDN — no bundler required.
+- **i18n engine**: the browser UMD build of [i18next](https://www.i18next.com/), loaded via CDN - no bundler required.
 - **Resource format**: one JSON file per language with a `domain.semantic` key hierarchy, e.g.
   - `common.ok`
   - `nav.dashboard`
@@ -37,9 +37,9 @@ Current goals:
 - `web/static/js/i18n.js`
   - Frontend i18n initialization and DOM application logic (introduced by this plan).
 - `web/static/i18n/` (new directory)
-  - `en-US.json` — English (default)
-  - `uk-UA.json` — Ukrainian
-  - `zh-CN.json` — Chinese
+  - `en-US.json` - English (default)
+  - `uk-UA.json` - Ukrainian
+  - `zh-CN.json` - Chinese
   - Future additions: `ja-JP.json`, `ko-KR.json`, etc.
 
 ---
@@ -110,7 +110,7 @@ The Chinese file `zh-CN.json` keeps the same keys with different values:
 }
 ```
 
-> Rule: **when adding a new UI element, define the i18n key first, then reference it from HTML/JS** — never hard-code a literal string.
+> Rule: **when adding a new UI element, define the i18n key first, then reference it from HTML/JS** - never hard-code a literal string.
 
 ---
 
@@ -155,7 +155,7 @@ The Chinese file `zh-CN.json` keeps the same keys with different values:
 - `window.t(key: string): string`
   - Returns the translation in the current language, falling back to the default language, and ultimately to the key itself if no translation exists.
 - `window.changeLanguage(lang: string): Promise<void>`
-  - Switches language and refreshes page strings in place — it does not reload the page.
+  - Switches language and refreshes page strings in place - it does not reload the page.
 
 Example (from `web/static/js/settings.js`):
 
@@ -167,7 +167,7 @@ alert('Load config failed: ' + error.message);
 alert(t('settings.loadConfigFailed') + ': ' + error.message);
 ```
 
-> Rule: **every user-facing alert, button label, and dialog title in JS goes through `t()`** — never hard-code a literal.
+> Rule: **every user-facing alert, button label, and dialog title in JS goes through `t()`** - never hard-code a literal.
 
 ### 5.2 Progressive-Migration Guidance
 
@@ -195,7 +195,7 @@ alert(t('settings.loadConfigFailed') + ': ' + error.message);
 2. Initialize i18next:
    - `lng` is the current language;
    - `fallbackLng` is `en-US`;
-   - Resources are empty initially — loaded on demand.
+   - Resources are empty initially - loaded on demand.
 3. `fetch` `/static/i18n/{lng}.json` and call `i18next.addResources`.
 4. Update:
    - The `<html lang="...">` attribute;
@@ -277,7 +277,7 @@ function updateLangLabel() {
 }
 ```
 
-> Rule: **language switch only updates strings** — no full-page reload, no URL-hash mutation.
+> Rule: **language switch only updates strings** - no full-page reload, no URL-hash mutation.
 
 ---
 
@@ -300,7 +300,7 @@ function updateLangLabel() {
    - All strings on the system-settings page (including the chatbot-configuration subpage) moved to i18n.
    - `settings.js` alerts and error toasts routed through `t()`.
 3. **Phase 3 (in progress)**
-   - Dashboard, Task Management, Vulnerability Management, MCP, Skills, Roles — migrated module by module.
+   - Dashboard, Task Management, Vulnerability Management, MCP, Skills, Roles - migrated module by module.
 4. **Phase 4**
    - Sweep out any remaining hard-coded strings in JS / HTML and route them through i18n.
 
@@ -313,13 +313,13 @@ When a new language is needed:
 1. Add `web/static/i18n/{lang}.json`, copying the structure of an existing locale and filling in translations.
 2. Add the matching option in the language-switcher dropdown, e.g.
    - `data-lang="ja-JP"` / label `日本語`.
-3. No changes are required in `i18n.js` or in existing HTML/JS — the new language just works.
+3. No changes are required in `i18n.js` or in existing HTML/JS - the new language just works.
 
 ---
 
 ## 10. Gotchas and Pitfalls
 
-- **Do not fork the HTML template** to implement multiple languages — maintenance cost explodes; the i18n layer is the single source of truth.
-- **Never use Chinese/English sentences as keys** — keep `module.semantic` short keys for easy diffing and searching.
+- **Do not fork the HTML template** to implement multiple languages - maintenance cost explodes; the i18n layer is the single source of truth.
+- **Never use Chinese/English sentences as keys** - keep `module.semantic` short keys for easy diffing and searching.
 - Avoid hard-coded text in CSS (`content: "xxx"`). If you truly need it, set the text from JS via i18n.
 - For backend-returned error messages (possibly localizable in the future), prefer letting the backend pick a language based on `Accept-Language` and let the frontend just display what it receives.

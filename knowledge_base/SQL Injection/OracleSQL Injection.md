@@ -228,7 +228,7 @@ utl_file.put_line(utl_file.fopen('/path/to/','file','R'), <buffer>)
 
 ## References
 
-* [ASDC12 - New and Improved Hacking Oracle From Web - Sumit “sid” Siddharth - November 8, 2021](https://web.archive.org/web/20211108150011/https://owasp.org/www-pdf-archive/ASDC12-New_and_Improved_Hacking_Oracle_From_Web.pdf)
+* [ASDC12 - New and Improved Hacking Oracle From Web - Sumit "sid" Siddharth - November 8, 2021](https://web.archive.org/web/20211108150011/https://owasp.org/www-pdf-archive/ASDC12-New_and_Improved_Hacking_Oracle_From_Web.pdf)
 * [Error Based Injection | NetSPI SQL Injection Wiki - NetSPI - February 15, 2021](https://sqlwiki.netspi.com/injectionTypes/errorBased/#oracle)
 * [ODAT: Oracle Database Attacking Tool - quentinhardy - March 24, 2016](https://github.com/quentinhardy/odat/wiki/privesc)
 * [Oracle SQL Injection Cheat Sheet - @pentestmonkey - August 30, 2011](http://pentestmonkey.net/cheat-sheet/sql-injection/oracle-sql-injection-cheat-sheet)

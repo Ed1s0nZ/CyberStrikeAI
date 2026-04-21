@@ -79,8 +79,8 @@ func (h *ConversationHandler) ListConversations(c *gin.Context) {
 func (h *ConversationHandler) GetConversation(c *gin.Context) {
 	id := c.Param("id")
 
-	// defaultload，
-	// include_process_details=1/true returns processDetails（）
+	// defaultload,
+	// include_process_details=1/true returns processDetails()
 	includeStr := c.DefaultQuery("include_process_details", "0")
 	include := includeStr == "1" || includeStr == "true" || includeStr == "yes"
 
@@ -102,7 +102,7 @@ func (h *ConversationHandler) GetConversation(c *gin.Context) {
 	c.JSON(http.StatusOK, conv)
 }
 
-// GetMessageProcessDetails messageprocess details（load）
+// GetMessageProcessDetails messageprocess details(load)
 func (h *ConversationHandler) GetMessageProcessDetails(c *gin.Context) {
 	messageID := c.Param("id")
 	if messageID == "" {
@@ -117,7 +117,7 @@ func (h *ConversationHandler) GetMessageProcessDetails(c *gin.Context) {
 		return
 	}
 
-	// JSON （ GetConversation processDetails ）
+	// JSON ( GetConversation processDetails )
 	out := make([]map[string]interface{}, 0, len(details))
 	for _, d := range details {
 		var data interface{}

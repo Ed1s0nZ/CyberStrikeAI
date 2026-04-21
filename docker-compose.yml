@@ -33,13 +33,13 @@ services:
       - LOG_HTML=${FLARESOLVERR_LOG_HTML:-false}
       - CAPTCHA_SOLVER=${FLARESOLVERR_CAPTCHA_SOLVER:-none}
       - TZ=${TZ:-UTC}
-      # Proxy — FlareSolverr browser routes through this proxy for all requests.
+      # Proxy - FlareSolverr browser routes through this proxy for all requests.
       # Set to match CyberStrikeAI's proxy config for consistent IP/cookies:
       #   Tor:    FLARESOLVERR_PROXY_URL=socks5://host.docker.internal:9050
       #   SOCKS5: FLARESOLVERR_PROXY_URL=socks5://host.docker.internal:1080
       #   HTTP:   FLARESOLVERR_PROXY_URL=http://host.docker.internal:8080
       - PROXY_URL=${FLARESOLVERR_PROXY_URL:-}
-    # Memory limit — Chromium can be hungry
+    # Memory limit - Chromium can be hungry
     deploy:
       resources:
         limits:

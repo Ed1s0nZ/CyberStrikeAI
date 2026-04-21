@@ -1,23 +1,23 @@
-// dashboardpage：fetchrunningintask、vulnerabilitystatistics、batchtask、tooland Skills statisticsrender
+// dashboardpage:fetchrunningintask,vulnerabilitystatistics,batchtask,tooland Skills statisticsrender
 
 async function refreshDashboard() {
     const runningEl = document.getElementById('dashboard-running-tasks');
     const vulnTotalEl = document.getElementById('dashboard-vuln-total');
     const severityIds = ['critical', 'high', 'medium', 'low', 'info'];
 
-    if (runningEl) runningEl.textContent = '…';
-    if (vulnTotalEl) vulnTotalEl.textContent = '…';
+    if (runningEl) runningEl.textContent = '...';
+    if (vulnTotalEl) vulnTotalEl.textContent = '...';
     severityIds.forEach(s => {
         const el = document.getElementById('dashboard-severity-' + s);
         if (el) el.textContent = '0';
         const barEl = document.getElementById('dashboard-bar-' + s);
         if (barEl) barEl.style.width = '0%';
     });
-    setDashboardOverviewPlaceholder('…');
-    setEl('dashboard-kpi-tools-calls', '…');
-    setEl('dashboard-kpi-success-rate', '…');
+    setDashboardOverviewPlaceholder('...');
+    setEl('dashboard-kpi-tools-calls', '...');
+    setEl('dashboard-kpi-success-rate', '...');
     var chartPlaceholder = document.getElementById('dashboard-tools-pie-placeholder');
-    if (chartPlaceholder) { chartPlaceholder.style.removeProperty('display'); chartPlaceholder.textContent = (typeof window.t === 'function' ? window.t('common.loading') : 'Loading…'); }
+    if (chartPlaceholder) { chartPlaceholder.style.removeProperty('display'); chartPlaceholder.textContent = (typeof window.t === 'function' ? window.t('common.loading') : 'Loading...'); }
     var barChartEl = document.getElementById('dashboard-tools-bar-chart');
     if (barChartEl) { barChartEl.style.display = 'none'; barChartEl.innerHTML = ''; }
 
@@ -41,7 +41,7 @@ async function refreshDashboard() {
             apiFetch('/api/skills/stats').then(r => r.ok ? r.json() : null).catch(() => null)
         ]);
 
-        // runningintask：Agent looptask + batchqueue「executing」countunifiedstatistics，avoidtop KPI andrunningoverviewnotconsistent
+        // runningintask:Agent looptask + batchqueue"executing"countunifiedstatistics,avoidtop KPI andrunningoverviewnotconsistent
         let agentRunningCount = null;
         if (tasksRes && Array.isArray(tasksRes.tasks)) {
             agentRunningCount = tasksRes.tasks.length;
@@ -81,7 +81,7 @@ async function refreshDashboard() {
             });
         }
 
- // batchtaskqueue：bystatusstatistics（optimized；running andon batchRunningCount consistent）
+ // batchtaskqueue:bystatusstatistics(optimized;running andon batchRunningCount consistent)
         if (batchRes && Array.isArray(batchRes.queues)) {
             const queues = batchRes.queues;
             let pending = 0, running = batchRunningCount, done = 0;
@@ -120,7 +120,7 @@ async function refreshDashboard() {
             updateProgressBar('dashboard-batch-progress-done', '0');
         }
 
-        // tool call：monitor/stats as { toolName: { totalCalls, successCalls, failedCalls, ... } }（optimized）
+        // tool call:monitor/stats as { toolName: { totalCalls, successCalls, failedCalls, ... } }(optimized)
         if (monitorRes && typeof monitorRes === 'object') {
             const names = Object.keys(monitorRes);
             let totalCalls = 0, totalSuccess = 0, totalFailed = 0;
@@ -149,13 +149,13 @@ async function refreshDashboard() {
             renderDashboardToolsBar(null);
         }
 
-        // knowledge：{ enabled, total_categories, total_items, ... }（optimized）
+        // knowledge:{ enabled, total_categories, total_items, ... }(optimized)
         const knowledgeItemsEl = document.getElementById('dashboard-knowledge-items');
         const knowledgeCategoriesEl = document.getElementById('dashboard-knowledge-categories');
         const knowledgeStatusEl = document.getElementById('dashboard-knowledge-status');
         if (knowledgeRes && typeof knowledgeRes === 'object') {
             if (knowledgeRes.enabled === false) {
-                // feature not enabled：usestatustabdisplay，valuemaintainas "-"
+                // feature not enabled:usestatustabdisplay,valuemaintainas "-"
                 if (knowledgeStatusEl) knowledgeStatusEl.textContent = (typeof window.t === 'function' ? window.t('dashboard.notEnabled') : 'Not enabled');
                 if (knowledgeItemsEl) knowledgeItemsEl.textContent = '-';
                 if (knowledgeCategoriesEl) knowledgeCategoriesEl.textContent = '-';
@@ -179,7 +179,7 @@ async function refreshDashboard() {
             if (knowledgeStatusEl) knowledgeStatusEl.textContent = '-';
         }
 
-        // Skills：{ total_skills, total_calls, ... }（optimized）
+        // Skills:{ total_skills, total_calls, ... }(optimized)
         if (skillsRes && typeof skillsRes === 'object') {
             const totalSkills = skillsRes.total_skills ?? 0;
             const totalCalls = skillsRes.total_calls ?? 0;
@@ -237,7 +237,7 @@ function setDashboardOverviewPlaceholder(t) {
     updateProgressBar('dashboard-batch-progress-done', '0');
 }
 
-// format，addthousandsseparator
+// format,addthousandsseparator
 function formatNumber(num) {
     if (typeof num !== 'number' || isNaN(num)) return '-';
     if (num === 0) return '0';
@@ -253,7 +253,7 @@ function updateProgressBar(id, percentage) {
     }
 }
 
-// Top 30 toollinetimebar chartcolor（30 notrepeat，soft、distinguish）
+// Top 30 toollinetimebar chartcolor(30 notrepeat,soft,distinguish)
 var DASHBOARD_BAR_COLORS = [
     '#93c5fd', '#a78bfa', '#6ee7b7', '#fde047', '#fda4af',
     '#7dd3fc', '#a5b4fc', '#5eead4', '#fdba74', '#e9d5ff',
@@ -304,7 +304,7 @@ function renderDashboardToolsBar(monitorRes) {
     var html = '';
     entries.forEach(function (e, i) {
         var pct = maxCalls > 0 ? (e.totalCalls / maxCalls) * 100 : 0;
-        var label = e.name.length > 12 ? e.name.slice(0, 10) + '…' : e.name;
+        var label = e.name.length > 12 ? e.name.slice(0, 10) + '...' : e.name;
         var color = DASHBOARD_BAR_COLORS[i % DASHBOARD_BAR_COLORS.length];
         var fullName = esc(e.name);
         html += '<div class="dashboard-tools-bar-item" data-tooltip="' + fullName + '">';

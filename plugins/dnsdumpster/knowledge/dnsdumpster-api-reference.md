@@ -32,8 +32,8 @@ Returns comprehensive DNS data for a domain: A records (hosts + IPs), MX, NS, TX
 CNAME, SOA records, ASN info, netblocks, banners/technology data.
 
 Parameters:
-- `page` (int) — page number for paginated results (Plus tier only)
-- `map` (int, 1) — include base64-encoded domain network map (Plus tier only)
+- `page` (int) - page number for paginated results (Plus tier only)
+- `map` (int, 1) - include base64-encoded domain network map (Plus tier only)
 
 Response (JSON):
 ```json
@@ -141,7 +141,7 @@ Returns WHOIS data in plain text.
 | 401 | Invalid API key |
 | 403 | Access denied (insufficient tier) |
 | 404 | Domain or resource not found |
-| 429 | Rate limited — wait and retry |
+| 429 | Rate limited - wait and retry |
 
 Error response format (DNSdumpster):
 ```json

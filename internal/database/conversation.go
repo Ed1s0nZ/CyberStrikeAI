@@ -36,7 +36,7 @@ func (db *DB) CreateConversation(title string) (*Conversation, error) {
 	return db.CreateConversationWithWebshell("", title)
 }
 
-// CreateConversationWithWebshell conversation， WebShell connection ID（conversation）
+// CreateConversationWithWebshell conversation, WebShell connection ID(conversation)
 func (db *DB) CreateConversationWithWebshell(webshellConnectionID, title string) (*Conversation, error) {
 	id := uuid.New().String()
 	now := time.Now()
@@ -65,7 +65,7 @@ func (db *DB) CreateConversationWithWebshell(webshellConnectionID, title string)
 	}, nil
 }
 
-// GetConversationByWebshellConnectionID WebShell connection ID conversation（ AI ）
+// GetConversationByWebshellConnectionID WebShell connection ID conversation( AI )
 func (db *DB) GetConversationByWebshellConnectionID(connectionID string) (*Conversation, error) {
 	if connectionID == "" {
 		return nil, fmt.Errorf("connectionID is empty")
@@ -104,7 +104,7 @@ func (db *DB) GetConversationByWebshellConnectionID(connectionID string) (*Conve
 	}
 	conv.Messages = messages
 
-	// loadprocess detailsmessage（ GetConversation ，）
+	// loadprocess detailsmessage( GetConversation ,)
 	processDetailsMap, err := db.GetProcessDetailsByConversation(conv.ID)
 	if err != nil {
 		db.logger.Warn("loadprocess details", zap.Error(err))
@@ -137,14 +137,14 @@ func (db *DB) GetConversationByWebshellConnectionID(connectionID string) (*Conve
 	return &conv, nil
 }
 
-// WebShellConversationItem list，message
+// WebShellConversationItem list,message
 type WebShellConversationItem struct {
 	ID        string    `json:"id"`
 	Title     string    `json:"title"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-// ListConversationsByWebshellConnectionID WebShell conversation（），
+// ListConversationsByWebshellConnectionID WebShell conversation(),
 func (db *DB) ListConversationsByWebshellConnectionID(connectionID string) ([]WebShellConversationItem, error) {
 	if connectionID == "" {
 		return nil, nil
@@ -220,7 +220,7 @@ func (db *DB) GetConversation(id string) (*Conversation, error) {
 	}
 	conv.Messages = messages
 
-	// loadprocess details（messageID）
+	// loadprocess details(messageID)
 	processDetailsMap, err := db.GetProcessDetailsByConversation(id)
 	if err != nil {
 		db.logger.Warn("loadprocess details", zap.Error(err))
@@ -230,7 +230,7 @@ func (db *DB) GetConversation(id string) (*Conversation, error) {
 	// process detailsmessage
 	for i := range conv.Messages {
 		if details, ok := processDetailsMap[conv.Messages[i].ID]; ok {
-			// ProcessDetailJSONformat，
+			// ProcessDetailJSONformat,
 			detailsJSON := make([]map[string]interface{}, len(details))
 			for j, detail := range details {
 				var data interface{}
@@ -256,8 +256,8 @@ func (db *DB) GetConversation(id string) (*Conversation, error) {
 	return &conv, nil
 }
 
-// GetConversationLite conversation（lite version）： messages，load process_details。
-// switch，process details。
+// GetConversationLite conversation(lite version): messages,load process_details.
+// switch,process details.
 func (db *DB) GetConversationLite(id string) (*Conversation, error) {
 	var conv Conversation
 	var createdAt, updatedAt string
@@ -294,7 +294,7 @@ func (db *DB) GetConversationLite(id string) (*Conversation, error) {
 
 	conv.Pinned = pinned != 0
 
-	// loadmessage（load process_details）
+	// loadmessage(load process_details)
 	messages, err := db.GetMessages(id)
 	if err != nil {
 		return nil, fmt.Errorf("loadmessage: %w", err)
@@ -309,9 +309,9 @@ func (db *DB) ListConversations(limit, offset int, search string) ([]*Conversati
 	var err error
 	
 	if search != "" {
-		// use LIKE for fuzzy search，titlemessage
+		// use LIKE for fuzzy search,titlemessage
 		searchPattern := "%" + search + "%"
-		// use DISTINCT to avoid duplicates，conversationmessagematch
+		// use DISTINCT to avoid duplicates,conversationmessagematch
 		rows, err = db.Query(
 			`SELECT DISTINCT c.id, c.title, COALESCE(c.pinned, 0), c.created_at, c.updated_at 
 			 FROM conversations c
@@ -371,7 +371,7 @@ func (db *DB) ListConversations(limit, offset int, search string) ([]*Conversati
 
 // UpdateConversationTitle conversationtitle
 func (db *DB) UpdateConversationTitle(id, title string) error {
-	// note: do not update updated_at，conversation
+	// note: do not update updated_at,conversation
 	_, err := db.Exec(
 		"UPDATE conversations SET title = ? WHERE id = ?",
 		title, id,
@@ -395,23 +395,23 @@ func (db *DB) UpdateConversationTime(id string) error {
 }
 
 // DeleteConversation deleteconversation
-// since database foreign key constraints are set to ON DELETE CASCADE，deleteconversationdelete：
-// - messages（message）
-// - process_details（process details）
-// - attack_chain_nodes（attack chain）
-// - attack_chain_edges（attack chain）
-// - vulnerabilities（）
-// - conversation_group_mappings（）
-// ：knowledge_retrieval_logs ON DELETE SET NULL，record conversation_id NULL
+// since database foreign key constraints are set to ON DELETE CASCADE,deleteconversationdelete:
+// - messages(message)
+// - process_details(process details)
+// - attack_chain_nodes(attack chain)
+// - attack_chain_edges(attack chain)
+// - vulnerabilities()
+// - conversation_group_mappings()
+// :knowledge_retrieval_logs ON DELETE SET NULL,record conversation_id NULL
 func (db *DB) DeleteConversation(id string) error {
-	// explicitly delete knowledge retrieval logs（SET NULL，，delete）
+	// explicitly delete knowledge retrieval logs(SET NULL,,delete)
 	_, err := db.Exec("DELETE FROM knowledge_retrieval_logs WHERE conversation_id = ?", id)
 	if err != nil {
 		db.logger.Warn("failed to delete knowledge retrieval logs", zap.String("conversationId", id), zap.Error(err))
-		// returnserror，continuedeleteconversation
+		// returnserror,continuedeleteconversation
 	}
 
-	// deleteconversation（CASCADEdelete）
+	// deleteconversation(CASCADEdelete)
 	_, err = db.Exec("DELETE FROM conversations WHERE id = ?", id)
 	if err != nil {
 		return fmt.Errorf("deleteconversation: %w", err)
@@ -612,7 +612,7 @@ func (db *DB) GetProcessDetails(messageID string) ([]ProcessDetail, error) {
 	return details, nil
 }
 
-// GetProcessDetailsByConversation conversationprocess details（message）
+// GetProcessDetailsByConversation conversationprocess details(message)
 func (db *DB) GetProcessDetailsByConversation(conversationID string) (map[string][]ProcessDetail, error) {
 	rows, err := db.Query(
 		"SELECT id, message_id, conversation_id, event_type, message, data, created_at FROM process_details WHERE conversation_id = ? ORDER BY created_at ASC",

@@ -111,9 +111,9 @@ args:
     if sent == 0:
         sys.stderr.write("No requests were sent; please check the parameter configuration.\n")
 enabled: true
-short_description: “Simple Intruder (sniper) fuzzing tool”
+short_description: "Simple Intruder (sniper) fuzzing tool"
 description: |
-  Lightweight HTTP “sniper” mode fuzzer; replaces each parameter with payloads one by one and records responses.
+  Lightweight HTTP "sniper" mode fuzzer; replaces each parameter with payloads one by one and records responses.
 parameters:
   - name: "url"
     type: "string"

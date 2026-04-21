@@ -2,9 +2,9 @@ name: "censys_search"
 command: "python3"
 args: ["{{PLUGIN_DIR}}/scripts/censys_search.py"]
 enabled: true
-short_description: "Censys Platform API v3 — host/cert/web search, aggregation, threat hunting. Requires PAT token."
+short_description: "Censys Platform API v3 - host/cert/web search, aggregation, threat hunting. Requires PAT token."
 description: |
-  Censys Platform API v3 — internet-wide host, certificate, and web property search.
+  Censys Platform API v3 - internet-wide host, certificate, and web property search.
 
   **IMPORTANT: Censys migrated to Platform API v3 in 2025.**
   - Old API ID/Secret NO LONGER WORKS
@@ -14,38 +14,38 @@ description: |
   - Configure in Settings → Plugins → Censys → CENSYS_PAT
 
   **Commands:**
-  - `validate` — check token validity and credit balance (free)
+  - `validate` - check token validity and credit balance (free)
 
   **Search (1 credit per query):**
-  - resource_type=`host` (default) — search internet hosts
-  - resource_type=`certificate` — search TLS certificates
-  - resource_type=`aggregate` — aggregate results by field (set agg_field)
+  - resource_type=`host` (default) - search internet hosts
+  - resource_type=`certificate` - search TLS certificates
+  - resource_type=`aggregate` - aggregate results by field (set agg_field)
 
   **Free lookups (no credits):**
-  - resource_type=`lookup` + query=IP — detailed host info
-  - resource_type=`names` + query=IP — DNS names for an IP
-  - resource_type=`cert` + query=SHA256 — certificate details
-  - resource_type=`web` + query=hostname — web property info
+  - resource_type=`lookup` + query=IP - detailed host info
+  - resource_type=`names` + query=IP - DNS names for an IP
+  - resource_type=`cert` + query=SHA256 - certificate details
+  - resource_type=`web` + query=hostname - web property info
 
   **Host search query examples:**
-  - `port: 22` — all hosts with SSH
-  - `port: 443 AND location.country: "Ukraine"` — HTTPS hosts in UA
-  - `services.http.response.html_title: "Dashboard"` — web dashboards
-  - `services.software.product: "OpenSSH" AND services.software.version: "7.*"` — outdated SSH
-  - `ip: 1.2.3.0/24` — CIDR range
-  - `autonomous_system.name: "HETZNER"` — hosts by ASN
-  - `services.tls.certificate.names: "*.example.com"` — TLS cert names
-  - `labels: "c2"` — known C2 infrastructure
-  - `labels: "self-signed"` — self-signed certs
-  - `services.http.response.status_code: 200 AND services.http.response.headers.server: "Apache*"` — Apache servers
+  - `port: 22` - all hosts with SSH
+  - `port: 443 AND location.country: "Ukraine"` - HTTPS hosts in UA
+  - `services.http.response.html_title: "Dashboard"` - web dashboards
+  - `services.software.product: "OpenSSH" AND services.software.version: "7.*"` - outdated SSH
+  - `ip: 1.2.3.0/24` - CIDR range
+  - `autonomous_system.name: "HETZNER"` - hosts by ASN
+  - `services.tls.certificate.names: "*.example.com"` - TLS cert names
+  - `labels: "c2"` - known C2 infrastructure
+  - `labels: "self-signed"` - self-signed certs
+  - `services.http.response.status_code: 200 AND services.http.response.headers.server: "Apache*"` - Apache servers
 
   **Certificate search:**
-  - `names: "*.example.com"` — certs by name
-  - `issuer.organization: "Let's Encrypt"` — by issuer
+  - `names: "*.example.com"` - certs by name
+  - `issuer.organization: "Let's Encrypt"` - by issuer
 
   **Aggregation examples:**
-  - query=`port: 443` resource_type=`aggregate` agg_field=`autonomous_system.name` — top ASNs
-  - query=`services.software.product: "nginx"` resource_type=`aggregate` agg_field=`location.country` — nginx by country
+  - query=`port: 443` resource_type=`aggregate` agg_field=`autonomous_system.name` - top ASNs
+  - query=`services.software.product: "nginx"` resource_type=`aggregate` agg_field=`location.country` - nginx by country
 
   **Boolean operators:** AND, OR, NOT (must be uppercase)
   **Wildcards:** `*` at end of strings
@@ -71,13 +71,13 @@ parameters:
     type: "string"
     description: |
       Resource type (default "host"):
-      - host — search internet hosts (1 credit)
-      - certificate — search TLS certs (1 credit)
-      - aggregate — aggregate by field (1 credit, set agg_field)
-      - lookup — free host detail by IP
-      - names — free DNS names for IP
-      - cert — free cert detail by SHA256
-      - web — free web property by hostname
+      - host - search internet hosts (1 credit)
+      - certificate - search TLS certs (1 credit)
+      - aggregate - aggregate by field (1 credit, set agg_field)
+      - lookup - free host detail by IP
+      - names - free DNS names for IP
+      - cert - free cert detail by SHA256
+      - web - free web property by hostname
     required: false
     position: 1
     format: "positional"

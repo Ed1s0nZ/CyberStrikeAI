@@ -6,13 +6,13 @@ Censys maintains an internet-wide scan database updated daily, covering every pu
 
 ## When to Use Censys
 
-- **Attack surface discovery** — find all internet-facing hosts for a target org
-- **Infrastructure mapping** — identify hosting providers, ASNs, IP ranges
-- **Certificate transparency** — find all TLS certs issued for a domain (including subdomains)
-- **Service fingerprinting** — identify specific software versions across IP ranges
-- **Exposed service detection** — find databases, admin panels, APIs without auth
-- **C2 hunting** — identify known C2 infrastructure
-- **Pre-nmap intelligence** — know what ports/services to expect before active scanning
+- **Attack surface discovery** - find all internet-facing hosts for a target org
+- **Infrastructure mapping** - identify hosting providers, ASNs, IP ranges
+- **Certificate transparency** - find all TLS certs issued for a domain (including subdomains)
+- **Service fingerprinting** - identify specific software versions across IP ranges
+- **Exposed service detection** - find databases, admin panels, APIs without auth
+- **C2 hunting** - identify known C2 infrastructure
+- **Pre-nmap intelligence** - know what ports/services to expect before active scanning
 
 ## Quick Start
 

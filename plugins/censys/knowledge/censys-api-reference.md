@@ -2,7 +2,7 @@
 
 ## Migration Notice
 Censys migrated from v1/v2 (search.censys.io) to Platform API v3 (api.platform.censys.io) in 2025.
-- Old: HTTP Basic auth with API ID + Secret — DEPRECATED
+- Old: HTTP Basic auth with API ID + Secret - DEPRECATED
 - New: Bearer token (Personal Access Token / PAT)
 - Generate PAT: https://accounts.censys.io/settings/personal-access-tokens
 

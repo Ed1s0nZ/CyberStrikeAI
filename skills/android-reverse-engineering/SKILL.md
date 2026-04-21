@@ -1,6 +1,6 @@
 ---
 name: android-reverse-engineering
-description: Deep Android APK/DEX reverse engineering — decompilation, API extraction, call flow tracing, Ghidra analysis, and dynamic testing with Cuttlefish VM
+description: Deep Android APK/DEX reverse engineering - decompilation, API extraction, call flow tracing, Ghidra analysis, and dynamic testing with Cuttlefish VM
 version: 1.0.0
 ---
 
@@ -25,16 +25,16 @@ bash skills/android-reverse-engineering/scripts/install-dep.sh dex2jar
 ```
 
 ### Required Tools
-- **Java JDK 17+** — runtime for all decompilers and Ghidra
-- **jadx** — primary DEX-to-Java decompiler (handles APK/AAR/JAR natively)
+- **Java JDK 17+** - runtime for all decompilers and Ghidra
+- **jadx** - primary DEX-to-Java decompiler (handles APK/AAR/JAR natively)
 
 ### Recommended Tools
-- **Fernflower/Vineflower** — alternative decompiler (better on some obfuscated code)
-- **dex2jar** — DEX-to-JAR converter (needed for Fernflower on APK files)
-- **apktool** — resource decoder (layouts, strings, assets)
-- **Ghidra Headless MCP** — deep binary analysis (native code, .so files, complex DEX)
-- **Cuttlefish VM** — Android VM for dynamic analysis
-- **Frida** — dynamic instrumentation
+- **Fernflower/Vineflower** - alternative decompiler (better on some obfuscated code)
+- **dex2jar** - DEX-to-JAR converter (needed for Fernflower on APK files)
+- **apktool** - resource decoder (layouts, strings, assets)
+- **Ghidra Headless MCP** - deep binary analysis (native code, .so files, complex DEX)
+- **Cuttlefish VM** - Android VM for dynamic analysis
+- **Frida** - dynamic instrumentation
 
 ## Phase 2: Decompilation
 
@@ -103,26 +103,26 @@ decomp.function session_id="..." name="Java_com_target_NativeLib_decrypt"
 Read the manifest to identify entry points:
 ```
 # Key elements to find:
-- <activity> — UI screens, especially android:exported="true" and intent-filters
-- <service> — background services (data sync, push notifications)
-- <receiver> — broadcast receivers (triggers, events)
-- <provider> — content providers (data access)
-- <uses-permission> — required permissions (INTERNET, READ_CONTACTS, CAMERA, etc.)
-- <application android:name="..."> — Application class (initialization, DI setup)
-- android:debuggable="true" — debug build leaked
-- android:allowBackup="true" — backup vulnerability
-- android:networkSecurityConfig — certificate pinning config
+- <activity> - UI screens, especially android:exported="true" and intent-filters
+- <service> - background services (data sync, push notifications)
+- <receiver> - broadcast receivers (triggers, events)
+- <provider> - content providers (data access)
+- <uses-permission> - required permissions (INTERNET, READ_CONTACTS, CAMERA, etc.)
+- <application android:name="..."> - Application class (initialization, DI setup)
+- android:debuggable="true" - debug build leaked
+- android:allowBackup="true" - backup vulnerability
+- android:networkSecurityConfig - certificate pinning config
 ```
 
 ### Package Structure Survey
 Look for these packages in the decompiled source:
-- `api/`, `network/`, `service/` — HTTP clients and API definitions
-- `data/`, `repository/`, `db/` — data layer, local storage
-- `crypto/`, `security/`, `encryption/` — cryptographic operations
-- `auth/`, `login/` — authentication logic
-- `di/`, `module/`, `inject/` — dependency injection (Dagger/Hilt)
-- `util/`, `helper/`, `common/` — utility classes (often contain crypto helpers)
-- `model/`, `entity/`, `dto/` — data models (reveal API structure)
+- `api/`, `network/`, `service/` - HTTP clients and API definitions
+- `data/`, `repository/`, `db/` - data layer, local storage
+- `crypto/`, `security/`, `encryption/` - cryptographic operations
+- `auth/`, `login/` - authentication logic
+- `di/`, `module/`, `inject/` - dependency injection (Dagger/Hilt)
+- `util/`, `helper/`, `common/` - utility classes (often contain crypto helpers)
+- `model/`, `entity/`, `dto/` - data models (reveal API structure)
 
 ### Architecture Pattern Identification
 - **MVP**: Presenter classes, Contract interfaces
@@ -328,8 +328,8 @@ The most effective approach combines both:
 ```
 STATIC ANALYSIS (understand the code):
 1. Decompile APK with jadx (--deobf)
-2. Read AndroidManifest.xml — find entry points, permissions
-3. Find API services — grep for Retrofit/OkHttp patterns
+2. Read AndroidManifest.xml - find entry points, permissions
+3. Find API services - grep for Retrofit/OkHttp patterns
 4. Decompile crypto functions with Ghidra Headless MCP
 5. Map the call flow: UI → ViewModel → Repository → API → HTTP
 
@@ -357,7 +357,7 @@ As soon as an APK is received or uploaded, register it with the File Manager:
 register_file
   file_path: "/path/to/target.apk"
   file_type: "apk"
-  summary: "Target Android APK — <app name>, <package name>, <version if known>"
+  summary: "Target Android APK - <app name>, <package name>, <version if known>"
   handle_plan: "1. Decompile (jadx + Ghidra) 2. Analyze structure 3. Extract APIs 4. Dynamic test on Cuttlefish"
   status: "processing"
 ```
@@ -368,7 +368,7 @@ After decompilation, register the output:
 register_file
   file_path: "/tmp/decompiled/"
   file_type: "directory"
-  summary: "Decompiled source of <package_name> — jadx with deobfuscation"
+  summary: "Decompiled source of <package_name> - jadx with deobfuscation"
   status: "analyzed"
 
 # Log the decompilation step
@@ -378,7 +378,7 @@ append_file_log
 ```
 
 ### Store Every Finding
-As you discover API endpoints, keys, crypto functions, vulnerabilities — record them immediately:
+As you discover API endpoints, keys, crypto functions, vulnerabilities - record them immediately:
 ```
 # After finding API endpoints
 append_file_findings
@@ -388,7 +388,7 @@ append_file_findings
 # After Ghidra analysis
 append_file_findings
   file_id: "<apk_file_id>"
-  findings: "Native lib analysis (libnative.so):\n- JNI_OnLoad at 0x1234 — registers 5 native methods\n- decrypt_payload at 0x5678 — AES-256-CBC, key derived from device ID\n- anti_debug_check at 0x9abc — checks TracerPid, calls ptrace"
+  findings: "Native lib analysis (libnative.so):\n- JNI_OnLoad at 0x1234 - registers 5 native methods\n- decrypt_payload at 0x5678 - AES-256-CBC, key derived from device ID\n- anti_debug_check at 0x9abc - checks TracerPid, calls ptrace"
 
 # After dynamic analysis
 append_file_findings

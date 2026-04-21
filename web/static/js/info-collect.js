@@ -1,4 +1,4 @@
-// Infocollectpage（FOFA）
+// Infocollectpage(FOFA)
 function _t(key, opts) {
     return typeof window.t === 'function' ? window.t(key, opts) : key;
 }
@@ -13,12 +13,12 @@ const infoCollectState = {
     tableBound: false
 };
 
-// AI parse（naturallanguage -> FOFA）status
+// AI parse(naturallanguage -> FOFA)status
 let fofaParseAbortController = null;
 let fofaParseSlowTimer = null;
 let fofaParseToastHandle = null;
 
-// HTMLescape（ifnot defined）
+// HTMLescape(ifnot defined)
 if (typeof escapeHtml === 'undefined') {
     function escapeHtml(text) {
         if (text == null) return '';
@@ -102,7 +102,7 @@ function initInfoCollectPage() {
         if (typeof saved.full === 'boolean') els.full.checked = saved.full;
     }
 
- // bind Enter fastQuery（at query inuse Ctrl/Cmd+Enter）
+ // bind Enter fastQuery(at query inuse Ctrl/Cmd+Enter)
     els.query.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
             e.preventDefault();
@@ -110,7 +110,7 @@ function initInfoCollectPage() {
         }
     });
 
-    // naturallanguageinput：Ctrl/Cmd+Enter triggerparse
+    // naturallanguageinput:Ctrl/Cmd+Enter triggerparse
     if (els.nl) {
         els.nl.addEventListener('keydown', (e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -120,7 +120,7 @@ function initInfoCollectPage() {
         });
     }
 
- // textarea：bycontentautoadd（avoiddefaultwhitespaceline）
+ // textarea:bycontentautoadd(avoiddefaultwhitespaceline)
     const autoGrowTextarea = (el) => {
         if (!el) return;
         try {
@@ -140,7 +140,7 @@ function initInfoCollectPage() {
         autoGrowTextarea(els.nl);
     }, 0);
 
- // bindtableevent（event，onlybindtime）
+ // bindtableevent(event,onlybindtime)
     bindFofaTableEvents();
     updateSelectedMeta();
 
@@ -243,20 +243,20 @@ async function parseFofaNaturalLanguage() {
         return;
     }
 
- // timeclick：Cancelenterlinein's parse（avoid“toas/Failed”）
+ // timeclick:Cancelenterlinein's parse(avoid"toas/Failed")
     if (fofaParseAbortController) {
         try { fofaParseAbortController.abort(); } catch (e) { /* ignore */ }
         return;
     }
 
- // firstcreate controller，avoidfast's repeatclicktriggerConcurrencyrequest
+ // firstcreate controller,avoidfast's repeatclicktriggerConcurrencyrequest
     fofaParseAbortController = new AbortController();
     setFofaParseLoading(true, _t('infoCollect.parsePending'));
 
- // hint：torequestcomplete/Cancel/Failedonly 
+ // hint:torequestcomplete/Cancel/Failedonly 
     fofaParseToastHandle = showInlineToast(_t('infoCollect.parsePendingClickCancel'), { duration: 0, id: 'fofa-parse-pending' });
 
- // ifexceedthroughsmalltimestillreturn，then“stillatenterlinein”，fallasFailed's 
+ // ifexceedthroughsmalltimestillreturn,then"stillatenterlinein",fallasFailed's 
     fofaParseSlowTimer = setTimeout(() => {
         const status = document.getElementById('fofa-nl-status');
         if (status) {
@@ -279,7 +279,7 @@ async function parseFofaNaturalLanguage() {
         showFofaParseModal(text, result);
         showInlineToast(_t('infoCollect.parseDone'));
     } catch (e) {
-        // AbortController Cancel：nottreated asFailed
+        // AbortController Cancel:nottreated asFailed
         if (e && (e.name === 'AbortError' || String(e).includes('AbortError'))) {
             showInlineToast(_t('infoCollect.parseCancelled'));
             return;
@@ -417,7 +417,7 @@ function showFofaParseModal(nlText, parsed) {
             els.query.value = q;
             try { els.query.focus(); } catch (e) { /* ignore */ }
         }
- // writeformcache（andhas“directlyQuery”consistent）
+ // writeformcache(andhas"directlyQuery"consistent)
         saveFofaFormToStorage({
             query: q,
             size: parseInt(els.size?.value, 10) || 100,
@@ -483,11 +483,11 @@ function renderFofaResults(payload) {
         results
     };
 
- // cleanupselect（avoidfield/resultchange）
+ // cleanupselect(avoidfield/resultchange)
     infoCollectState.selectedRowIndexes.clear();
     updateSelectedMeta();
 
- // hidefield：onlypreservecurrent fields inexist's 
+ // hidefield:onlypreservecurrent fields inexist's 
     const allowed = new Set(fields);
     infoCollectState.hiddenFields.forEach(f => {
         if (!allowed.has(f)) infoCollectState.hiddenFields.delete(f);
@@ -506,7 +506,7 @@ function renderFofaResults(payload) {
     // columnpanel
     renderFofaColumnsPanel(fields, visibleFields);
 
- // table header（：column；：Actionscolumnfixed）
+ // table header(:column;:Actionscolumnfixed)
     const headerCells = [
         '<th class="info-collect-col-select"><input type="checkbox" id="fofa-select-all" title="' + escapeHtml(_t('infoCollect.selectAll')) + '"/></th>',
         ...visibleFields.map(f => `<th>${escapeHtml(String(f))}</th>`),
@@ -532,7 +532,7 @@ function renderFofaResults(payload) {
         const cellsHtml = visibleFields.map(f => {
             const val = safeRow[f];
             const text = val == null ? '' : String(val);
- // host field：as much asrenderascanclicklink
+ // host field:as much asrenderascanclicklink
             if (f === 'host') {
                 const href = normalizeHttpLink(text);
                 if (href) {
@@ -571,7 +571,7 @@ function renderFofaResults(payload) {
 }
 
 function inferTargetFromRow(row, fields) {
-    // prefer host（FOFA commonreturn http(s)://...）
+    // prefer host(FOFA commonreturn http(s)://...)
     const host = row.host != null ? String(row.host).trim() : '';
     if (host) return host;
 
@@ -584,7 +584,7 @@ function inferTargetFromRow(row, fields) {
     if (!base) return '';
 
     if (port) {
- // onlydolightweight：443 -> https, 80 -> http，itsnotline scheme
+ // onlydolightweight:443 -> https, 80 -> http,itsnotline scheme
         const p = parseInt(port, 10);
         if (!isNaN(p) && (p === 80 || p === 443)) {
             const scheme = p === 443 ? 'https' : 'http';
@@ -603,7 +603,7 @@ function normalizeHttpLink(raw) {
     const v = (raw || '').trim();
     if (!v) return '';
     if (v.startsWith('http://') || v.startsWith('https://')) return v;
- // somethese host possiblyis domain or ip:port；herenotline，avoid
+ // somethese host possiblyis domain or ip:port;herenotline,avoid
     return '';
 }
 
@@ -629,7 +629,7 @@ function copyFofaTargetEncoded(encodedTarget) {
     }
 }
 
-// showInlineToast('xxx')；alsosupport showInlineToast('xxx', { duration: 0, id: '...' })
+// showInlineToast('xxx');alsosupport showInlineToast('xxx', { duration: 0, id: '...' })
 function showInlineToast(text, options) {
     const opts = options && typeof options === 'object' ? options : {};
     const duration = typeof opts.duration === 'number' ? opts.duration : 1200;
@@ -719,7 +719,7 @@ function scanFofaRow(encodedRowJson, clickEvent) {
         return;
     }
 
- // switchtoconversationpagesendmessage（eachtimeclickall newConversation，avoidtohistoryConversation）
+ // switchtoconversationpagesendmessage(eachtimeclickall newConversation,avoidtohistoryConversation)
     if (typeof switchPage === 'function') {
         switchPage('chat');
     } else {
@@ -730,7 +730,7 @@ function scanFofaRow(encodedRowJson, clickEvent) {
     const autoSend = !!(clickEvent && (clickEvent.ctrlKey || clickEvent.metaKey));
 
     setTimeout(async () => {
- // newConversation：mustwaititscomplete，otherwisewillatafterinput boxclear
+ // newConversation:mustwaititscomplete,otherwisewillatafterinput boxclear
         try {
             if (typeof startNewConversation === 'function') {
                 const maybePromise = startNewConversation();
@@ -745,7 +745,7 @@ function scanFofaRow(encodedRowJson, clickEvent) {
         const input = document.getElementById('chat-input');
         if (input) {
             input.value = message;
-            // triggerautoheightadjust（chat.js iniflisten input）
+            // triggerautoheightadjust(chat.js iniflisten input)
             input.dispatchEvent(new Event('input', { bubbles: true }));
             input.focus();
         }
@@ -766,7 +766,7 @@ function buildScanMessage(target, row, options) {
     const fields = Array.isArray(opts.fields) ? opts.fields : [];
 
     const summary = formatFofaRowSummary(row || {}, fields);
- return `forbelowTargetdoInfocollectandScan：\n${target}\n\nneed：\n1) recognizeservice/andclose\n2) enumopenPortandcommonmanagementin\n3) use httpx//directoryetcmethodfastconfirmaccessible\n4) outputcan's commandand\n\nalreadyInfo（ FOFA thislineAllfield）：\n${summary}`.trim();
+ return `forbelowTargetdoInfocollectandScan:\n${target}\n\nneed:\n1) recognizeservice/andclose\n2) enumopenPortandcommonmanagementin\n3) use httpx//directoryetcmethodfastconfirmaccessible\n4) outputcan's commandand\n\nalreadyInfo( FOFA thislineAllfield):\n${summary}`.trim();
 }
 
 function bindFofaTableEvents() {
@@ -776,7 +776,7 @@ function bindFofaTableEvents() {
     const els = getFofaFormElements();
     if (!els.tbody) return;
 
- // event：select/expand
+ // event:select/expand
     els.tbody.addEventListener('click', (e) => {
         const checkbox = e.target && e.target.classList && e.target.classList.contains('fofa-row-select') ? e.target : null;
         if (checkbox) {
@@ -802,7 +802,7 @@ function bindFofaTableEvents() {
         }
     });
 
- // thead 's select all（because thead willrender，useeventto document）
+ // thead 's select all(because thead willrender,useeventto document)
     document.addEventListener('change', (e) => {
         const t = e.target;
         if (!t || t.id !== 'fofa-select-all') return;
@@ -871,7 +871,7 @@ function toggleFofaColumn(field, visible) {
     if (visible) infoCollectState.hiddenFields.delete(f);
     else infoCollectState.hiddenFields.add(f);
     saveHiddenFieldsToStorage();
-    // re-rendertable（use state incache's  payload）
+    // re-rendertable(use state incache's  payload)
     if (infoCollectState.currentPayload) {
         renderFofaResults(infoCollectState.currentPayload);
     }
@@ -889,7 +889,7 @@ function closeFofaColumnsPanel() {
     if (els.columnsPanel) els.columnsPanel.style.display = 'none';
 }
 
-// clickpanelExternalClose（avoidtabletop）
+// clickpanelExternalClose(avoidtabletop)
 document.addEventListener('click', (e) => {
     const panel = document.getElementById('fofa-columns-panel');
     const btn = e.target && e.target.closest ? e.target.closest('button') : null;
@@ -908,7 +908,7 @@ function showAllFofaColumns() {
 function hideAllFofaColumns() {
     const p = infoCollectState.currentPayload;
     if (!p || !Array.isArray(p.fields)) return;
- // allowhideAll，buttouseminavailable：at leastpreserve host/ip/domain in（if exists）
+ // allowhideAll,buttouseminavailable:at leastpreserve host/ip/domain in(if exists)
     const keep = ['host', 'ip', 'domain'].find(x => p.fields.includes(x));
     infoCollectState.hiddenFields = new Set(p.fields.filter(f => f !== keep));
     saveHiddenFieldsToStorage();
@@ -942,7 +942,7 @@ function exportFofaResults(format) {
     }
 
     if (format === 'xlsx') {
- // use SheetJS generate XLSX（needatpageinin xlsx ）
+ // use SheetJS generate XLSX(needatpageinin xlsx )
         if (typeof XLSX === 'undefined') {
             alert(_t('infoCollect.xlsxNotLoaded'));
             return;
@@ -958,7 +958,7 @@ function exportFofaResults(format) {
         return;
     }
 
- // csv：defaultexportcanfield， UTF-8 BOM tocompatible Excel in
+ // csv:defaultexportcanfield, UTF-8 BOM tocompatible Excel in
     const header = visibleFields;
     const rows = p.results.map(row => {
         const r = row && typeof row === 'object' ? row : {};
@@ -1010,7 +1010,7 @@ async function batchScanSelectedFofaRows() {
             skipped.push(idx + 1);
             return;
         }
- // batchtask：andrecordconsistent，only“thislineAllfield”'s summary（avoidrepeatandexceedlong）
+ // batchtask:andrecordconsistent,only"thislineAllfield"'s summary(avoidrepeatandexceedlong)
         tasks.push(buildScanMessage(target, row || {}, {
             fields
         }));
@@ -1021,9 +1021,9 @@ async function batchScanSelectedFofaRows() {
         return;
     }
 
-    const title = (p.query ? _t('infoCollect.batchScanTitle') + '：' + p.query : _t('infoCollect.batchScanTitle')).slice(0, 80);
+    const title = (p.query ? _t('infoCollect.batchScanTitle') + ':' + p.query : _t('infoCollect.batchScanTitle')).slice(0, 80);
     try {
- // notforceswitchto“Infocollect”role：usecurrentalreadyrole；ifasdefaultthenemptystringtobackenddefault
+ // notforceswitchto"Infocollect"role:usecurrentalreadyrole;ifasdefaultthenemptystringtobackenddefault
         let role = '';
         if (typeof getCurrentRole === 'function') {
             try { role = getCurrentRole() || ''; } catch (e) { /* ignore */ }
@@ -1112,7 +1112,7 @@ function showCellDetailModal(field, fullText) {
     document.addEventListener('keydown', onKey);
 }
 
-// exposetoglobal（for index.html onclick call）
+// exposetoglobal(for index.html onclick call)
 window.initInfoCollectPage = initInfoCollectPage;
 window.resetFofaForm = resetFofaForm;
 window.submitFofaSearch = submitFofaSearch;
@@ -1196,7 +1196,7 @@ var currentReconTab = 'fofa';
 
 function switchReconTab(panelId) {
     currentReconTab = panelId;
-    // Hide all panels (use class, not inline style — CSS uses .active for display)
+    // Hide all panels (use class, not inline style - CSS uses .active for display)
     document.querySelectorAll('.recon-panel').forEach(p => {
         p.classList.remove('active');
         p.removeAttribute('style'); // clear any inline display overrides

@@ -30,8 +30,8 @@ func NewManager(db *sql.DB, basePath string, logger *zap.Logger) *Manager {
 	}
 }
 
-// ScanKnowledgeBase scanknowledge base，update database
-// returnsIDlist（add）
+// ScanKnowledgeBase scanknowledge base,update database
+// returnsIDlist(add)
 func (m *Manager) ScanKnowledgeBase() ([]string, error) {
 	if m.basePath == "" {
 		return nil, fmt.Errorf("knowledge base")
@@ -61,7 +61,7 @@ func (m *Manager) ScanKnowledgeBase() ([]string, error) {
 			return err
 		}
 
-		// first directory name as category（type）
+		// first directory name as category(type)
 		parts := strings.Split(relPath, string(filepath.Separator))
 		category := "uncategorized"
 		if len(parts) > 1 {
@@ -117,7 +117,7 @@ func (m *Manager) ScanKnowledgeBase() ([]string, error) {
 				// content-updated items need re-indexing
 				itemsToIndex = append(itemsToIndex, existingID)
 			} else {
-				m.logger.Debug("，skip", zap.String("id", existingID), zap.String("title", title))
+				m.logger.Debug(",skip", zap.String("id", existingID), zap.String("title", title))
 			}
 		} else {
 			return fmt.Errorf("failed to query knowledge items: %w", err)
@@ -133,7 +133,7 @@ func (m *Manager) ScanKnowledgeBase() ([]string, error) {
 	return itemsToIndex, nil
 }
 
-// GetCategories get all categories（type）
+// GetCategories get all categories(type)
 func (m *Manager) GetCategories() ([]string, error) {
 	rows, err := m.db.Query("SELECT DISTINCT category FROM knowledge_base_items ORDER BY category")
 	if err != nil {
@@ -172,11 +172,11 @@ func (m *Manager) GetStats() (int, int, error) {
 	return totalCategories, totalItems, nil
 }
 
-// GetCategoriesWithItems paginate by categoryget knowledge item（）
-// limit: categories per page（0 means unlimited）
-// offset: offset（offset by category）
+// GetCategoriesWithItems paginate by categoryget knowledge item()
+// limit: categories per page(0 means unlimited)
+// offset: offset(offset by category)
 func (m *Manager) GetCategoriesWithItems(limit, offset int) ([]*CategoryWithItems, int, error) {
-	// get all categories（with count statistics）
+	// get all categories(with count statistics)
 	rows, err := m.db.Query(`
 		SELECT category, COUNT(*) as item_count 
 		FROM knowledge_base_items 
@@ -204,7 +204,7 @@ func (m *Manager) GetCategoriesWithItems(limit, offset int) ([]*CategoryWithItem
 
 	totalCategories := len(allCategories)
 
-	// apply pagination（paginate by category）
+	// apply pagination(paginate by category)
 	var paginatedCategories []categoryInfo
 	if limit > 0 {
 		start := offset
@@ -221,7 +221,7 @@ func (m *Manager) GetCategoriesWithItems(limit, offset int) ([]*CategoryWithItem
 		paginatedCategories = allCategories
 	}
 
-	// get knowledge items for each category（returns，）
+	// get knowledge items for each category(returns,)
 	result := make([]*CategoryWithItems, 0, len(paginatedCategories))
 	for _, catInfo := range paginatedCategories {
 		// get all knowledge items under this category
@@ -240,16 +240,16 @@ func (m *Manager) GetCategoriesWithItems(limit, offset int) ([]*CategoryWithItem
 	return result, totalCategories, nil
 }
 
-// GetItems get knowledge itemlist（，）
+// GetItems get knowledge itemlist(,)
 func (m *Manager) GetItems(category string) ([]*KnowledgeItem, error) {
 	return m.GetItemsWithOptions(category, 0, 0, true)
 }
 
-// GetItemsWithOptions get knowledge itemlist（）
-// category: category filter（empty string means all categories）
-// limit: items per page（0 means unlimited）
+// GetItemsWithOptions get knowledge itemlist()
+// category: category filter(empty string means all categories)
+// limit: items per page(0 means unlimited)
 // offset: offset
-// includeContent: whether to include full content（falsereturns）
+// includeContent: whether to include full content(falsereturns)
 func (m *Manager) GetItemsWithOptions(category string, limit, offset int, includeContent bool) ([]*KnowledgeItem, error) {
 	var rows *sql.Rows
 	var err error
@@ -299,7 +299,7 @@ func (m *Manager) GetItemsWithOptions(category string, limit, offset int, includ
 			if err := rows.Scan(&item.ID, &item.Category, &item.Title, &item.FilePath, &createdAt, &updatedAt); err != nil {
 				return nil, fmt.Errorf("scan: %w", err)
 			}
-			// when not including content，Content
+			// when not including content,Content
 			item.Content = ""
 		}
 
@@ -336,7 +336,7 @@ func (m *Manager) GetItemsWithOptions(category string, limit, offset int, includ
 			}
 		}
 
-		// ，creation time
+		// ,creation time
 		if item.UpdatedAt.IsZero() && !item.CreatedAt.IsZero() {
 			item.UpdatedAt = item.CreatedAt
 		}
@@ -365,17 +365,17 @@ func (m *Manager) GetItemsCount(category string) (int, error) {
 	return count, nil
 }
 
-// SearchItemsByKeyword search knowledge items by keyword（search across all data，title、、、match）
+// SearchItemsByKeyword search knowledge items by keyword(search across all data,title,,,match)
 func (m *Manager) SearchItemsByKeyword(keyword string, category string) ([]*KnowledgeItemSummary, error) {
 	if keyword == "" {
 		return nil, fmt.Errorf("search keyword cannot be empty")
 	}
 
-	// build SQL query，use LIKE for keyword matching（case-insensitive）
+	// build SQL query,use LIKE for keyword matching(case-insensitive)
 	var query string
 	var args []interface{}
 
-	// SQLiteLIKEcase-insensitive，COLLATE NOCASELOWER()
+	// SQLiteLIKEcase-insensitive,COLLATE NOCASELOWER()
 	// %keyword%fuzzy match
 	searchPattern := "%" + keyword + "%"
 
@@ -386,7 +386,7 @@ func (m *Manager) SearchItemsByKeyword(keyword string, category string) ([]*Know
 	`
 	args = append(args, searchPattern, searchPattern, searchPattern, searchPattern)
 
-	// ，add
+	// ,add
 	if category != "" {
 		query += " AND category = ?"
 		args = append(args, category)
@@ -450,7 +450,7 @@ func (m *Manager) SearchItemsByKeyword(keyword string, category string) ([]*Know
 	return items, nil
 }
 
-// GetItemsSummary get knowledge itemlist（without full content, supports pagination）
+// GetItemsSummary get knowledge itemlist(without full content, supports pagination)
 func (m *Manager) GetItemsSummary(category string, limit, offset int) ([]*KnowledgeItemSummary, int, error) {
 	// get total count
 	total, err := m.GetItemsCount(category)
@@ -458,7 +458,7 @@ func (m *Manager) GetItemsSummary(category string, limit, offset int) ([]*Knowle
 		return nil, 0, err
 	}
 
-	// list（）
+	// list()
 	var rows *sql.Rows
 	var query string
 	var args []interface{}
@@ -586,7 +586,7 @@ func (m *Manager) GetItem(id string) (*KnowledgeItem, error) {
 		}
 	}
 
-	// ，creation time
+	// ,creation time
 	if item.UpdatedAt.IsZero() && !item.CreatedAt.IsZero() {
 		item.UpdatedAt = item.CreatedAt
 	}
@@ -655,10 +655,10 @@ func (m *Manager) UpdateItem(id, category, title, content string) (*KnowledgeIte
 			return nil, fmt.Errorf("move file: %w", err)
 		}
 
-		// delete（）
+		// delete()
 		oldDir := filepath.Dir(item.FilePath)
 		if isEmpty, _ := isEmptyDir(oldDir); isEmpty {
-			// knowledge basedelete（delete）
+			// knowledge basedelete(delete)
 			if oldDir != m.basePath {
 				if err := os.Remove(oldDir); err != nil {
 					m.logger.Warn("delete", zap.String("dir", oldDir), zap.Error(err))
@@ -681,7 +681,7 @@ func (m *Manager) UpdateItem(id, category, title, content string) (*KnowledgeIte
 		return nil, fmt.Errorf("failed to update knowledge item: %w", err)
 	}
 
-	// delete（need to re-index）
+	// delete(need to re-index)
 	_, err = m.db.Exec("DELETE FROM knowledge_embeddings WHERE item_id = ?", id)
 	if err != nil {
 		m.logger.Warn("delete", zap.Error(err))
@@ -704,16 +704,16 @@ func (m *Manager) DeleteItem(id string) error {
 		m.logger.Warn("delete", zap.String("path", filePath), zap.Error(err))
 	}
 
-	// deleterecord（delete）
+	// deleterecord(delete)
 	_, err = m.db.Exec("DELETE FROM knowledge_base_items WHERE id = ?", id)
 	if err != nil {
 		return fmt.Errorf("delete: %w", err)
 	}
 
-	// delete（）
+	// delete()
 	dir := filepath.Dir(filePath)
 	if isEmpty, _ := isEmptyDir(dir); isEmpty {
-		// knowledge basedelete（delete）
+		// knowledge basedelete(delete)
 		if dir != m.basePath {
 			if err := os.Remove(dir); err != nil {
 				m.logger.Warn("delete", zap.String("dir", dir), zap.Error(err))
@@ -724,14 +724,14 @@ func (m *Manager) DeleteItem(id string) error {
 	return nil
 }
 
-// isEmptyDir check if directory is empty（ignore hidden files . ）
+// isEmptyDir check if directory is empty(ignore hidden files . )
 func isEmptyDir(dir string) (bool, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return false, err
 	}
 	for _, entry := range entries {
-		// ignore hidden files（starting with .）
+		// ignore hidden files(starting with .)
 		if !strings.HasPrefix(entry.Name(), ".") {
 			return false, nil
 		}
@@ -760,7 +760,7 @@ func (m *Manager) GetIndexStatus() (map[string]interface{}, error) {
 		return nil, fmt.Errorf("failed to query total knowledge item count: %w", err)
 	}
 
-	// get indexed knowledge item count（with vector embeddings）
+	// get indexed knowledge item count(with vector embeddings)
 	var indexedItems int
 	err = m.db.QueryRow(`
 		SELECT COUNT(DISTINCT item_id) 
@@ -844,7 +844,7 @@ func (m *Manager) GetRetrievalLogs(conversationID, messageID string, limit int) 
 			}
 		}
 
-		// if all formats fail，recordcontinue
+		// if all formats fail,recordcontinue
 		if log.CreatedAt.IsZero() {
 			m.logger.Warn("parseretrieval log",
 				zap.String("timeStr", createdAt),

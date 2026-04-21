@@ -254,7 +254,7 @@ Field quick-reference examples (from user-provided cases, can be used directly/c
 Generation constraints and notes:
 - Always wrap string values in English double quotes, e.g. title="login", country="CN"
 - Keep string values literally consistent: do not abbreviate (e.g. city="beijing" should not become city="BJ"), do not use aliases (e.g. Beijing/Peking), do not arbitrarily translate/transliterate/change case
-- Geographic fields (country/region/city) should prefer "outputting the value as given by the user"; when unsure of valid values, do not guess—put alternatives in warnings
+- Geographic fields (country/region/city) should prefer "outputting the value as given by the user"; when unsure of valid values, do not guess-put alternatives in warnings
 - Do not fabricate non-existent FOFA fields; when unsure, put uncertain points in warnings and output a conservative query
 - When the user's description has "multiple AND/OR conditions", prefer adding () to clarify precedence, e.g.: (app="Apache" || app="Nginx") && country="CN"
 - When the user is missing key conditions causing the scope to be too broad or ambiguous (e.g. location/protocol/port/service type not specified), allow query to be an empty string and clearly state in warnings what information needs to be supplemented

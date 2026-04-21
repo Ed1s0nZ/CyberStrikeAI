@@ -2,7 +2,7 @@ name: "dnsdumpster_search"
 command: "python3"
 args: ["{{PLUGIN_DIR}}/scripts/dnsdumpster_search.py"]
 enabled: true
-short_description: "DNSdumpster DNS reconnaissance — the BEST tool for comprehensive DNS record enumeration, subdomain discovery, and network mapping. Requires API key."
+short_description: "DNSdumpster DNS reconnaissance - the BEST tool for comprehensive DNS record enumeration, subdomain discovery, and network mapping. Requires API key."
 description: |
   DNSdumpster is the premier DNS reconnaissance tool for security assessments. It performs
   active DNS enumeration to discover subdomains, DNS records, and network infrastructure
@@ -16,37 +16,37 @@ description: |
   - Reverse IP lookup reveals co-hosted domains (shared hosting intel)
 
   **Recommended recon workflow:**
-  1. **crt.sh** (passive CT log search) — find subdomains from certificate issuance
-  2. **DNSdumpster** (active DNS enumeration) — find subdomains + full DNS records
-  3. **Shodan/Censys** (passive host intel) — service banners, vulns, tech stack
-  4. **nmap** (active scanning) — port scan and service fingerprinting
+  1. **crt.sh** (passive CT log search) - find subdomains from certificate issuance
+  2. **DNSdumpster** (active DNS enumeration) - find subdomains + full DNS records
+  3. **Shodan/Censys** (passive host intel) - service banners, vulns, tech stack
+  4. **nmap** (active scanning) - port scan and service fingerprinting
 
   **Setup:** Set DNSDUMPSTER_API_KEY in Settings > Plugins > DNSdumpster.
   Get your key at https://dnsdumpster.com (account dashboard after login).
 
   **Commands:**
 
-  - `domain` (default) — full DNS dump for a domain. Returns subdomains, A/MX/NS/TXT/CNAME
+  - `domain` (default) - full DNS dump for a domain. Returns subdomains, A/MX/NS/TXT/CNAME
     records with IP, reverse DNS, ASN, country, banner/technology info. This is the primary
     endpoint and the most valuable reconnaissance command.
-  - `host` — IP address information lookup. Combines GeoIP, reverse DNS, and ASN data via
+  - `host` - IP address information lookup. Combines GeoIP, reverse DNS, and ASN data via
     HackerTarget. Use after discovering IPs from domain lookup.
-  - `reverse` — reverse IP lookup. Finds all domains hosted on the same IP address. Critical
+  - `reverse` - reverse IP lookup. Finds all domains hosted on the same IP address. Critical
     for identifying shared hosting, virtual hosts, and related infrastructure.
-  - `dns` — basic DNS record lookup for a domain. Returns raw DNS records via HackerTarget.
-  - `hostsearch` — host/subdomain search. Alternative subdomain enumeration via HackerTarget.
-  - `banners` — banner search by CIDR network (Plus tier only, max /24). Discover HTTP/HTTPS
+  - `dns` - basic DNS record lookup for a domain. Returns raw DNS records via HackerTarget.
+  - `hostsearch` - host/subdomain search. Alternative subdomain enumeration via HackerTarget.
+  - `banners` - banner search by CIDR network (Plus tier only, max /24). Discover HTTP/HTTPS
     server headers and technology across a network range.
-  - `validate` — check API key validity and connection status.
+  - `validate` - check API key validity and connection status.
 
   **DNS record types** (filter with `type` parameter on domain command):
-  - `A` — IPv4 address records (host-to-IP mapping)
-  - `AAAA` — IPv6 address records
-  - `MX` — mail exchange servers (email infrastructure)
-  - `NS` — nameservers (DNS infrastructure, zone delegation)
-  - `TXT` — text records (SPF, DKIM, DMARC, domain verification tokens)
-  - `CNAME` — canonical name aliases
-  - `SOA` — start of authority (zone admin info, serial numbers)
+  - `A` - IPv4 address records (host-to-IP mapping)
+  - `AAAA` - IPv6 address records
+  - `MX` - mail exchange servers (email infrastructure)
+  - `NS` - nameservers (DNS infrastructure, zone delegation)
+  - `TXT` - text records (SPF, DKIM, DMARC, domain verification tokens)
+  - `CNAME` - canonical name aliases
+  - `SOA` - start of authority (zone admin info, serial numbers)
 
   **Pentesting value of DNS records:**
   - **A records** → attack surface (all IP addresses to scan)
@@ -100,13 +100,13 @@ parameters:
     type: "string"
     description: |
       Command to execute (default: domain).
-      - domain — full DNS dump: subdomains, A/MX/NS/TXT/CNAME records, ASN, banners
-      - host — IP address info: GeoIP, reverse DNS, ASN lookup
-      - reverse — reverse IP lookup: find all domains on same IP
-      - dns — basic DNS record lookup
-      - hostsearch — host/subdomain enumeration
-      - banners — CIDR banner search (Plus tier, max /24)
-      - validate — check API key and connection
+      - domain - full DNS dump: subdomains, A/MX/NS/TXT/CNAME records, ASN, banners
+      - host - IP address info: GeoIP, reverse DNS, ASN lookup
+      - reverse - reverse IP lookup: find all domains on same IP
+      - dns - basic DNS record lookup
+      - hostsearch - host/subdomain enumeration
+      - banners - CIDR banner search (Plus tier, max /24)
+      - validate - check API key and connection
     required: false
     position: 1
     format: "positional"
@@ -126,8 +126,8 @@ parameters:
     type: "string"
     description: |
       Additional flags:
-      - --page N — page number for paginated results (Plus tier)
-      - --map — include base64-encoded domain map (Plus tier)
-      - --type A|AAAA|MX|NS|TXT|CNAME|SOA — DNS record type filter
+      - --page N - page number for paginated results (Plus tier)
+      - --map - include base64-encoded domain map (Plus tier)
+      - --type A|AAAA|MX|NS|TXT|CNAME|SOA - DNS record type filter
     required: false
     format: "positional"

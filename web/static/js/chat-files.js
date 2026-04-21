@@ -1,4 +1,4 @@
-// conversationattachment（chat_uploads）File Manager
+// conversationattachment(chat_uploads)File Manager
 
 let chatFilesCache = [];
 let chatFilesDisplayed = [];
@@ -8,14 +8,14 @@ let chatFilesRenameRelativePath = '';
 const CHAT_FILES_GROUP_STORAGE_KEY = 'csai_chat_files_group_by';
 const CHAT_FILES_BROWSE_PATH_KEY = 'csai_chat_files_browse_path';
 
-/** byfileBrowsemodeunder's currentpath（for chat_uploads 's array），like ['2024-03-21','uuid'] */
+/** byfileBrowsemodeunder's currentpath(for chat_uploads 's array),like ['2024-03-21','uuid'] */
 let chatFilesBrowsePath = [];
-/** emptywhen，undertimeonfiletothisforpath（chat_uploads underdirectory），like 2026-03-21/uuid/sub */
+/** emptywhen,undertimeonfiletothisforpath(chat_uploads underdirectory),like 2026-03-21/uuid/sub */
 let chatFilesPendingUploadDir = '';
-/** File Managerpagetowardsserviceonenterlinein，avoidrepeatselectdisablebutton */
+/** File Managerpagetowardsserviceonenterlinein,avoidrepeatselectdisablebutton */
 let chatFilesXHRUploadBusy = false;
 
-/** onlyfrontendrecord's 「emptydirectory」 parentPath（'' indicates chat_uploads based on）-> directorylist，andmergeso that mkdir aftercan */
+/** onlyfrontendrecord's "emptydirectory" parentPath('' indicates chat_uploads based on)-> directorylist,andmergeso that mkdir aftercan */
 const CHAT_FILES_SYNTHETIC_DIRS_KEY = 'csai_chat_files_synthetic_dirs';
 let chatFilesSyntheticEmptyDirs = {};
 
@@ -187,7 +187,7 @@ function chatFilesCloseAllMenus() {
 }
 
 /**
- * 「more」menuuse fixed ，avoidtableoutside overflow menurecord。
+ * "more"menuuse fixed ,avoidtableoutside overflow menurecord.
  */
 function chatFilesToggleMoreMenu(ev, idx) {
     if (ev) ev.stopPropagation();
@@ -260,7 +260,7 @@ async function loadChatFilesPage() {
     if (!wrap) return;
     wrap.classList.remove('chat-files-table-wrap--grouped');
     wrap.classList.remove('chat-files-table-wrap--tree');
-    wrap.innerHTML = '<div class="loading-spinner" data-i18n="common.loading">Loading…</div>';
+    wrap.innerHTML = '<div class="loading-spinner" data-i18n="common.loading">Loading...</div>';
     if (typeof window.applyTranslations === 'function') {
         window.applyTranslations(wrap);
     }
@@ -301,7 +301,7 @@ function chatFilesNameFilter(files) {
     });
 }
 
-/** onlyfrontendbyFilenameFilter，notre-request */
+/** onlyfrontendbyFilenameFilter,notre-request */
 function chatFilesFilterNameOnInput() {
     if (!chatFilesCache.length && chatFilesGetGroupByMode() !== 'folder') return;
     renderChatFilesTable();
@@ -367,7 +367,7 @@ async function copyChatFilePathIdx(idx) {
     }
 }
 
-/** commonbinaryExtension：thisfilecannotattextEditinopen */
+/** commonbinaryExtension:thisfilecannotattextEditinopen */
 const CHAT_FILES_BINARY_EXT = new Set([
     'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'tif', 'tiff', 'heic', 'heif', 'svgz',
     'pdf', 'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'zst',
@@ -429,12 +429,12 @@ function chatFilesGroupByChange() {
 function chatFilesCompareDateKeysDesc(a, b) {
     const as = String(a);
     const bs = String(b);
-    if (as === '—' && bs !== '—') return 1;
-    if (bs === '—' && as !== '—') return -1;
+    if (as === '-' && bs !== '-') return 1;
+    if (bs === '-' && as !== '-') return -1;
     return bs.localeCompare(as);
 }
 
-/** directorynode：dirs[] -> node；files: { idx, name }[] */
+/** directorynode:dirs[] -> node;files: { idx, name }[] */
 function chatFilesTreeMakeNode() {
     return { dirs: {}, files: [] };
 }
@@ -495,7 +495,7 @@ function chatFilesTreeSortDirKeys(node, keys) {
 function chatFilesBuildGroups(files, mode) {
     const map = new Map();
     files.forEach(function (f, idx) {
-        const key = mode === 'date' ? (f.date || '—') : (f.conversationId || '—');
+        const key = mode === 'date' ? (f.date || '-') : (f.conversationId || '-');
         if (!map.has(key)) {
             map.set(key, { key: key, items: [] });
         }
@@ -531,11 +531,11 @@ function chatFilesBuildGroups(files, mode) {
     return groups;
 }
 
-/** grouptitle：Conversation ID throughlongwhenshortdisplay，completeat title */
+/** grouptitle:Conversation ID throughlongwhenshortdisplay,completeat title */
 function chatFilesGroupHeadingConversation(key) {
     const c = key == null ? '' : String(key);
-    if (c === '' || c === '—') {
-        return { text: '—', title: '' };
+    if (c === '' || c === '-') {
+        return { text: '-', title: '' };
     }
     if (typeof window.t === 'function') {
         if (c === '_manual') {
@@ -546,7 +546,7 @@ function chatFilesGroupHeadingConversation(key) {
         }
     }
     if (c.length > 36) {
-        return { text: c.slice(0, 8) + '…' + c.slice(-6), title: c };
+        return { text: c.slice(0, 8) + '...' + c.slice(-6), title: c };
     }
     return { text: c, title: c };
 }
@@ -558,7 +558,7 @@ function renderChatFilesTable() {
     chatFilesDisplayed = chatFilesNameFilter(chatFilesCache);
     const groupMode = chatFilesGetGroupByMode();
     const emptyMsg = (typeof window.t === 'function') ? window.t('chatFilesPage.empty') : 'No files';
- // 「byfile」modeundereven ifnofile，alsoneedShow chat_uploads pathand「New folder」，otherwisecannotfirstdirectory
+ // "byfile"modeundereven ifnofile,alsoneedShow chat_uploads pathand"New folder",otherwisecannotfirstdirectory
     if (!chatFilesDisplayed.length && groupMode !== 'folder') {
         wrap.classList.remove('chat-files-table-wrap--grouped');
         wrap.classList.remove('chat-files-table-wrap--tree');
@@ -593,7 +593,7 @@ function renderChatFilesTable() {
         const nameEsc = escapeHtml(f.name || '');
         const conv = f.conversationId || '';
         const convEsc = escapeHtml(conv);
-        const dt = f.modifiedUnix ? new Date(f.modifiedUnix * 1000).toLocaleString() : '—';
+        const dt = f.modifiedUnix ? new Date(f.modifiedUnix * 1000).toLocaleString() : '-';
         const canOpenChat = conv && conv !== '_manual' && conv !== '_new';
 
         const bin = chatFileIsBinaryByName(f.name);
@@ -618,7 +618,7 @@ function renderChatFilesTable() {
         const menuHtml = menuParts.join('');
 
         const subRaw = (f.subPath && String(f.subPath).trim()) ? String(f.subPath).trim() : '';
-        const rootLabel = (typeof window.t === 'function') ? window.t('chatFilesPage.folderRoot') : '（root）';
+        const rootLabel = (typeof window.t === 'function') ? window.t('chatFilesPage.folderRoot') : '(root)';
         let subCellInner;
         if (subRaw) {
             const segs = subRaw.split('/').filter(function (s) {
@@ -633,7 +633,7 @@ function renderChatFilesTable() {
         }
 
         return `<tr>
-            <td>${escapeHtml(f.date || '—')}</td>
+            <td>${escapeHtml(f.date || '-')}</td>
             <td class="chat-files-cell-conv"><code title="${convEsc}">${convEsc}</code></td>
             <td class="chat-files-cell-subpath" title="${escapeHtml(subRaw || '')}">${subCellInner}</td>
             <td class="chat-files-cell-name" title="${escapeHtml(pathForTitle)}">${nameEsc}</td>
@@ -722,8 +722,8 @@ function renderChatFilesTable() {
                 <td class="chat-files-tree-name-cell chat-files-tree-name-cell--folder" title="${tEnter}">
                     <span class="chat-files-tree-name-inner">${svgFolder}<span class="chat-files-tree-name-text">${escapeHtml(name)}</span></span>
                 </td>
-                <td class="chat-files-tree-muted">—</td>
-                <td class="chat-files-tree-muted">—</td>
+                <td class="chat-files-tree-muted">-</td>
+                <td class="chat-files-tree-muted">-</td>
                 <td class="chat-files-actions" data-chat-files-stop="true" onclick="event.stopPropagation()">
                     <div class="chat-files-action-bar">
                         <button type="button" class="btn-icon" title="${tUploadToFolder}" data-upload-dir="${uploadDirAttr}" onclick="chatFilesUploadToFolderClick(event, this)">${svgUploadToFolder}</button>
@@ -737,7 +737,7 @@ function renderChatFilesTable() {
         function rowHtmlTreeFile(f, idx) {
             const pathForTitle = (f.absolutePath && String(f.absolutePath).trim()) ? String(f.absolutePath).trim() : (f.relativePath || '');
             const nameEsc = escapeHtml(f.name || '');
-            const dt = f.modifiedUnix ? new Date(f.modifiedUnix * 1000).toLocaleString() : '—';
+            const dt = f.modifiedUnix ? new Date(f.modifiedUnix * 1000).toLocaleString() : '-';
             const conv = f.conversationId || '';
             const canOpenChat = conv && conv !== '_manual' && conv !== '_new';
 
@@ -1302,7 +1302,7 @@ async function onChatFilesUploadPick(ev) {
     }
 }
 
-// languageswitchafterre-renderlist：table headerand「more」menu JS concatenate，no data-i18n，needusecurrentlanguage's t() thengenerate
+// languageswitchafterre-renderlist:table headerand"more"menu JS concatenate,no data-i18n,needusecurrentlanguage's t() thengenerate
 document.addEventListener('languagechange', function () {
     if (typeof window.currentPage !== 'function') return;
     if (window.currentPage() !== 'chat-files') return;

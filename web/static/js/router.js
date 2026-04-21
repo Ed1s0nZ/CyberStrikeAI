@@ -3,7 +3,7 @@ let currentPage = 'dashboard';
 
 // initializeroute
 function initRouter() {
-    // fromURL hashreadpage（ifhas）
+    // fromURL hashreadpage(ifhas)
     const hash = window.location.hash.slice(1);
     if (hash) {
         const hashParts = hash.split('?');
@@ -11,7 +11,7 @@ function initRouter() {
         if (pageId && ['dashboard', 'chat', 'info-collect', 'vulnerabilities', 'webshell', 'chat-files', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'roles-management', 'skills-monitor', 'skills-management', 'agents-management', 'settings', 'tasks'].includes(pageId)) {
             switchPage(pageId);
             
- // if it ischatpageandhasconversationparameter，loadforshouldconversation
+ // if it ischatpageandhasconversationparameter,loadforshouldconversation
             if (pageId === 'chat' && hashParts.length > 1) {
                 const params = new URLSearchParams(hashParts[1]);
                 const conversationId = params.get('conversation');
@@ -166,7 +166,7 @@ function showSubmenuPopup(navItem, menuId) {
     const existingPopup = document.querySelector('.submenu-popup');
     if (existingPopup) {
         existingPopup.remove();
-        return; // ifalreadyopen，clickwhenClose
+        return; // ifalreadyopen,clickwhenClose
     }
     
     const navItemContent = navItem.querySelector('.nav-item-content');
@@ -225,7 +225,7 @@ function showSubmenuPopup(navItem, menuId) {
         }
     };
     
-    // delayaddeventlisten，avoidimmediatelytrigger
+    // delayaddeventlisten,avoidimmediatelytrigger
     setTimeout(() => {
         document.addEventListener('click', closePopup);
     }, 0);
@@ -240,7 +240,7 @@ function initPage(pageId) {
             }
             break;
         case 'chat':
- // restoreconversationlistcollapsestatus（fromotherpagereturnwhenmaintainuseselect）
+ // restoreconversationlistcollapsestatus(fromotherpagereturnwhenmaintainuseselect)
             initConversationSidebarState();
             break;
         case 'info-collect':
@@ -263,20 +263,20 @@ function initPage(pageId) {
             break;
         case 'mcp-management':
             // initializeMCPmanagement
- // firstloadExternalMCPlist（fast），afterloadtoollist
+ // firstloadExternalMCPlist(fast),afterloadtoollist
             if (typeof loadExternalMCPs === 'function') {
                 loadExternalMCPs().catch(err => {
                     console.warn('loadExternalMCPlist failed:', err);
                 });
             }
- // loadtoollist（MCPtoolconfigurationalreadytoMCPmanagement page）
-            // useasyncload，avoidblockpagerender
+ // loadtoollist(MCPtoolconfigurationalreadytoMCPmanagement page)
+            // useasyncload,avoidblockpagerender
             if (typeof loadToolsList === 'function') {
                 // ensuretoolpaginationsettingsalreadyinitialize
                 if (typeof getToolsPageSize === 'function' && typeof toolsPagination !== 'undefined') {
                     toolsPagination.pageSize = getToolsPageSize();
                 }
-                // delayload，letpagefirstrender
+                // delayload,letpagefirstrender
                 setTimeout(() => {
                     loadToolsList(1, '').catch(err => {
                         console.error('Failed to load tool list:', err);
@@ -302,14 +302,14 @@ function initPage(pageId) {
             }
             break;
         case 'settings':
-            // initializesettingspage（notneedloadtoollist）
+            // initializesettingspage(notneedloadtoollist)
             if (typeof loadConfig === 'function') {
                 loadConfig(false);
             }
             break;
         case 'roles-management':
             // initializerolemanagement page
-            // resetsearchUI（variablewillatundertimesearchwhenautoupdate）
+            // resetsearchUI(variablewillatundertimesearchwhenautoupdate)
             const rolesSearchInput = document.getElementById('roles-search');
             if (rolesSearchInput) {
                 rolesSearchInput.value = '';
@@ -334,7 +334,7 @@ function initPage(pageId) {
             break;
         case 'skills-management':
             // initializeSkillsmanagement page
-            // resetsearchUI（variablewillatundertimesearchwhenautoupdate）
+            // resetsearchUI(variablewillatundertimesearchwhenautoupdate)
             const skillsSearchInput = document.getElementById('skills-search');
             if (skillsSearchInput) {
                 skillsSearchInput.value = '';
@@ -371,14 +371,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // listenhashchange
     window.addEventListener('hashchange', function() {
         const hash = window.location.hash.slice(1);
- // processparameter's hash（like chat?conversation=xxx）
+ // processparameter's hash(like chat?conversation=xxx)
         const hashParts = hash.split('?');
         const pageId = hashParts[0];
         
         if (pageId && ['chat', 'info-collect', 'tasks', 'vulnerabilities', 'webshell', 'chat-files', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'roles-management', 'skills-monitor', 'skills-management', 'agents-management', 'settings'].includes(pageId)) {
             switchPage(pageId);
             
- // if it ischatpageandhasconversationparameter，loadforshouldconversation
+ // if it ischatpageandhasconversationparameter,loadforshouldconversation
             if (pageId === 'chat' && hashParts.length > 1) {
                 const params = new URLSearchParams(hashParts[1]);
                 const conversationId = params.get('conversation');
@@ -448,7 +448,7 @@ function toggleConversationSidebar() {
     }
 }
 
-// restoreconversationlistcollapsestatus（Enterconversationpagewhentake effect）
+// restoreconversationlistcollapsestatus(Enterconversationpagewhentake effect)
 function initConversationSidebarState() {
     const sidebar = document.getElementById('conversation-sidebar');
     if (sidebar) {

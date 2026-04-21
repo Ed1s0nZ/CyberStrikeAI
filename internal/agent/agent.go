@@ -80,10 +80,10 @@ func NewAgent(cfg *config.OpenAIConfig, agentCfg *config.AgentConfig, mcpServer 
 	}
 
 	// configure HTTP Transport for LLM inference calls.
-	// IMPORTANT: Proxy is explicitly nil — inference MUST go direct to the LLM provider.
+	// IMPORTANT: Proxy is explicitly nil - inference MUST go direct to the LLM provider.
 	// Tool traffic is proxied separately via executor subprocess env vars.
 	transport := &http.Transport{
-		Proxy: nil, // NEVER proxy inference calls — breaks auth with cloud providers
+		Proxy: nil, // NEVER proxy inference calls - breaks auth with cloud providers
 		DialContext: (&net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
@@ -518,7 +518,7 @@ Skills Library:
 - For example: if you need to test SQL injection, first call ` + builtin.ToolListSkills + ` to check for sql-injection related skills, then call ` + builtin.ToolReadSkill + ` to read its content
 - Skills content includes complete testing methods, tool usage, bypass techniques, best practices and other professional skill documents to help you execute tasks more professionally
 
-LANGUAGE: You MUST respond ONLY in English. All output — including todo lists, task descriptions, analysis, reports, and every other text — MUST be in English. NEVER use Chinese or any non-English language.`
+LANGUAGE: You MUST respond ONLY in English. All output - including todo lists, task descriptions, analysis, reports, and every other text - MUST be in English. NEVER use Chinese or any non-English language.`
 
 	// if role has configured skills, hint AI in system prompt (without hardcoding content)
 	if len(roleSkills) > 0 {
@@ -526,7 +526,7 @@ LANGUAGE: You MUST respond ONLY in English. All output — including todo lists,
 		skillsHint.WriteString("\n\nRecommended Skills for this role:\n")
 		for i, skillName := range roleSkills {
 			if i > 0 {
-				skillsHint.WriteString("、")
+				skillsHint.WriteString(",")
 			}
 			skillsHint.WriteString("`")
 			skillsHint.WriteString(skillName)
@@ -1296,14 +1296,14 @@ func (a *Agent) callOpenAI(ctx context.Context, messages []ChatMessage, tools []
 			return nil, err
 		}
 
-		// ，
+		// ,
 		if attempt < maxRetries-1 {
-			// ：2s, 4s, 8s...
+			// :2s, 4s, 8s...
 			backoff := time.Duration(1<<uint(attempt+1)) * time.Second
 			if backoff > 30*time.Second {
 				backoff = 30 * time.Second // 30
 			}
-			a.logger.Warn("OpenAI API，",
+			a.logger.Warn("OpenAI API,",
 				zap.Error(err),
 				zap.Int("attempt", attempt+1),
 				zap.Int("maxRetries", maxRetries),
@@ -1323,7 +1323,7 @@ func (a *Agent) callOpenAI(ctx context.Context, messages []ChatMessage, tools []
 	return nil, fmt.Errorf("failed after %d retries: %w", maxRetries, lastErr)
 }
 
-// callOpenAISingle OpenAI API（）
+// callOpenAISingle OpenAI API()
 func (a *Agent) callOpenAISingle(ctx context.Context, messages []ChatMessage, tools []Tool) (*OpenAIResponse, error) {
 	model := a.config.Model
 	if len(tools) > 0 && a.config.ToolModel != "" {
@@ -1359,8 +1359,8 @@ func (a *Agent) callOpenAISingle(ctx context.Context, messages []ChatMessage, to
 	return &response, nil
 }
 
-// callOpenAISingleStreamText OpenAI，"invoke tool"（tools ）。
-// onDelta content delta，； callback returns，returns。
+// callOpenAISingleStreamText OpenAI,"invoke tool"(tools ).
+// onDelta content delta,; callback returns,returns.
 func (a *Agent) callOpenAISingleStreamText(ctx context.Context, messages []ChatMessage, tools []Tool, onDelta func(delta string) error) (string, error) {
 	model := a.config.Model
 	if len(tools) > 0 && a.config.ToolModel != "" {
@@ -1387,7 +1387,7 @@ func (a *Agent) callOpenAISingleStreamText(ctx context.Context, messages []ChatM
 	return client.ChatCompletionStream(ctx, reqBody, onDelta)
 }
 
-// callOpenAIStreamText OpenAI（），" delta"，。
+// callOpenAIStreamText OpenAI()," delta",.
 func (a *Agent) callOpenAIStreamText(ctx context.Context, messages []ChatMessage, tools []Tool, onDelta func(delta string) error) (string, error) {
 	maxRetries := 3
 	var lastErr error
@@ -1409,7 +1409,7 @@ func (a *Agent) callOpenAIStreamText(ctx context.Context, messages []ChatMessage
 		}
 
 		lastErr = err
-		// delta，：。
+		// delta,:.
 		if deltasSent {
 			return "", err
 		}
@@ -1423,7 +1423,7 @@ func (a *Agent) callOpenAIStreamText(ctx context.Context, messages []ChatMessage
 			if backoff > 30*time.Second {
 				backoff = 30 * time.Second
 			}
-			a.logger.Warn("OpenAI stream ，",
+			a.logger.Warn("OpenAI stream ,",
 				zap.Error(err),
 				zap.Int("attempt", attempt+1),
 				zap.Int("maxRetries", maxRetries),
@@ -1441,7 +1441,7 @@ func (a *Agent) callOpenAIStreamText(ctx context.Context, messages []ChatMessage
 	return "", fmt.Errorf("failed after %d retries: %w", maxRetries, lastErr)
 }
 
-// callOpenAISingleStreamWithToolCalls OpenAI（），。
+// callOpenAISingleStreamWithToolCalls OpenAI(),.
 func (a *Agent) callOpenAISingleStreamWithToolCalls(
 	ctx context.Context,
 	messages []ChatMessage,
@@ -1492,7 +1492,7 @@ func (a *Agent) callOpenAISingleStreamWithToolCalls(
 		args := make(map[string]interface{})
 		if strings.TrimSpace(fnArgsStr) != "" {
 			if err := json.Unmarshal([]byte(fnArgsStr), &args); err != nil {
-				// ：arguments JSON
+				// :arguments JSON
 				args = map[string]interface{}{"raw": fnArgsStr}
 			}
 		}
@@ -1528,7 +1528,7 @@ func (a *Agent) callOpenAISingleStreamWithToolCalls(
 	return response, nil
 }
 
-// callOpenAIStreamWithToolCalls OpenAI（）， content delta 。
+// callOpenAIStreamWithToolCalls OpenAI(), content delta .
 func (a *Agent) callOpenAIStreamWithToolCalls(
 	ctx context.Context,
 	messages []ChatMessage,
@@ -1559,7 +1559,7 @@ func (a *Agent) callOpenAIStreamWithToolCalls(
 
 		lastErr = err
 		if deltasSent {
-			// delta：
+			// delta:
 			return nil, err
 		}
 
@@ -1571,7 +1571,7 @@ func (a *Agent) callOpenAIStreamWithToolCalls(
 			if backoff > 30*time.Second {
 				backoff = 30 * time.Second
 			}
-			a.logger.Warn("OpenAI stream ，",
+			a.logger.Warn("OpenAI stream ,",
 				zap.Error(err),
 				zap.Int("attempt", attempt+1),
 				zap.Int("maxRetries", maxRetries),
@@ -1597,14 +1597,14 @@ type ToolExecutionResult struct {
 }
 
 // executeToolViaMCP MCP
-// ，returns，AI
+// ,returns,AI
 func (a *Agent) executeToolViaMCP(ctx context.Context, toolName string, args map[string]interface{}) (*ToolExecutionResult, error) {
 	a.logger.Info("MCP",
 		zap.String("tool", toolName),
 		zap.Any("args", args),
 	)
 
-	// record_vulnerability，conversation_id
+	// record_vulnerability,conversation_id
 	if toolName == builtin.ToolRecordVulnerability {
 		a.mu.RLock()
 		conversationID := a.currentConversationID
@@ -1624,7 +1624,7 @@ func (a *Agent) executeToolViaMCP(ctx context.Context, toolName string, args map
 	var executionID string
 	var err error
 
-	// ：（ 30 ）
+	// :( 30 )
 	toolCtx := ctx
 	var toolCancel context.CancelFunc
 	if a.agentConfig != nil && a.agentConfig.ToolTimeoutMinutes > 0 {
@@ -1636,7 +1636,7 @@ func (a *Agent) executeToolViaMCP(ctx context.Context, toolName string, args map
 		}()
 	}
 
-	// MCP（）
+	// MCP()
 	a.mu.RLock()
 	originalToolName, isExternalTool := a.toolNameMapping[toolName]
 	a.mu.RUnlock()
@@ -1653,7 +1653,7 @@ func (a *Agent) executeToolViaMCP(ctx context.Context, toolName string, args map
 		result, executionID, err = a.mcpServer.CallTool(toolCtx, toolName, args)
 	}
 
-	// （、），returns
+	// (,),returns
 	if err != nil {
 		detail := err.Error()
 		if errors.Is(err, context.DeadlineExceeded) {
@@ -1661,7 +1661,7 @@ func (a *Agent) executeToolViaMCP(ctx context.Context, toolName string, args map
 			if a.agentConfig != nil && a.agentConfig.ToolTimeoutMinutes > 0 {
 				min = a.agentConfig.ToolTimeoutMinutes
 			}
-			detail = fmt.Sprintf(" %d （ config.yaml agent.tool_timeout_minutes ）", min)
+			detail = fmt.Sprintf(" %d ( config.yaml agent.tool_timeout_minutes )", min)
 		}
 		errorMsg := fmt.Sprintf(`
 
@@ -1669,23 +1669,23 @@ func (a *Agent) executeToolViaMCP(ctx context.Context, toolName string, args map
 : 
 : %s
 
-：
+:
 - "%s" 
-- （agent.tool_timeout_minutes）
+- (agent.tool_timeout_minutes)
 - 
 - 
 
-：
+:
 - 
-- ， agent.tool_timeout_minutes
+- , agent.tool_timeout_minutes
 - 
-- ，`, toolName, detail, toolName)
+- ,`, toolName, detail, toolName)
 
 		return &ToolExecutionResult{
 			Result:      errorMsg,
 			ExecutionID: executionID,
 			IsError:     true,
-		}, nil // returns nil ，
+		}, nil // returns nil ,
 	}
 
 	// format
@@ -1748,8 +1748,8 @@ func (a *Agent) executeToolViaMCP(ctx context.Context, toolName string, args map
 func (a *Agent) formatMinimalNotification(executionID string, toolName string, size int, lineCount int, filePath string) string {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("。（ID: %s）。\n\n", executionID))
-	sb.WriteString("：\n")
+	sb.WriteString(fmt.Sprintf(".(ID: %s).\n\n", executionID))
+	sb.WriteString(":\n")
 	sb.WriteString(fmt.Sprintf(" - : %s\n", toolName))
 	sb.WriteString(fmt.Sprintf(" - : %d bytes (%.2f KB)\n", size, float64(size)/1024))
 	sb.WriteString(fmt.Sprintf(" - : %d \n", lineCount))
@@ -1757,38 +1757,38 @@ func (a *Agent) formatMinimalNotification(executionID string, toolName string, s
 		sb.WriteString(fmt.Sprintf(" - : %s\n", filePath))
 	}
 	sb.WriteString("\n")
-	sb.WriteString(" query_execution_result ：\n")
+	sb.WriteString(" query_execution_result :\n")
 	sb.WriteString(fmt.Sprintf(" - : query_execution_result(execution_id=\"%s\", page=1, limit=100)\n", executionID))
 	sb.WriteString(fmt.Sprintf(" - : query_execution_result(execution_id=\"%s\", search=\"\")\n", executionID))
 	sb.WriteString(fmt.Sprintf(" - : query_execution_result(execution_id=\"%s\", filter=\"error\")\n", executionID))
 	sb.WriteString(fmt.Sprintf(" - match: query_execution_result(execution_id=\"%s\", search=\"\\\\d+\\\\.\\\\d+\\\\.\\\\d+\\\\.\\\\d+\", use_regex=true)\n", executionID))
 	sb.WriteString("\n")
 	if filePath != "" {
-		sb.WriteString(" query_execution_result ，：\n")
+		sb.WriteString(" query_execution_result ,:\n")
 		sb.WriteString("\n")
-		sb.WriteString("**：**\n")
+		sb.WriteString("**:**\n")
 		sb.WriteString(fmt.Sprintf(" - 100: exec(command=\"head\", args=[\"-n\", \"100\", \"%s\"])\n", filePath))
 		sb.WriteString(fmt.Sprintf(" - 100: exec(command=\"tail\", args=[\"-n\", \"100\", \"%s\"])\n", filePath))
 		sb.WriteString(fmt.Sprintf(" - 50-150: exec(command=\"sed\", args=[\"-n\", \"50,150p\", \"%s\"])\n", filePath))
 		sb.WriteString("\n")
-		sb.WriteString("**match：**\n")
+		sb.WriteString("**match:**\n")
 		sb.WriteString(fmt.Sprintf(" - : exec(command=\"grep\", args=[\"\", \"%s\"])\n", filePath))
 		sb.WriteString(fmt.Sprintf(" - matchIP: exec(command=\"grep\", args=[\"-E\", \"\\\\d+\\\\.\\\\d+\\\\.\\\\d+\\\\.\\\\d+\", \"%s\"])\n", filePath))
 		sb.WriteString(fmt.Sprintf(" - case-insensitive: exec(command=\"grep\", args=[\"-i\", \"\", \"%s\"])\n", filePath))
 		sb.WriteString(fmt.Sprintf(" - match: exec(command=\"grep\", args=[\"-n\", \"\", \"%s\"])\n", filePath))
 		sb.WriteString("\n")
-		sb.WriteString("**：**\n")
+		sb.WriteString("**:**\n")
 		sb.WriteString(fmt.Sprintf(" - : exec(command=\"wc\", args=[\"-l\", \"%s\"])\n", filePath))
 		sb.WriteString(fmt.Sprintf(" - error: exec(command=\"grep\", args=[\"error\", \"%s\"])\n", filePath))
 		sb.WriteString(fmt.Sprintf(" - : exec(command=\"grep\", args=[\"-v\", \"^$\", \"%s\"])\n", filePath))
 		sb.WriteString("\n")
-		sb.WriteString("**（）：**\n")
+		sb.WriteString("**():**\n")
 		sb.WriteString(fmt.Sprintf(" - cat : cat(file=\"%s\")\n", filePath))
 		sb.WriteString(fmt.Sprintf(" - exec : exec(command=\"cat\", args=[\"%s\"])\n", filePath))
 		sb.WriteString("\n")
-		sb.WriteString("**：**\n")
+		sb.WriteString("**:**\n")
 		sb.WriteString(" - \n")
-		sb.WriteString(" - ，\n")
+		sb.WriteString(" - ,\n")
 		sb.WriteString(" - POSIX \n")
 	}
 
@@ -1832,7 +1832,7 @@ func (a *Agent) UpdateConfig(cfg *config.OpenAIConfig) {
 		a.toolOpenAIClient = nil
 	}
 
-	// MemoryCompressor（）
+	// MemoryCompressor()
 	if a.memoryCompressor != nil {
 		a.memoryCompressor.UpdateConfig(cfg)
 	}
@@ -1885,7 +1885,7 @@ func (a *Agent) ModelName() string {
 	return ""
 }
 
-// formatToolError format，description
+// formatToolError format,description
 func (a *Agent) formatToolError(toolName string, args map[string]interface{}, err error) string {
 	errorMsg := fmt.Sprintf(`
 
@@ -1893,16 +1893,16 @@ func (a *Agent) formatToolError(toolName string, args map[string]interface{}, er
 : %v
 : %v
 
-：
-1. ，
-2. ，
-3. ，
-4. ，`, toolName, args, err)
+:
+1. ,
+2. ,
+3. ,
+4. ,`, toolName, args, err)
 
 	return errorMsg
 }
 
-// applyMemoryCompression LLM， token 。reservedTokens tools token ， 0 。
+// applyMemoryCompression LLM, token .reservedTokens tools token , 0 .
 func (a *Agent) applyMemoryCompression(ctx context.Context, messages []ChatMessage, reservedTokens int) []ChatMessage {
 	if a.memoryCompressor == nil {
 		return messages
@@ -1910,7 +1910,7 @@ func (a *Agent) applyMemoryCompression(ctx context.Context, messages []ChatMessa
 
 	compressed, changed, err := a.memoryCompressor.CompressHistory(ctx, messages, reservedTokens)
 	if err != nil {
-		a.logger.Warn("，", zap.Error(err))
+		a.logger.Warn(",", zap.Error(err))
 		return messages
 	}
 	if changed {
@@ -1924,7 +1924,7 @@ func (a *Agent) applyMemoryCompression(ctx context.Context, messages []ChatMessa
 	return messages
 }
 
-// countToolsTokens tools token ，。mc nil returns 0。
+// countToolsTokens tools token ,.mc nil returns 0.
 func (a *Agent) countToolsTokens(tools []Tool) int {
 	if len(tools) == 0 || a.memoryCompressor == nil {
 		return 0
@@ -1936,7 +1936,7 @@ func (a *Agent) countToolsTokens(tools []Tool) int {
 	return a.memoryCompressor.CountTextTokens(string(data))
 }
 
-// handleMissingToolError LLM，
+// handleMissingToolError LLM,
 func (a *Agent) handleMissingToolError(errMsg string, messages *[]ChatMessage) (bool, string) {
 	lowerMsg := strings.ToLower(errMsg)
 	if !(strings.Contains(lowerMsg, "non-exist tool") || strings.Contains(lowerMsg, "non exist tool")) {
@@ -1982,15 +1982,15 @@ func (a *Agent) handleToolRoleError(errMsg string, messages *[]ChatMessage) bool
 	return true
 }
 
-// RepairOrphanToolMessages tooltool_calls，OpenAI
-// tool_calls，
-// ，
+// RepairOrphanToolMessages tooltool_calls,OpenAI
+// tool_calls,
+// ,
 func (a *Agent) RepairOrphanToolMessages(messages *[]ChatMessage) bool {
 	return a.repairOrphanToolMessages(messages)
 }
 
-// repairOrphanToolMessages tooltool_calls，OpenAI
-// tool_calls，
+// repairOrphanToolMessages tooltool_calls,OpenAI
+// tool_calls,
 func (a *Agent) repairOrphanToolMessages(messages *[]ChatMessage) bool {
 	if messages == nil {
 		return false
@@ -2039,8 +2039,8 @@ func (a *Agent) repairOrphanToolMessages(messages *[]ChatMessage) bool {
 		}
 	}
 
-	// matchtool_calls（assistanttool_callstool）
-	// assistanttool_calls，AI
+	// matchtool_calls(assistanttool_callstool)
+	// assistanttool_calls,AI
 	if len(pending) > 0 {
 		// assistant
 		for i := len(cleaned) - 1; i >= 0; i-- {
@@ -2050,7 +2050,7 @@ func (a *Agent) repairOrphanToolMessages(messages *[]ChatMessage) bool {
 				validToolCalls := make([]ToolCall, 0)
 				for _, tc := range cleaned[i].ToolCalls {
 					if tc.ID != "" && pending[tc.ID] > 0 {
-						// tool_calltool，
+						// tool_calltool,
 						removed = true
 						delete(pending, tc.ID)
 					} else {
@@ -2060,7 +2060,7 @@ func (a *Agent) repairOrphanToolMessages(messages *[]ChatMessage) bool {
 				// ToolCalls
 				if len(validToolCalls) != originalCount {
 					cleaned[i].ToolCalls = validToolCalls
-					a.logger.Info("tool_calls，",
+					a.logger.Info("tool_calls,",
 						zap.Int("removed_count", originalCount-len(validToolCalls)),
 					)
 				}
@@ -2080,12 +2080,12 @@ func (a *Agent) repairOrphanToolMessages(messages *[]ChatMessage) bool {
 	return removed
 }
 
-// ToolsForRole returns Agent （OpenAI function format）， Eino DeepAgent MCP 。
+// ToolsForRole returns Agent (OpenAI function format), Eino DeepAgent MCP .
 func (a *Agent) ToolsForRole(roleTools []string) []Tool {
 	return a.getAvailableTools(roleTools)
 }
 
-// ExecuteMCPToolForConversation MCP （ Agent ， conversation_id）。
+// ExecuteMCPToolForConversation MCP ( Agent , conversation_id).
 func (a *Agent) ExecuteMCPToolForConversation(ctx context.Context, conversationID, toolName string, args map[string]interface{}) (*ToolExecutionResult, error) {
 	a.mu.Lock()
 	prev := a.currentConversationID

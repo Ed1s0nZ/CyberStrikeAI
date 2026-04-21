@@ -52,7 +52,7 @@ nmap -sn SUBNET | grep MAC  # First 3 octets = vendor
 ```
 
 ## Phase 5: Prioritize Targets
-1. Open ADB (5555) — instant shell
+1. Open ADB (5555) - instant shell
 2. IoT with default creds (cameras, routers)
 3. SMB with weak/reused passwords
 4. Unpatched services (EternalBlue, BlueKeep)

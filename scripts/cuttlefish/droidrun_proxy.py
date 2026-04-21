@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-CyberStrikeAI — DroidRun LLM Proxy Service
+CyberStrikeAI - DroidRun LLM Proxy Service
 ============================================
 Acts as a bridge between CyberStrikeAI's MCP tools and DroidRun's device
 control layer. Provides LLM-friendly formatted device state (UI tree +
 screenshots) and translates high-level LLM commands to device actions.
 
 This is easier for the LLM than raw ADB commands because:
-1. UI elements are indexed — LLM says "click(3)" instead of pixel coordinates
+1. UI elements are indexed - LLM says "click(3)" instead of pixel coordinates
 2. State is pre-formatted as readable text the LLM can reason about
 3. Screenshots are returned as base64 for vision-language models (Qwen3.5 VL)
 4. Actions return structured success/failure with descriptions
@@ -419,7 +419,7 @@ class DroidRunProxy:
             return ActionResult(False, "list_apps", "", "Not connected")
         try:
             apps = await self._driver.get_apps(include_system=include_system)
-            app_lines = [f"  {a.get('package', '')} — {a.get('label', '')}" for a in apps]
+            app_lines = [f"  {a.get('package', '')} - {a.get('label', '')}" for a in apps]
             summary = f"Found {len(apps)} apps:\n" + "\n".join(app_lines)
             return ActionResult(True, "list_apps", summary)
         except Exception as e:

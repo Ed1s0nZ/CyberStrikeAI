@@ -1,4 +1,4 @@
-# DroidRun Proxy — LLM-Friendly Android Device Control
+# DroidRun Proxy - LLM-Friendly Android Device Control
 
 ## Overview
 - Tool category: DroidRun proxy tools (12 MCP tools)
@@ -82,16 +82,16 @@ Example: Type into already-focused field
 ### droidrun_scroll
 Scroll the screen up or down.
 ```
-droidrun_scroll direction="down"  — scroll down to see more content
-droidrun_scroll direction="up"    — scroll back up
+droidrun_scroll direction="down"  - scroll down to see more content
+droidrun_scroll direction="up"    - scroll back up
 ```
 
 ### droidrun_button
 Press system buttons.
 ```
-droidrun_button button="back"   — navigate back
-droidrun_button button="home"   — go to home screen
-droidrun_button button="enter"  — submit text input / confirm
+droidrun_button button="back"   - navigate back
+droidrun_button button="home"   - go to home screen
+droidrun_button button="enter"  - submit text input / confirm
 ```
 
 ### droidrun_open_app
@@ -104,8 +104,8 @@ droidrun_open_app package_name="com.target.app"
 ### droidrun_list_apps
 List installed applications.
 ```
-droidrun_list_apps                        — user-installed apps only
-droidrun_list_apps include_system=true    — all apps including system
+droidrun_list_apps                        - user-installed apps only
+droidrun_list_apps include_system=true    - all apps including system
 ```
 
 ### droidrun_install
@@ -129,7 +129,7 @@ droidrun_swipe x1=540 y1=1800 x2=540 y2=600 duration_ms=500
 ### droidrun_wait
 Wait for a duration, then return fresh state.
 ```
-droidrun_wait seconds=2.0  — wait for loading/animation to complete
+droidrun_wait seconds=2.0  - wait for loading/animation to complete
 ```
 
 ## Model Usage Guidance
@@ -198,8 +198,8 @@ Cuttlefish VM (AOSP on QEMU/KVM)
 
 ## Configuration
 All settings under `agent.cuttlefish` in config.yaml:
-- `proxy_port: 18090` — HTTP port for the proxy service
-- `proxy_auto_start: true` — auto-start proxy with VM
-- `screenshot_dir: /tmp/droidrun_screenshots` — saved screenshots
-- `vision_enabled: true` — include base64 PNG in state responses
-- `droidrun_path: ~/droidrun` — DroidRun installation
+- `proxy_port: 18090` - HTTP port for the proxy service
+- `proxy_auto_start: true` - auto-start proxy with VM
+- `screenshot_dir: /tmp/droidrun_screenshots` - saved screenshots
+- `vision_enabled: true` - include base64 PNG in state responses
+- `droidrun_path: ~/droidrun` - DroidRun installation

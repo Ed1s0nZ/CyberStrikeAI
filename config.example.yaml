@@ -20,7 +20,7 @@ server:
   port: 18080 # HTTP service port; accessible in a browser at http://localhost:18080
 # Authentication configuration
 auth:
-  password: changeme # Web login password — please change this to a strong password
+  password: changeme # Web login password - please change this to a strong password
   session_duration_hours: 12 # Login session duration (hours); re-login required after expiry
 # Logging configuration
 log:
@@ -74,7 +74,7 @@ censys:
 # When the maximum iteration count is reached, the AI will automatically summarize the test results.
 agent:
   max_iterations: 120 # Maximum iteration count; maximum number of tool-call rounds for the AI agent
-  large_result_threshold: 102400 # Large-result threshold (bytes); default 50 KB — results exceeding this size are automatically saved to storage
+  large_result_threshold: 102400 # Large-result threshold (bytes); default 50 KB - results exceeding this size are automatically saved to storage
   result_storage_dir: /tmp # Result storage directory; large results will be saved here
   parallel_tool_execution: true # Execute multiple tool calls concurrently (true by default; set false to revert to sequential)
   max_parallel_tools: 10 # Max concurrent tool goroutines per iteration (0 = unlimited)
@@ -119,11 +119,11 @@ agent:
     gpu_mode: guest_swiftshader # GPU mode: guest_swiftshader (software, always works), drm_virgl (hardware accel)
     auto_launch: false       # Auto-launch Android VM when CyberStrikeAI server starts
     russian_identity: false  # Apply Russian phone identity on boot (locale, carrier, timezone, device model)
-    webrtc_port: 8443        # WebRTC display port — access VM screen at https://localhost:<port>
+    webrtc_port: 8443        # WebRTC display port - access VM screen at https://localhost:<port>
     droidrun_path: ""        # Path to DroidRun installation (default: ~/droidrun)
     droidrun_config: ""      # Path to DroidRun config YAML (default: <cvd_home>/droidrun/config.yaml)
     bridge_script: ""        # Path to droidrun-bridge.py (auto-detected from CyberStrikeAI scripts/)
-    proxy_port: 18090        # DroidRun proxy HTTP port — LLM-friendly device interaction service
+    proxy_port: 18090        # DroidRun proxy HTTP port - LLM-friendly device interaction service
     proxy_auto_start: true   # Auto-start proxy when Cuttlefish VM launches
     screenshot_dir: /tmp/droidrun_screenshots # Directory for proxy screenshots (VL model analysis)
     vision_enabled: true     # Include base64 screenshots in state responses (for VL models)
@@ -181,9 +181,9 @@ external_mcp:
       external_mcp_enable: true
       tool_enabled: {} # Empty = all tools enabled; customize per-tool with {tool_name: true/false}
       enabled: true
-    # ── Ghidra Headless MCP — Deep Binary Analysis ──────────────────────────
+    # ── Ghidra Headless MCP - Deep Binary Analysis ──────────────────────────
     # Standalone MCP server providing ~212 Ghidra reverse engineering tools.
-    # Supports: ELF, PE, Mach-O, APK/DEX, firmware, shellcode — any binary Ghidra can open.
+    # Supports: ELF, PE, Mach-O, APK/DEX, firmware, shellcode - any binary Ghidra can open.
     # Start manually: scripts/ghidra/start-ghidra-mcp.sh --install (first time)
     #                  scripts/ghidra/start-ghidra-mcp.sh --tcp     (subsequent runs)
     # Or let CyberStrikeAI auto-start it in stdio mode (set external_mcp_enable: true below).
@@ -195,8 +195,8 @@ external_mcp:
       env:
         GHIDRA_INSTALL_DIR: ""  # Set to your Ghidra installation path, e.g. /opt/ghidra
         GHIDRA_MCP_HOME: ""     # Path to ghidra-headless-mcp repo (default: ~/ghidra-headless-mcp)
-      description: "Ghidra Headless MCP — interactive binary reverse engineering (212 tools: decompile, disassemble, xrefs, types, patching, scripting)"
-      timeout: 600  # Binary analysis can take time — 10 min timeout
+      description: "Ghidra Headless MCP - interactive binary reverse engineering (212 tools: decompile, disassemble, xrefs, types, patching, scripting)"
+      timeout: 600  # Binary analysis can take time - 10 min timeout
       external_mcp_enable: false  # Enable after installing: scripts/ghidra/start-ghidra-mcp.sh --install
       tool_enabled: {}  # Empty = all tools enabled when server is active
 # ============================================
@@ -214,7 +214,7 @@ knowledge:
   retrieval:
     top_k: 10 # Number of Top-K results returned by retrieval
     similarity_threshold: 0.7 # Similarity threshold (0–1); results below this value are filtered out
-    hybrid_weight: 0.7 # Hybrid retrieval weight (0–1); weight of vector retrieval — 1.0 = pure vector retrieval, 0.0 = pure keyword retrieval
+    hybrid_weight: 0.7 # Hybrid retrieval weight (0–1); weight of vector retrieval - 1.0 = pure vector retrieval, 0.0 = pure keyword retrieval
 # ============================================
 # Bot Configuration (Lark/Feishu, Telegram)
 # ============================================

@@ -22,17 +22,17 @@ const DRAFT_STORAGE_KEY = 'cyberstrike-chat-draft';
 let draftSaveTimer = null;
 const DRAFT_SAVE_DELAY = 500; // 500ms
 
-// （，）
+// (,)
 const MAX_CHAT_FILES = 10;
-const CHAT_FILE_DEFAULT_PROMPT = '。';
+const CHAT_FILE_DEFAULT_PROMPT = '.';
 /**
- * ： POST /api/chat-uploads， serverPath（），。
+ * : POST /api/chat-uploads, serverPath(),.
  * @type {{ id: number, fileName: string, mimeType: string, serverPath: string|null, uploading: boolean, uploadPercent: number, uploadPromise: Promise<void>|null, uploadError: string|null }[]}
  */
 let chatAttachments = [];
 let chatAttachmentSeq = 0;
 
-// （Eino）： multi_agent.enabled， /agent-loop 
+// (Eino): multi_agent.enabled, /agent-loop 
 const AGENT_MODE_STORAGE_KEY = 'cyberstrike-chat-agent-mode';
 let multiAgentAPIEnabled = false;
 
@@ -134,7 +134,7 @@ document.addEventListener('languagechange', function () {
     }
 });
 
-// localStorage（）
+// localStorage()
 function saveChatDraftDebounced(content) {
  // 
     if (draftSaveTimer) {
@@ -158,11 +158,11 @@ function saveChatDraft(content) {
         if (trimmed && (!placeholderText || trimmed !== placeholderText)) {
             localStorage.setItem(DRAFT_STORAGE_KEY, content);
         } else {
- // ，
+ // ,
             localStorage.removeItem(DRAFT_STORAGE_KEY);
         }
     } catch (error) {
- // localStorage，
+ // localStorage,
  console.warn(':', error);
     }
 }
@@ -175,11 +175,11 @@ function restoreChatDraft() {
             return;
         }
         const placeholderText = (chatInput.getAttribute('placeholder') || '').trim();
- // value placeholder ，，
+ // value placeholder ,,
         if (placeholderText && chatInput.value.trim() === placeholderText) {
             chatInput.value = '';
         }
- // ，（）
+ // ,()
         if (chatInput.value && chatInput.value.trim().length > 0) {
             return;
         }
@@ -187,13 +187,13 @@ function restoreChatDraft() {
         const draft = localStorage.getItem(DRAFT_STORAGE_KEY);
         const trimmedDraft = draft ? draft.trim() : '';
 
- // ，，
+ // ,,
         if (trimmedDraft && (!placeholderText || trimmedDraft !== placeholderText)) {
             chatInput.value = draft;
  // 
             adjustTextareaHeight(chatInput);
         } else if (trimmedDraft && placeholderText && trimmedDraft === placeholderText) {
- // ，
+ // ,
             localStorage.removeItem(DRAFT_STORAGE_KEY);
         }
     } catch (error) {
@@ -204,7 +204,7 @@ function restoreChatDraft() {
 // 
 function clearChatDraft() {
     try {
- // ，
+ // ,
         localStorage.removeItem(DRAFT_STORAGE_KEY);
     } catch (error) {
  console.warn(':', error);
@@ -215,17 +215,17 @@ function clearChatDraft() {
 function adjustTextareaHeight(textarea) {
     if (!textarea) return;
     
- // auto，，scrollHeight
+ // auto,,scrollHeight
     textarea.style.height = 'auto';
  // 
     void textarea.offsetHeight;
     
- // （40px，300px）
+ // (40px,300px)
     const scrollHeight = textarea.scrollHeight;
     const newHeight = Math.min(Math.max(scrollHeight, 40), 300);
     textarea.style.height = newHeight + 'px';
     
- // ，
+ // ,
     if (!textarea.value || textarea.value.trim().length === 0) {
         textarea.style.height = '40px';
     }
@@ -246,7 +246,7 @@ async function sendMessage() {
         if (needWait) {
             const waitLabel = (typeof window.t === 'function')
                 ? window.t('chat.waitingAttachmentsUpload')
- : '…';
+ : '...';
             chatAttachmentProgressSet(true, 0, waitLabel);
         }
         try {
@@ -258,30 +258,30 @@ async function sendMessage() {
         if (bad.length) {
             const hint = (typeof window.t === 'function')
                 ? window.t('chat.attachmentsUploadIncomplete')
- : '，。';
+ : ',.';
             alert(hint);
             return;
         }
     }
 
- // ，（）
+ // ,()
     if (hasAttachments && !message) {
         message = CHAT_FILE_DEFAULT_PROMPT;
     }
 
- // （，）
+ // (,)
     const displayMessage = hasAttachments
         ? message + '\n' + chatAttachments.map(a => '📎 ' + a.fileName).join('\n')
         : message;
     addMessage('user', displayMessage);
     
- // ，
+ // ,
     if (draftSaveTimer) {
         clearTimeout(draftSaveTimer);
         draftSaveTimer = null;
     }
     
- // ，
+ // ,
     clearChatDraft();
  // 
     try {
@@ -290,12 +290,12 @@ async function sendMessage() {
  // 
     }
     
- // （）
+ // ()
     input.value = '';
- // （40px）
+ // (40px)
     input.style.height = '40px';
 
- // （）
+ // ()
     const body = {
         message: message,
         conversationId: currentConversationId,
@@ -312,7 +312,7 @@ async function sendMessage() {
     chatAttachments = [];
     renderChatFileChips();
 
- // （）
+ // ()
     const progressId = addProgressMessage();
     const progressElement = document.getElementById(progressId);
     registerProgressTask(progressId, currentConversationId);
@@ -379,7 +379,7 @@ async function sendMessage() {
             }
         }
         
- // ，
+ // ,
         clearChatDraft();
         try {
             localStorage.removeItem(DRAFT_STORAGE_KEY);
@@ -394,14 +394,14 @@ async function sendMessage() {
         if (isNetwork && typeof window.t === 'function') {
             addMessage('system', window.t('chat.streamNetworkErrorHint', { detail: msg }));
         } else if (isNetwork) {
- addMessage('system', '（' + msg + '）。，。');
+ addMessage('system', '(' + msg + ').,.');
         } else {
  addMessage('system', ': ' + msg);
         }
         if (typeof loadActiveTasks === 'function') {
             loadActiveTasks();
         }
- // ，，
+ // ,,
     }
 }
 
@@ -422,7 +422,7 @@ function renderChatFileChips() {
         name.title = a.fileName;
         let label = a.fileName;
         if (a.uploading) {
- label += ' · ' + ((typeof window.t === 'function') ? window.t('chat.attachmentUploading') : '…');
+ label += ' · ' + ((typeof window.t === 'function') ? window.t('chat.attachmentUploading') : '...');
         } else if (a.uploadError) {
  label += ' · ' + ((typeof window.t === 'function') ? window.t('chat.attachmentUploadFailed') : '');
         }
@@ -446,7 +446,7 @@ function removeChatAttachment(index) {
     refreshChatAttachmentUploadProgress();
 }
 
-// ，（）；
+// ,();
 function appendChatFilePrompt() {
     const input = document.getElementById('chat-input');
     if (!input || !chatAttachments.length) return;
@@ -541,7 +541,7 @@ async function uploadOneChatAttachment(entry, file) {
             cur.uploadError = msg;
             cur.serverPath = null;
         }
- alert(((typeof window.t === 'function') ? window.t('chat.attachmentUploadAlert', { name: file.name }) : ('：' + file.name)) + '\n' + msg);
+ alert(((typeof window.t === 'function') ? window.t('chat.attachmentUploadAlert', { name: file.name }) : (':' + file.name)) + '\n' + msg);
     }
     renderChatFileChips();
     refreshChatAttachmentUploadProgress();
@@ -551,7 +551,7 @@ async function addFilesToChat(files) {
     if (!files || !files.length) return;
     const next = Array.from(files);
     if (chatAttachments.length + next.length > MAX_CHAT_FILES) {
- alert(' ' + MAX_CHAT_FILES + ' ， ' + chatAttachments.length + ' 。');
+ alert(' ' + MAX_CHAT_FILES + ' , ' + chatAttachments.length + ' .');
         return;
     }
     next.forEach((file) => {
@@ -608,7 +608,7 @@ function setupChatFileUpload() {
     });
 }
 
-// chat-input-container id（）
+// chat-input-container id()
 function ensureChatInputContainerId() {
     const c = document.querySelector('.chat-input-container');
     if (c && !c.id) c.id = 'chat-input-container';
@@ -624,17 +624,17 @@ function setupMentionSupport() {
         });
     }
     ensureMentionToolsLoaded().catch(() => {
- // ，
+ // ,
     });
 }
 
-// （，）
+// (,)
 function refreshMentionTools() {
     mentionToolsLoaded = false;
     mentionTools = [];
     externalMcpNames = [];
     mentionToolsLoadingPromise = null;
- // @，
+ // @,
     if (mentionState.active) {
         ensureMentionToolsLoaded().catch(() => {
  // 
@@ -642,13 +642,13 @@ function refreshMentionTools() {
     }
 }
 
-// window，
+// window,
 if (typeof window !== 'undefined') {
     window.refreshMentionTools = refreshMentionTools;
 }
 
 function ensureMentionToolsLoaded() {
- // ，
+ // ,
     if (typeof window !== 'undefined' && window._mentionToolsRoleChanged) {
         mentionToolsLoaded = false;
         mentionTools = [];
@@ -667,10 +667,10 @@ function ensureMentionToolsLoaded() {
     return mentionToolsLoadingPromise;
 }
 
-// ，
+// ,
 function getToolKeyForMention(tool) {
- // ， external_mcp::tool.name 
- // ， tool.name 
+ // , external_mcp::tool.name 
+ // , tool.name 
     if (tool.is_external && tool.external_mcp) {
         return `${tool.external_mcp}::${tool.name}`;
     }
@@ -685,7 +685,7 @@ async function fetchMentionTools() {
     const collected = [];
 
     try {
- // （ roles.js ）
+ // ( roles.js )
         const roleName = typeof getCurrentRole === 'function' ? getCurrentRole() : '';
 
  // MCP
@@ -706,7 +706,7 @@ async function fetchMentionTools() {
         }
 
         while (page <= totalPages && page <= 20) {
- // API URL，，role
+ // API URL,,role
             let url = `/api/config/tools?page=${page}&page_size=${pageSize}`;
  if (roleName && roleName !== '') {
                 url += `&role=${encodeURIComponent(roleName)}`;
@@ -722,7 +722,7 @@ async function fetchMentionTools() {
                 if (!tool || !tool.name) {
                     return;
                 }
- // ，
+ // ,
                 const toolKey = getToolKeyForMention(tool);
                 if (seen.has(toolKey)) {
                     return;
@@ -730,8 +730,8 @@ async function fetchMentionTools() {
                 seen.add(toolKey);
 
  // 
- // role_enabled ，（）
- // enabled （）
+ // role_enabled ,()
+ // enabled ()
                 let roleEnabled = tool.enabled !== false;
                 if (tool.role_enabled !== undefined && tool.role_enabled !== null) {
                     roleEnabled = tool.role_enabled;
@@ -756,7 +756,7 @@ async function fetchMentionTools() {
         mentionTools = collected;
         mentionToolsLoaded = true;
     } catch (error) {
- console.warn('，@:', error);
+ console.warn(',@:', error);
     }
     return mentionTools;
 }
@@ -765,11 +765,11 @@ function handleChatInputInput(event) {
     const textarea = event.target;
     updateMentionStateFromInput(textarea);
  // 
- // requestAnimationFrameDOM，
+ // requestAnimationFrameDOM,
     requestAnimationFrame(() => {
         adjustTextareaHeight(textarea);
     });
- // localStorage（）
+ // localStorage()
     saveChatDraftDebounced(textarea.value);
 }
 
@@ -778,7 +778,7 @@ function handleChatInputClick(event) {
 }
 
 function handleChatInputKeydown(event) {
- // （IME），，
+ // (IME),,
  // event.isComposing isComposing 
     if (event.isComposing || isComposing) {
         return;
@@ -830,7 +830,7 @@ function updateMentionStateFromInput(textarea) {
  // 
     if (atIndex > 0) {
         const boundaryChar = textBefore[atIndex - 1];
-        if (boundaryChar && !/\s/.test(boundaryChar) && !'([{，。,.;:!?'.includes(boundaryChar)) {
+        if (boundaryChar && !/\s/.test(boundaryChar) && !'([{,.,.;:!?'.includes(boundaryChar)) {
             deactivateMentionState();
             return;
         }
@@ -883,7 +883,7 @@ function updateMentionCandidates() {
         );
 
         if (exactMatchedMcp) {
- // MCP，MCP
+ // MCP,MCP
             filtered = mentionTools.filter(tool => {
                 return tool.externalMcp && tool.externalMcp.toLowerCase() === exactMatchedMcp.toLowerCase();
             });
@@ -893,13 +893,13 @@ function updateMentionCandidates() {
                 mcpName.toLowerCase().includes(normalizedQuery)
             );
             
- // ：，MCP
+ // :,MCP
             filtered = mentionTools.filter(tool => {
                 const nameMatch = tool.name.toLowerCase().includes(normalizedQuery);
                 const descMatch = tool.description && tool.description.toLowerCase().includes(normalizedQuery);
                 const mcpMatch = tool.externalMcp && tool.externalMcp.toLowerCase().includes(normalizedQuery);
                 
- // MCP，MCP
+ // MCP,MCP
                 const mcpPartialMatch = partialMatchedMcps.some(mcpName => 
                     tool.externalMcp && tool.externalMcp.toLowerCase() === mcpName.toLowerCase()
                 );
@@ -910,7 +910,7 @@ function updateMentionCandidates() {
     }
 
     filtered = filtered.slice().sort((a, b) => {
- // ，
+ // ,
         if (a.roleEnabled !== undefined || b.roleEnabled !== undefined) {
             const aRoleEnabled = a.roleEnabled !== undefined ? a.roleEnabled : a.enabled;
             const bRoleEnabled = b.roleEnabled !== undefined ? b.roleEnabled : b.enabled;
@@ -933,7 +933,7 @@ function updateMentionCandidates() {
                 return aStarts ? -1 : 1;
             }
         }
- // ， roleEnabled； enabled
+ // , roleEnabled; enabled
         const aEnabled = a.roleEnabled !== undefined ? a.roleEnabled : a.enabled;
         const bEnabled = b.roleEnabled !== undefined ? b.roleEnabled : b.enabled;
         if (aEnabled !== bEnabled) {
@@ -979,7 +979,7 @@ function renderMentionSuggestions({ showLoading = false } = {}) {
 
     const itemsHtml = mentionFilteredTools.map((tool, index) => {
         const activeClass = index === mentionState.selectedIndex ? 'active' : '';
- // roleEnabled （），； enabled
+ // roleEnabled (),; enabled
         const toolEnabled = tool.roleEnabled !== undefined ? tool.roleEnabled : tool.enabled;
         const disabledClass = toolEnabled ? '' : 'disabled';
  const badge = tool.isExternal ? '<span class="mention-item-badge"></span>' : '<span class="mention-item-badge internal"></span>';
@@ -987,11 +987,11 @@ function renderMentionSuggestions({ showLoading = false } = {}) {
  const description = tool.description && tool.description.length > 0 ? escapeHtml(tool.description) : (typeof window.t === 'function' ? window.t('chat.noDescription') : '');
         const descHtml = `<div class="mention-item-desc">${description}</div>`;
  // 
- const statusLabel = toolEnabled ? '' : (tool.roleEnabled !== undefined ? '（）' : '');
+ const statusLabel = toolEnabled ? '' : (tool.roleEnabled !== undefined ? '()' : '');
         const statusClass = toolEnabled ? 'enabled' : 'disabled';
         const originLabel = tool.isExternal
- ? (tool.externalMcp ? `：${escapeHtml(tool.externalMcp)}` : '：MCP')
- : '：';
+ ? (tool.externalMcp ? `:${escapeHtml(tool.externalMcp)}` : ':MCP')
+ : ':';
 
         return `
             <button type="button" class="mention-item ${activeClass} ${disabledClass}" data-index="${index}">
@@ -1145,9 +1145,9 @@ function initializeChatUI() {
     if (chatInputEl) {
  // 
         adjustTextareaHeight(chatInputEl);
- // （，）
+ // (,)
         if (!chatInputEl.value || chatInputEl.value.trim() === '') {
- // （30），，，
+ // (30),,,
             const messagesDiv = document.getElementById('chat-messages');
             let shouldRestoreDraft = true;
             if (messagesDiv && messagesDiv.children.length > 0) {
@@ -1156,15 +1156,15 @@ function initializeChatUI() {
                 if (lastMessage) {
                     const timeDiv = lastMessage.querySelector('.message-time');
                     if (timeDiv && timeDiv.textContent) {
- // ，，
+ // ,,
                         const isUserMessage = lastMessage.classList.contains('user');
                         if (isUserMessage) {
- // ，30，
+ // ,30,
                             const now = new Date();
                             const messageTimeText = timeDiv.textContent;
- // ：（：HH:MM），，
- // ，
- // ：，，，
+ // :(:HH:MM),,
+ // ,
+ // :,,,
                             shouldRestoreDraft = false;
                         }
                     }
@@ -1173,7 +1173,7 @@ function initializeChatUI() {
             if (shouldRestoreDraft) {
                 restoreChatDraft();
             } else {
- // ，localStorage，
+ // ,localStorage,
                 clearChatDraft();
             }
         }
@@ -1181,7 +1181,7 @@ function initializeChatUI() {
 
     const messagesDiv = document.getElementById('chat-messages');
     if (messagesDiv && messagesDiv.childElementCount === 0) {
- const readyMsg = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '。，。';
+ const readyMsg = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '.,.';
         addMessage('assistant', readyMsg, null, null, null, { systemReadyMessage: true });
     }
 
@@ -1196,7 +1196,7 @@ function initializeChatUI() {
     setupChatFileUpload();
 }
 
-// ，ID
+// ,ID
 let messageCounter = 0;
 
 // 
@@ -1219,7 +1219,7 @@ function wrapTablesInBubble(bubble) {
 }
 
 /**
- * 「」（ addMessage ）
+ * ""( addMessage )
  */
 function refreshSystemReadyMessageBubbles() {
     if (typeof window.t !== 'function') return;
@@ -1270,7 +1270,7 @@ function refreshSystemReadyMessageBubbles() {
     });
 }
 
-// （options.systemReadyMessage true ，）
+// (options.systemReadyMessage true ,)
 function addMessage(role, content, mcpExecutionIds = null, progressId = null, createdAt = null, options = null) {
     const messagesDiv = document.getElementById('chat-messages');
     const messageDiv = document.createElement('div');
@@ -1315,11 +1315,11 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
         return div.innerHTML;
     };
     
- // ：，：
- // 1. Markdown，<code><pre>
- // 2. <code><pre>HTML（）
+ // :,:
+ // 1. Markdown,<code><pre>
+ // 2. <code><pre>HTML()
  // 3. DOMPurify
- // XSS，
+ // XSS,
     
     const parseMarkdown = (raw) => {
         if (typeof marked === 'undefined') {
@@ -1337,7 +1337,7 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
         }
     };
     
- // （）
+ // ()
     let displayContent = content;
     if (role === 'assistant' && typeof displayContent === 'string' && typeof window.t === 'function') {
  if (displayContent.indexOf(': ') === 0) {
@@ -1348,30 +1348,30 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
         }
     }
 
- // ，HTML，Markdown，
+ // ,HTML,Markdown,
     if (role === 'user') {
         formattedContent = escapeHtml(content).replace(/\n/g, '<br>');
     } else if (typeof DOMPurify !== 'undefined') {
- // Markdown（<code>/<pre>，DOMPurify）
+ // Markdown(<code>/<pre>,DOMPurify)
         let parsedContent = parseMarkdown(role === 'assistant' ? displayContent : content);
         if (!parsedContent) {
             parsedContent = content;
         }
         
- // DOMPurify，URL（DOMPurify）
+ // DOMPurify,URL(DOMPurify)
         if (DOMPurify.addHook) {
  // 
             try {
                 DOMPurify.removeHook('uponSanitizeAttribute');
             } catch (e) {
- // ，
+ // ,
             }
             
- // URL，（DOMPurify、style）
+ // URL,(DOMPurify,style)
             DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
                 const attrName = data.attrName.toLowerCase();
                 
- // URL（src, href）
+ // URL(src, href)
                 if ((attrName === 'src' || attrName === 'href') && data.attrValue) {
                     const value = data.attrValue.trim().toLowerCase();
  // 
@@ -1382,7 +1382,7 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
                         data.keepAttr = false;
                         return;
                     }
- // imgsrc，URL（404XSS）
+ // imgsrc,URL(404XSS)
                     if (attrName === 'src' && node.tagName && node.tagName.toLowerCase() === 'img') {
                         if (value.length <= 2 || /^[a-z]$/i.test(value)) {
                             data.keepAttr = false;
@@ -1409,14 +1409,14 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
     
     bubble.innerHTML = formattedContent;
     
- // ：（404XSS）
- // DOMPurifyXSS，
+ // :(404XSS)
+ // DOMPurifyXSS,
     const images = bubble.querySelectorAll('img');
     images.forEach(img => {
         const src = img.getAttribute('src');
         if (src) {
             const trimmedSrc = src.trim();
- // URL（、）
+ // URL(,)
             if (trimmedSrc.length <= 2 || /^[a-z]$/i.test(trimmedSrc)) {
                 img.remove();
             }
@@ -1430,12 +1430,12 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
     
     contentWrapper.appendChild(bubble);
     
- // ，
+ // ,
     if (role === 'assistant') {
         messageDiv.dataset.originalContent = content;
     }
     
- // （）- 
+ // ()- 
     if (role === 'assistant') {
         const copyBtn = document.createElement('button');
         copyBtn.className = 'message-copy-btn';
@@ -1451,7 +1451,7 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
  // 
     const timeDiv = document.createElement('div');
     timeDiv.className = 'message-time';
- // ，；
+ // ,;
     let messageTime;
     if (createdAt) {
  // Date
@@ -1462,7 +1462,7 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
         } else {
             messageTime = new Date(createdAt);
         }
- // ，
+ // ,
         if (isNaN(messageTime.getTime())) {
             messageTime = new Date();
         }
@@ -1478,7 +1478,7 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
     } catch (e) { /* ignore */ }
     contentWrapper.appendChild(timeDiv);
     
- // MCP ； progressId （， integrate ）
+ // MCP ; progressId (, integrate )
     if (role === 'assistant' && (mcpExecutionIds && Array.isArray(mcpExecutionIds) && mcpExecutionIds.length > 0) && !progressId) {
         const mcpSection = document.createElement('div');
         mcpSection.className = 'mcp-call-section';
@@ -1505,7 +1505,7 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
     }
     
     messageDiv.appendChild(contentWrapper);
- // 「」，
+ // "",
     if (options && options.systemReadyMessage) {
         messageDiv.setAttribute('data-system-ready-message', '1');
     }
@@ -1514,7 +1514,7 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
     return id;
 }
 
-// （Markdown）
+// (Markdown)
 function copyMessageToClipboard(messageDiv, button) {
     try {
  // Markdown
@@ -1522,7 +1522,7 @@ function copyMessageToClipboard(messageDiv, button) {
 
  // 
         const doCopy = (text) => {
- // Clipboard API（ HTTPS localhost）
+ // Clipboard API( HTTPS localhost)
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 return navigator.clipboard.writeText(text).then(() => {
                     showCopySuccess(button);
@@ -1531,12 +1531,12 @@ function copyMessageToClipboard(messageDiv, button) {
                     fallbackCopy(text);
                 });
             } else {
- // ： execCommand （ HTTP ）
+ // : execCommand ( HTTP )
                 return fallbackCopy(text);
             }
         };
 
- // （ document.execCommand）
+ // ( document.execCommand)
         const fallbackCopy = (text) => {
             try {
                 const textArea = document.createElement('textarea');
@@ -1559,18 +1559,18 @@ function copyMessageToClipboard(messageDiv, button) {
                 }
             } catch (execErr) {
  console.error(':', execErr);
- alert(typeof window.t === 'function' ? window.t('chat.copyFailedManual') : '，');
+ alert(typeof window.t === 'function' ? window.t('chat.copyFailedManual') : ',');
             }
         };
 
         if (!originalContent) {
- // ，HTML（）
+ // ,HTML()
             const bubble = messageDiv.querySelector('.message-bubble');
             if (bubble) {
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = bubble.innerHTML;
                 
- // （）
+ // ()
                 const copyBtnInTemp = tempDiv.querySelector('.message-copy-btn');
                 if (copyBtnInTemp) {
                     copyBtnInTemp.remove();
@@ -1589,7 +1589,7 @@ function copyMessageToClipboard(messageDiv, button) {
         doCopy(originalContent);
     } catch (error) {
  console.error(':', error);
- alert(typeof window.t === 'function' ? window.t('chat.copyFailedManual') : '，');
+ alert(typeof window.t === 'function' ? window.t('chat.copyFailedManual') : ',');
     }
 }
 
@@ -1631,29 +1631,29 @@ function renderProcessDetails(messageId, processDetails) {
         }
     }
     
- // （）
+ // ()
     let mcpLabel = mcpSection.querySelector('.mcp-call-label');
     let buttonsContainer = mcpSection.querySelector('.mcp-call-buttons');
     
- // ，（）
+ // ,()
     if (!mcpLabel && !buttonsContainer) {
         mcpLabel = document.createElement('div');
         mcpLabel.className = 'mcp-call-label';
  mcpLabel.textContent = '📋 ' + (typeof window.t === 'function' ? window.t('chat.penetrationTestDetail') : '');
         mcpSection.appendChild(mcpLabel);
  } else if (mcpLabel && mcpLabel.textContent !== ('📋 ' + (typeof window.t === 'function' ? window.t('chat.penetrationTestDetail') : ''))) {
- // ，
+ // ,
  mcpLabel.textContent = '📋 ' + (typeof window.t === 'function' ? window.t('chat.penetrationTestDetail') : '');
     }
     
- // ，
+ // ,
     if (!buttonsContainer) {
         buttonsContainer = document.createElement('div');
         buttonsContainer.className = 'mcp-call-buttons';
         mcpSection.appendChild(buttonsContainer);
     }
     
- // （）
+ // ()
     let processDetailBtn = buttonsContainer.querySelector('.process-detail-btn');
     if (!processDetailBtn) {
         processDetailBtn = document.createElement('button');
@@ -1663,7 +1663,7 @@ function renderProcessDetails(messageId, processDetails) {
         buttonsContainer.appendChild(processDetailBtn);
     }
     
- // （）
+ // ()
     const detailsId = 'process-details-' + messageId;
     let detailsContainer = document.getElementById(detailsId);
     
@@ -1679,7 +1679,7 @@ function renderProcessDetails(messageId, processDetails) {
         }
     }
     
- // （processDetails，）
+ // (processDetails,)
     const timelineId = detailsId + '-timeline';
     let timeline = document.getElementById(timelineId);
     
@@ -1695,24 +1695,24 @@ function renderProcessDetails(messageId, processDetails) {
         detailsContainer.appendChild(contentDiv);
     }
     
- // processDetails === null “（）”
+ // processDetails === null "()"
     const isLazyNotLoaded = (processDetails === null);
     if (isLazyNotLoaded) {
         detailsContainer.dataset.lazyNotLoaded = '1';
         detailsContainer.dataset.loaded = '0';
         timeline.innerHTML = '<div class="progress-timeline-empty">' +
  (typeof window.t === 'function' ? window.t('chat.expandDetail') : '') +
- '（）</div>';
+ '()</div>';
  // 
         timeline.classList.remove('expanded');
         return;
     }
     detailsContainer.dataset.lazyNotLoaded = '0';
     detailsContainer.dataset.loaded = '1';
- // processDetails，
+ // processDetails,
     if (!processDetails || processDetails.length === 0) {
  // 
- timeline.innerHTML = '<div class="progress-timeline-empty">' + (typeof window.t === 'function' ? window.t('chat.noProcessDetail') : '（）') + '</div>';
+ timeline.innerHTML = '<div class="progress-timeline-empty">' + (typeof window.t === 'function' ? window.t('chat.noProcessDetail') : '()') + '</div>';
  // 
         timeline.classList.remove('expanded');
         return;
@@ -1778,7 +1778,7 @@ function renderProcessDetails(messageId, processDetails) {
         });
     });
     
- // ，，
+ // ,,
     const hasErrorOrCancelled = processDetails.some(d => 
         d.eventType === 'error' || d.eventType === 'cancelled'
     );
@@ -1801,14 +1801,14 @@ function removeMessage(id) {
     }
 }
 
-// （ / @）
+// ( / @)
 const chatInput = document.getElementById('chat-input');
 if (chatInput) {
     chatInput.addEventListener('keydown', handleChatInputKeydown);
     chatInput.addEventListener('input', handleChatInputInput);
     chatInput.addEventListener('click', handleChatInputClick);
     chatInput.addEventListener('focus', handleChatInputClick);
- // IME，
+ // IME,
     chatInput.addEventListener('compositionstart', () => {
         isComposing = true;
     });
@@ -1821,7 +1821,7 @@ if (chatInput) {
                 deactivateMentionState();
             }
         }, 120);
- // （）
+ // ()
         if (chatInput.value) {
             saveChatDraft(chatInput.value);
         }
@@ -1832,7 +1832,7 @@ if (chatInput) {
 window.addEventListener('beforeunload', () => {
     const chatInput = document.getElementById('chat-input');
     if (chatInput && chatInput.value) {
- // ，
+ // ,
         saveChatDraft(chatInput.value);
     }
 });
@@ -1844,12 +1844,12 @@ async function updateButtonWithToolName(button, executionId, index) {
         if (response.ok) {
             const exec = await response.json();
  const toolName = exec.toolName || (typeof window.t === 'function' ? window.t('chat.unknownTool') : '');
- // （ name::toolName ， toolName ）
+ // ( name::toolName , toolName )
             const displayToolName = toolName.includes('::') ? toolName.split('::')[1] : toolName;
             button.querySelector('span').textContent = `${displayToolName} #${index}`;
         }
     } catch (error) {
- // ，
+ // ,
  console.error(':', error);
     }
 }
@@ -1876,7 +1876,7 @@ async function showMCPDetail(executionId) {
             if (detailTimeEl) {
                 detailTimeEl.textContent = exec.startTime
                     ? new Date(exec.startTime).toLocaleString(detailTimeLocale)
-                    : '—';
+                    : '-';
                 try {
                     detailTimeEl.dataset.detailTimeIso = exec.startTime ? new Date(exec.startTime).toISOString() : '';
                 } catch (e) { /* ignore */ }
@@ -1916,14 +1916,14 @@ async function showMCPDetail(executionId) {
                 responseElement.textContent = JSON.stringify(responseData, null, 2);
 
                 if (exec.result.isError) {
- // ： + 
+ // : + 
                     responseElement.className = 'code-block error';
                     if (exec.error && errorSection && errorElement) {
                         errorSection.style.display = 'block';
                         errorElement.textContent = exec.error;
                     }
                 } else {
- // ：，
+ // :,
                     responseElement.className = 'code-block';
                     if (successSection && successElement) {
                         successSection.style.display = 'block';
@@ -1942,7 +1942,7 @@ async function showMCPDetail(executionId) {
                             successText = content.text;
                         }
                         if (!successText) {
- successText = typeof window.t === 'function' ? window.t('mcpDetailModal.execSuccessNoContent') : '，。';
+ successText = typeof window.t === 'function' ? window.t('mcpDetailModal.execSuccessNoContent') : ',.';
                         }
                         successElement.textContent = successText;
                     }
@@ -2031,14 +2031,14 @@ function copyDetailBlock(elementId, triggerBtn = null) {
                 triggerBtn.disabled = false;
  triggerBtn.textContent = triggerBtn.dataset.originalLabel || originalLabel || '';
             }
- alert('，。');
+ alert(',.');
         });
 }
 
 
 // 
 async function startNewConversation() {
- // ，
+ // ,
     if (currentGroupId) {
         const groupDetailPage = document.getElementById('group-detail-page');
         const chatContainer = document.querySelector('.chat-container');
@@ -2052,20 +2052,20 @@ async function startNewConversation() {
     currentConversationId = null;
  currentConversationGroupId = null; // 
     document.getElementById('chat-messages').innerHTML = '';
- const readyMsgNew = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '。，。';
+ const readyMsgNew = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '.,.';
     addMessage('assistant', readyMsgNew, null, null, null, { systemReadyMessage: true });
     addAttackChainButton(null);
     updateActiveConversation();
- // ，
+ // ,
     await loadGroups();
- // ，
+ // ,
     loadConversationsWithGroups();
- // ，
+ // ,
     if (draftSaveTimer) {
         clearTimeout(draftSaveTimer);
         draftSaveTimer = null;
     }
- // ，
+ // ,
     clearChatDraft();
  // 
     const chatInput = document.getElementById('chat-input');
@@ -2075,7 +2075,7 @@ async function startNewConversation() {
     }
 }
 
-// （）
+// ()
 async function loadConversations(searchQuery = '') {
     try {
         let url = '/api/conversations?limit=50';
@@ -2096,7 +2096,7 @@ async function loadConversations(searchQuery = '') {
         const emptyStateHtml = '<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.875rem;" data-i18n="chat.noHistoryConversations"></div>';
         listContainer.innerHTML = '';
 
- // 200，（，）
+ // 200,(,)
         if (!response.ok) {
             listContainer.innerHTML = emptyStateHtml;
             if (typeof window.applyTranslations === 'function') window.applyTranslations(listContainer);
@@ -2189,7 +2189,7 @@ async function loadConversations(searchQuery = '') {
         }
     } catch (error) {
  console.error(':', error);
- // ，（）
+ // ,()
         const listContainer = document.getElementById('conversations-list');
         if (listContainer) {
             const emptyStateHtml = '<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.875rem;" data-i18n="chat.noHistoryConversations"></div>';
@@ -2250,7 +2250,7 @@ function createConversationListItem(conversation) {
 // 
 let conversationSearchTimer = null;
 function handleConversationSearch(query) {
- // ，
+ // ,
     if (conversationSearchTimer) {
         clearTimeout(conversationSearchTimer);
     }
@@ -2290,7 +2290,7 @@ function formatConversationTimestamp(dateObj, todayStart, yesterdayStart) {
     if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) {
         return '';
     }
- // todayStart，
+ // todayStart,
     const now = new Date();
     const referenceToday = todayStart || new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const referenceYesterday = yesterdayStart || new Date(referenceToday.getTime() - 24 * 60 * 60 * 1000);
@@ -2341,7 +2341,7 @@ function getConversationGroup(dateObj, todayStart, startOfWeek, yesterdayStart) 
 // 
 async function loadConversation(conversationId) {
     try {
- // ： processDetails，；
+ // : processDetails,;
         const response = await apiFetch(`/api/conversations/${conversationId}?include_process_details=0`);
         const conversation = await response.json();
         
@@ -2350,8 +2350,8 @@ async function loadConversation(conversationId) {
             return;
         }
         
- // ，
- // ，，
+ // ,
+ // ,,
         if (currentGroupId) {
             const sidebar = document.querySelector('.conversation-sidebar');
             const groupDetailPage = document.getElementById('group-detail-page');
@@ -2359,35 +2359,35 @@ async function loadConversation(conversationId) {
             
  // 
             if (sidebar) sidebar.style.display = 'flex';
- // ，
+ // ,
             if (groupDetailPage) groupDetailPage.style.display = 'none';
             if (chatContainer) chatContainer.style.display = 'flex';
             
- // ，
- // ，
+ // ,
+ // ,
             const previousGroupId = currentGroupId;
             currentGroupId = null;
             
- // ，（）
+ // ,()
             loadConversationsWithGroups();
         }
         
- // ID（）
+ // ID()
  // 
         if (Object.keys(conversationGroupMappingCache).length === 0) {
             await loadConversationGroupMapping();
         }
         currentConversationGroupId = conversationGroupMappingCache[conversationId] || null;
         
- // ，，
- // ，UI
+ // ,,
+ // ,UI
         await loadGroups();
         
  // ID
         currentConversationId = conversationId;
         updateActiveConversation();
         
- // ，
+ // ,
         const attackChainModal = document.getElementById('attack-chain-modal');
         if (attackChainModal && attackChainModal.style.display === 'block') {
             if (currentAttackChainConversationId !== conversationId) {
@@ -2399,12 +2399,12 @@ async function loadConversation(conversationId) {
         const messagesDiv = document.getElementById('chat-messages');
         messagesDiv.innerHTML = '';
         
- // ，，（）
+ // ,,()
         let hasRecentUserMessage = false;
         if (conversation.messages && conversation.messages.length > 0) {
             const lastMessage = conversation.messages[conversation.messages.length - 1];
             if (lastMessage && lastMessage.role === 'user') {
- // ，30，
+ // ,30,
                 const messageTime = new Date(lastMessage.createdAt);
                 const now = new Date();
                 const timeDiff = now.getTime() - messageTime.getTime();
@@ -2414,7 +2414,7 @@ async function loadConversation(conversationId) {
             }
         }
         if (hasRecentUserMessage) {
- // ，
+ // ,
             clearChatDraft();
             const chatInput = document.getElementById('chat-input');
             if (chatInput) {
@@ -2426,7 +2426,7 @@ async function loadConversation(conversationId) {
  // 
         if (conversation.messages && conversation.messages.length > 0) {
             conversation.messages.forEach(msg => {
- // "..."，，processDetails
+ // "...",,processDetails
                 let displayContent = msg.content;
  if (msg.role === 'assistant' && msg.content === '...' && msg.processDetails && msg.processDetails.length > 0) {
  // errorcancelled
@@ -2441,19 +2441,19 @@ async function loadConversation(conversationId) {
                 
  // 
                 const messageId = addMessage(msg.role, displayContent, msg.mcpExecutionIds || [], null, msg.createdAt);
- // messageId，
+ // messageId,
                 const messageEl = document.getElementById(messageId);
                 if (messageEl && msg && msg.id) {
                     messageEl.dataset.backendMessageId = String(msg.id);
                 }
- // ，（processDetails）
+ // ,(processDetails)
                 if (msg.role === 'assistant') {
- // ，
+ // ,
                     setTimeout(() => {
- // processDetails ， null “，”
+ // processDetails , null ","
                         const hasField = msg && Object.prototype.hasOwnProperty.call(msg, 'processDetails');
                         renderProcessDetails(messageId, hasField ? (msg.processDetails || []) : null);
- // ，，，
+ // ,,,
                         if (msg.processDetails && msg.processDetails.length > 0) {
                             const hasErrorOrCancelled = msg.processDetails.some(d => 
                                 d.eventType === 'error' || d.eventType === 'cancelled'
@@ -2466,7 +2466,7 @@ async function loadConversation(conversationId) {
                 }
             });
         } else {
- const readyMsgEmpty = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '。，。';
+ const readyMsgEmpty = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '.,.';
             addMessage('assistant', readyMsgEmpty, null, null, null, { systemReadyMessage: true });
         }
         
@@ -2486,9 +2486,9 @@ async function loadConversation(conversationId) {
 
 // 
 async function deleteConversation(conversationId, skipConfirm = false) {
- // （）
+ // ()
     if (!skipConfirm) {
- if (!confirm('？。')) {
+ if (!confirm('?.')) {
             return;
         }
     }
@@ -2503,32 +2503,32 @@ async function deleteConversation(conversationId, skipConfirm = false) {
  throw new Error(error.error || '');
         }
         
- // ，
+ // ,
         if (conversationId === currentConversationId) {
             currentConversationId = null;
             document.getElementById('chat-messages').innerHTML = '';
- const readyMsgLoad = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '。，。';
+ const readyMsgLoad = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '.,.';
             addMessage('assistant', readyMsgLoad, null, null, null, { systemReadyMessage: true });
             addAttackChainButton(null);
         }
         
- // - ，
+ // - ,
         delete conversationGroupMappingCache[conversationId];
  // 
         delete pendingGroupMappings[conversationId];
         
- // ，
+ // ,
         if (currentGroupId) {
             await loadGroupConversations(currentGroupId);
         }
         
- // （）
+ // ()
         if (typeof loadConversationsWithGroups === 'function') {
             loadConversationsWithGroups();
         } else if (typeof loadConversations === 'function') {
             loadConversations();
         }
- // （ WebShell AI ），
+ // ( WebShell AI ),
         try {
             document.dispatchEvent(new CustomEvent('conversation-deleted', { detail: { conversationId } }));
         } catch (e) { /* ignore */ }
@@ -2552,7 +2552,7 @@ function updateActiveConversation() {
 
 let attackChainCytoscape = null;
 let currentAttackChainConversationId = null;
-// ID，
+// ID,
 const attackChainLoadingMap = new Map(); // Map<conversationId, boolean>
 
 // 
@@ -2569,10 +2569,10 @@ function setAttackChainLoading(conversationId, loading) {
     }
 }
 
-// （，，）
+// (,,)
 function addAttackChainButton(conversationId) {
- // ，
- // ，
+ // ,
+ // ,
     const conversationHeader = document.getElementById('conversation-header');
     if (conversationHeader) {
         conversationHeader.style.display = 'none';
@@ -2585,13 +2585,13 @@ function updateAttackChainAvailability() {
 
 // 
 async function showAttackChain(conversationId) {
- // ID，，
- // ，（）
+ // ID,,
+ // ,()
     if (isAttackChainLoading(conversationId) && currentAttackChainConversationId === conversationId) {
- // ，
+ // ,
         const modal = document.getElementById('attack-chain-modal');
         if (modal && modal.style.display === 'block') {
- console.log('，');
+ console.log(',');
             return;
         }
     }
@@ -2604,7 +2604,7 @@ async function showAttackChain(conversationId) {
     }
     
     modal.style.display = 'block';
- // （）
+ // ()
     updateAttackChainStats({ nodes: [], edges: [] });
 
  // 
@@ -2643,7 +2643,7 @@ async function loadAttackChain(conversationId) {
         const response = await apiFetch(`/api/attack-chain/${conversationId}`);
         
         if (!response.ok) {
- // 409 Conflict（）
+ // 409 Conflict()
             if (response.status === 409) {
                 const error = await response.json();
                 const container = document.getElementById('attack-chain-container');
@@ -2652,7 +2652,7 @@ async function loadAttackChain(conversationId) {
                         <div style="text-align: center; padding: 28px 24px; color: var(--text-secondary);">
                             <div style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.95rem; color: var(--text-primary);">
                                 <span role="presentation" aria-hidden="true">⏳</span>
- <span>，</span>
+ <span>,</span>
                             </div>
                             <button class="btn-secondary" onclick="refreshAttackChain()" style="margin-top: 12px; font-size: 0.78rem; padding: 4px 12px;">
  
@@ -2660,25 +2660,25 @@ async function loadAttackChain(conversationId) {
                         </div>
                     `;
                 }
- // 5（，）
- // conversationId，
+ // 5(,)
+ // conversationId,
                 setTimeout(() => {
  // ID
                     if (currentAttackChainConversationId === conversationId) {
                         refreshAttackChain();
                     }
                 }, 5000);
- // 409 ，，
+ // 409 ,,
  // refreshAttackChain loadAttackChain 
- // ：，
- // （，）
+ // :,
+ // (,)
                 const regenerateBtn = document.querySelector('button[onclick="regenerateAttackChain()"]');
                 if (regenerateBtn) {
                     regenerateBtn.disabled = false;
                     regenerateBtn.style.opacity = '1';
                     regenerateBtn.style.cursor = 'pointer';
                 }
- return; // ， finally setAttackChainLoading(conversationId, false)
+ return; // , finally setAttackChainLoading(conversationId, false)
             }
             
             const error = await response.json();
@@ -2687,9 +2687,9 @@ async function loadAttackChain(conversationId) {
         
         const chainData = await response.json();
         
- // ID，
+ // ID,
         if (currentAttackChainConversationId !== conversationId) {
- console.log('，，', {
+ console.log(',,', {
                 returned: conversationId,
                 current: currentAttackChainConversationId
             });
@@ -2703,7 +2703,7 @@ async function loadAttackChain(conversationId) {
  // 
         updateAttackChainStats(chainData);
         
- // ，
+ // ,
         setAttackChainLoading(conversationId, false);
         
     } catch (error) {
@@ -2740,23 +2740,23 @@ function renderAttackChain(chainData) {
         return;
     }
     
- // （）
+ // ()
     const nodeCount = chainData.nodes.length;
     const edgeCount = chainData.edges.length;
     const isComplexGraph = nodeCount > 15 || edgeCount > 25;
     
- // ：
+ // :
     chainData.nodes.forEach(node => {
         if (node.label) {
- // ：、
+ // :,
             const maxLength = isComplexGraph ? 18 : 22;
             if (node.label.length > maxLength) {
                 let truncated = node.label.substring(0, maxLength);
  // 
                 const lastPunct = Math.max(
-                    truncated.lastIndexOf('，'),
-                    truncated.lastIndexOf('。'),
-                    truncated.lastIndexOf('、'),
+                    truncated.lastIndexOf(','),
+                    truncated.lastIndexOf('.'),
+                    truncated.lastIndexOf(','),
                     truncated.lastIndexOf(' '),
                     truncated.lastIndexOf('/')
                 );
@@ -2771,18 +2771,18 @@ function renderAttackChain(chainData) {
  // Cytoscape
     const elements = [];
     
- // ，，
+ // ,,
     chainData.nodes.forEach(node => {
         const riskScore = node.risk_score || 0;
         const nodeType = node.type || '';
         
- // （）
+ // ()
         let typeLabel = '';
         let typeBadge = '';
         let typeColor = '';
         if (nodeType === 'target') {
  typeLabel = '';
- typeBadge = '○'; // ，
+ typeBadge = '○'; // ,
  typeColor = '#1976d2'; // 
         } else if (nodeType === 'action') {
  typeLabel = '';
@@ -2790,7 +2790,7 @@ function renderAttackChain(chainData) {
  typeColor = '#f57c00'; // 
         } else if (nodeType === 'vulnerability') {
  typeLabel = '';
- typeBadge = '◇'; // ，
+ typeBadge = '◇'; // ,
  typeColor = '#d32f2f'; // 
         } else {
             typeLabel = nodeType;
@@ -2801,32 +2801,32 @@ function renderAttackChain(chainData) {
  // 
         let textColor, borderColor, textOutlineWidth, textOutlineColor;
         if (riskScore >= 80) {
- // ：，
+ // :,
             textColor = '#fff';
             borderColor = '#fff';
             textOutlineWidth = 1;
             textOutlineColor = '#333';
         } else if (riskScore >= 60) {
- // ：，
+ // :,
             textColor = '#fff';
             borderColor = '#fff';
             textOutlineWidth = 1;
             textOutlineColor = '#333';
         } else if (riskScore >= 40) {
- // ：，
+ // :,
             textColor = '#333';
             borderColor = '#cc9900';
             textOutlineWidth = 2;
             textOutlineColor = '#fff';
         } else {
- // ：，
+ // :,
             textColor = '#1a5a1a';
             borderColor = '#5a8a5a';
             textOutlineWidth = 2;
             textOutlineColor = '#fff';
         }
         
- // ，（）
+ // ,()
         elements.push({
             data: {
                 id: node.id,
@@ -2847,7 +2847,7 @@ function renderAttackChain(chainData) {
         });
     });
     
- // （）
+ // ()
     const nodeIds = new Set(chainData.nodes.map(node => node.id));
     
  // ELK
@@ -2866,7 +2866,7 @@ function renderAttackChain(chainData) {
                 }
             });
         } else {
- console.warn('：', {
+ console.warn(':', {
                 edgeId: edge.id,
                 source: edge.source,
                 target: edge.target,
@@ -2884,14 +2884,14 @@ function renderAttackChain(chainData) {
             {
                 selector: 'node',
                 style: {
- // ：，
+ // :,
                     'label': function(ele) {
                         const typeLabel = ele.data('typeLabel') || '';
                         const label = ele.data('label') || '';
- // ： + 
+ // : + 
                         return typeLabel + '\n' + label;
                     },
- // ，
+ // ,
                     'width': function(ele) {
                         const type = ele.data('type');
                         if (type === 'target') return isComplexGraph ? 280 : 320;
@@ -2905,17 +2905,17 @@ function renderAttackChain(chainData) {
                         return isComplexGraph ? 80 : 100;
                     },
                     'shape': 'round-rectangle',
- // ： + 
+ // : + 
                     'background-color': '#FFFFFF',
                     'background-opacity': 1,
- // （）
+ // ()
                     'border-width': function(ele) {
                         const type = ele.data('type');
- return 0; // ，
+ return 0; // ,
                     },
                     'border-color': 'transparent',
- // ：
- 'color': '#2C3E50', // ，
+ // :
+ 'color': '#2C3E50', // ,
                     'font-size': function(ele) {
                         const type = ele.data('type');
                         if (type === 'target') return isComplexGraph ? '14px' : '16px';
@@ -2941,7 +2941,7 @@ function renderAttackChain(chainData) {
                 }
             },
             {
- // ：
+ // :
                 selector: 'node[type = "target"]',
                 style: {
                     'background-color': '#E3F2FD',
@@ -2952,7 +2952,7 @@ function renderAttackChain(chainData) {
                 }
             },
             {
- // ：
+ // :
                 selector: 'node[type = "action"]',
                 style: {
                     'background-color': function(ele) {
@@ -2987,7 +2987,7 @@ function renderAttackChain(chainData) {
                 }
             },
             {
- // ：
+ // :
                 selector: 'node[type = "vulnerability"]',
                 style: {
                     'background-color': function(ele) {
@@ -3018,7 +3018,7 @@ function renderAttackChain(chainData) {
             {
                 selector: 'edge',
                 style: {
- // ：
+ // :
                     'width': function(ele) {
                         const type = ele.data('type');
  if (type === 'discovers') return 2.5; // 
@@ -3074,7 +3074,7 @@ function renderAttackChain(chainData) {
         boxSelectionEnabled: true
     });
     
- // ELK（DAG，）
+ // ELK(DAG,)
     let layoutOptions = {
         name: 'breadthfirst',
         directed: true,
@@ -3083,7 +3083,7 @@ function renderAttackChain(chainData) {
     };
     
  // ELK.js
- // elk.bundled.jsELK，new ELK()
+ // elk.bundled.jsELK,new ELK()
     let elkInstance = null;
     if (typeof ELK !== 'undefined') {
         try {
@@ -3106,7 +3106,7 @@ function renderAttackChain(chainData) {
  'elk.spacing.edgeNode': '50', // 
  'elk.spacing.edgeEdge': '25', // 
  'elk.layered.spacing.nodeNodeBetweenLayers': String(isComplexGraph ? 150 : 180), // 
- 'elk.layered.nodePlacement.strategy': 'SIMPLE', // ，
+ 'elk.layered.nodePlacement.strategy': 'SIMPLE', // ,
  'elk.layered.crossingMinimization.strategy': 'INTERACTIVE', // 
  'elk.layered.thoroughness': '10', // 
                     'elk.layered.spacing.edgeNodeBetweenLayers': '50',
@@ -3115,7 +3115,7 @@ function renderAttackChain(chainData) {
                     'elk.layered.crossingMinimization.forceNodeModelOrder': 'true',
                     'elk.layered.cycleBreaking.strategy': 'GREEDY',
                     'elk.layered.thoroughness': '7',
- 'elk.padding': '[top=60,left=100,bottom=60,right=100]', // ，
+ 'elk.padding': '[top=60,left=100,bottom=60,right=100]', // ,
  'elk.spacing.componentComponent': String(isComplexGraph ? 100 : 120) // 
                 },
                 children: chainData.nodes.map(node => {
@@ -3151,7 +3151,7 @@ function renderAttackChain(chainData) {
                         }
                     });
                     
- // ，
+ // ,
                     setTimeout(() => {
                         centerAttackChain();
                     }, 150);
@@ -3159,7 +3159,7 @@ function renderAttackChain(chainData) {
  throw new Error('ELK');
                 }
             }).catch(err => {
- console.warn('ELK，:', err);
+ console.warn('ELK,:', err);
  // 
                 const layout = attackChainCytoscape.layout(layoutOptions);
                 layout.one('layoutstop', () => {
@@ -3170,7 +3170,7 @@ function renderAttackChain(chainData) {
                 layout.run();
             });
         } catch (e) {
- console.warn('ELK，:', e);
+ console.warn('ELK,:', e);
  // 
             const layout = attackChainCytoscape.layout(layoutOptions);
             layout.one('layoutstop', () => {
@@ -3181,7 +3181,7 @@ function renderAttackChain(chainData) {
             layout.run();
         }
     } else {
- console.warn('ELK.js，。elkjs。');
+ console.warn('ELK.js,.elkjs.');
  // 
         const layout = attackChainCytoscape.layout(layoutOptions);
         layout.one('layoutstop', () => {
@@ -3208,12 +3208,12 @@ function renderAttackChain(chainData) {
             const containerHeight = container.offsetHeight;
             
             if (containerWidth === 0 || containerHeight === 0) {
- // 0，
+ // 0,
                 setTimeout(centerAttackChain, 100);
                 return;
             }
             
- // ，
+ // ,
  const padding = 80; // 
             attackChainCytoscape.fit(undefined, padding);
             
@@ -3229,14 +3229,14 @@ function renderAttackChain(chainData) {
                 const graphHeight = extent.y2 - extent.y1;
                 const currentZoom = attackChainCytoscape.zoom();
                 
- // ，
+ // ,
                 const availableWidth = containerWidth - padding * 2;
                 const availableHeight = containerHeight - padding * 2;
                 const widthScale = graphWidth > 0 ? availableWidth / (graphWidth * currentZoom) : 1;
                 const heightScale = graphHeight > 0 ? availableHeight / (graphHeight * currentZoom) : 1;
                 const scale = Math.min(widthScale, heightScale);
                 
- // （0.8-1.3）
+ // (0.8-1.3)
                 if (scale > 1 && scale < 1.3) {
                     attackChainCytoscape.zoom(currentZoom * scale);
                 } else if (scale < 0.8) {
@@ -3274,7 +3274,7 @@ function renderAttackChain(chainData) {
         showNodeDetails(node.data());
     });
     
- // （CSS）
+ // (CSS)
     attackChainCytoscape.on('mouseover', 'node', function(evt) {
         const node = evt.target;
         node.style('border-width', 5);
@@ -3315,7 +3315,7 @@ function getEdgeNodes(edge) {
     }
 }
 
-// （）
+// ()
 function filterAttackChainNodes(searchText) {
     if (!attackChainCytoscape || !window.attackChainOriginalData) {
         return;
@@ -3333,7 +3333,7 @@ function filterAttackChainNodes(searchText) {
     
  // 
     attackChainCytoscape.nodes().forEach(node => {
- // ，
+ // ,
         const originalLabel = node.data('originalLabel') || node.data('label') || '';
         const label = originalLabel.toLowerCase();
         const type = (node.data('type') || '').toLowerCase();
@@ -3513,7 +3513,7 @@ function showNodeDetails(nodeData) {
  // requestAnimationFrame 
     requestAnimationFrame(() => {
         detailsPanel.style.display = 'flex';
- // ，
+ // ,
         requestAnimationFrame(() => {
             detailsPanel.style.opacity = '1';
         });
@@ -3534,7 +3534,7 @@ function showNodeDetails(nodeData) {
         </div>
     `;
     
- // action（ + AI）
+ // action( + AI)
     if (nodeData.type === 'action' && nodeData.metadata) {
         if (nodeData.metadata.tool_name) {
             html += `
@@ -3576,7 +3576,7 @@ function showNodeDetails(nodeData) {
         }
     }
     
- // （）
+ // ()
     if (nodeData.type === 'target' && nodeData.metadata && nodeData.metadata.target) {
         html += `
             <div class="node-detail-item">
@@ -3585,7 +3585,7 @@ function showNodeDetails(nodeData) {
         `;
     }
     
- // （）
+ // ()
     if (nodeData.type === 'vulnerability' && nodeData.metadata) {
         if (nodeData.metadata.vulnerability_type) {
             html += `
@@ -3625,7 +3625,7 @@ function showNodeDetails(nodeData) {
         `;
     }
     
- // ，
+ // ,
     if (detailsContent) {
         detailsContent.scrollTop = 0;
     }
@@ -3635,20 +3635,20 @@ function showNodeDetails(nodeData) {
  // 
         detailsContent.innerHTML = html;
         
- // ， DOM 
+ // , DOM 
         requestAnimationFrame(() => {
  // 
             if (detailsContent) {
                 detailsContent.scrollTop = 0;
             }
             
- // ，
+ // ,
             const sidebar = document.querySelector('.attack-chain-sidebar-content');
             if (sidebar) {
  // 
                 const detailsPanel = document.getElementById('attack-chain-details');
                 if (detailsPanel && detailsPanel.offsetParent !== null) {
- // getBoundingClientRect ，
+ // getBoundingClientRect ,
                     const detailsRect = detailsPanel.getBoundingClientRect();
                     const sidebarRect = sidebar.getBoundingClientRect();
                     const scrollTop = sidebar.scrollTop;
@@ -3681,7 +3681,7 @@ function getNodeTypeLabel(type) {
     return labels[type] || type;
 }
 
-// （ i18n， attackChainModal.nodesEdges ）
+// ( i18n, attackChainModal.nodesEdges )
 function updateAttackChainStats(chainData) {
     const statsElement = document.getElementById('attack-chain-stats');
     if (statsElement) {
@@ -3698,7 +3698,7 @@ function updateAttackChainStats(chainData) {
     }
 }
 
-// （ textContent applyTranslations ）
+// ( textContent applyTranslations )
 document.addEventListener('languagechange', function () {
     if (window.attackChainOriginalData && typeof updateAttackChainStats === 'function') {
         updateAttackChainStats(window.attackChainOriginalData);
@@ -3750,20 +3750,20 @@ function closeAttackChainModal() {
     currentAttackChainConversationId = null;
 }
 
-// （）
-// ：，
+// ()
+// :,
 function refreshAttackChain() {
     if (currentAttackChainConversationId) {
- // ，（）
+ // ,()
         const wasLoading = isAttackChainLoading(currentAttackChainConversationId);
- setAttackChainLoading(currentAttackChainConversationId, false); // ，
+ setAttackChainLoading(currentAttackChainConversationId, false); // ,
         loadAttackChain(currentAttackChainConversationId).finally(() => {
- // （409 ），
- // false（）
+ // (409 ),
+ // false()
             if (wasLoading) {
- // （ 409， loadAttackChain ）
- // ，
- // 409，loadAttackChain 
+ // ( 409, loadAttackChain )
+ // ,
+ // 409,loadAttackChain 
             }
         });
     }
@@ -3775,13 +3775,13 @@ async function regenerateAttackChain() {
         return;
     }
     
- // （）
+ // ()
     if (isAttackChainLoading(currentAttackChainConversationId)) {
- console.log('，...');
+ console.log(',...');
         return;
     }
     
- // ID，
+ // ID,
     const savedConversationId = currentAttackChainConversationId;
     setAttackChainLoading(savedConversationId, true);
     
@@ -3805,7 +3805,7 @@ async function regenerateAttackChain() {
         });
         
         if (!response.ok) {
- // 409 Conflict（）
+ // 409 Conflict()
             if (response.status === 409) {
                 const error = await response.json();
                 if (container) {
@@ -3813,7 +3813,7 @@ async function regenerateAttackChain() {
                         <div class="loading-spinner" style="text-align: center; padding: 40px;">
  <div style="margin-bottom: 16px;">⏳ ...</div>
                             <div style="color: var(--text-secondary); font-size: 0.875rem;">
- ，
+ ,
                             </div>
                             <button class="btn-secondary" onclick="refreshAttackChain()" style="margin-top: 16px;">
  
@@ -3824,7 +3824,7 @@ async function regenerateAttackChain() {
  // 5
  // savedConversationId 
                 setTimeout(() => {
- // ID，
+ // ID,
                     if (currentAttackChainConversationId === savedConversationId && 
                         isAttackChainLoading(savedConversationId)) {
                         refreshAttackChain();
@@ -3839,9 +3839,9 @@ async function regenerateAttackChain() {
         
         const chainData = await response.json();
         
- // ID，
+ // ID,
         if (currentAttackChainConversationId !== savedConversationId) {
- console.log('，，', {
+ console.log(',,', {
                 returned: savedConversationId,
                 current: currentAttackChainConversationId
             });
@@ -3879,7 +3879,7 @@ function exportAttackChain(format) {
         return;
     }
     
- // （）
+ // ()
     setTimeout(() => {
         try {
             if (format === 'png') {
@@ -3910,7 +3910,7 @@ function exportAttackChain(format) {
  alert('PNG: ' + (err.message || ''));
                         });
                     } else {
- // Promise，
+ // Promise,
                         const url = URL.createObjectURL(pngPromise);
                         const a = document.createElement('a');
                         a.href = url;
@@ -3927,7 +3927,7 @@ function exportAttackChain(format) {
             } else if (format === 'svg') {
                 try {
  // Cytoscape.js 3.x .svg() 
- // ： Cytoscape SVG
+ // : Cytoscape SVG
                     const container = attackChainCytoscape.container();
                     if (!container) {
  throw new Error('');
@@ -3941,7 +3941,7 @@ function exportAttackChain(format) {
  throw new Error('');
                     }
                     
- // （）
+ // ()
                     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
                     nodes.forEach(node => {
                         const pos = node.position();
@@ -3997,7 +3997,7 @@ function exportAttackChain(format) {
  // defs 
                     const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
                     
- // （）
+ // ()
                     const edgeTypes = ['discovers', 'targets', 'enables', 'leads_to'];
                     edgeTypes.forEach((type, index) => {
                         let color = '#999';
@@ -4021,7 +4021,7 @@ function exportAttackChain(format) {
                     });
                     svg.appendChild(defs);
                     
- // （，）
+ // (,)
                     edges.forEach(edge => {
                         const { source, target, valid } = getEdgeNodes(edge);
                         if (!valid) {
@@ -4040,9 +4040,9 @@ function exportAttackChain(format) {
                         else if (edgeType === 'enables') lineColor = '#e74c3c';
                         else if (edgeType === 'leads_to') lineColor = '#666';
                         
- // （）
+ // ()
                         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
- // （）
+ // ()
                         const midX = (sourcePos.x + targetPos.x) / 2;
                         const midY = (sourcePos.y + targetPos.y) / 2;
                         const dx = targetPos.x - sourcePos.x;
@@ -4101,7 +4101,7 @@ function exportAttackChain(format) {
                             ].join(' ');
                             shapeElement.setAttribute('points', points);
                         } else if (nodeType === 'target') {
- // （）
+ // ()
                             shapeElement = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
                             const points = [];
                             for (let i = 0; i < 5; i++) {
@@ -4127,17 +4127,17 @@ function exportAttackChain(format) {
                         shapeElement.setAttribute('stroke-width', '2');
                         svg.appendChild(shapeElement);
                         
- // （）
- // ，
+ // ()
+ // ,
                         const label = (nodeData.originalLabel || nodeData.label || nodeData.id || '').toString();
                         const maxLength = 15;
                         
- // ，
+ // ,
                         const textGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
                         textGroup.setAttribute('text-anchor', 'middle');
                         textGroup.setAttribute('dominant-baseline', 'middle');
                         
- // （）
+ // ()
                         let lines = [];
                         if (label.length > maxLength) {
                             const words = label.split(' ');
@@ -4156,19 +4156,19 @@ function exportAttackChain(format) {
                             lines = [label];
                         }
                         
- // （）
+ // ()
                         let textOutlineColor = '#fff';
                         let textOutlineWidth = 2;
                         if (riskScore >= 80 || riskScore >= 60) {
- // /：，，
+ // /:,,
                             textOutlineColor = '#333';
                             textOutlineWidth = 1;
                         } else if (riskScore >= 40) {
- // ：，
+ // :,
                             textOutlineColor = '#fff';
                             textOutlineWidth = 2;
                         } else {
- // ：，
+ // :,
                             textOutlineColor = '#fff';
                             textOutlineWidth = 2;
                         }
@@ -4177,7 +4177,7 @@ function exportAttackChain(format) {
                         lines.forEach((line, i) => {
                             const textY = pos.y + (i - (lines.length - 1) / 2) * 16;
                             
- // （，text-outline）
+ // (,text-outline)
                             const strokeText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                             strokeText.setAttribute('x', pos.x.toString());
                             strokeText.setAttribute('y', textY.toString());
@@ -4194,7 +4194,7 @@ function exportAttackChain(format) {
                             strokeText.textContent = line;
                             textGroup.appendChild(strokeText);
                             
- // （）
+ // ()
                             const fillText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                             fillText.setAttribute('x', pos.x.toString());
                             fillText.setAttribute('y', textY.toString());
@@ -4247,15 +4247,15 @@ function exportAttackChain(format) {
 // 
 // ============================================
 
-// （API）
+// (API)
 let currentGroupId = null; // 
-let currentConversationGroupId = null; // ID（）
+let currentConversationGroupId = null; // ID()
 let contextMenuConversationId = null;
 let contextMenuGroupId = null;
 let groupsCache = [];
 let conversationGroupMappingCache = {};
-let pendingGroupMappings = {}; // （API）
-let conversationsListLoadSeq = 0; // ，
+let pendingGroupMappings = {}; // (API)
+let conversationsListLoadSeq = 0; // ,
 
 // 
 async function loadGroups() {
@@ -4270,7 +4270,7 @@ async function loadGroups() {
         if (Array.isArray(data)) {
             groupsCache = data;
         } else {
- // ，（，）
+ // ,(,)
             groupsCache = [];
         }
 
@@ -4283,15 +4283,15 @@ async function loadGroups() {
             return;
         }
 
- // ：（，）
+ // :(,)
         const sortedGroups = [...groupsCache];
 
             sortedGroups.forEach(group => {
             const groupItem = document.createElement('div');
             groupItem.className = 'group-item';
- // ：
- // 1. ，（currentGroupId）
- // 2. ，（currentConversationGroupId）
+ // :
+ // 1. ,(currentGroupId)
+ // 2. ,(currentConversationGroupId)
             const shouldHighlight = currentGroupId 
                 ? (currentGroupId === group.id)
                 : (currentConversationGroupId === group.id);
@@ -4318,7 +4318,7 @@ async function loadGroups() {
             content.appendChild(icon);
             content.appendChild(name);
 
- // ，
+ // ,
             if (isPinned) {
                 const pinIcon = document.createElement('span');
                 pinIcon.className = 'group-item-pinned';
@@ -4348,18 +4348,18 @@ async function loadGroups() {
     }
 }
 
-// （）
+// ()
 async function loadConversationsWithGroups(searchQuery = '') {
     const loadSeq = ++conversationsListLoadSeq;
     try {
- // ，
+ // ,
  // 
         await loadGroups();
         if (loadSeq !== conversationsListLoadSeq) return;
         await loadConversationGroupMapping();
         if (loadSeq !== conversationsListLoadSeq) return;
 
- // ，limit
+ // ,limit
         const limit = (searchQuery && searchQuery.trim()) ? 1000 : 100;
         let url = `/api/conversations?limit=${limit}`;
         if (searchQuery && searchQuery.trim()) {
@@ -4380,7 +4380,7 @@ async function loadConversationsWithGroups(searchQuery = '') {
         const emptyStateHtml = '<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.875rem;" data-i18n="chat.noHistoryConversations"></div>';
         listContainer.innerHTML = '';
 
- // 200，（，）
+ // 200,(,)
         if (!response.ok) {
             listContainer.innerHTML = emptyStateHtml;
             if (typeof window.applyTranslations === 'function') window.applyTranslations(listContainer);
@@ -4390,7 +4390,7 @@ async function loadConversationsWithGroups(searchQuery = '') {
         const conversations = await response.json();
         if (loadSeq !== conversationsListLoadSeq) return;
 
- // ：ID，ID
+ // :ID,ID
         const uniqueConversations = [];
         const seenConversationIds = new Set();
         (Array.isArray(conversations) ? conversations : []).forEach(conv => {
@@ -4413,9 +4413,9 @@ async function loadConversationsWithGroups(searchQuery = '') {
         const hasSearchQuery = searchQuery && searchQuery.trim();
 
         uniqueConversations.forEach(conv => {
- // ，（，）
+ // ,(,)
             if (hasSearchQuery) {
- // ，
+ // ,
                 if (conv.pinned) {
                     pinnedConvs.push(conv);
                 } else {
@@ -4424,11 +4424,11 @@ async function loadConversationsWithGroups(searchQuery = '') {
                 return;
             }
 
- // ，
+ // ,
  // ""
- // ，""
+ // ,""
             if (conversationGroupMappingCache[conv.id]) {
- // ，""
+ // ,""
                 return;
             }
 
@@ -4485,7 +4485,7 @@ async function loadConversationsWithGroups(searchQuery = '') {
     } catch (error) {
         if (loadSeq !== conversationsListLoadSeq) return;
  console.error(':', error);
- // ，（）
+ // ,()
         const listContainer = document.getElementById('conversations-list');
         if (listContainer) {
             const emptyStateHtml = '<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.875rem;" data-i18n="chat.noHistoryConversations"></div>';
@@ -4535,7 +4535,7 @@ function createConversationListItemWithMenu(conversation, isPinned) {
     time.textContent = formatConversationTimestamp(dateObj);
     contentWrapper.appendChild(time);
 
- // ，
+ // ,
     const groupId = conversationGroupMappingCache[conversation.id];
     if (groupId) {
         const group = groupsCache.find(g => g.id === groupId);
@@ -4577,7 +4577,7 @@ async function showConversationContextMenu(event) {
     const menu = document.getElementById('conversation-context-menu');
     if (!menu) return;
 
- // ，
+ // ,
     const submenu = document.getElementById('move-to-group-submenu');
     if (submenu) {
         submenu.style.display = 'none';
@@ -4606,7 +4606,7 @@ async function showConversationContextMenu(event) {
                 attackChainMenuItem.style.opacity = '0.5';
                 attackChainMenuItem.style.cursor = 'not-allowed';
                 attackChainMenuItem.onclick = null;
- attackChainMenuItem.title = '，';
+ attackChainMenuItem.title = ',';
             } else {
                 attackChainMenuItem.style.opacity = '1';
                 attackChainMenuItem.style.cursor = 'pointer';
@@ -4621,7 +4621,7 @@ async function showConversationContextMenu(event) {
         }
     }
     
- // （）
+ // ()
     if (convId) {
         try {
             let isPinned = false;
@@ -4630,7 +4630,7 @@ async function showConversationContextMenu(event) {
             const isInCurrentGroup = currentGroupId && conversationGroupId === currentGroupId;
             
             if (isInCurrentGroup) {
- // ，
+ // ,
                 const response = await apiFetch(`/api/groups/${currentGroupId}/conversations`);
                 if (response.ok) {
                     const groupConvs = await response.json();
@@ -4640,7 +4640,7 @@ async function showConversationContextMenu(event) {
                     }
                 }
             } else {
- // ，，
+ // ,,
                 const response = await apiFetch(`/api/conversations/${convId}`);
                 if (response.ok) {
                     const conv = await response.json();
@@ -4681,28 +4681,28 @@ async function showConversationContextMenu(event) {
  // 
     void menu.offsetHeight;
     
- // ，
+ // ,
     const menuRect = menu.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     
- // （，submenu）
+ // (,submenu)
  const submenuWidth = submenu ? 180 : 0; // + 
     
     let left = event.clientX;
     let top = event.clientY;
     
- // ，
+ // ,
  // 
     if (left + menuRect.width + submenuWidth > viewportWidth) {
         left = event.clientX - menuRect.width;
- // ，
+ // ,
         if (left < 0) {
             left = Math.max(8, event.clientX - menuRect.width - submenuWidth);
         }
     }
     
- // ，
+ // ,
     if (top + menuRect.height > viewportHeight) {
         top = Math.max(8, event.clientY - menuRect.height);
     }
@@ -4720,7 +4720,7 @@ async function showConversationContextMenu(event) {
     menu.style.left = left + 'px';
     menu.style.top = top + 'px';
     
- // ，
+ // ,
     if (left < event.clientX) {
         if (submenu) {
             submenu.style.left = 'auto';
@@ -4776,7 +4776,7 @@ async function showGroupContextMenu(event, groupId) {
 
     contextMenuGroupId = groupId;
 
- // （）
+ // ()
     try {
  // 
         let group = groupsCache.find(g => g.id === groupId);
@@ -4785,7 +4785,7 @@ async function showGroupContextMenu(event, groupId) {
         if (group) {
             isPinned = group.pinned || false;
         } else {
- // ，API
+ // ,API
             const response = await apiFetch(`/api/groups/${groupId}`);
             if (response.ok) {
                 group = await response.json();
@@ -4818,7 +4818,7 @@ async function showGroupContextMenu(event, groupId) {
  // 
     void menu.offsetHeight;
     
- // ，
+ // ,
     const menuRect = menu.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
@@ -4826,12 +4826,12 @@ async function showGroupContextMenu(event, groupId) {
     let left = event.clientX;
     let top = event.clientY;
     
- // ，
+ // ,
     if (left + menuRect.width > viewportWidth) {
         left = event.clientX - menuRect.width;
     }
     
- // ，
+ // ,
     if (top + menuRect.height > viewportHeight) {
         top = event.clientY - menuRect.height;
     }
@@ -4895,7 +4895,7 @@ async function renameConversation() {
             }
         }
 
- // ，
+ // ,
         const groupItem = document.querySelector(`.group-conversation-item[data-conversation-id="${convId}"]`);
         if (groupItem) {
             const groupTitleEl = groupItem.querySelector('.group-conversation-title');
@@ -4923,19 +4923,19 @@ async function pinConversation() {
 
     try {
  // 
- // ，conversationGroupMappingCache 
+ // ,conversationGroupMappingCache 
  // IDID
         const conversationGroupId = conversationGroupMappingCache[convId];
         const isInCurrentGroup = currentGroupId && conversationGroupId === currentGroupId;
         
- // ，，
+ // ,,
         if (isInCurrentGroup) {
  // 
             const response = await apiFetch(`/api/groups/${currentGroupId}/conversations`);
             const groupConvs = await response.json();
             const conv = groupConvs.find(c => c.id === convId);
             
- // ，，
+ // ,,
             const currentPinned = conv && conv.groupPinned !== undefined ? conv.groupPinned : false;
             const newPinned = !currentPinned;
 
@@ -4951,7 +4951,7 @@ async function pinConversation() {
  // 
             loadGroupConversations(currentGroupId);
         } else {
- // ，，
+ // ,,
             const response = await apiFetch(`/api/conversations/${convId}`);
             const conv = await response.json();
             const newPinned = !conv.pinned;
@@ -4980,12 +4980,12 @@ async function showMoveToGroupSubmenu() {
     const submenu = document.getElementById('move-to-group-submenu');
     if (!submenu) return;
 
- // ，
+ // ,
     if (submenuVisible && submenu.style.display === 'block') {
         return;
     }
 
- // ，
+ // ,
     if (submenuLoading) {
         return;
     }
@@ -4999,12 +4999,12 @@ async function showMoveToGroupSubmenu() {
 
  // - 
     try {
- // ，
+ // ,
         if (!Array.isArray(groupsCache) || groupsCache.length === 0) {
             await loadGroups();
         } else {
- // ，，
- // ，
+ // ,,
+ // ,
             try {
                 const response = await apiFetch('/api/groups');
                 if (response.ok) {
@@ -5014,26 +5014,26 @@ async function showMoveToGroupSubmenu() {
                     }
                 }
             } catch (err) {
- // ，
- console.warn('，:', err);
+ // ,
+ console.warn(',:', err);
             }
         }
         
  // 
         if (!Array.isArray(groupsCache)) {
- console.warn('groupsCache ，');
+ console.warn('groupsCache ,');
             groupsCache = [];
- // ，
+ // ,
             if (groupsCache.length === 0) {
                 await loadGroups();
             }
         }
     } catch (error) {
  console.error(':', error);
- // ，，
+ // ,,
     }
 
- // ，""
+ // ,""
     if (currentGroupId && contextMenuConversationId) {
  // 
         const convInGroup = conversationGroupMappingCache[contextMenuConversationId] === currentGroupId;
@@ -5061,11 +5061,11 @@ async function showMoveToGroupSubmenu() {
 
  // groupsCache 
     if (!Array.isArray(groupsCache)) {
- console.warn('groupsCache ，');
+ console.warn('groupsCache ,');
         groupsCache = [];
     }
 
- // ，（）
+ // ,()
     if (groupsCache.length > 0) {
  // ID
         const conversationCurrentGroupId = contextMenuConversationId 
@@ -5079,7 +5079,7 @@ async function showMoveToGroupSubmenu() {
                 return;
             }
             
- // ，（）
+ // ,()
             if (conversationCurrentGroupId && group.id === conversationCurrentGroupId) {
                 return;
             }
@@ -5098,8 +5098,8 @@ async function showMoveToGroupSubmenu() {
             submenu.appendChild(item);
         });
     } else {
- // ，
- console.warn('showMoveToGroupSubmenu: groupsCache ，');
+ // ,
+ console.warn('showMoveToGroupSubmenu: groupsCache ,');
     }
 
  // ""
@@ -5121,13 +5121,13 @@ async function showMoveToGroupSubmenu() {
     submenuVisible = true;
     submenuLoading = false;
     
- // ，
+ // ,
     setTimeout(() => {
         const submenuRect = submenu.getBoundingClientRect();
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
         
- // ，
+ // ,
         if (submenuRect.right > viewportWidth) {
             submenu.style.left = 'auto';
             submenu.style.right = '100%';
@@ -5135,7 +5135,7 @@ async function showMoveToGroupSubmenu() {
             submenu.style.marginRight = '4px';
         }
         
- // ，
+ // ,
         if (submenuRect.bottom > viewportHeight) {
             const overflow = submenuRect.bottom - viewportHeight;
             const currentTop = parseInt(submenu.style.top) || 0;
@@ -5219,12 +5219,12 @@ function handleDownloadMarkdownSubmenuLeave(event) {
     }, 200);
 }
 
-// ""（）
+// ""()
 function handleMoveToGroupSubmenuEnter() {
  // 
     clearSubmenuHideTimeout();
     
- // ，
+ // ,
     const submenu = document.getElementById('move-to-group-submenu');
     if (submenu && submenuVisible && submenu.style.display === 'block') {
         return;
@@ -5233,7 +5233,7 @@ function handleMoveToGroupSubmenuEnter() {
  // 
     clearSubmenuShowTimeout();
     
- // ，
+ // ,
     submenuShowTimeout = setTimeout(() => {
         showMoveToGroupSubmenu();
         submenuShowTimeout = null;
@@ -5251,14 +5251,14 @@ function handleMoveToGroupSubmenuLeave(event) {
  // 
     const relatedTarget = event.relatedTarget;
     if (relatedTarget && submenu.contains(relatedTarget)) {
- // ，
+ // ,
         return;
     }
     
  // 
     clearSubmenuHideTimeout();
     
- // ，
+ // ,
     submenuHideTimeout = setTimeout(() => {
         hideMoveToGroupSubmenu();
         submenuHideTimeout = null;
@@ -5283,32 +5283,32 @@ async function moveConversationToGroup(convId, groupId) {
         const oldGroupId = conversationGroupMappingCache[convId];
         conversationGroupMappingCache[convId] = groupId;
         
- // ，API
+ // ,API
         pendingGroupMappings[convId] = groupId;
         
- // ， currentConversationGroupId
+ // , currentConversationGroupId
         if (currentConversationId === convId) {
             currentConversationGroupId = groupId;
         }
         
- // ，
+ // ,
         if (currentGroupId) {
- // ，，
+ // ,,
             if (currentGroupId === oldGroupId || currentGroupId === groupId) {
                 await loadGroupConversations(currentGroupId);
             }
         }
         
- // ，
- // ，
- // loadConversationsWithGroups loadConversationGroupMapping，
+ // ,
+ // ,
+ // loadConversationsWithGroups loadConversationGroupMapping,
  // loadConversationGroupMapping pendingGroupMappings 
         await loadConversationsWithGroups();
         
- // ：pendingGroupMappings loadConversationGroupMapping 
- // （ loadConversationGroupMapping ）
+ // :pendingGroupMappings loadConversationGroupMapping 
+ // ( loadConversationGroupMapping )
         
- // ，
+ // ,
         await loadGroups();
     } catch (error) {
  console.error(':', error);
@@ -5325,29 +5325,29 @@ async function removeConversationFromGroup(convId, groupId) {
             method: 'DELETE',
         });
 
- // - ，
+ // - ,
         delete conversationGroupMappingCache[convId];
  // 
         delete pendingGroupMappings[convId];
         
- // ， currentConversationGroupId
+ // , currentConversationGroupId
         if (currentConversationId === convId) {
             currentConversationGroupId = null;
         }
         
- // ，
+ // ,
         if (currentGroupId === groupId) {
             await loadGroupConversations(groupId);
         }
         
- // ，
+ // ,
         await loadConversationGroupMapping();
         
- // ，
+ // ,
         await loadGroups();
         
- // ，
- // currentGroupId， null，
+ // ,
+ // currentGroupId, null,
         const savedGroupId = currentGroupId;
         currentGroupId = null;
         await loadConversationsWithGroups();
@@ -5363,22 +5363,22 @@ async function removeConversationFromGroup(convId, groupId) {
 // 
 async function loadConversationGroupMapping() {
     try {
- // ，
+ // ,
         let groups;
         if (Array.isArray(groupsCache) && groupsCache.length > 0) {
             groups = groupsCache;
         } else {
             const response = await apiFetch('/api/groups');
             if (!response.ok) {
- // API，，（）
+ // API,,()
                 groups = [];
             } else {
                 groups = await response.json();
- // groups，
+ // groups,
                 if (!Array.isArray(groups)) {
- // null/undefined（）
+ // null/undefined()
                     if (groups !== null && groups !== undefined) {
- console.warn('loadConversationGroupMapping: groups，', groups);
+ console.warn('loadConversationGroupMapping: groups,', groups);
                     }
                     groups = [];
                 }
@@ -5397,7 +5397,7 @@ async function loadConversationGroupMapping() {
             if (Array.isArray(conversations)) {
                 conversations.forEach(conv => {
                     conversationGroupMappingCache[conv.id] = group.id;
- // ，（）
+ // ,()
                     if (preservedMappings[conv.id] === group.id) {
                         delete pendingGroupMappings[conv.id];
                     }
@@ -5405,7 +5405,7 @@ async function loadConversationGroupMapping() {
             }
         }
         
- // （API）
+ // (API)
         Object.assign(conversationGroupMappingCache, preservedMappings);
     } catch (error) {
  console.error(':', error);
@@ -5529,7 +5529,7 @@ async function downloadConversationMarkdownFromContext(includeToolDetails = fals
     if (!convId) return;
 
     try {
- // ：
+ // :
         const response = await apiFetch(`/api/conversations/${convId}?include_process_details=1`);
         let conversation = null;
         try {
@@ -5567,9 +5567,9 @@ function deleteConversationFromContext() {
     const convId = contextMenuConversationId;
     if (!convId) return;
 
- const confirmMsg = typeof window.t === 'function' ? window.t('chat.deleteConversationConfirm') : '？';
+ const confirmMsg = typeof window.t === 'function' ? window.t('chat.deleteConversationConfirm') : '?';
     if (confirm(confirmMsg)) {
- deleteConversation(convId, true); // ，
+ deleteConversation(convId, true); // ,
     }
     closeContextMenu();
 }
@@ -5600,7 +5600,7 @@ function closeContextMenu() {
 // 
 let allConversationsForBatch = [];
 
-// （）， i18n；count 
+// (), i18n;count 
 function updateBatchManageTitle(count) {
     const titleEl = document.getElementById('batch-manage-title');
     if (!titleEl || typeof window.t !== 'function') return;
@@ -5613,7 +5613,7 @@ async function showBatchManageModal() {
     try {
         const response = await apiFetch('/api/conversations?limit=1000');
         
- // 200，（，）
+ // 200,(,)
         if (!response.ok) {
             allConversationsForBatch = [];
         } else {
@@ -5630,7 +5630,7 @@ async function showBatchManageModal() {
         }
     } catch (error) {
  console.error(':', error);
- // ，（）
+ // ,()
         allConversationsForBatch = [];
         const modal = document.getElementById('batch-manage-modal');
         updateBatchManageTitle(0);
@@ -5641,27 +5641,27 @@ async function showBatchManageModal() {
     }
 }
 
-// ，
+// ,
 function safeTruncateText(text, maxLength = 50) {
     if (!text || typeof text !== 'string') {
         return text || '';
     }
     
- // Array.from （ Unicode ）
+ // Array.from ( Unicode )
     const chars = Array.from(text);
     
- // ，
+ // ,
     if (chars.length <= maxLength) {
         return text;
     }
     
- // （，）
+ // (,)
     let truncatedChars = chars.slice(0, maxLength);
     
- // ，
- // （20%）
+ // ,
+ // (20%)
     const searchRange = Math.floor(maxLength * 0.2);
-    const breakChars = ['，', '。', '、', ' ', ',', '.', ';', ':', '!', '?', '！', '？', '/', '\\', '-', '_'];
+    const breakChars = [',', '.', ',', ' ', ',', '.', ';', ':', '!', '?', '!', '?', '/', '\\', '-', '_'];
     let bestBreakPos = truncatedChars.length;
     
     for (let i = truncatedChars.length - 1; i >= truncatedChars.length - searchRange && i >= 0; i--) {
@@ -5671,12 +5671,12 @@ function safeTruncateText(text, maxLength = 50) {
         }
     }
     
- // ，；
+ // ,;
     if (bestBreakPos < truncatedChars.length) {
         truncatedChars = truncatedChars.slice(0, bestBreakPos);
     }
     
- // ，
+ // ,
     return truncatedChars.join('') + '...';
 }
 
@@ -5701,10 +5701,10 @@ function renderBatchConversations(filtered = null) {
         const name = document.createElement('div');
         name.className = 'batch-table-col-name';
  const originalTitle = conv.title || (typeof window.t === 'function' ? window.t('batchManageModal.unnamedConversation') : '');
- // ，45（）
+ // ,45()
         const truncatedTitle = safeTruncateText(originalTitle, 45);
         name.textContent = truncatedTitle;
- // title（）
+ // title()
         name.title = originalTitle;
 
         const time = document.createElement('div');
@@ -5769,7 +5769,7 @@ async function deleteSelectedConversations() {
         return;
     }
 
- const confirmMsg = typeof window.t === 'function' ? window.t('batchManageModal.confirmDeleteN', { count: checkboxes.length }) : ' ' + checkboxes.length + ' ？';
+ const confirmMsg = typeof window.t === 'function' ? window.t('batchManageModal.confirmDeleteN', { count: checkboxes.length }) : ' ' + checkboxes.length + ' ?';
     if (!confirm(confirmMsg)) {
         return;
     }
@@ -5778,7 +5778,7 @@ async function deleteSelectedConversations() {
     
     try {
         for (const id of ids) {
- await deleteConversation(id, true); // ，
+ await deleteConversation(id, true); // ,
         }
         closeBatchManageModal();
         loadConversationsWithGroups();
@@ -5803,7 +5803,7 @@ function closeBatchManageModal() {
     allConversationsForBatch = [];
 }
 
-// （、 monitor refreshProgressAndTimelineI18n ）
+// (, monitor refreshProgressAndTimelineI18n )
 function refreshChatPanelI18n() {
     const locale = (typeof window.__locale === 'string' && window.__locale.startsWith('zh')) ? 'zh-CN' : 'en-US';
     const timeOpts = { hour: '2-digit', minute: '2-digit' };
@@ -5853,7 +5853,7 @@ function refreshChatPanelI18n() {
     }
 }
 
-// （）；；
+// ();;
 document.addEventListener('languagechange', function () {
     refreshSystemReadyMessageBubbles();
     refreshChatPanelI18n();
@@ -5861,7 +5861,7 @@ document.addEventListener('languagechange', function () {
     if (modal && modal.style.display === 'flex') {
         updateBatchManageTitle(allConversationsForBatch.length);
     }
- // （24h/12h ），
+ // (24h/12h ),
     if (typeof loadConversationsWithGroups === 'function') {
         loadConversationsWithGroups();
     } else if (typeof loadConversations === 'function') {
@@ -5937,7 +5937,7 @@ function selectSuggestion(name) {
     }
 }
 
-// i18n key （）
+// i18n key ()
 function selectSuggestionByKey(i18nKey) {
     const input = document.getElementById('create-group-name-input');
     if (input && typeof window.t === 'function') {
@@ -6010,12 +6010,12 @@ document.addEventListener('DOMContentLoaded', function() {
     initChatAgentModeFromConfig();
 });
 
-// 、
+// ,
 document.addEventListener('click', function(event) {
     const picker = document.getElementById('group-icon-picker');
     const iconBtn = document.getElementById('create-group-icon-btn');
     if (picker && iconBtn) {
- // ，
+ // ,
         if (!picker.contains(event.target) && !iconBtn.contains(event.target)) {
             picker.style.display = 'none';
         }
@@ -6050,7 +6050,7 @@ async function createGroup(event) {
         return;
     }
 
- // ：
+ // :
     try {
         let groups;
         if (Array.isArray(groupsCache) && groupsCache.length > 0) {
@@ -6067,7 +6067,7 @@ async function createGroup(event) {
         
         const nameExists = groups.some(g => g.name === name);
         if (nameExists) {
- alert(typeof window.t === 'function' ? window.t('createGroupModal.nameExists') : '，');
+ alert(typeof window.t === 'function' ? window.t('createGroupModal.nameExists') : ',');
             return;
         }
     } catch (error) {
@@ -6092,7 +6092,7 @@ async function createGroup(event) {
 
         if (!response.ok) {
             const error = await response.json();
- const nameExistsMsg = typeof window.t === 'function' ? window.t('createGroupModal.nameExists') : '，';
+ const nameExistsMsg = typeof window.t === 'function' ? window.t('createGroupModal.nameExists') : ',';
  if (error.error && error.error.includes('')) {
                 alert(nameExistsMsg);
                 return;
@@ -6118,7 +6118,7 @@ async function createGroup(event) {
             moveConversationToGroup(contextMenuConversationId, newGroup.id);
         }
 
- // ，，
+ // ,,
         if (isSubmenuOpen) {
             await showMoveToGroupSubmenu();
         }
@@ -6133,8 +6133,8 @@ async function createGroup(event) {
 // 
 async function enterGroupDetail(groupId) {
     currentGroupId = groupId;
- // ，ID，
- // ，
+ // ,ID,
+ // ,
     currentConversationGroupId = null;
     
     try {
@@ -6146,7 +6146,7 @@ async function enterGroupDetail(groupId) {
             return;
         }
 
- // ，，
+ // ,,
         const sidebar = document.querySelector('.conversation-sidebar');
         const groupDetailPage = document.getElementById('group-detail-page');
         const chatContainer = document.querySelector('.chat-container');
@@ -6154,15 +6154,15 @@ async function enterGroupDetail(groupId) {
 
  // 
         if (sidebar) sidebar.style.display = 'flex';
- // ，
+ // ,
         if (chatContainer) chatContainer.style.display = 'none';
         if (groupDetailPage) groupDetailPage.style.display = 'flex';
         if (titleEl) titleEl.textContent = group.name;
 
- // ，
+ // ,
         await loadGroups();
 
- // （）
+ // ()
         loadGroupConversations(groupId, currentGroupSearchQuery);
     } catch (error) {
  console.error(':', error);
@@ -6187,7 +6187,7 @@ function exitGroupDetail() {
 
  // 
     if (sidebar) sidebar.style.display = 'flex';
- // ，
+ // ,
     if (groupDetailPage) groupDetailPage.style.display = 'none';
     if (chatContainer) chatContainer.style.display = 'flex';
 
@@ -6207,7 +6207,7 @@ async function loadGroupConversations(groupId, searchQuery = '') {
             await loadConversationGroupMapping();
         }
         
- // ，
+ // ,
         const list = document.getElementById('group-conversations-list');
         if (!list) {
             console.error('group-conversations-list element not found');
@@ -6221,7 +6221,7 @@ async function loadGroupConversations(groupId, searchQuery = '') {
  list.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-muted);">' + (typeof window.t === 'function' ? window.t('chat.loading') : '...') + '</div>';
         }
 
- // URL，search
+ // URL,search
         let url = `/api/groups/${groupId}/conversations`;
         if (searchQuery && searchQuery.trim()) {
             url += '?search=' + encodeURIComponent(searchQuery.trim());
@@ -6230,13 +6230,13 @@ async function loadGroupConversations(groupId, searchQuery = '') {
         const response = await apiFetch(url);
         if (!response.ok) {
             console.error(`Failed to load conversations for group ${groupId}:`, response.statusText);
- list.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-muted);">' + (typeof window.t === 'function' ? window.t('chat.loadFailedRetry') : '，') + '</div>';
+ list.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-muted);">' + (typeof window.t === 'function' ? window.t('chat.loadFailedRetry') : ',') + '</div>';
             return;
         }
         
         let groupConvs = await response.json();
         
- // null undefined ，
+ // null undefined ,
         if (!groupConvs) {
             groupConvs = [];
         }
@@ -6248,11 +6248,11 @@ async function loadGroupConversations(groupId, searchQuery = '') {
             return;
         }
         
- // （）
- // （）
+ // ()
+ // ()
         Object.keys(conversationGroupMappingCache).forEach(convId => {
             if (conversationGroupMappingCache[convId] === groupId) {
- // ，
+ // ,
                 if (!groupConvs.find(c => c.id === convId)) {
                     delete conversationGroupMappingCache[convId];
                 }
@@ -6264,7 +6264,7 @@ async function loadGroupConversations(groupId, searchQuery = '') {
             conversationGroupMappingCache[conv.id] = groupId;
         });
 
- // （""）
+ // ("")
         list.innerHTML = '';
 
         if (groupConvs.length === 0) {
@@ -6299,7 +6299,7 @@ async function loadGroupConversations(groupId, searchQuery = '') {
                 item.className = 'group-conversation-item';
                 item.dataset.conversationId = conv.id;
  // IDactive
- // ，active
+ // ,active
                 if (currentGroupId && conv.id === currentConversationId) {
                     item.classList.add('active');
                 } else {
@@ -6322,7 +6322,7 @@ async function loadGroupConversations(groupId, searchQuery = '') {
  title.title = titleText; // 
                 titleWrapper.appendChild(title);
 
- // ，
+ // ,
                 if (conv.groupPinned) {
                     const pinIcon = document.createElement('span');
                     pinIcon.className = 'conversation-item-pinned';
@@ -6347,7 +6347,7 @@ async function loadGroupConversations(groupId, searchQuery = '') {
 
                 contentWrapper.appendChild(timeWrapper);
 
- // ，
+ // ,
                 if (fullConv.messages && fullConv.messages.length > 0) {
                     const firstMsg = fullConv.messages.find(m => m.role === 'user' && m.content);
                     if (firstMsg && firstMsg.content) {
@@ -6378,7 +6378,7 @@ async function loadGroupConversations(groupId, searchQuery = '') {
                 item.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
- // ，
+ // ,
                     const groupDetailPage = document.getElementById('group-detail-page');
                     const chatContainer = document.querySelector('.chat-container');
                     if (groupDetailPage) groupDetailPage.style.display = 'none';
@@ -6405,13 +6405,13 @@ async function editGroup() {
         const group = await response.json();
         if (!group) return;
 
- const renamePrompt = typeof window.t === 'function' ? window.t('chat.renameGroupPrompt') : '：';
+ const renamePrompt = typeof window.t === 'function' ? window.t('chat.renameGroupPrompt') : ':';
         const newName = prompt(renamePrompt, group.name);
         if (newName === null || !newName.trim()) return;
 
         const trimmedName = newName.trim();
         
- // ：（）
+ // :()
         let groups;
         if (Array.isArray(groupsCache) && groupsCache.length > 0) {
             groups = groupsCache;
@@ -6427,7 +6427,7 @@ async function editGroup() {
         
         const nameExists = groups.some(g => g.name === trimmedName && g.id !== currentGroupId);
         if (nameExists) {
- alert(typeof window.t === 'function' ? window.t('createGroupModal.nameExists') : '，');
+ alert(typeof window.t === 'function' ? window.t('createGroupModal.nameExists') : ',');
             return;
         }
 
@@ -6445,7 +6445,7 @@ async function editGroup() {
         if (!updateResponse.ok) {
             const error = await updateResponse.json();
  if (error.error && error.error.includes('')) {
- alert('，');
+ alert(',');
                 return;
             }
  throw new Error(error.error || '');
@@ -6467,7 +6467,7 @@ async function editGroup() {
 async function deleteGroup() {
     if (!currentGroupId) return;
 
- const deleteConfirmMsg = typeof window.t === 'function' ? window.t('chat.deleteGroupConfirm') : '？，。';
+ const deleteConfirmMsg = typeof window.t === 'function' ? window.t('chat.deleteGroupConfirm') : '?,.';
     if (!confirm(deleteConfirmMsg)) {
         return;
     }
@@ -6485,10 +6485,10 @@ async function deleteGroup() {
             }
         });
 
- // ""，
+ // "",
         const submenu = document.getElementById('move-to-group-submenu');
         if (submenu && submenu.style.display !== 'none') {
- // ，
+ // ,
             await loadGroups();
             await showMoveToGroupSubmenu();
         } else {
@@ -6496,7 +6496,7 @@ async function deleteGroup() {
             await loadGroups();
         }
         
- // ，
+ // ,
         await loadConversationsWithGroups();
     } catch (error) {
  console.error(':', error);
@@ -6514,7 +6514,7 @@ async function renameGroupFromContext() {
         const group = await response.json();
         if (!group) return;
 
- const renamePrompt = typeof window.t === 'function' ? window.t('chat.renameGroupPrompt') : '：';
+ const renamePrompt = typeof window.t === 'function' ? window.t('chat.renameGroupPrompt') : ':';
         const newName = prompt(renamePrompt, group.name);
         if (newName === null || !newName.trim()) {
             closeGroupContextMenu();
@@ -6523,7 +6523,7 @@ async function renameGroupFromContext() {
 
         const trimmedName = newName.trim();
         
- // ：（）
+ // :()
         let groups;
         if (Array.isArray(groupsCache) && groupsCache.length > 0) {
             groups = groupsCache;
@@ -6539,7 +6539,7 @@ async function renameGroupFromContext() {
         
         const nameExists = groups.some(g => g.name === trimmedName && g.id !== groupId);
         if (nameExists) {
- alert(typeof window.t === 'function' ? window.t('createGroupModal.nameExists') : '，');
+ alert(typeof window.t === 'function' ? window.t('createGroupModal.nameExists') : ',');
             return;
         }
 
@@ -6557,7 +6557,7 @@ async function renameGroupFromContext() {
         if (!updateResponse.ok) {
             const error = await updateResponse.json();
  if (error.error && error.error.includes('')) {
- alert('，');
+ alert(',');
                 return;
             }
  throw new Error(error.error || '');
@@ -6565,7 +6565,7 @@ async function renameGroupFromContext() {
 
         loadGroups();
         
- // ，
+ // ,
         if (currentGroupId === groupId) {
             const titleEl = document.getElementById('group-detail-title');
             if (titleEl) {
@@ -6626,7 +6626,7 @@ async function deleteGroupFromContext() {
     const groupId = contextMenuGroupId;
     if (!groupId) return;
 
- const deleteConfirmMsg = typeof window.t === 'function' ? window.t('chat.deleteGroupConfirm') : '？，。';
+ const deleteConfirmMsg = typeof window.t === 'function' ? window.t('chat.deleteGroupConfirm') : '?,.';
     if (!confirm(deleteConfirmMsg)) {
         closeGroupContextMenu();
         return;
@@ -6645,21 +6645,21 @@ async function deleteGroupFromContext() {
             }
         });
 
- // ""，
+ // "",
         const submenu = document.getElementById('move-to-group-submenu');
         if (submenu && submenu.style.display !== 'none') {
- // ，
+ // ,
             await loadGroups();
             await showMoveToGroupSubmenu();
         } else {
- // ，
+ // ,
             if (currentGroupId === groupId) {
                 exitGroupDetail();
             }
             await loadGroups();
         }
         
- // ，
+ // ,
         await loadConversationsWithGroups();
     } catch (error) {
  console.error(':', error);
@@ -6763,7 +6763,7 @@ function clearGroupSearch() {
     
     currentGroupSearchQuery = '';
     
- // （）
+ // ()
     if (currentGroupId) {
         loadGroupConversations(currentGroupId, '');
     }
@@ -6774,7 +6774,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadGroups();
  // loadConversations
     if (typeof loadConversations === 'function') {
- // ，
+ // ,
         const originalLoad = loadConversations;
         loadConversations = function(...args) {
             loadConversationsWithGroups(...args);
@@ -6783,13 +6783,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadConversationsWithGroups();
     
  // 
- // OpenAPI，
+ // OpenAPI,
     let lastFocusTime = Date.now();
- const CONVERSATION_REFRESH_INTERVAL = 30000; // 30，
+ const CONVERSATION_REFRESH_INTERVAL = 30000; // 30,
     
     window.addEventListener('focus', () => {
         const now = Date.now();
- // 30，
+ // 30,
         if (now - lastFocusTime > CONVERSATION_REFRESH_INTERVAL) {
             lastFocusTime = now;
             if (typeof loadConversationsWithGroups === 'function') {
@@ -6798,10 +6798,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
     
- // （）
+ // ()
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
- // ，
+ // ,
             const now = Date.now();
             if (now - lastFocusTime > CONVERSATION_REFRESH_INTERVAL) {
                 lastFocusTime = now;
@@ -6812,7 +6812,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
- // ：，（ WebShell AI ）
+ // :,( WebShell AI )
     document.addEventListener('conversation-deleted', (e) => {
         const id = e.detail && e.detail.conversationId;
         if (!id) return;
@@ -6820,7 +6820,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentConversationId = null;
             const messagesDiv = document.getElementById('chat-messages');
             if (messagesDiv) messagesDiv.innerHTML = '';
- const readyMsg = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '。，。';
+ const readyMsg = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '.,.';
             addMessage('assistant', readyMsg, null, null, null, { systemReadyMessage: true });
             addAttackChainButton(null);
         }

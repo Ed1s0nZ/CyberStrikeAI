@@ -51,7 +51,7 @@ func safeTruncateString(s string, maxLen int) string {
 	if searchRange > maxLen {
 		searchRange = maxLen
 	}
-	breakChars := []rune("，。、 ,.;:!?！？/\\-_")
+	breakChars := []rune(",., ,.;:!?!?/\\-_")
 	bestBreakPos := len(runes[:maxLen])
 
 	for i := bestBreakPos - 1; i >= bestBreakPos-searchRange && i >= 0; i-- {
@@ -194,7 +194,7 @@ func avoidChatUploadDestCollision(path string) string {
 	return filepath.Join(dir, unique)
 }
 
-// relocateManualOrNewUploadToConversation when no session ID, frontend uploads to …//_manual；message， …//{conversationId}/ conversation。
+// relocateManualOrNewUploadToConversation when no session ID, frontend uploads to ...//_manual;message, ...//{conversationId}/ conversation.
 func relocateManualOrNewUploadToConversation(absPath, conversationID string, logger *zap.Logger) (string, error) {
 	conv := strings.TrimSpace(conversationID)
 	if conv == "" {
@@ -340,7 +340,7 @@ func attachmentContentToBytes(a ChatAttachment) ([]byte, error) {
 	return []byte(content), nil
 }
 
-// userMessageContentForStorage returns user message content for database storage：（），，continueconversation
+// userMessageContentForStorage returns user message content for database storage:(),,continueconversation
 func userMessageContentForStorage(message string, attachments []ChatAttachment, savedPaths []string) string {
 	if len(attachments) == 0 {
 		return message
@@ -358,7 +358,7 @@ func userMessageContentForStorage(message string, attachments []ChatAttachment, 
 	return b.String()
 }
 
-// appendAttachmentsToMessage only appends attachment save paths to end of user message，，
+// appendAttachmentsToMessage only appends attachment save paths to end of user message,,
 func appendAttachmentsToMessage(msg string, attachments []ChatAttachment, savedPaths []string) string {
 	if len(attachments) == 0 {
 		return msg
@@ -451,9 +451,9 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 	// apply role user prompt and tool configuration
 	finalMessage := req.Message
 	var roleTools []string  // role-configured tool list
-	var roleSkills []string // role-configured skills list（AI，）
+	var roleSkills []string // role-configured skills list(AI,)
 
-	// WebShell AI assistant mode：current， webshell_* connection_id
+	// WebShell AI assistant mode:current, webshell_* connection_id
 	if req.WebShellConnectionID != "" {
 		conn, err := h.db.GetWebshellConnection(strings.TrimSpace(req.WebShellConnectionID))
 		if err != nil || conn == nil {
@@ -465,7 +465,7 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 		if remark == "" {
 			remark = conn.URL
 		}
-		finalMessage = fmt.Sprintf("[WebShell ] currentconnection ID：%s，remark：%s。（，connection_id \"%s\"）：webshell_exec、webshell_file_list、webshell_file_read、webshell_file_write、record_vulnerability、list_knowledge_risk_types、search_knowledge_base、list_skills、read_skill。：、，，invoke tool；、、、recordknowledge base/ Skills 。\n\n：%s",
+		finalMessage = fmt.Sprintf("[WebShell ] currentconnection ID:%s,remark:%s.(,connection_id \"%s\"):webshell_exec,webshell_file_list,webshell_file_read,webshell_file_write,record_vulnerability,list_knowledge_risk_types,search_knowledge_base,list_skills,read_skill.:,,,invoke tool;,,,recordknowledge base/ Skills .\n\n:%s",
 			conn.ID, remark, conn.ID, req.Message)
 		roleTools = []string{
 			builtin.ToolWebshellExec,
@@ -487,12 +487,12 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 					finalMessage = role.UserPrompt + "\n\n" + req.Message
 					h.logger.Info("applied role user prompt", zap.String("role", req.Role))
 				}
-				// get role-configured tool list（tools，mcps）
+				// get role-configured tool list(tools,mcps)
 				if len(role.Tools) > 0 {
 					roleTools = role.Tools
 					h.logger.Info("using role-configured tool list", zap.String("role", req.Role), zap.Int("toolCount", len(roleTools)))
 				}
-				// get role-configured skills list（AI，）
+				// get role-configured skills list(AI,)
 				if len(role.Skills) > 0 {
 					roleSkills = role.Skills
 					h.logger.Info("role has skills configured, will hint AI in system prompt", zap.String("role", req.Role), zap.Int("skillCount", len(roleSkills)), zap.Strings("skills", roleSkills))
@@ -511,7 +511,7 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 	}
 	finalMessage = appendAttachmentsToMessage(finalMessage, req.Attachments, savedPaths)
 
-	// save user message：，、continueconversation
+	// save user message:,,continueconversation
 	userContent := userMessageContentForStorage(req.Message, req.Attachments, savedPaths)
 	_, err = h.db.AddMessage(conversationID, "user", userContent, nil)
 	if err != nil {
@@ -520,13 +520,13 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 		return
 	}
 
-	// execute Agent Loop，messageconversationID（rolefinalMessagerolelist）
-	// ：skills，AIroleskills
+	// execute Agent Loop,messageconversationID(rolefinalMessagerolelist)
+	// :skills,AIroleskills
 	result, err := h.agent.AgentLoopWithProgress(c.Request.Context(), finalMessage, agentHistoryMessages, conversationID, nil, roleTools, roleSkills)
 	if err != nil {
 		h.logger.Error("Agent Loop execution failed", zap.Error(err))
 
-		// execution failed，ReAct（result）
+		// execution failed,ReAct(result)
 		if result != nil && (result.LastReActInput != "" || result.LastReActOutput != "") {
 			if saveErr := h.db.SaveReActData(conversationID, result.LastReActInput, result.LastReActOutput); saveErr != nil {
 				h.logger.Warn("failed to save ReAct data for failed task", zap.Error(saveErr))
@@ -543,8 +543,8 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 	_, err = h.db.AddMessage(conversationID, "assistant", result.Response, result.MCPExecutionIDs)
 	if err != nil {
 		h.logger.Error("failed to save assistant message", zap.Error(err))
-		// ，returns，recorderror
-		// AI，
+		// ,returns,recorderror
+		// AI,
 	}
 
 	// ReAct
@@ -608,7 +608,7 @@ func (h *AgentHandler) ProcessMessageForRobot(ctx context.Context, conversationI
 		return "", "", fmt.Errorf("message: %w", err)
 	}
 
-	// agent-loop/stream ：message， progressCallback process details（ SSE）
+	// agent-loop/stream :message, progressCallback process details( SSE)
 	assistantMsg, err := h.db.AddMessage(conversationID, "assistant", "processing...", nil)
 	if err != nil {
 		h.logger.Warn("robot: failed to create assistant message placeholder", zap.Error(err))
@@ -676,7 +676,7 @@ func (h *AgentHandler) ProcessMessageForRobot(ctx context.Context, conversationI
 		return "", conversationID, err
 	}
 
-	// message MCP ID（ stream ）
+	// message MCP ID( stream )
 	if assistantMessageID != "" {
 		mcpIDsJSON := ""
 		if len(result.MCPExecutionIDs) > 0 {
@@ -708,14 +708,14 @@ type StreamEvent struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
-// createProgressCallback ，processDetails
-// sendEventFunc: ，nil
+// createProgressCallback ,processDetails
+// sendEventFunc: ,nil
 func (h *AgentHandler) createProgressCallback(conversationID, assistantMessageID string, sendEventFunc func(eventType, message string, data interface{})) agent.ProgressCallback {
-	// tool_call，tool_result
+	// tool_call,tool_result
 	toolCallCache := make(map[string]map[string]interface{}) // toolCallId -> arguments
 
 	return func(eventType, message string, data interface{}) {
-		// sendEventFunc，
+		// sendEventFunc,
 		if sendEventFunc != nil {
 			sendEventFunc(eventType, message, data)
 		}
@@ -758,7 +758,7 @@ func (h *AgentHandler) createProgressCallback(conversationID, assistantMessageID
 						}
 					}
 
-					// ，argumentsObj
+					// ,argumentsObj
 					if query == "" {
 						if arguments, ok := dataMap["argumentsObj"].(map[string]interface{}); ok {
 							if q, ok := arguments["query"].(string); ok && q != "" {
@@ -770,10 +770,10 @@ func (h *AgentHandler) createProgressCallback(conversationID, assistantMessageID
 						}
 					}
 
-					// query，result（）
+					// query,result()
 					if query == "" {
 						if result, ok := dataMap["result"].(string); ok && result != "" {
-							// （" 'xxx' "）
+							// (" 'xxx' ")
 							if strings.Contains(result, " '") {
 								start := strings.Index(result, " '") + len(" '")
 								end := strings.Index(result[start:], "'")
@@ -782,14 +782,14 @@ func (h *AgentHandler) createProgressCallback(conversationID, assistantMessageID
 								}
 							}
 						}
-						// ，default value
+						// ,default value
 						if query == "" {
 							query = "unknown query"
 						}
 					}
 
 					// ID
-					// format：" X ：\n\n--- 1 (: XX.XX%) ---\n: [] title\n...\n<!-- METADATA: {...} -->"
+					// format:" X :\n\n--- 1 (: XX.XX%) ---\n: [] title\n...\n<!-- METADATA: {...} -->"
 					if result, ok := dataMap["result"].(string); ok && result != "" {
 						// ID
 						metadataMatch := strings.Index(result, "<!-- METADATA:")
@@ -815,14 +815,14 @@ func (h *AgentHandler) createProgressCallback(conversationID, assistantMessageID
 							}
 						}
 
-						// ，" X "，
+						// ," X ",
 						if len(retrievedItems) == 0 && strings.Contains(result, "") && !strings.Contains(result, "") {
-							// ，ID，
+							// ,ID,
 							retrievedItems = []string{"_has_results"}
 						}
 					}
 
-					// recordretrieval log（，）
+					// recordretrieval log(,)
 					go func() {
 						if err := h.knowledgeManager.LogRetrieval(conversationID, assistantMessageID, query, riskType, retrievedItems); err != nil {
 							h.logger.Warn("failed to record knowledge retrieval log", zap.Error(err))
@@ -844,7 +844,7 @@ func (h *AgentHandler) createProgressCallback(conversationID, assistantMessageID
 			}
 		}
 
-		// ； eino_agent_reply
+		// ; eino_agent_reply
 		if assistantMessageID != "" && eventType == "eino_agent_reply_stream_end" {
 			if err := h.db.AddProcessDetail(assistantMessageID, conversationID, "eino_agent_reply", message, data); err != nil {
 				h.logger.Warn("failed to save process details", zap.Error(err), zap.String("eventType", eventType))
@@ -852,8 +852,8 @@ func (h *AgentHandler) createProgressCallback(conversationID, assistantMessageID
 			return
 		}
 
-		// process details（response/done，）
-		// ：response_start/response_delta ，process details，。
+		// process details(response/done,)
+		// :response_start/response_delta ,process details,.
 		if assistantMessageID != "" &&
 			eventType != "response" &&
 			eventType != "done" &&
@@ -876,7 +876,7 @@ func (h *AgentHandler) createProgressCallback(conversationID, assistantMessageID
 func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	var req ChatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		// ，SSEformaterror
+		// ,SSEformaterror
 		c.Header("Content-Type", "text/event-stream")
 		c.Header("Cache-Control", "no-cache")
 		c.Header("Connection", "keep-alive")
@@ -904,7 +904,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	// 
 	// 
 	clientDisconnected := false
-	// shared with sseKeepalive： ResponseWriter， chunked （ERR_INVALID_CHUNKED_ENCODING）。
+	// shared with sseKeepalive: ResponseWriter, chunked (ERR_INVALID_CHUNKED_ENCODING).
 	var sseWriteMu sync.Mutex
 	// delta
 	var responseDeltaCount int
@@ -937,7 +937,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 			)
 		} else if eventType == "response_delta" {
 			responseDeltaCount++
-			// ，
+			// ,
 			if responseStartLogged && responseDeltaCount <= 3 {
 				h.logger.Info("SSE: response_delta",
 					zap.Int("index", responseDeltaCount),
@@ -953,12 +953,12 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 			}
 		}
 
-		// ，
+		// ,
 		if clientDisconnected {
 			return
 		}
 
-		// （）
+		// ()
 		select {
 		case <-c.Request.Context().Done():
 			clientDisconnected = true
@@ -989,7 +989,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 		sseWriteMu.Unlock()
 	}
 
-	// if no conversation ID, create new conversation（WebShell connection ID ）
+	// if no conversation ID, create new conversation(WebShell connection ID )
 	conversationID := req.ConversationID
 	if conversationID == "" {
 		title := safeTruncateString(req.Message, 50)
@@ -1064,7 +1064,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 		if remark == "" {
 			remark = conn.URL
 		}
-		finalMessage = fmt.Sprintf("[WebShell ] currentconnection ID：%s，remark：%s。（，connection_id \"%s\"）：webshell_exec、webshell_file_list、webshell_file_read、webshell_file_write、record_vulnerability、list_knowledge_risk_types、search_knowledge_base、list_skills、read_skill。：、，，invoke tool；、、、recordknowledge base/ Skills 。\n\n：%s",
+		finalMessage = fmt.Sprintf("[WebShell ] currentconnection ID:%s,remark:%s.(,connection_id \"%s\"):webshell_exec,webshell_file_list,webshell_file_read,webshell_file_write,record_vulnerability,list_knowledge_risk_types,search_knowledge_base,list_skills,read_skill.:,,,invoke tool;,,,recordknowledge base/ Skills .\n\n:%s",
 			conn.ID, remark, conn.ID, req.Message)
 		roleTools = []string{
 			builtin.ToolWebshellExec,
@@ -1085,16 +1085,16 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 					finalMessage = role.UserPrompt + "\n\n" + req.Message
 					h.logger.Info("applied role user prompt", zap.String("role", req.Role))
 				}
-				// get role-configured tool list（tools，mcps）
+				// get role-configured tool list(tools,mcps)
 				if len(role.Tools) > 0 {
 					roleTools = role.Tools
 					h.logger.Info("using role-configured tool list", zap.String("role", req.Role), zap.Int("toolCount", len(roleTools)))
 				} else if len(role.MCPs) > 0 {
-					// ：mcps，list（）
-					// mcpsMCP，list
-					h.logger.Info("rolemcps，", zap.String("role", req.Role))
+					// :mcps,list()
+					// mcpsMCP,list
+					h.logger.Info("rolemcps,", zap.String("role", req.Role))
 				}
-				// ：roleskills，AIlist_skillsread_skill
+				// :roleskills,AIlist_skillsread_skill
 				if len(role.Skills) > 0 {
 					roleSkills = role.Skills
 					h.logger.Info("role has skills, AI can call via tools on demand", zap.String("role", req.Role), zap.Int("skillCount", len(role.Skills)), zap.Strings("skills", role.Skills))
@@ -1111,36 +1111,36 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 			return
 		}
 	}
-	// finalMessage，file content
+	// finalMessage,file content
 	finalMessage = appendAttachmentsToMessage(finalMessage, req.Attachments, savedPaths)
-	// roleTools，（defaultrolerole）
+	// roleTools,(defaultrolerole)
 
-	// save user message：，、continueconversation
+	// save user message:,,continueconversation
 	userContent := userMessageContentForStorage(req.Message, req.Attachments, savedPaths)
 	_, err = h.db.AddMessage(conversationID, "user", userContent, nil)
 	if err != nil {
 		h.logger.Error("failed to save user message", zap.Error(err))
 	}
 
-	// message，process details
+	// message,process details
 	assistantMsg, err := h.db.AddMessage(conversationID, "assistant", "processing...", nil)
 	if err != nil {
 		h.logger.Error("failed to create assistant message", zap.Error(err))
-		// ，continueprocess details
+		// ,continueprocess details
 		assistantMsg = nil
 	}
 
-	// ，
+	// ,
 	var assistantMessageID string
 	if assistantMsg != nil {
 		assistantMessageID = assistantMsg.ID
 	}
 
-	// ，
+	// ,
 	progressCallback := h.createProgressCallback(conversationID, assistantMessageID, sendEvent)
 
-	// ，HTTP
-	// （），continue
+	// ,HTTP
+	// (),continue
 	baseCtx, cancelWithCause := context.WithCancelCause(context.Background())
 	taskCtx, timeoutCancel := context.WithTimeout(baseCtx, 600*time.Minute)
 	defer timeoutCancel()
@@ -1149,7 +1149,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	if _, err := h.tasks.StartTask(conversationID, req.Message, cancelWithCause); err != nil {
 		var errorMsg string
 		if errors.Is(err, ErrTaskAlreadyRunning) {
-			errorMsg = "⚠️ currentsession already has a running task，current「stop」。"
+			errorMsg = "⚠️ This session already has a running task. Say \"stop\" to cancel it."
 			sendEvent("error", errorMsg, map[string]interface{}{
 				"conversationId": conversationID,
 				"errorType":      "task_already_running",
@@ -1193,9 +1193,9 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	taskStatus := "completed"
 	defer h.tasks.FinishTask(conversationID, taskStatus)
 
-	// execute Agent Loop，，（rolefinalMessagerolelist）
+	// execute Agent Loop,,(rolefinalMessagerolelist)
 	sendEvent("progress", "analyzing your request...", nil)
-	// ：roleSkills req.Role WebShell 
+	// :roleSkills req.Role WebShell 
 	stopKeepalive := make(chan struct{})
 	go sseKeepalive(c, stopKeepalive, &sseWriteMu)
 	defer close(stopKeepalive)
@@ -1205,8 +1205,8 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 		h.logger.Error("Agent Loop execution failed", zap.Error(err))
 		cause := context.Cause(baseCtx)
 
-		// ：contextcauseErrTaskCancelled
-		// causeErrTaskCancelled，errortype（context.Canceled），
+		// :contextcauseErrTaskCancelled
+		// causeErrTaskCancelled,errortype(context.Canceled),
 		// API
 		isCancelled := errors.Is(cause, ErrTaskCancelled)
 
@@ -1215,7 +1215,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 			taskStatus = "cancelled"
 			cancelMsg := "Task cancelled by user, subsequent operations stopped."
 
-			// status，status
+			// status,status
 			h.tasks.UpdateTaskStatus(conversationID, taskStatus)
 
 			if assistantMessageID != "" {
@@ -1229,7 +1229,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 				h.db.AddProcessDetail(assistantMessageID, conversationID, "cancelled", cancelMsg, nil)
 			}
 
-			// ，ReAct（result）
+			// ,ReAct(result)
 			if result != nil && (result.LastReActInput != "" || result.LastReActOutput != "") {
 				if err := h.db.SaveReActData(conversationID, result.LastReActInput, result.LastReActOutput); err != nil {
 					h.logger.Warn("failed to save ReAct data for cancelled task", zap.Error(err))
@@ -1250,7 +1250,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 			taskStatus = "timeout"
 			timeoutMsg := "Task execution timed out, auto-terminated."
 
-			// status，status
+			// status,status
 			h.tasks.UpdateTaskStatus(conversationID, taskStatus)
 
 			if assistantMessageID != "" {
@@ -1264,7 +1264,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 				h.db.AddProcessDetail(assistantMessageID, conversationID, "timeout", timeoutMsg, nil)
 			}
 
-			// ，ReAct（result）
+			// ,ReAct(result)
 			if result != nil && (result.LastReActInput != "" || result.LastReActOutput != "") {
 				if err := h.db.SaveReActData(conversationID, result.LastReActInput, result.LastReActOutput); err != nil {
 					h.logger.Warn("failed to save ReAct for timed-out task", zap.Error(err))
@@ -1285,7 +1285,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 			taskStatus = "failed"
 			errorMsg := "execution failed: " + err.Error()
 
-			// status，status
+			// status,status
 			h.tasks.UpdateTaskStatus(conversationID, taskStatus)
 
 			if assistantMessageID != "" {
@@ -1299,7 +1299,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 				h.db.AddProcessDetail(assistantMessageID, conversationID, "error", errorMsg, nil)
 			}
 
-			// ，ReAct（result）
+			// ,ReAct(result)
 			if result != nil && (result.LastReActInput != "" || result.LastReActOutput != "") {
 				if err := h.db.SaveReActData(conversationID, result.LastReActInput, result.LastReActOutput); err != nil {
 					h.logger.Warn("failed to save ReAct data for failed task", zap.Error(err))
@@ -1337,7 +1337,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 			h.logger.Error("failed to update assistant message", zap.Error(err))
 		}
 	} else {
-		// ，
+		// ,
 		_, err = h.db.AddMessage(conversationID, "assistant", result.Response, result.MCPExecutionIDs)
 		if err != nil {
 			h.logger.Error("failed to save assistant message", zap.Error(err))
@@ -1357,7 +1357,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	sendEvent("response", result.Response, map[string]interface{}{
 		"mcpExecutionIds": result.MCPExecutionIDs,
 		"conversationId":  conversationID,
-		"messageId": assistantMessageID, // messageID，process details
+		"messageId": assistantMessageID, // messageID,process details
 	})
 	sendEvent("done", "", map[string]interface{}{
 		"conversationId": conversationID,
@@ -1390,7 +1390,7 @@ func (h *AgentHandler) CancelAgentLoop(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":         "cancelling",
 		"conversationId": req.ConversationID,
-		"message": "，currentstop。",
+		"message": ",currentstop.",
 	})
 }
 
@@ -1410,9 +1410,9 @@ func (h *AgentHandler) ListCompletedTasks(c *gin.Context) {
 
 // BatchTaskRequest batch tasks
 type BatchTaskRequest struct {
-	Title string `json:"title"` // title（）
-	Tasks []string `json:"tasks" binding:"required"` // list，
-	Role string `json:"role,omitempty"` // role（，defaultrole）
+	Title string `json:"title"` // title()
+	Tasks []string `json:"tasks" binding:"required"` // list,
+	Role string `json:"role,omitempty"` // role(,defaultrole)
 }
 
 // CreateBatchQueue batch tasks
@@ -1468,7 +1468,7 @@ type ListBatchQueuesResponse struct {
 	TotalPages int               `json:"total_pages"`
 }
 
-// ListBatchQueues batch tasks（）
+// ListBatchQueues batch tasks()
 func (h *AgentHandler) ListBatchQueues(c *gin.Context) {
 	limitStr := c.DefaultQuery("limit", "10")
 	offsetStr := c.DefaultQuery("offset", "0")
@@ -1480,7 +1480,7 @@ func (h *AgentHandler) ListBatchQueues(c *gin.Context) {
 	offset, _ := strconv.Atoi(offsetStr)
 	page := 1
 
-	// page，pageoffset
+	// page,pageoffset
 	if pageStr != "" {
 		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
 			page = p
@@ -1515,7 +1515,7 @@ func (h *AgentHandler) ListBatchQueues(c *gin.Context) {
 		totalPages = 1
 	}
 
-	// offsetpage，
+	// offsetpage,
 	if pageStr == "" {
 		page = (offset / limit) + 1
 	}
@@ -1694,13 +1694,13 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 		}
 		conversationID = conv.ID
 
-		// conversationId（status，conversation）
+		// conversationId(status,conversation)
 		h.batchTaskManager.UpdateTaskStatusWithConversationID(queueID, task.ID, "running", "", "", conversationID)
 
 		// apply role user prompt and tool configuration
 		finalMessage := task.Message
 		var roleTools []string  // role-configured tool list
-		var roleSkills []string // role-configured skills list（AI，）
+		var roleSkills []string // role-configured skills list(AI,)
 		if queue.Role != "" && queue.Role != "default" {
 			if h.config.Roles != nil {
 				if role, exists := h.config.Roles[queue.Role]; exists && role.Enabled {
@@ -1709,12 +1709,12 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 						finalMessage = role.UserPrompt + "\n\n" + task.Message
 						h.logger.Info("applied role user prompt", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("role", queue.Role))
 					}
-					// get role-configured tool list（tools，mcps）
+					// get role-configured tool list(tools,mcps)
 					if len(role.Tools) > 0 {
 						roleTools = role.Tools
 						h.logger.Info("using role-configured tool list", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("role", queue.Role), zap.Int("toolCount", len(roleTools)))
 					}
-					// get role-configured skills list（AI，）
+					// get role-configured skills list(AI,)
 					if len(role.Skills) > 0 {
 						roleSkills = role.Skills
 						h.logger.Info("role has skills configured, will hint AI in system prompt", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("role", queue.Role), zap.Int("skillCount", len(roleSkills)), zap.Strings("skills", roleSkills))
@@ -1723,36 +1723,36 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 			}
 		}
 
-		// save user message（message，role）
+		// save user message(message,role)
 		_, err = h.db.AddMessage(conversationID, "user", task.Message, nil)
 		if err != nil {
 			h.logger.Error("failed to save user message", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("conversationId", conversationID), zap.Error(err))
 		}
 
-		// message，process details
+		// message,process details
 		assistantMsg, err := h.db.AddMessage(conversationID, "assistant", "processing...", nil)
 		if err != nil {
 			h.logger.Error("failed to create assistant message", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("conversationId", conversationID), zap.Error(err))
-			// ，continueprocess details
+			// ,continueprocess details
 			assistantMsg = nil
 		}
 
-		// ，（batch tasks，nil）
+		// ,(batch tasks,nil)
 		var assistantMessageID string
 		if assistantMsg != nil {
 			assistantMessageID = assistantMsg.ID
 		}
 		progressCallback := h.createProgressCallback(conversationID, assistantMessageID, nil)
 
-		// （rolefinalMessagerolelist）
+		// (rolefinalMessagerolelist)
 		h.logger.Info("batch tasks", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("message", task.Message), zap.String("role", queue.Role), zap.String("conversationId", conversationID))
 
-		// ：306，/scan
+		// :306,/scan
 		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Hour)
-		// ，current
+		// ,current
 		h.batchTaskManager.SetTaskCancel(queueID, cancel)
-		// rolelist（，）
-		// ：skills，AIroleskills
+		// rolelist(,)
+		// :skills,AIroleskills
 		useBatchMulti := h.config != nil && h.config.MultiAgent.Enabled && h.config.MultiAgent.BatchUseMultiAgent
 		var result *agent.AgentLoopResult
 		var resultMA *multiagent.RunResult
@@ -1762,13 +1762,13 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 		} else {
 			result, runErr = h.agent.AgentLoopWithProgress(ctx, finalMessage, []agent.ChatMessage{}, conversationID, progressCallback, roleTools, roleSkills)
 		}
-		// ，
+		// ,
 		h.batchTaskManager.SetTaskCancel(queueID, nil)
 		cancel()
 
 		if runErr != nil {
 			// error
-			// 1. context.Canceled（error）
+			// 1. context.Canceled(error)
 			// 2. errormessage"context canceled""cancelled"
 			// 3. result.Response message
 			errStr := runErr.Error()
@@ -1786,7 +1786,7 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 			if isCancelled {
 				h.logger.Info("batch tasks", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("conversationId", conversationID))
 				cancelMsg := "Task cancelled by user, subsequent operations stopped."
-				// message，
+				// message,
 				if partialResp != "" && (strings.Contains(partialResp, "") || strings.Contains(partialResp, "")) {
 					cancelMsg = partialResp
 				}
@@ -1804,13 +1804,13 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 						h.logger.Warn("", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(err))
 					}
 				} else {
-					// message，
+					// message,
 					_, errMsg := h.db.AddMessage(conversationID, "assistant", cancelMsg, nil)
 					if errMsg != nil {
 						h.logger.Warn("message", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(errMsg))
 					}
 				}
-				// ReAct（）
+				// ReAct()
 				if result != nil && (result.LastReActInput != "" || result.LastReActOutput != "") {
 					if err := h.db.SaveReActData(conversationID, result.LastReActInput, result.LastReActOutput); err != nil {
 						h.logger.Warn("failed to save ReAct data for cancelled task", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(err))
@@ -1872,14 +1872,14 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 					assistantMessageID,
 				); updateErr != nil {
 					h.logger.Warn("failed to update assistant message", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(updateErr))
-					// ，message
+					// ,message
 					_, err = h.db.AddMessage(conversationID, "assistant", resText, mcpIDs)
 					if err != nil {
 						h.logger.Error("failed to save assistant message", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("conversationId", conversationID), zap.Error(err))
 					}
 				}
 			} else {
-				// message，
+				// message,
 				_, err = h.db.AddMessage(conversationID, "assistant", resText, mcpIDs)
 				if err != nil {
 					h.logger.Error("failed to save assistant message", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("conversationId", conversationID), zap.Error(err))
@@ -1911,7 +1911,7 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 }
 
 // loadHistoryFromReActData ReActmessage
-// attack chain：last_react_inputlast_react_output，message
+// attack chain:last_react_inputlast_react_output,message
 func (h *AgentHandler) loadHistoryFromReActData(conversationID string) ([]agent.ChatMessage, error) {
 	// ReAct
 	reactInputJSON, reactOutput, err := h.db.GetReActData(conversationID)
@@ -1919,9 +1919,9 @@ func (h *AgentHandler) loadHistoryFromReActData(conversationID string) ([]agent.
 		return nil, fmt.Errorf("failed to get ReAct data: %w", err)
 	}
 
-	// last_react_input，message（attack chain）
+	// last_react_input,message(attack chain)
 	if reactInputJSON == "" {
-		return nil, fmt.Errorf("ReAct，message")
+		return nil, fmt.Errorf("ReAct,message")
 	}
 
 	dataSource := "database_last_react_input"
@@ -1955,7 +1955,7 @@ func (h *AgentHandler) loadHistoryFromReActData(conversationID string) ([]agent.
 			continue // skipmessage
 		}
 
-		// skipsystemmessage（AgentLoopadd）
+		// skipsystemmessage(AgentLoopadd)
 		if msg.Role == "system" {
 			continue
 		}
@@ -1965,7 +1965,7 @@ func (h *AgentHandler) loadHistoryFromReActData(conversationID string) ([]agent.
 			msg.Content = content
 		}
 
-		// parsetool_calls（）
+		// parsetool_calls()
 		if toolCallsRaw, ok := msgMap["tool_calls"]; ok && toolCallsRaw != nil {
 			if toolCallsArray, ok := toolCallsRaw.([]interface{}); ok {
 				msg.ToolCalls = make([]agent.ToolCall, 0, len(toolCallsArray))
@@ -1992,16 +1992,16 @@ func (h *AgentHandler) loadHistoryFromReActData(conversationID string) ([]agent.
 								toolCall.Function.Name = name
 							}
 
-							// parsearguments（）
+							// parsearguments()
 							if argsRaw, ok := funcMap["arguments"]; ok {
 								if argsStr, ok := argsRaw.(string); ok {
-									// ，parseJSON
+									// ,parseJSON
 									var argsMap map[string]interface{}
 									if err := json.Unmarshal([]byte(argsStr), &argsMap); err == nil {
 										toolCall.Function.Arguments = argsMap
 									}
 								} else if argsMap, ok := argsRaw.(map[string]interface{}); ok {
-									// ，
+									// ,
 									toolCall.Function.Arguments = argsMap
 								}
 							}
@@ -2015,7 +2015,7 @@ func (h *AgentHandler) loadHistoryFromReActData(conversationID string) ([]agent.
 			}
 		}
 
-		// parsetool_call_id（toolrolemessage）
+		// parsetool_call_id(toolrolemessage)
 		if toolCallID, ok := msgMap["tool_call_id"].(string); ok {
 			msg.ToolCallID = toolCallID
 		}
@@ -2023,25 +2023,25 @@ func (h *AgentHandler) loadHistoryFromReActData(conversationID string) ([]agent.
 		agentMessages = append(agentMessages, msg)
 	}
 
-	// last_react_output，assistantmessage
-	// last_react_input，
+	// last_react_output,assistantmessage
+	// last_react_input,
 	if reactOutput != "" {
 		// messageassistantmessagetool_calls
-		// tool_calls，toolmessageassistant
+		// tool_calls,toolmessageassistant
 		if len(agentMessages) > 0 {
 			lastMsg := &agentMessages[len(agentMessages)-1]
 			if strings.EqualFold(lastMsg.Role, "assistant") && len(lastMsg.ToolCalls) == 0 {
-				// assistantmessagetool_calls，content
+				// assistantmessagetool_calls,content
 				lastMsg.Content = reactOutput
 			} else {
-				// assistantmessage，tool_calls，addassistantmessage
+				// assistantmessage,tool_calls,addassistantmessage
 				agentMessages = append(agentMessages, agent.ChatMessage{
 					Role:    "assistant",
 					Content: reactOutput,
 				})
 			}
 		} else {
-			// message，add
+			// message,add
 			agentMessages = append(agentMessages, agent.ChatMessage{
 				Role:    "assistant",
 				Content: reactOutput,
@@ -2053,7 +2053,7 @@ func (h *AgentHandler) loadHistoryFromReActData(conversationID string) ([]agent.
 		return nil, fmt.Errorf("ReActparsemessage")
 	}
 
-	// toolmessage，OpenAI
+	// toolmessage,OpenAI
 	// "messages with role 'tool' must be a response to a preceeding message with 'tool_calls'"error
 	if h.agent != nil {
 		if fixed := h.agent.RepairOrphanToolMessages(&agentMessages); fixed {

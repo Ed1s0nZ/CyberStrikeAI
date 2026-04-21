@@ -29,26 +29,26 @@ Port: 5432 (default)
 Allows full SQL queries against the certificate database.
 
 ### Key SQL Tables
-- `certificate` — raw certificate data
-- `certificate_identity` — extracted names (dNSName, rfc822Name)
-- `ca_certificate` — CA certificates
-- `ct_log_entry` — CT log entries with timestamps
+- `certificate` - raw certificate data
+- `certificate_identity` - extracted names (dNSName, rfc822Name)
+- `ca_certificate` - CA certificates
+- `ct_log_entry` - CT log entries with timestamps
 
 ### Useful SQL Functions
-- `x509_commonName(certificate)` — extract CN
-- `x509_issuerName(certificate)` — extract issuer DN
-- `x509_notBefore(certificate)` — validity start
-- `x509_notAfter(certificate)` — validity end
-- `x509_subjectName(certificate)` — full subject DN
+- `x509_commonName(certificate)` - extract CN
+- `x509_issuerName(certificate)` - extract issuer DN
+- `x509_notBefore(certificate)` - validity start
+- `x509_notAfter(certificate)` - validity end
+- `x509_subjectName(certificate)` - full subject DN
 
 ## Query Wildcards
 
 crt.sh uses SQL LIKE wildcards:
-- `%` — match any characters (SQL wildcard)
-- `_` — match single character
-- `%.example.com` — all subdomains of example.com
-- `%.%.example.com` — sub-subdomains
-- `example.%` — all TLDs
+- `%` - match any characters (SQL wildcard)
+- `_` - match single character
+- `%.example.com` - all subdomains of example.com
+- `%.%.example.com` - sub-subdomains
+- `example.%` - all TLDs
 
 ## Response Fields (JSON API)
 

@@ -16,13 +16,13 @@ import (
 	"go.uber.org/zap"
 )
 
-// MultiAgentLoopStream Eino DeepAgent conversation（ config.multi_agent.enabled）。
+// MultiAgentLoopStream Eino DeepAgent conversation( config.multi_agent.enabled).
 func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
 	if h.config == nil || !h.config.MultiAgent.Enabled {
-		ev := StreamEvent{Type: "error", Message: "multi-agent not enabled，enable in settings or config.yaml multi_agent.enabled"}
+		ev := StreamEvent{Type: "error", Message: "multi-agent not enabled,enable in settings or config.yaml multi_agent.enabled"}
 		b, _ := json.Marshal(ev)
 		fmt.Fprintf(c.Writer, "data: %s\n\n", b)
 		done := StreamEvent{Type: "done", Message: ""}
@@ -45,19 +45,19 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 
 	c.Header("X-Accel-Buffering", "no")
 
-	// sendEvent stop。
-	// ：baseCtx ；。
+	// sendEvent stop.
+	// :baseCtx ;.
 	var baseCtx context.Context
 
 	clientDisconnected := false
-	// shared with sseKeepalive： ResponseWriter， chunked （ERR_INVALID_CHUNKED_ENCODING）。
+	// shared with sseKeepalive: ResponseWriter, chunked (ERR_INVALID_CHUNKED_ENCODING).
 	var sseWriteMu sync.Mutex
 	sendEvent := func(eventType, message string, data interface{}) {
 		if clientDisconnected {
 			return
 		}
-		// stop，Eino eventType=="error"。
-		// UI "error + cancelled "， error。
+		// stop,Eino eventType=="error".
+		// UI "error + cancelled ", error.
 		if eventType == "error" && baseCtx != nil && errors.Is(context.Cause(baseCtx), ErrTaskCancelled) {
 			return
 		}
@@ -113,7 +113,7 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 	if _, err := h.tasks.StartTask(conversationID, req.Message, cancelWithCause); err != nil {
 		var errorMsg string
 		if errors.Is(err, ErrTaskAlreadyRunning) {
-			errorMsg = "⚠️ currentsession already has a running task，current「stop」。"
+			errorMsg = "⚠️ This session already has a running task. Say \"stop\" to cancel it."
 			sendEvent("error", errorMsg, map[string]interface{}{
 				"conversationId": conversationID,
 				"errorType":      "task_already_running",
@@ -159,7 +159,7 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 		if errors.Is(cause, ErrTaskCancelled) {
 			taskStatus = "cancelled"
 			h.tasks.UpdateTaskStatus(conversationID, taskStatus)
-			cancelMsg := "，stop。"
+			cancelMsg := ",stop."
 			if assistantMessageID != "" {
 				_, _ = h.db.Exec("UPDATE messages SET content = ? WHERE id = ?", cancelMsg, assistantMessageID)
 				_ = h.db.AddProcessDetail(assistantMessageID, conversationID, "cancelled", cancelMsg, nil)
@@ -217,10 +217,10 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 	sendEvent("done", "", map[string]interface{}{"conversationId": conversationID})
 }
 
-// MultiAgentLoop Eino DeepAgent conversation（ POST /api/agent-loop ， multi_agent.enabled）。
+// MultiAgentLoop Eino DeepAgent conversation( POST /api/agent-loop , multi_agent.enabled).
 func (h *AgentHandler) MultiAgentLoop(c *gin.Context) {
 	if h.config == nil || !h.config.MultiAgent.Enabled {
-		c.JSON(http.StatusNotFound, gin.H{"error": "multi-agent not enabled， config.yaml multi_agent.enabled: true"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "multi-agent not enabled, config.yaml multi_agent.enabled: true"})
 		return
 	}
 

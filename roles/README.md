@@ -37,11 +37,11 @@ enabled: true
 
 **If the `tools` field is set, make sure to include the following 5 built-in MCP tools in the list:**
 
-1. **`record_vulnerability`** — Vulnerability management tool for recording discovered vulnerabilities
-2. **`list_knowledge_risk_types`** — Knowledge base tool for listing available risk types
-3. **`search_knowledge_base`** — Knowledge base tool for searching knowledge base content
-4. **`list_skills`** — Skills tool for listing available skills
-5. **`read_skill`** — Skills tool for reading skill details
+1. **`record_vulnerability`** - Vulnerability management tool for recording discovered vulnerabilities
+2. **`list_knowledge_risk_types`** - Knowledge base tool for listing available risk types
+3. **`search_knowledge_base`** - Knowledge base tool for searching knowledge base content
+4. **`list_skills`** - Skills tool for listing available skills
+5. **`read_skill`** - Skills tool for reading skill details
 
 These built-in tools are core system features. It is recommended that all roles include them to ensure:
 - Ability to record and manage discovered vulnerabilities
@@ -54,12 +54,12 @@ These built-in tools are core system features. It is recommended that all roles 
 
 - **name**: Role name (required)
 - **description**: Role description (required)
-- **user_prompt**: User prompt — prepended to user messages to guide the AI to adopt specific testing methodologies and focus areas (optional)
+- **user_prompt**: User prompt - prepended to user messages to guide the AI to adopt specific testing methodologies and focus areas (optional)
 - **icon**: Role icon, supports Unicode emoji (optional)
-- **tools**: Tool list — specifies the tools available to the role (optional)
+- **tools**: Tool list - specifies the tools available to the role (optional)
   - **If `tools` is not set**: defaults to all tools enabled in MCP management
   - **If `tools` is set**: only the tools specified in the list are used (recommended to include at least the 5 built-in tools)
-- **skills**: Skill list — specifies the skills associated with the role (optional)
+- **skills**: Skill list - specifies the skills associated with the role (optional)
 - **enabled**: Whether to enable the role (required, true/false)
 
 ## Examples

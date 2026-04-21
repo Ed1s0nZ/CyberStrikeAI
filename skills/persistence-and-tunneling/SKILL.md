@@ -1,7 +1,7 @@
 # Persistence & Reverse Connect Toolkit
 
 ## Overview
-Comprehensive toolkit for maintaining persistent covert access using multiple transport protocols and tools. Always deploy multiple persistence methods — if one fails, others maintain access.
+Comprehensive toolkit for maintaining persistent covert access using multiple transport protocols and tools. Always deploy multiple persistence methods - if one fails, others maintain access.
 
 ## Persistence Hierarchy (deploy in order)
 
@@ -195,8 +195,8 @@ sc start SvcName
 |----------|---------|----------|---------------|
 | Full outbound | qsocket/gsocket | chisel/frp | SSH reverse |
 | HTTP only | chisel | frp | revsocks |
-| DNS only | iodine | dnscat2 | — |
-| ICMP only | hans | icmpsh | — |
+| DNS only | iodine | dnscat2 | - |
+| ICMP only | hans | icmpsh | - |
 | No outbound | AnyDesk (vendor relay) | VNC + qsocket | Physical |
 | Windows domain | AnyDesk + RDP-PTH | Metasploit | atexec persistence |
 | Linux server | qsocket + systemd | SSH keys + cron | crontab + .bashrc |

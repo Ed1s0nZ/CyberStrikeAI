@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# CyberStrikeAI — Ghidra Headless MCP Server Launcher
+# CyberStrikeAI - Ghidra Headless MCP Server Launcher
 # ============================================================================
 # Starts ghidra-headless-mcp as a standalone MCP server for binary analysis.
 # The server exposes ~212 tools covering the full Ghidra API: decompilation,
@@ -15,10 +15,10 @@
 #   ./start-ghidra-mcp.sh --tcp --port 9000  # TCP mode on custom port
 #
 # Environment variables:
-#   GHIDRA_INSTALL_DIR  — path to Ghidra installation (auto-detected/installed if missing)
-#   GHIDRA_MCP_PORT     — TCP port (default 8765, only for --tcp mode)
-#   GHIDRA_MCP_HOME     — path to ghidra-headless-mcp repo (default ~/ghidra-headless-mcp)
-#   GHIDRA_VERSION      — Ghidra version to install if missing (default 11.3.2)
+#   GHIDRA_INSTALL_DIR  - path to Ghidra installation (auto-detected/installed if missing)
+#   GHIDRA_MCP_PORT     - TCP port (default 8765, only for --tcp mode)
+#   GHIDRA_MCP_HOME     - path to ghidra-headless-mcp repo (default ~/ghidra-headless-mcp)
+#   GHIDRA_VERSION      - Ghidra version to install if missing (default 11.3.2)
 # ============================================================================
 set -euo pipefail
 
@@ -236,7 +236,7 @@ if [[ "$MODE" == "tcp" ]]; then
         --port "$GHIDRA_MCP_PORT" \
         --ghidra-install-dir "$GHIDRA_INSTALL_DIR"
 else
-    # Stdio mode — ghidra-headless-mcp reads JSON-RPC from stdin, writes to stdout
+    # Stdio mode - ghidra-headless-mcp reads JSON-RPC from stdin, writes to stdout
     # CyberStrikeAI will spawn this as a subprocess
     exec python3 -m ghidra_headless_mcp \
         --transport stdio \
