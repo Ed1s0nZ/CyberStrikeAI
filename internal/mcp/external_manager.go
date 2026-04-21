@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"cyberstrike-ai/internal/config"
@@ -30,6 +31,7 @@ type ExternalMCPManager struct {
 	toolCacheMu  sync.RWMutex              // lock for tool list cache
 	stopRefresh  chan struct{}             // signal to stop background refresh
 	refreshWg    sync.WaitGroup            // wait for background refresh goroutine to finish
+	refreshing   atomic.Bool               // guard against concurrent refreshToolCounts stacking up
 	mu           sync.RWMutex
 }
 
@@ -717,8 +719,16 @@ func (m *ExternalMCPManager) GetToolCounts() map[string]int {
 	return result
 }
 
-// refreshToolCounts refreshes the tool count cache (executed asynchronously in background)
+// refreshToolCounts refreshes the tool count cache (executed asynchronously in background).
+// Guarded by an atomic flag: if a previous refresh hasn't finished, this invocation returns
+// immediately instead of stacking up behind it. Slow MCP endpoints combined with the periodic
+// ticker used to let goroutines queue and eventually exhaust heap/fd.
 func (m *ExternalMCPManager) refreshToolCounts() {
+	if !m.refreshing.CompareAndSwap(false, true) {
+		return
+	}
+	defer m.refreshing.Store(false)
+
 	m.mu.RLock()
 	clients := make(map[string]ExternalMCPClient)
 	for k, v := range m.clients {
