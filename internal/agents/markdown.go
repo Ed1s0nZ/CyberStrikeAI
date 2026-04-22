@@ -30,11 +30,11 @@ type FrontMatter struct {
 
 // OrchestratorMarkdown is the orchestrator (Deep coordinator) definition parsed from the agents directory.
 type OrchestratorMarkdown struct {
-	Filename    string
-	EinoName    string // written to deep.Config.Name / streaming event filtering
-	DisplayName string
-	Description string
-	Instruction string
+	Filename         string
+	OrchestratorName string // normalized agent identifier; surfaces in streaming event filtering
+	DisplayName      string
+	Description      string
+	Instruction      string
 }
 
 // MarkdownDirLoad is the result of a single scan of the agents directory (sub-agents exclude the orchestrator file).
@@ -160,8 +160,11 @@ func SlugID(name string) string {
 	return s
 }
 
-// sanitizeEinoAgentID normalizes the Deep orchestrator's Name in Eino: lowercase ASCII, digits, hyphens, consistent with default cyberstrike-deep.
-func sanitizeEinoAgentID(s string) string {
+// sanitizeOrchestratorAgentID normalizes the Deep-orchestrator agent name to
+// lowercase ASCII letters, digits, and hyphens — consistent with the default
+// `cyberstrike-deep` identifier. The normalized form is what the orchestrator
+// emits on streaming events and what downstream routing keys on.
+func sanitizeOrchestratorAgentID(s string) string {
 	s = strings.TrimSpace(strings.ToLower(s))
 	var b strings.Builder
 	for _, r := range s {
@@ -203,13 +206,13 @@ func orchestratorFromParsed(filename string, fm FrontMatter, body string) (*Orch
 	if rawID == "" {
 		rawID = SlugID(display)
 	}
-	eino := sanitizeEinoAgentID(rawID)
+	orchestratorID := sanitizeOrchestratorAgentID(rawID)
 	return &OrchestratorMarkdown{
-		Filename:    filepath.Base(strings.TrimSpace(filename)),
-		EinoName:    eino,
-		DisplayName: display,
-		Description: strings.TrimSpace(fm.Description),
-		Instruction: strings.TrimSpace(body),
+		Filename:         filepath.Base(strings.TrimSpace(filename)),
+		OrchestratorName: orchestratorID,
+		DisplayName:      display,
+		Description:      strings.TrimSpace(fm.Description),
+		Instruction:      strings.TrimSpace(body),
 	}, nil
 }
 
@@ -218,7 +221,7 @@ func orchestratorConfigFromOrchestrator(o *OrchestratorMarkdown) config.MultiAge
 		return config.MultiAgentSubConfig{}
 	}
 	return config.MultiAgentSubConfig{
-		ID:          o.EinoName,
+		ID:          o.OrchestratorName,
 		Name:        o.DisplayName,
 		Description: o.Description,
 		Instruction: o.Instruction,

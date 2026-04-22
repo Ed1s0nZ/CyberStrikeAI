@@ -198,8 +198,8 @@
     "maxIterSummary": "Досягнуто максимум ітерацій, генерація підсумку...",
     "analyzingRequestShort": "Аналіз вашого запиту...",
     "analyzingRequestPlanning": "Аналіз вашого запиту та планування стратегії тестування...",
-    "startingEinoDeepAgent": "Запуск Eino DeepAgent...",
-    "einoAgent": "Агент Eino: {{name}}"
+    "startingEinoDeepAgent": "Запуск мультиагентного оркестратора...",
+    "einoAgent": "Субагент: {{name}}"
   },
   "timeline": {
     "params": "Параметри:",

@@ -39,7 +39,13 @@ function translateProgressMessage(message) {
  '...': 'progress.analyzingRequestShort',
  '': 'progress.analyzingRequestPlanning',
  ' Eino DeepAgent...': 'progress.startingEinoDeepAgent',
- // ( en-US.json ,/)
+ // Canonical English progress strings emitted by the backend (see
+ // internal/handler/agent.go + internal/multiagent/orchestrator.go).
+ // Keys on the left are matched against the raw SSE progress message;
+ // values on the right are the i18n keys under the progress. namespace
+ // in web/static/i18n/*.json. Keep both the current and legacy backend
+ // strings mapped so the frontend renders correctly across mixed
+ // frontend/backend version skew during upgrades.
         'Calling AI model...': 'progress.callingAI',
         'Last iteration: generating summary and next steps...': 'progress.lastIterSummary',
         'Summary complete': 'progress.summaryDone',
@@ -47,6 +53,7 @@ function translateProgressMessage(message) {
         'Max iterations reached, generating summary...': 'progress.maxIterSummary',
         'Analyzing your request...': 'progress.analyzingRequestShort',
         'Analyzing your request and planning test strategy...': 'progress.analyzingRequestPlanning',
+        'starting multi-agent orchestrator...': 'progress.startingEinoDeepAgent',
         'Starting Eino DeepAgent...': 'progress.startingEinoDeepAgent'
     };
     if (map[trim]) return window.t(map[trim]);

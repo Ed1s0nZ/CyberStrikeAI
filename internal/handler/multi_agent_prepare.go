@@ -11,7 +11,9 @@ import (
 	"go.uber.org/zap"
 )
 
-// multiAgentPrepared Eino message.
+// multiAgentPrepared holds the per-request state the multi-agent handler
+// needs after session + message + role-tools preparation is complete.
+// Both MultiAgentLoop and MultiAgentLoopStream consume it identically.
 type multiAgentPrepared struct {
 	ConversationID     string
 	CreatedNew         bool
@@ -23,7 +25,7 @@ type multiAgentPrepared struct {
 
 func (h *AgentHandler) prepareMultiAgentSession(req *ChatRequest) (*multiAgentPrepared, error) {
 	if len(req.Attachments) > maxAttachments {
-		return nil, fmt.Errorf("maximum attachments %d ", maxAttachments)
+		return nil, fmt.Errorf("attachments exceed the limit of %d", maxAttachments)
 	}
 
 	conversationID := strings.TrimSpace(req.ConversationID)

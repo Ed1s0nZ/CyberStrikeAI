@@ -198,8 +198,8 @@
     "maxIterSummary": "Max iterations reached, generating summary...",
     "analyzingRequestShort": "Analyzing your request...",
     "analyzingRequestPlanning": "Analyzing your request and planning test strategy...",
-    "startingEinoDeepAgent": "Starting Eino DeepAgent...",
-    "einoAgent": "Eino agent: {{name}}"
+    "startingEinoDeepAgent": "Starting multi-agent orchestrator...",
+    "einoAgent": "Sub-agent: {{name}}"
   },
   "timeline": {
     "params": "Parameters:",

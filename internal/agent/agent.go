@@ -2080,7 +2080,10 @@ func (a *Agent) repairOrphanToolMessages(messages *[]ChatMessage) bool {
 	return removed
 }
 
-// ToolsForRole returns Agent (OpenAI function format), Eino DeepAgent MCP .
+// ToolsForRole returns the tool list for a given role in the agent's
+// OpenAI-function-format shape. Callers outside the single-agent loop
+// (the multi-agent orchestrator, the MCP federation layer) use this
+// to inherit the role's tool scoping instead of re-deriving it.
 func (a *Agent) ToolsForRole(roleTools []string) []Tool {
 	return a.getAvailableTools(roleTools)
 }

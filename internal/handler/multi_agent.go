@@ -16,13 +16,17 @@ import (
 	"go.uber.org/zap"
 )
 
-// MultiAgentLoopStream Eino DeepAgent conversation( config.multi_agent.enabled).
+// MultiAgentLoopStream runs a conversation through the native multi-agent
+// orchestrator (internal/multiagent) and emits SSE progress + final response.
+// The caller must have config.multi_agent.enabled=true; the handler fails
+// fast with an SSE error/done pair when the feature is off rather than
+// returning an HTTP error (the stream is already open by the time we check).
 func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
 	if h.config == nil || !h.config.MultiAgent.Enabled {
-		ev := StreamEvent{Type: "error", Message: "multi-agent not enabled,enable in settings or config.yaml multi_agent.enabled"}
+		ev := StreamEvent{Type: "error", Message: "multi-agent mode is not enabled. Enable it in Settings, or set multi_agent.enabled: true in config.yaml and restart."}
 		b, _ := json.Marshal(ev)
 		fmt.Fprintf(c.Writer, "data: %s\n\n", b)
 		done := StreamEvent{Type: "done", Message: ""}
@@ -45,8 +49,9 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 
 	c.Header("X-Accel-Buffering", "no")
 
-	// sendEvent stop.
-	// :baseCtx ;.
+	// sendEvent is the emit hook for SSE events. It respects task
+	// cancellation — baseCtx is the parent task context and
+	// ErrTaskCancelled suppresses spurious error events during stop.
 	var baseCtx context.Context
 
 	clientDisconnected := false
@@ -56,8 +61,11 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 		if clientDisconnected {
 			return
 		}
-		// stop,Eino eventType=="error".
-		// UI "error + cancelled ", error.
+		// Cancellation squelch: when the operator stops the task, the
+		// orchestrator's error channel also fires an eventType=="error"
+		// event. Suppressing it here keeps the UI from rendering a
+		// spurious "error + cancelled" pair — the "cancelled" status
+		// is the authoritative outcome.
 		if eventType == "error" && baseCtx != nil && errors.Is(context.Cause(baseCtx), ErrTaskCancelled) {
 			return
 		}
@@ -84,7 +92,7 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 		sseWriteMu.Unlock()
 	}
 
-	h.logger.Info("received Eino DeepAgent streaming request",
+	h.logger.Info("multi-agent orchestrator: received streaming request",
 		zap.String("conversationId", req.ConversationID),
 	)
 
@@ -119,7 +127,7 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 				"errorType":      "task_already_running",
 			})
 		} else {
-			errorMsg = "❌ : " + err.Error()
+			errorMsg = "❌ Failed to start task: " + err.Error()
 			sendEvent("error", errorMsg, nil)
 		}
 		if assistantMessageID != "" {
@@ -132,7 +140,7 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 	taskStatus := "completed"
 	defer h.tasks.FinishTask(conversationID, taskStatus)
 
-	sendEvent("progress", "starting Eino DeepAgent...", map[string]interface{}{
+	sendEvent("progress", "starting multi-agent orchestrator...", map[string]interface{}{
 		"conversationId": conversationID,
 	})
 
@@ -140,7 +148,7 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 	go sseKeepalive(c, stopKeepalive, &sseWriteMu)
 	defer close(stopKeepalive)
 
-	result, runErr := multiagent.RunDeepAgent(
+	result, runErr := multiagent.RunOrchestrator(
 		taskCtx,
 		h.config,
 		&h.config.MultiAgent,
@@ -159,7 +167,7 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 		if errors.Is(cause, ErrTaskCancelled) {
 			taskStatus = "cancelled"
 			h.tasks.UpdateTaskStatus(conversationID, taskStatus)
-			cancelMsg := ",stop."
+			cancelMsg := "Task cancelled by user; stopping."
 			if assistantMessageID != "" {
 				_, _ = h.db.Exec("UPDATE messages SET content = ? WHERE id = ?", cancelMsg, assistantMessageID)
 				_ = h.db.AddProcessDetail(assistantMessageID, conversationID, "cancelled", cancelMsg, nil)
@@ -172,7 +180,7 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 			return
 		}
 
-		h.logger.Error("Eino DeepAgent execution failed", zap.Error(runErr))
+		h.logger.Error("multi-agent orchestrator: execution failed", zap.Error(runErr))
 		taskStatus = "failed"
 		h.tasks.UpdateTaskStatus(conversationID, taskStatus)
 		errMsg := "execution failed: " + runErr.Error()
@@ -212,15 +220,18 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 		"mcpExecutionIds": result.MCPExecutionIDs,
 		"conversationId":  conversationID,
 		"messageId":       assistantMessageID,
-		"agentMode":       "eino_deep",
+		"agentMode":       "multi",
 	})
 	sendEvent("done", "", map[string]interface{}{"conversationId": conversationID})
 }
 
-// MultiAgentLoop Eino DeepAgent conversation( POST /api/agent-loop , multi_agent.enabled).
+// MultiAgentLoop runs a conversation through the native multi-agent
+// orchestrator and returns the final result as JSON (non-streaming
+// counterpart to /api/agent-loop). Requires config.multi_agent.enabled=true;
+// otherwise returns HTTP 404 with a JSON error body.
 func (h *AgentHandler) MultiAgentLoop(c *gin.Context) {
 	if h.config == nil || !h.config.MultiAgent.Enabled {
-		c.JSON(http.StatusNotFound, gin.H{"error": "multi-agent not enabled, config.yaml multi_agent.enabled: true"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "multi-agent mode is not enabled. Set multi_agent.enabled: true in config.yaml and restart."})
 		return
 	}
 
@@ -230,7 +241,7 @@ func (h *AgentHandler) MultiAgentLoop(c *gin.Context) {
 		return
 	}
 
-	h.logger.Info("received Eino DeepAgent non-streaming request", zap.String("conversationId", req.ConversationID))
+	h.logger.Info("multi-agent orchestrator: received non-streaming request", zap.String("conversationId", req.ConversationID))
 
 	prep, err := h.prepareMultiAgentSession(&req)
 	if err != nil {
@@ -239,7 +250,7 @@ func (h *AgentHandler) MultiAgentLoop(c *gin.Context) {
 		return
 	}
 
-	result, runErr := multiagent.RunDeepAgent(
+	result, runErr := multiagent.RunOrchestrator(
 		c.Request.Context(),
 		h.config,
 		&h.config.MultiAgent,
@@ -253,7 +264,7 @@ func (h *AgentHandler) MultiAgentLoop(c *gin.Context) {
 		h.agentsMarkdownDir,
 	)
 	if runErr != nil {
-		h.logger.Error("Eino DeepAgent execution failed", zap.Error(runErr))
+		h.logger.Error("multi-agent orchestrator: execution failed", zap.Error(runErr))
 		errMsg := "execution failed: " + runErr.Error()
 		if prep.AssistantMessageID != "" {
 			_, _ = h.db.Exec("UPDATE messages SET content = ? WHERE id = ?", errMsg, prep.AssistantMessageID)

@@ -67,11 +67,11 @@ type subAgentDef struct {
 	maxIter     int
 }
 
-// RunDeepAgent executes one round of conversation using the native Go orchestrator.
-// Streaming events are emitted via the progress callback using the same event types
-// the frontend expects, maintaining full compatibility with the previous Eino-based
-// implementation.
-func RunDeepAgent(
+// RunOrchestrator executes one round of conversation using the native Go
+// multi-agent orchestrator. Streaming events are emitted via the progress
+// callback using the same event types the frontend expects — wire-compatible
+// with the upstream Eino DeepAgent integration this fork replaced.
+func RunOrchestrator(
 	ctx context.Context,
 	appCfg *config.Config,
 	ma *config.MultiAgentConfig,

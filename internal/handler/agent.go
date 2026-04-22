@@ -633,7 +633,7 @@ func (h *AgentHandler) ProcessMessageForRobot(ctx context.Context, conversationI
 
 	useRobotMulti := h.config != nil && h.config.MultiAgent.Enabled && h.config.MultiAgent.RobotUseMultiAgent
 	if useRobotMulti {
-		resultMA, errMA := multiagent.RunDeepAgent(
+		resultMA, errMA := multiagent.RunOrchestrator(
 			ctx,
 			h.config,
 			&h.config.MultiAgent,
@@ -1778,7 +1778,7 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 		var resultMA *multiagent.RunResult
 		var runErr error
 		if useBatchMulti {
-			resultMA, runErr = multiagent.RunDeepAgent(ctx, h.config, &h.config.MultiAgent, h.agent, h.logger, conversationID, finalMessage, []agent.ChatMessage{}, roleTools, progressCallback, h.agentsMarkdownDir)
+			resultMA, runErr = multiagent.RunOrchestrator(ctx, h.config, &h.config.MultiAgent, h.agent, h.logger, conversationID, finalMessage, []agent.ChatMessage{}, roleTools, progressCallback, h.agentsMarkdownDir)
 		} else {
 			result, runErr = h.agent.AgentLoopWithProgress(ctx, finalMessage, []agent.ChatMessage{}, conversationID, progressCallback, roleTools, roleSkills)
 		}

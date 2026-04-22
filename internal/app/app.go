@@ -704,8 +704,11 @@ func setupRoutes(
 		protected.GET("/agent-loop/tasks", agentHandler.ListAgentTasks)
 		protected.GET("/agent-loop/tasks/completed", agentHandler.ListCompletedTasks)
 
-		// Eino DeepAgent ( Agent , config.multi_agent.enabled)
-		// ; h.config.MultiAgent.Enabled (apply config)
+		// Multi-agent orchestrator routes (native Go; replaces the upstream
+		// CloudWeGo Eino DeepAgent integration that our fork removed). These
+		// routes are always registered; the handlers themselves gate on
+		// h.config.MultiAgent.Enabled so that config-reload / apply-config
+		// can toggle the feature at runtime without a server restart.
 		protected.POST("/multi-agent", agentHandler.MultiAgentLoop)
 		protected.POST("/multi-agent/stream", agentHandler.MultiAgentLoopStream)
 		protected.GET("/multi-agent/markdown-agents", markdownAgentsHandler.ListMarkdownAgents)

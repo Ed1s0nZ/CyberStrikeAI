@@ -1484,8 +1484,8 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 			"/api/multi-agent": map[string]interface{}{
 				"post": map[string]interface{}{
 					"tags":        []string{"conversation"},
-					"summary":     "message AI (Eino DeepAgent,)",
-					"description": " `POST /api/agent-loop` request body, **CloudWeGo Eino DeepAgent** .****:`multi_agent.enabled: true`( `config.yaml` );returns 404 JSON.request body `webshellConnectionId`( WebShell ).",
+					"summary":     "Send message via multi-agent orchestrator",
+					"description": "Route the message through the native multi-agent orchestrator (`internal/multiagent/orchestrator.go`) instead of the single-agent ReAct loop. The orchestrator plans, delegates sub-tasks to Markdown-defined sub-agents under `agents/*.md` via the `task` tool, and synthesises their results. Accepts the same request body shape as `POST /api/agent-loop`. **Requirements:** `multi_agent.enabled: true` in `config.yaml`; the endpoint returns HTTP 404 with a JSON error body when multi-agent mode is disabled. If `webshellConnectionId` is supplied the orchestrator is scoped to that WebShell connection and the sub-agents inherit the connection-scoped tool list, matching `/api/agent-loop` semantics.",
 					"operationId": "sendMessageMultiAgent",
 					"requestBody": map[string]interface{}{
 						"required": true,
@@ -1496,19 +1496,19 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 									"properties": map[string]interface{}{
 										"message": map[string]interface{}{
 											"type":        "string",
-											"description": "message()",
+											"description": "The message text to send to the agent.",
 										},
 										"conversationId": map[string]interface{}{
 											"type":        "string",
-											"description": "conversation ID(,)",
+											"description": "Conversation ID (optional). When omitted, a new conversation is created; when provided, the message is added to the specified conversation (which must exist).",
 										},
 										"role": map[string]interface{}{
 											"type":        "string",
-											"description": "role()",
+											"description": "Role name (optional). When provided, must match an entry defined under `roles/` — the orchestrator applies the role's system prompt and tool whitelist.",
 										},
 										"webshellConnectionId": map[string]interface{}{
 											"type":        "string",
-											"description": "WebShell connection ID(, agent-loop )",
+											"description": "WebShell connection ID (optional). When set, the orchestrator is scoped to the specified WebShell connection — same scoping semantics as `/api/agent-loop`.",
 										},
 									},
 									"required": []string{"message"},
@@ -1518,20 +1518,20 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 					},
 					"responses": map[string]interface{}{
 						"200": map[string]interface{}{
-							"description": ",format /api/agent-loop",
+							"description": "Success. Response body follows the same shape as `/api/agent-loop`.",
 						},
-						"400": map[string]interface{}{"description": "error"},
-						"401": map[string]interface{}{"description": "unauthorized"},
-						"404": map[string]interface{}{"description": "multi-agent not enabledconversation"},
-						"500": map[string]interface{}{"description": "execution failed"},
+						"400": map[string]interface{}{"description": "Invalid request parameters"},
+						"401": map[string]interface{}{"description": "Unauthorized"},
+						"404": map[string]interface{}{"description": "Multi-agent mode is not enabled, or the referenced conversation does not exist"},
+						"500": map[string]interface{}{"description": "Execution failed"},
 					},
 				},
 			},
 			"/api/multi-agent/stream": map[string]interface{}{
 				"post": map[string]interface{}{
 					"tags":        []string{"conversation"},
-					"summary":     "message AI (Eino DeepAgent,SSE)",
-					"description": " `POST /api/agent-loop/stream` ,type; Eino DeepAgent .****:`multi_agent.enabled: true`;,returns 200 SSE, `type: error` `done`. `webshellConnectionId`.",
+					"summary":     "Send message via multi-agent orchestrator (SSE stream)",
+					"description": "Streaming variant of `POST /api/agent-loop/stream` routed through the native multi-agent orchestrator. Emits the same set of SSE event types as the single-agent stream (progress, tool calls, sub-agent delegation events, thinking, response, done, error). **Requirements:** `multi_agent.enabled: true`; the endpoint returns HTTP 200 with an SSE body in all cases — transport-level errors are delivered as `type: error` events, followed by `type: done`, rather than as HTTP error codes once the stream has opened. Supports `webshellConnectionId` with the same scoping semantics as the non-stream endpoint.",
 					"operationId": "sendMessageMultiAgentStream",
 					"requestBody": map[string]interface{}{
 						"required": true,
@@ -1552,17 +1552,17 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 					},
 					"responses": map[string]interface{}{
 						"200": map[string]interface{}{
-							"description": "text/event-stream(SSE)",
+							"description": "Server-Sent Events stream. Content-Type is `text/event-stream`.",
 							"content": map[string]interface{}{
 								"text/event-stream": map[string]interface{}{
 									"schema": map[string]interface{}{
 										"type":        "string",
-										"description": "SSE ",
+										"description": "SSE event payload. Each event has a `type` field — see the Agent Loop stream protocol documentation for the full event-type catalogue.",
 									},
 								},
 							},
 						},
-						"401": map[string]interface{}{"description": "unauthorized"},
+						"401": map[string]interface{}{"description": "Unauthorized"},
 					},
 				},
 			},
