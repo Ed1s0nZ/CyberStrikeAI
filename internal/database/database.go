@@ -273,7 +273,8 @@ func (db *DB) initTables() error {
 		started_at INTEGER NOT NULL,
 		ended_at   INTEGER,
 		outcome    TEXT,
-		label      TEXT
+		label      TEXT,
+		FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
 	);`
 
 	// create debug LLM calls table
@@ -292,7 +293,8 @@ func (db *DB) initTables() error {
 		completion_tokens INTEGER,
 		request_json      TEXT NOT NULL,
 		response_json     TEXT NOT NULL,
-		error             TEXT
+		error             TEXT,
+		FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
 	);`
 
 	// create debug events table
@@ -306,7 +308,8 @@ func (db *DB) initTables() error {
 		agent_id        TEXT,
 		payload_json    TEXT NOT NULL,
 		started_at      INTEGER NOT NULL,
-		finished_at     INTEGER
+		finished_at     INTEGER,
+		FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
 	);`
 
 	// create indexes
