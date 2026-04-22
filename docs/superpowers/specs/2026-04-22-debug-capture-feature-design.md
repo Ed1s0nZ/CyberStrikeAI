@@ -89,7 +89,7 @@ debug:
 | File | Purpose |
 |---|---|
 | `sink.go` | `Sink` interface, `noopSink{}`, `dbSink{db, enabled atomic.Bool, seqByConv sync.Map}`, `NewSink(enabled bool, db *sql.DB, log *zap.Logger) Sink` |
-| `capture.go` | Value types `LLMCall`, `Event`, `ToolCall` and helpers for marshaling verbatim request/response |
+| `capture.go` | Value types `LLMCall`, `Event` and helpers for marshaling verbatim request/response |
 | `session.go` | `StartSession(convID)`, `EndSession(convID, outcome)`, boot-time `SweepOrphans(db)` |
 | `converter.go` | Pure function `ToShareGPT(llmCalls []LLMCall) ([]byte, error)` |
 | `export.go` | Streaming writers `WriteRawJSONL(w, convID)`, `WriteShareGPTJSONL(w, convID)`, `WriteBulkArchive(w, filter)` |
@@ -104,11 +104,12 @@ type Sink interface {
     EndSession(convID, outcome string)
     RecordLLMCall(convID, msgID string, c LLMCall)
     RecordEvent(convID, msgID string, e Event)
-    RecordToolCall(convID, msgID string, t ToolCall)
     SetEnabled(bool)
     Enabled() bool
 }
 ```
+
+Tool dispatch is captured without a dedicated `RecordToolCall` method: the existing `tool_executions` table already records tool name / args / result / duration, and the `tool_call` + `tool_result` SSE events route through `RecordEvent` for the fine-grained timestamp + payload capture. No third source of truth for tools.
 
 ### DB migrations
 
