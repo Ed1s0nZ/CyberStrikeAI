@@ -199,6 +199,27 @@ external_mcp:
       timeout: 600  # Binary analysis can take time - 10 min timeout
       external_mcp_enable: false  # Enable after installing: scripts/ghidra/start-ghidra-mcp.sh --install
       tool_enabled: {}  # Empty = all tools enabled when server is active
+    # ── Frida Kahlo MCP - Android Dynamic Instrumentation ───────────────────
+    # Wraps Frida's Android instrumentation API for AI-driven analysis: device
+    # discovery, attach/spawn lifecycle, isolated script injection, telemetry
+    # streaming, artifact storage. Upstream: https://github.com/FuzzySecurity/kahlo-mcp
+    # Full setup guide: docs/mcp-setup.md
+    # First run installs Node.js (if missing), clones the upstream repo, runs
+    # npm install + npm run build, and writes a default config.json. You still
+    # need `adb` on PATH and a rooted device with frida-server running.
+    # Auto-start: scripts/frida/start-frida-kahlo-mcp.sh --install  (one time)
+    frida-kahlo:
+      transport: stdio
+      command: bash
+      args: ["scripts/frida/start-frida-kahlo-mcp.sh"]
+      env:
+        KAHLO_MCP_HOME: ""   # Path to the kahlo-mcp checkout (default: ~/kahlo-mcp)
+        KAHLO_ADB_PATH: ""   # Full path to adb (default: auto-detect via `which adb`)
+        KAHLO_LOG_LEVEL: "info"
+      description: "Frida Kahlo MCP - Android dynamic instrumentation (device/process discovery, attach/spawn, Frida script injection, telemetry, stdlib for Java hooks / Intent parsing / stack traces)"
+      timeout: 300  # 5 min — Frida scripts can run long analyses
+      external_mcp_enable: false  # Enable after installing: scripts/frida/start-frida-kahlo-mcp.sh --install
+      tool_enabled: {}
 # ============================================
 # Knowledge Base Configuration
 # ============================================

@@ -499,6 +499,7 @@ Build an attack chain for the latest engagement and export the node list with se
 
 - [tools/README.md](tools/README.md) — tool YAML schema and extension guide
 - [skills/README.md](skills/README.md) — skill pack layout
+- [docs/mcp-setup.md](docs/mcp-setup.md) — External MCP servers: Ghidra (static RE) and Frida-Kahlo (Android dynamic instrumentation) installation, config, troubleshooting — plus the pattern for bundling your own
 - [docs/frontend-i18n.md](docs/frontend-i18n.md) — frontend internationalization plan
 - [docs/robot_en.md](docs/robot_en.md) — Telegram chatbot setup (DingTalk/Lark/WeCom setup preserved from upstream for users on those platforms)
 - [docs/plugins.md](docs/plugins.md) — recon plugin system reference
