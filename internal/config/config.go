@@ -105,8 +105,8 @@ type LogConfig struct {
 }
 
 type DebugConfig struct {
-	Enabled    bool `yaml:"enabled"`
-	RetainDays int  `yaml:"retain_days"`
+	Enabled    bool `yaml:"enabled" json:"enabled"`
+	RetainDays int  `yaml:"retain_days" json:"retain_days"`
 }
 
 type MCPConfig struct {

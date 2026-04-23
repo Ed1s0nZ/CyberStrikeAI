@@ -333,8 +333,8 @@ async function loadConfig(loadTools = true) {
         if (currentConfig.debug) {
             const debugEnabledEl = document.getElementById('debug-enabled');
             const debugRetainEl  = document.getElementById('debug-retain-days');
-            if (debugEnabledEl) debugEnabledEl.checked = !!currentConfig.debug.Enabled;
-            if (debugRetainEl)  debugRetainEl.value    = Number(currentConfig.debug.RetainDays || 0);
+            if (debugEnabledEl) debugEnabledEl.checked = !!currentConfig.debug.enabled;
+            if (debugRetainEl)  debugRetainEl.value    = Number(currentConfig.debug.retain_days || 0);
         }
 
         // onlyhasatneedwhenonly loadtoollist(MCPmanagement pageneed,systemsettingspagenotneed)
@@ -953,8 +953,8 @@ async function applySettings() {
                 const debugRetainEl  = document.getElementById('debug-retain-days');
                 if (!debugEnabledEl) return undefined;
                 return {
-                    Enabled:    debugEnabledEl.checked,
-                    RetainDays: parseInt(debugRetainEl?.value || '0', 10),
+                    enabled:    debugEnabledEl.checked,
+                    retain_days: parseInt(debugRetainEl?.value || '0', 10),
                 };
             })()
         };
