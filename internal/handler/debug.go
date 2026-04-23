@@ -232,6 +232,11 @@ func (h *DebugHandler) ExportBulk(c *gin.Context) {
 		}
 	}
 
+	if format != "raw" && format != "sharegpt" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "format must be raw or sharegpt"})
+		return
+	}
+
 	c.Header("Content-Type", "application/gzip")
 	c.Header("Content-Disposition", `attachment; filename="debug-export.tar.gz"`)
 

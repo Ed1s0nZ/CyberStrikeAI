@@ -340,3 +340,18 @@ func TestExportBulk_TarGzValid(t *testing.T) {
 		t.Fatalf("missing entries: %v", names)
 	}
 }
+
+func TestExportBulk_InvalidFormatReturns400(t *testing.T) {
+	db := openHandlerTestDB(t)
+	h := &DebugHandler{db: db, logger: zap.NewNop()}
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/api/debug/export-bulk", h.ExportBulk)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/api/debug/export-bulk?format=bogus", nil)
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status: want 400, got %d", w.Code)
+	}
+}
