@@ -343,3 +343,32 @@ func TestSweepOrphans_FallsBackToStartedAtWhenNoEvents(t *testing.T) {
 		t.Fatalf("fallback to started_at failed: want 42, got %v", endedAt)
 	}
 }
+
+// TestNewSink_DisabledInitialButTogglable is the regression test for
+// the Gemini PR #19 HIGH finding: booting with debug.enabled=false
+// must still produce a sink whose SetEnabled(true) starts writing,
+// so the Settings toggle works without a restart.
+func TestNewSink_DisabledInitialButTogglable(t *testing.T) {
+	db := openTestDB(t)
+	s := NewSink(false, db, nil)
+	if s.Enabled() {
+		t.Fatalf("NewSink(false, db, ...) must start disabled")
+	}
+	// While disabled, writes must be suppressed.
+	s.RecordEvent("conv-x", "", Event{EventType: "early", PayloadJSON: "{}", StartedAt: 1})
+	var n int
+	_ = db.QueryRow(`SELECT COUNT(*) FROM debug_events WHERE conversation_id = 'conv-x'`).Scan(&n)
+	if n != 0 {
+		t.Fatalf("writes should be suppressed while disabled: got %d events", n)
+	}
+	// Flip on — writes must land now.
+	s.SetEnabled(true)
+	if !s.Enabled() {
+		t.Fatalf("SetEnabled(true) should make Enabled() return true")
+	}
+	s.RecordEvent("conv-x", "", Event{EventType: "late", PayloadJSON: "{}", StartedAt: 2})
+	_ = db.QueryRow(`SELECT COUNT(*) FROM debug_events WHERE conversation_id = 'conv-x'`).Scan(&n)
+	if n != 1 {
+		t.Fatalf("writes should resume after SetEnabled(true): got %d events", n)
+	}
+}

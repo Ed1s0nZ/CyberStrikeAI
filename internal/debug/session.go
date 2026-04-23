@@ -47,6 +47,7 @@ func (s *dbSink) EndSession(conversationID, outcome string) {
 			zap.String("outcome", outcome),
 			zap.Error(err))
 	}
+	s.seqByConv.Delete(conversationID)
 }
 
 // SweepOrphans marks any debug_sessions row with ended_at IS NULL as

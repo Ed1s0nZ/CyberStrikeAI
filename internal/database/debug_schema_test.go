@@ -31,7 +31,12 @@ func TestInit_CreatesDebugTables(t *testing.T) {
 			t.Fatalf("table %s missing: %v", table, err)
 		}
 	}
-	for _, idx := range []string{"idx_debug_llm_calls_conv", "idx_debug_events_conv"} {
+	for _, idx := range []string{
+		"idx_debug_llm_calls_conv",
+		"idx_debug_events_conv",
+		"idx_debug_sessions_started",
+		"idx_debug_sessions_ended",
+	} {
 		var name string
 		err := db.QueryRow("SELECT name FROM sqlite_master WHERE type='index' AND name=?", idx).Scan(&name)
 		if err != nil {

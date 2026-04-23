@@ -22,19 +22,22 @@ type Sink interface {
 	Enabled() bool
 }
 
-// NewSink returns a dbSink when enabled at construction, otherwise a
-// noopSink. The SetEnabled runtime toggle only flips writes for an
-// already-dbSink; a noopSink stays a noopSink for the process lifetime
-// (the handler wires a single Sink at boot).
+// NewSink returns a Sink bound to db. When db is non-nil, the returned
+// *dbSink honors SetEnabled for runtime toggling — boot-time enabled
+// is the initial value of the atomic.Bool, not a choice of
+// implementation. When db is nil (test harnesses, NewAgent's
+// nil-fallback), a noopSink is returned because there's no
+// destination to write to; a noopSink's SetEnabled is intentionally
+// inert so it can't try to write to a nil *sql.DB.
 func NewSink(enabled bool, db *sql.DB, log *zap.Logger) Sink {
 	if log == nil {
 		log = zap.NewNop()
 	}
-	if !enabled {
+	if db == nil {
 		return noopSink{}
 	}
 	s := &dbSink{db: db, log: log}
-	s.enabled.Store(true)
+	s.enabled.Store(enabled)
 	return s
 }
 
@@ -59,7 +62,8 @@ type dbSink struct {
 
 	// seqByConv[conversationID] is a *atomic.Int64 holding the next
 	// event seq. Lazily populated on first RecordEvent for the
-	// conversation; never deleted (bounded by retention sweep).
+	// conversation; entries are reaped by EndSession to bound memory
+	// growth over the process lifetime.
 	seqByConv sync.Map
 }
 

@@ -30,8 +30,18 @@ func wrapRunWithDebug(sink debug.Sink, conversationID string, runFn func() (stri
 		sink.StartSession(conversationID)
 	}
 	defer func() {
-		// Apply defaults before EndSession fires so the deferred
-		// call always receives a non-empty outcome string.
+		// Panic recovery: record outcome="failed" and re-panic so the
+		// caller sees the original panic. Without this, a panic in
+		// runFn would leave outcome="" and the defer would default it
+		// to "completed" (because err is also zero-valued at panic
+		// time, since named returns haven't been assigned yet).
+		if r := recover(); r != nil {
+			outcome = "failed"
+			if sink != nil {
+				sink.EndSession(conversationID, outcome)
+			}
+			panic(r)
+		}
 		if outcome == "" {
 			if err != nil {
 				outcome = "failed"
@@ -44,5 +54,5 @@ func wrapRunWithDebug(sink debug.Sink, conversationID string, runFn func() (stri
 		}
 	}()
 	outcome, err = runFn()
-	return outcome, err
+	return
 }

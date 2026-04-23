@@ -342,6 +342,8 @@ func (db *DB) initTables() error {
 	CREATE INDEX IF NOT EXISTS idx_webshell_connection_states_updated_at ON webshell_connection_states(updated_at);
 	CREATE INDEX IF NOT EXISTS idx_debug_llm_calls_conv ON debug_llm_calls(conversation_id, sent_at);
 	CREATE INDEX IF NOT EXISTS idx_debug_events_conv ON debug_events(conversation_id, seq);
+	CREATE INDEX IF NOT EXISTS idx_debug_sessions_started ON debug_sessions(started_at);
+	CREATE INDEX IF NOT EXISTS idx_debug_sessions_ended ON debug_sessions(ended_at);
 	`
 
 	if _, err := db.Exec(createConversationsTable); err != nil {
