@@ -261,3 +261,85 @@ func TestDBSink_RecordEvent_SeparateConversationsIndependentSeq(t *testing.T) {
 		}
 	}
 }
+
+func TestDBSink_SetEnabled_GatesWrites(t *testing.T) {
+	db := openTestDB(t)
+	s := NewSink(true, db, nil)
+	s.RecordEvent("conv-1", "", Event{EventType: "a", PayloadJSON: "{}", StartedAt: 1})
+
+	s.SetEnabled(false)
+	s.RecordEvent("conv-1", "", Event{EventType: "b", PayloadJSON: "{}", StartedAt: 2})
+
+	s.SetEnabled(true)
+	s.RecordEvent("conv-1", "", Event{EventType: "c", PayloadJSON: "{}", StartedAt: 3})
+
+	rows, err := db.Query(`SELECT event_type FROM debug_events WHERE conversation_id = ? ORDER BY id`, "conv-1")
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	defer rows.Close()
+	var types []string
+	for rows.Next() {
+		var ty string
+		_ = rows.Scan(&ty)
+		types = append(types, ty)
+	}
+	if len(types) != 2 || types[0] != "a" || types[1] != "c" {
+		t.Fatalf("want [a c] (b suppressed while disabled), got %v", types)
+	}
+}
+
+func TestSweepOrphans_MarksLiveRowsAsInterrupted(t *testing.T) {
+	db := openTestDB(t)
+	mustExec := func(q string, args ...interface{}) {
+		if _, err := db.Exec(q, args...); err != nil {
+			t.Fatalf("exec %q: %v", q, err)
+		}
+	}
+	// Seed one live (ended_at NULL) row with a latest-event timestamp,
+	// plus one already-ended row that must NOT be touched.
+	mustExec(`INSERT INTO debug_sessions (conversation_id, started_at) VALUES ('orphan', 100)`)
+	mustExec(`INSERT INTO debug_sessions (conversation_id, started_at, ended_at, outcome) VALUES ('done', 50, 200, 'completed')`)
+	mustExec(`INSERT INTO debug_events (conversation_id, seq, event_type, payload_json, started_at, finished_at) VALUES ('orphan', 0, 'tool_call', '{}', 150, 175)`)
+
+	if err := SweepOrphans(db, nil); err != nil {
+		t.Fatalf("SweepOrphans: %v", err)
+	}
+
+	var endedAt sql.NullInt64
+	var outcome sql.NullString
+	if err := db.QueryRow(`SELECT ended_at, outcome FROM debug_sessions WHERE conversation_id='orphan'`).Scan(&endedAt, &outcome); err != nil {
+		t.Fatalf("Query orphan: %v", err)
+	}
+	if outcome.String != "interrupted" {
+		t.Fatalf("orphan outcome: want interrupted, got %q", outcome.String)
+	}
+	if !endedAt.Valid || endedAt.Int64 != 175 {
+		t.Fatalf("orphan ended_at: want 175 (latest event's finished_at), got %v", endedAt)
+	}
+
+	// The done row must be untouched.
+	if err := db.QueryRow(`SELECT ended_at, outcome FROM debug_sessions WHERE conversation_id='done'`).Scan(&endedAt, &outcome); err != nil {
+		t.Fatalf("Query done: %v", err)
+	}
+	if outcome.String != "completed" || endedAt.Int64 != 200 {
+		t.Fatalf("done row changed: outcome=%q ended_at=%v", outcome.String, endedAt)
+	}
+}
+
+func TestSweepOrphans_FallsBackToStartedAtWhenNoEvents(t *testing.T) {
+	db := openTestDB(t)
+	if _, err := db.Exec(`INSERT INTO debug_sessions (conversation_id, started_at) VALUES ('orphan-noevents', 42)`); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := SweepOrphans(db, nil); err != nil {
+		t.Fatalf("SweepOrphans: %v", err)
+	}
+	var endedAt sql.NullInt64
+	if err := db.QueryRow(`SELECT ended_at FROM debug_sessions WHERE conversation_id='orphan-noevents'`).Scan(&endedAt); err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	if !endedAt.Valid || endedAt.Int64 != 42 {
+		t.Fatalf("fallback to started_at failed: want 42, got %v", endedAt)
+	}
+}

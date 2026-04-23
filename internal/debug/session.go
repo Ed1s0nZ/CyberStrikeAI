@@ -1,6 +1,7 @@
 package debug
 
 import (
+	"database/sql"
 	"time"
 
 	"go.uber.org/zap"
@@ -47,3 +48,36 @@ func (s *dbSink) EndSession(conversationID, outcome string) {
 			zap.Error(err))
 	}
 }
+
+// SweepOrphans marks any debug_sessions row with ended_at IS NULL as
+// outcome='interrupted' with ended_at derived from the latest
+// captured event timestamp. Intended to run once at server boot so
+// pre-crash live sessions don't appear eternally live in the
+// Settings → Debug list.
+//
+// Priority for the derived ended_at:
+//   1. MAX(debug_events.finished_at) for that conversation
+//   2. MAX(debug_events.started_at) if no finished_at present
+//   3. the session's own started_at if no events captured
+func SweepOrphans(db *sql.DB, log *zap.Logger) error {
+	if db == nil {
+		return nil
+	}
+	if log == nil {
+		log = zap.NewNop()
+	}
+	_, err := db.Exec(`
+		UPDATE debug_sessions
+		SET ended_at = COALESCE(
+		        (SELECT MAX(finished_at) FROM debug_events WHERE conversation_id = debug_sessions.conversation_id),
+		        (SELECT MAX(started_at)  FROM debug_events WHERE conversation_id = debug_sessions.conversation_id),
+		        started_at
+		    ),
+		    outcome = 'interrupted'
+		WHERE ended_at IS NULL`)
+	if err != nil {
+		log.Warn("debug: SweepOrphans failed", zap.Error(err))
+	}
+	return err
+}
+
