@@ -1507,61 +1507,68 @@ func (a *Agent) callOpenAISingleStreamWithToolCalls(
 		return nil, fmt.Errorf("OpenAI client not initialized")
 	}
 
-	content, streamToolCalls, finishReason, err := client.ChatCompletionStreamWithToolCalls(ctx, reqBody, onContentDelta)
-	if err != nil && usingToolClient && a.openAIClient != nil {
-		// Fallback to main model if tool endpoint fails
-		a.logger.Warn("tool model endpoint failed, falling back to main model",
-			zap.Error(err),
-			zap.String("tool_model", model),
-			zap.String("main_model", a.config.Model),
-		)
-		reqBody.Model = a.config.Model
-		content, streamToolCalls, finishReason, err = a.openAIClient.ChatCompletionStreamWithToolCalls(ctx, reqBody, onContentDelta)
-	}
+	respIface, err := a.captureLLMCall(ctx, reqBody, func() (interface{}, int64, int64, error) {
+		content, streamToolCalls, finishReason, cerr := client.ChatCompletionStreamWithToolCalls(ctx, reqBody, onContentDelta)
+		if cerr != nil && usingToolClient && a.openAIClient != nil {
+			// Fallback to main model if tool endpoint fails
+			a.logger.Warn("tool model endpoint failed, falling back to main model",
+				zap.Error(cerr),
+				zap.String("tool_model", model),
+				zap.String("main_model", a.config.Model),
+			)
+			reqBody.Model = a.config.Model
+			content, streamToolCalls, finishReason, cerr = a.openAIClient.ChatCompletionStreamWithToolCalls(ctx, reqBody, onContentDelta)
+		}
+		if cerr != nil {
+			return nil, 0, 0, cerr
+		}
+
+		toolCalls := make([]ToolCall, 0, len(streamToolCalls))
+		for _, stc := range streamToolCalls {
+			fnArgsStr := stc.FunctionArgsStr
+			args := make(map[string]interface{})
+			if strings.TrimSpace(fnArgsStr) != "" {
+				if err := json.Unmarshal([]byte(fnArgsStr), &args); err != nil {
+					// :arguments JSON
+					args = map[string]interface{}{"raw": fnArgsStr}
+				}
+			}
+
+			typ := stc.Type
+			if strings.TrimSpace(typ) == "" {
+				typ = "function"
+			}
+
+			toolCalls = append(toolCalls, ToolCall{
+				ID:   stc.ID,
+				Type: typ,
+				Function: FunctionCall{
+					Name:      stc.FunctionName,
+					Arguments: args,
+				},
+			})
+		}
+
+		response := &OpenAIResponse{
+			ID: "",
+			Choices: []Choice{
+				{
+					Message: MessageWithTools{
+						Role:      "assistant",
+						Content:   content,
+						ToolCalls: toolCalls,
+					},
+					FinishReason: finishReason,
+				},
+			},
+		}
+		// OpenAI streaming backend: token counts unknown per plan deviation note.
+		return response, 0, 0, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	toolCalls := make([]ToolCall, 0, len(streamToolCalls))
-	for _, stc := range streamToolCalls {
-		fnArgsStr := stc.FunctionArgsStr
-		args := make(map[string]interface{})
-		if strings.TrimSpace(fnArgsStr) != "" {
-			if err := json.Unmarshal([]byte(fnArgsStr), &args); err != nil {
-				// :arguments JSON
-				args = map[string]interface{}{"raw": fnArgsStr}
-			}
-		}
-
-		typ := stc.Type
-		if strings.TrimSpace(typ) == "" {
-			typ = "function"
-		}
-
-		toolCalls = append(toolCalls, ToolCall{
-			ID:   stc.ID,
-			Type: typ,
-			Function: FunctionCall{
-				Name:      stc.FunctionName,
-				Arguments: args,
-			},
-		})
-	}
-
-	response := &OpenAIResponse{
-		ID: "",
-		Choices: []Choice{
-			{
-				Message: MessageWithTools{
-					Role:      "assistant",
-					Content:   content,
-					ToolCalls: toolCalls,
-				},
-				FinishReason: finishReason,
-			},
-		},
-	}
-	return response, nil
+	return respIface.(*OpenAIResponse), nil
 }
 
 // callOpenAIStreamWithToolCalls OpenAI(), content delta .

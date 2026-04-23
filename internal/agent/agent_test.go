@@ -2,7 +2,9 @@ package agent
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,9 +16,11 @@ import (
 	"time"
 
 	"cyberstrike-ai/internal/config"
+	"cyberstrike-ai/internal/debug"
 	"cyberstrike-ai/internal/mcp"
 	"cyberstrike-ai/internal/storage"
 
+	_ "github.com/mattn/go-sqlite3"
 	"go.uber.org/zap"
 )
 
@@ -517,4 +521,110 @@ func TestAgentLoop_StopWaitsForDeferredToolResults(t *testing.T) {
 	t.Skip("needs rewrite after deferred-tool-delivery refactor; parallelToolWait hook removed")
 	_ = callCount
 	_ = releaseTool
+}
+
+// newSSETestServer returns an httptest.Server that emits one SSE stop-response.
+// The streaming parser in ChatCompletionStreamWithToolCalls expects
+// "data: {JSON}\n\n" lines followed by "data: [DONE]\n\n".
+func newSSETestServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	stop := "stop"
+	chunk := struct {
+		Choices []struct {
+			Delta        struct{ Content string `json:"content"` } `json:"delta"`
+			FinishReason *string                                    `json:"finish_reason"`
+		} `json:"choices"`
+	}{
+		Choices: []struct {
+			Delta        struct{ Content string `json:"content"` } `json:"delta"`
+			FinishReason *string                                    `json:"finish_reason"`
+		}{
+			{
+				Delta:        struct{ Content string `json:"content"` }{Content: "hi"},
+				FinishReason: &stop,
+			},
+		},
+	}
+	chunkJSON, _ := json.Marshal(chunk)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/chat/completions" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "data: %s\n\n", chunkJSON)
+		fmt.Fprintf(w, "data: [DONE]\n\n")
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+// setupTestAgentWithSink creates a test Agent with an explicit debug Sink,
+// wired to a mock SSE server so CallStreamWithToolCalls can complete.
+func setupTestAgentWithSink(t *testing.T, sink debug.Sink) *Agent {
+	t.Helper()
+	server := newSSETestServer(t)
+	logger := zap.NewNop()
+	mcpServer := mcp.NewServer(logger)
+
+	openAICfg := &config.OpenAIConfig{
+		APIKey:  "test-key",
+		BaseURL: server.URL,
+		Model:   "test-model",
+	}
+	agentCfg := &config.AgentConfig{
+		MaxIterations:        10,
+		LargeResultThreshold: 100,
+	}
+	return NewAgent(openAICfg, agentCfg, mcpServer, nil, logger, 10, sink)
+}
+
+func TestAgent_LLMCallWrapper_RecordsWhenDebugOn(t *testing.T) {
+	tmp := filepath.Join(t.TempDir(), "agent_debug_test.db")
+	testDB, err := sql.Open("sqlite3", tmp)
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer testDB.Close()
+	for _, ddl := range []string{
+		`CREATE TABLE debug_sessions (conversation_id TEXT PRIMARY KEY, started_at INTEGER NOT NULL, ended_at INTEGER, outcome TEXT, label TEXT)`,
+		`CREATE TABLE debug_llm_calls (id INTEGER PRIMARY KEY AUTOINCREMENT, conversation_id TEXT NOT NULL, message_id TEXT, iteration INTEGER, call_index INTEGER, agent_id TEXT, sent_at INTEGER NOT NULL, first_token_at INTEGER, finished_at INTEGER, prompt_tokens INTEGER, completion_tokens INTEGER, request_json TEXT NOT NULL, response_json TEXT NOT NULL, error TEXT)`,
+		`CREATE TABLE debug_events (id INTEGER PRIMARY KEY AUTOINCREMENT, conversation_id TEXT NOT NULL, message_id TEXT, seq INTEGER NOT NULL, event_type TEXT NOT NULL, agent_id TEXT, payload_json TEXT NOT NULL, started_at INTEGER NOT NULL, finished_at INTEGER)`,
+	} {
+		if _, err := testDB.Exec(ddl); err != nil {
+			t.Fatalf("DDL: %v", err)
+		}
+	}
+	sink := debug.NewSink(true, testDB, zap.NewNop())
+
+	agent := setupTestAgentWithSink(t, sink)
+
+	ctx := debug.WithCapture(context.Background(), "conv-t", "msg-t", 1, 0, "cyberstrike-orchestrator")
+	msgs := []ChatMessage{{Role: "user", Content: "hi"}}
+	_, err = agent.CallStreamWithToolCalls(ctx, msgs, nil, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("CallStreamWithToolCalls: %v", err)
+	}
+
+	var n int
+	if err := testDB.QueryRow("SELECT COUNT(*) FROM debug_llm_calls WHERE conversation_id = ?", "conv-t").Scan(&n); err != nil {
+		t.Fatalf("QueryRow: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("want 1 debug_llm_calls row, got %d", n)
+	}
+
+	var iter, callIdx int64
+	var agentID string
+	if err := testDB.QueryRow(`SELECT iteration, call_index, agent_id FROM debug_llm_calls WHERE conversation_id = ?`, "conv-t").Scan(&iter, &callIdx, &agentID); err != nil {
+		t.Fatalf("metadata QueryRow: %v", err)
+	}
+	if iter != 1 || callIdx != 0 || agentID != "cyberstrike-orchestrator" {
+		t.Fatalf("metadata mismatch: iter=%d callIdx=%d agent=%q", iter, callIdx, agentID)
+	}
 }
