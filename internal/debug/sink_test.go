@@ -73,3 +73,92 @@ func TestDBSink_StartEndSession_HappyPath(t *testing.T) {
 		t.Fatalf("outcome: want completed, got %q", outcome.String)
 	}
 }
+
+func TestDBSink_RecordLLMCall_PersistsRow(t *testing.T) {
+	db := openTestDB(t)
+	s := NewSink(true, db, nil)
+
+	call := LLMCall{
+		Iteration:        2,
+		CallIndex:        5,
+		AgentID:          "cyberstrike-orchestrator",
+		SentAt:           1000,
+		FirstTokenAt:     1100,
+		FinishedAt:       1500,
+		PromptTokens:     42,
+		CompletionTokens: 13,
+		RequestJSON:      `{"messages":[{"role":"user","content":"hi"}]}`,
+		ResponseJSON:     `{"choices":[{"message":{"role":"assistant","content":"hello"}}]}`,
+	}
+	s.RecordLLMCall("conv-1", "msg-1", call)
+
+	var iter, callIdx, sentAt, firstTok, finAt, promptT, complT int64
+	var agent, req, resp string
+	var errStr sql.NullString
+	err := db.QueryRow(`
+		SELECT iteration, call_index, agent_id, sent_at, first_token_at,
+		       finished_at, prompt_tokens, completion_tokens,
+		       request_json, response_json, error
+		FROM debug_llm_calls WHERE conversation_id = ? AND message_id = ?`,
+		"conv-1", "msg-1").Scan(
+		&iter, &callIdx, &agent, &sentAt, &firstTok,
+		&finAt, &promptT, &complT, &req, &resp, &errStr,
+	)
+	if err != nil {
+		t.Fatalf("QueryRow: %v", err)
+	}
+	if iter != 2 || callIdx != 5 || agent != "cyberstrike-orchestrator" {
+		t.Fatalf("metadata mismatch: iter=%d callIdx=%d agent=%q", iter, callIdx, agent)
+	}
+	if sentAt != 1000 || firstTok != 1100 || finAt != 1500 {
+		t.Fatalf("timestamps mismatch: sent=%d first=%d fin=%d", sentAt, firstTok, finAt)
+	}
+	if promptT != 42 || complT != 13 {
+		t.Fatalf("token counts mismatch: prompt=%d completion=%d", promptT, complT)
+	}
+	if req != call.RequestJSON || resp != call.ResponseJSON {
+		t.Fatalf("JSON payload mismatch")
+	}
+	if errStr.Valid {
+		t.Fatalf("error column should be NULL when LLMCall.Error is empty, got %q", errStr.String)
+	}
+}
+
+func TestDBSink_RecordLLMCall_NullableTokenColumns(t *testing.T) {
+	db := openTestDB(t)
+	s := NewSink(true, db, nil)
+	// Zero-valued token fields must be stored as SQL NULL so that
+	// read-side aggregates like AVG(completion_tokens) skip them
+	// for backends that don't report usage.
+	s.RecordLLMCall("conv-1", "msg-1", LLMCall{
+		Iteration:    1,
+		SentAt:       1,
+		RequestJSON:  "{}",
+		ResponseJSON: "{}",
+		// PromptTokens, CompletionTokens, FirstTokenAt, FinishedAt all zero.
+	})
+	var firstTok, finAt, promptT, complT sql.NullInt64
+	err := db.QueryRow(`SELECT first_token_at, finished_at, prompt_tokens, completion_tokens FROM debug_llm_calls WHERE conversation_id = ?`, "conv-1").Scan(&firstTok, &finAt, &promptT, &complT)
+	if err != nil {
+		t.Fatalf("QueryRow: %v", err)
+	}
+	if firstTok.Valid || finAt.Valid || promptT.Valid || complT.Valid {
+		t.Fatalf("optional columns should be NULL: firstTok=%v finAt=%v promptT=%v complT=%v", firstTok, finAt, promptT, complT)
+	}
+}
+
+func TestDBSink_RecordLLMCall_NoWriteWhenDisabled(t *testing.T) {
+	db := openTestDB(t)
+	s := NewSink(true, db, nil)
+	s.SetEnabled(false)
+
+	s.RecordLLMCall("conv-1", "msg-1", LLMCall{SentAt: 1, RequestJSON: "{}", ResponseJSON: "{}"})
+
+	var n int
+	if err := db.QueryRow("SELECT COUNT(*) FROM debug_llm_calls").Scan(&n); err != nil {
+		t.Fatalf("QueryRow: %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("want 0 rows when sink disabled, got %d", n)
+	}
+}

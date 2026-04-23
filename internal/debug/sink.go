@@ -67,5 +67,56 @@ func (s *dbSink) SetEnabled(v bool) { s.enabled.Store(v) }
 func (s *dbSink) Enabled() bool     { return s.enabled.Load() }
 
 // RecordLLMCall and RecordEvent bodies are filled in Tasks 6-7.
-func (s *dbSink) RecordLLMCall(conversationID, messageID string, c LLMCall) {}
-func (s *dbSink) RecordEvent(conversationID, messageID string, e Event)     {}
+func (s *dbSink) RecordLLMCall(conversationID, messageID string, c LLMCall) {
+	if !s.enabled.Load() {
+		return
+	}
+	// Zero-valued optional columns (FirstTokenAt, FinishedAt,
+	// PromptTokens, CompletionTokens, Error) become SQL NULL instead
+	// of 0 / "" so read-side aggregates like AVG(completion_tokens)
+	// WHERE ... IS NOT NULL behave correctly for backends that don't
+	// report token usage (e.g. the OpenAI streaming path).
+	var firstTok, finAt, promptT, complT interface{}
+	if c.FirstTokenAt != 0 {
+		firstTok = c.FirstTokenAt
+	}
+	if c.FinishedAt != 0 {
+		finAt = c.FinishedAt
+	}
+	if c.PromptTokens != 0 {
+		promptT = c.PromptTokens
+	}
+	if c.CompletionTokens != 0 {
+		complT = c.CompletionTokens
+	}
+	var errVal interface{}
+	if c.Error != "" {
+		errVal = c.Error
+	}
+	_, err := s.db.Exec(`
+		INSERT INTO debug_llm_calls
+		  (conversation_id, message_id, iteration, call_index, agent_id,
+		   sent_at, first_token_at, finished_at, prompt_tokens,
+		   completion_tokens, request_json, response_json, error)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		conversationID, nullableStr(messageID), c.Iteration, c.CallIndex, c.AgentID,
+		c.SentAt, firstTok, finAt, promptT, complT,
+		c.RequestJSON, c.ResponseJSON, errVal,
+	)
+	if err != nil {
+		s.log.Warn("debug: RecordLLMCall insert failed",
+			zap.String("conversation_id", conversationID),
+			zap.Error(err))
+	}
+}
+
+// nullableStr returns nil for empty strings so they're stored as SQL NULL
+// instead of "" — keeps IS NULL filters correct on the read side.
+func nullableStr(s string) interface{} {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+func (s *dbSink) RecordEvent(conversationID, messageID string, e Event) {}
