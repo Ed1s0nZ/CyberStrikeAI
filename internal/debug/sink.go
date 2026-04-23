@@ -119,4 +119,37 @@ func nullableStr(s string) interface{} {
 	return s
 }
 
-func (s *dbSink) RecordEvent(conversationID, messageID string, e Event) {}
+func (s *dbSink) RecordEvent(conversationID, messageID string, e Event) {
+	if !s.enabled.Load() {
+		return
+	}
+	seq := s.nextSeq(conversationID)
+	var finAt interface{}
+	if e.FinishedAt != 0 {
+		finAt = e.FinishedAt
+	}
+	_, err := s.db.Exec(`
+		INSERT INTO debug_events
+		  (conversation_id, message_id, seq, event_type, agent_id,
+		   payload_json, started_at, finished_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		conversationID, nullableStr(messageID), seq, e.EventType,
+		nullableStr(e.AgentID), e.PayloadJSON, e.StartedAt, finAt,
+	)
+	if err != nil {
+		s.log.Warn("debug: RecordEvent insert failed",
+			zap.String("conversation_id", conversationID),
+			zap.Int64("seq", seq),
+			zap.Error(err))
+	}
+}
+
+// nextSeq returns the next 0-based monotonic sequence for a
+// conversation. Backed by sync.Map<string, *atomic.Int64> — lazy
+// populated on first call per conversation. LoadOrStore races are
+// harmless: the loser's freshly-allocated *atomic.Int64 is discarded
+// before any Add, so the winner's counter is authoritative.
+func (s *dbSink) nextSeq(conversationID string) int64 {
+	v, _ := s.seqByConv.LoadOrStore(conversationID, new(atomic.Int64))
+	return v.(*atomic.Int64).Add(1) - 1
+}

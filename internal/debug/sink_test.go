@@ -3,6 +3,7 @@ package debug
 import (
 	"database/sql"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -160,5 +161,103 @@ func TestDBSink_RecordLLMCall_NoWriteWhenDisabled(t *testing.T) {
 	}
 	if n != 0 {
 		t.Fatalf("want 0 rows when sink disabled, got %d", n)
+	}
+}
+
+func TestDBSink_RecordEvent_BasicRow(t *testing.T) {
+	db := openTestDB(t)
+	s := NewSink(true, db, nil)
+
+	s.RecordEvent("conv-1", "msg-1", Event{
+		EventType:   "iteration",
+		AgentID:     "cyberstrike-orchestrator",
+		PayloadJSON: `{"iteration":1}`,
+		StartedAt:   1000,
+	})
+
+	var seq int64
+	var evType, agent, payload string
+	var startedAt int64
+	err := db.QueryRow(`SELECT seq, event_type, agent_id, payload_json, started_at
+		FROM debug_events WHERE conversation_id = ?`, "conv-1").
+		Scan(&seq, &evType, &agent, &payload, &startedAt)
+	if err != nil {
+		t.Fatalf("QueryRow: %v", err)
+	}
+	if seq != 0 {
+		t.Fatalf("first event seq: want 0, got %d", seq)
+	}
+	if evType != "iteration" || agent != "cyberstrike-orchestrator" {
+		t.Fatalf("metadata mismatch: evType=%q agent=%q", evType, agent)
+	}
+	if payload != `{"iteration":1}` {
+		t.Fatalf("payload mismatch: %q", payload)
+	}
+	if startedAt != 1000 {
+		t.Fatalf("startedAt mismatch: %d", startedAt)
+	}
+}
+
+func TestDBSink_RecordEvent_MonotonicSeq_Concurrent(t *testing.T) {
+	db := openTestDB(t)
+	s := NewSink(true, db, nil)
+
+	const N = 50
+	var wg sync.WaitGroup
+	wg.Add(N)
+	for i := 0; i < N; i++ {
+		go func() {
+			defer wg.Done()
+			s.RecordEvent("conv-1", "", Event{EventType: "tool_call", PayloadJSON: "{}", StartedAt: 1})
+		}()
+	}
+	wg.Wait()
+
+	rows, err := db.Query(`SELECT seq FROM debug_events WHERE conversation_id = ? ORDER BY seq`, "conv-1")
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	defer rows.Close()
+	seen := make([]int64, 0, N)
+	for rows.Next() {
+		var v int64
+		if err := rows.Scan(&v); err != nil {
+			t.Fatalf("Scan: %v", err)
+		}
+		seen = append(seen, v)
+	}
+	if len(seen) != N {
+		t.Fatalf("want %d rows, got %d", N, len(seen))
+	}
+	for i, v := range seen {
+		if v != int64(i) {
+			t.Fatalf("seq[%d]: want %d, got %d (dups or gaps)", i, i, v)
+		}
+	}
+}
+
+func TestDBSink_RecordEvent_SeparateConversationsIndependentSeq(t *testing.T) {
+	db := openTestDB(t)
+	s := NewSink(true, db, nil)
+	for _, conv := range []string{"conv-a", "conv-b"} {
+		for i := 0; i < 3; i++ {
+			s.RecordEvent(conv, "", Event{EventType: "iteration", PayloadJSON: "{}", StartedAt: 1})
+		}
+	}
+	for _, conv := range []string{"conv-a", "conv-b"} {
+		rows, err := db.Query(`SELECT seq FROM debug_events WHERE conversation_id = ? ORDER BY seq`, conv)
+		if err != nil {
+			t.Fatalf("Query %s: %v", conv, err)
+		}
+		var seqs []int64
+		for rows.Next() {
+			var v int64
+			_ = rows.Scan(&v)
+			seqs = append(seqs, v)
+		}
+		rows.Close()
+		if len(seqs) != 3 || seqs[0] != 0 || seqs[1] != 1 || seqs[2] != 2 {
+			t.Fatalf("%s: want seq {0,1,2}, got %v", conv, seqs)
+		}
 	}
 }
