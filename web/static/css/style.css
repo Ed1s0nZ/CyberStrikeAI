@@ -14710,3 +14710,28 @@ button.chat-files-dropdown-item:hover:not(:disabled) {
     word-break: break-all;
 }
 
+/* Debug tab — captured sessions table + slide-over viewer */
+.data-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+.data-table th, .data-table td { padding: 6px 10px; border-bottom: 1px solid var(--border-color, #e9ecef); text-align: left; }
+.data-table tbody tr:hover { background: var(--bg-tertiary, rgba(0,0,0,0.04)); cursor: pointer; }
+
+.slide-over {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: min(780px, 100vw);
+    background: var(--bg-primary, #fff);
+    box-shadow: -4px 0 16px rgba(0,0,0,0.22);
+    z-index: 9000;
+    overflow: auto;
+}
+.slide-over-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px; border-bottom: 1px solid var(--border-color, #e9ecef);
+    background: var(--bg-secondary, #f8f9fa);
+}
+
+#debug-viewer-body .debug-event   { padding: 8px 12px; border-bottom: 1px solid rgba(0,0,0,0.08); font-family: monospace; font-size: 0.85em; }
+#debug-viewer-body .debug-llmcall { padding: 8px 12px; border-bottom: 1px solid rgba(0,0,0,0.08); background: var(--bg-tertiary, rgba(0,0,0,0.02)); }
+#debug-viewer-body .debug-llmcall details summary { cursor: pointer; font-weight: 600; }
+#debug-viewer-body pre { white-space: pre-wrap; word-break: break-word; max-height: 240px; overflow: auto; }
+

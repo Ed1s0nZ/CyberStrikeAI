@@ -1364,6 +1364,9 @@
                                 <div class="settings-nav-item" data-section="plugins" onclick="switchSettingsSection('plugins')">
                                     <span data-i18n="settingsPlugins.title">Plugins</span>
                                 </div>
+                                <div class="settings-nav-item" data-section="debug" onclick="switchSettingsSection('debug')">
+                                    <span data-i18n="settingsDebug.tabTitle">Debug</span>
+                                </div>
                             </nav>
                         </aside>
                         
@@ -1850,6 +1853,60 @@
                                 </div>
                                 <div id="plugins-list" class="plugins-container">
                                     <div style="text-align: center; padding: 20px; color: var(--text-muted);">Loading plugins...</div>
+                                </div>
+                            </div>
+
+                            <div id="settings-section-debug" class="settings-section-content">
+                                <div class="settings-section-header">
+                                    <h3 data-i18n="settingsDebug.tabTitle">Debug</h3>
+                                </div>
+                                <div class="settings-subsection">
+                                    <div class="form-group">
+                                        <label class="checkbox-label">
+                                            <input type="checkbox" id="debug-enabled" class="modern-checkbox" />
+                                            <span class="checkbox-custom"></span>
+                                            <span class="checkbox-text" data-i18n="settingsDebug.enableToggle">Enable debug capture</span>
+                                        </label>
+                                        <small class="form-hint" data-i18n="settingsDebug.enableHint">
+                                            Captures verbatim LLM requests, token usage, timestamps, and the full SSE event stream for each new conversation. No redaction — self-hosted only.
+                                        </small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="debug-retain-days" data-i18n="settingsDebug.retainDays">Retention (days)</label>
+                                        <input type="number" id="debug-retain-days" min="0" step="1" value="0" />
+                                        <small class="form-hint" data-i18n="settingsDebug.retainDaysHint">
+                                            0 = keep forever. Sessions older than N days are auto-pruned daily.
+                                        </small>
+                                    </div>
+                                    <hr />
+                                    <h4 data-i18n="settingsDebug.sessionsHeading">Captured sessions</h4>
+                                    <div id="debug-sessions-table-wrap">
+                                        <table id="debug-sessions-table" class="data-table">
+                                            <thead>
+                                                <tr>
+                                                    <th data-i18n="settingsDebug.colStarted">Started</th>
+                                                    <th data-i18n="settingsDebug.colLabel">Label</th>
+                                                    <th data-i18n="settingsDebug.colOutcome">Outcome</th>
+                                                    <th data-i18n="settingsDebug.colIterations">Iterations</th>
+                                                    <th data-i18n="settingsDebug.colTokens">Tokens (in/out)</th>
+                                                    <th data-i18n="settingsDebug.colDuration">Duration</th>
+                                                    <th data-i18n="settingsDebug.colActions">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="debug-sessions-tbody"></tbody>
+                                        </table>
+                                    </div>
+                                    <div class="settings-actions">
+                                        <button class="btn-secondary" id="debug-refresh-btn" data-i18n="settingsDebug.refresh">Refresh</button>
+                                        <button class="btn-secondary" id="debug-export-bulk-btn" data-i18n="settingsDebug.exportBulk">Export all (tar.gz)</button>
+                                    </div>
+                                    <div id="debug-viewer-panel" class="slide-over" hidden>
+                                        <div class="slide-over-header">
+                                            <span id="debug-viewer-title"></span>
+                                            <button class="btn-icon" id="debug-viewer-close" aria-label="Close">&#xD7;</button>
+                                        </div>
+                                        <div id="debug-viewer-body"></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

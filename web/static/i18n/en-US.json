@@ -1677,5 +1677,30 @@
     "depsFailed": "Install failed",
     "toggleFailed": "Failed to toggle plugin",
     "loadFailed": "Failed to load plugins"
+  },
+  "settingsDebug": {
+    "tabTitle": "Debug",
+    "enableToggle": "Enable debug capture",
+    "enableHint": "Captures verbatim LLM requests, token usage, timestamps, and the full SSE event stream for each new conversation. No redaction — self-hosted only.",
+    "retainDays": "Retention (days)",
+    "retainDaysHint": "0 = keep forever. Sessions older than N days are auto-pruned daily.",
+    "sessionsHeading": "Captured sessions",
+    "colStarted": "Started",
+    "colLabel": "Label",
+    "colOutcome": "Outcome",
+    "colIterations": "Iterations",
+    "colTokens": "Tokens (in/out)",
+    "colDuration": "Duration",
+    "colActions": "Actions",
+    "refresh": "Refresh",
+    "exportBulk": "Export all (tar.gz)",
+    "view": "View",
+    "exportRaw": "Export raw",
+    "exportShareGPT": "Export ShareGPT",
+    "delete": "Delete",
+    "emptyState": "No debug sessions yet — enable debug and run a conversation.",
+    "deleteConfirm": "Delete captured session for {{id}}?",
+    "deleteOk": "Session deleted",
+    "labelPlaceholder": "Add a label…"
   }
 }
