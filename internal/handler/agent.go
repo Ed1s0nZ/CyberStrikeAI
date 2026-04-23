@@ -19,6 +19,7 @@ import (
 	"cyberstrike-ai/internal/agent"
 	"cyberstrike-ai/internal/config"
 	"cyberstrike-ai/internal/database"
+	"cyberstrike-ai/internal/debug"
 	"cyberstrike-ai/internal/mcp/builtin"
 	"cyberstrike-ai/internal/multiagent"
 	"cyberstrike-ai/internal/skills"
@@ -81,10 +82,11 @@ type AgentHandler struct {
 	}
 	skillsManager     *skills.Manager // Skills manager
 	agentsMarkdownDir string          // multi-agent: Markdown sub-agent directory (absolute path, empty means no disk merge)
+	debugSink         debug.Sink
 }
 
 // NewAgentHandler creates a new Agent handler
-func NewAgentHandler(agent *agent.Agent, db *database.DB, cfg *config.Config, logger *zap.Logger) *AgentHandler {
+func NewAgentHandler(agent *agent.Agent, db *database.DB, cfg *config.Config, logger *zap.Logger, sink debug.Sink) *AgentHandler {
 	batchTaskManager := NewBatchTaskManager()
 	batchTaskManager.SetDB(db)
 
@@ -100,6 +102,7 @@ func NewAgentHandler(agent *agent.Agent, db *database.DB, cfg *config.Config, lo
 		tasks:            NewAgentTaskManager(),
 		batchTaskManager: batchTaskManager,
 		config:           cfg,
+		debugSink:        sink,
 	}
 }
 
@@ -645,6 +648,7 @@ func (h *AgentHandler) ProcessMessageForRobot(ctx context.Context, conversationI
 			roleTools,
 			progressCallback,
 			h.agentsMarkdownDir,
+			h.debugSink,
 		)
 		if errMA != nil {
 			errMsg := "execution failed: " + errMA.Error()
@@ -1779,7 +1783,7 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 		var resultMA *multiagent.RunResult
 		var runErr error
 		if useBatchMulti {
-			resultMA, runErr = multiagent.RunOrchestrator(ctx, h.config, &h.config.MultiAgent, h.agent, h.logger, conversationID, finalMessage, []agent.ChatMessage{}, roleTools, progressCallback, h.agentsMarkdownDir)
+			resultMA, runErr = multiagent.RunOrchestrator(ctx, h.config, &h.config.MultiAgent, h.agent, h.logger, conversationID, finalMessage, []agent.ChatMessage{}, roleTools, progressCallback, h.agentsMarkdownDir, h.debugSink)
 		} else {
 			result, runErr = h.agent.AgentLoopWithProgress(ctx, finalMessage, []agent.ChatMessage{}, conversationID, progressCallback, roleTools, roleSkills)
 		}

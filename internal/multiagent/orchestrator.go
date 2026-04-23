@@ -17,6 +17,7 @@ import (
 	"cyberstrike-ai/internal/agent"
 	"cyberstrike-ai/internal/agents"
 	"cyberstrike-ai/internal/config"
+	"cyberstrike-ai/internal/debug"
 	"cyberstrike-ai/internal/security"
 
 	"go.uber.org/zap"
@@ -83,6 +84,7 @@ func RunOrchestrator(
 	roleTools []string,
 	progress func(eventType, message string, data interface{}),
 	agentsMarkdownDir string,
+	sink debug.Sink,
 ) (*RunResult, error) {
 	if appCfg == nil || ma == nil || ag == nil {
 		return nil, fmt.Errorf("multiagent: config or Agent is nil")
@@ -189,6 +191,10 @@ func RunOrchestrator(
 		deepMaxIter = 40
 	}
 
+	if sink == nil {
+		sink = debug.NewSink(false, nil, logger)
+	}
+
 	o := &orchestratorState{
 		ctx:             ctx,
 		appCfg:          appCfg,
@@ -200,6 +206,7 @@ func RunOrchestrator(
 		orchInstruction: orchInstruction,
 		maxIter:         deepMaxIter,
 		roleTools:       roleTools,
+		sink:            sink,
 	}
 
 	return o.run(userMessage, history)
@@ -217,6 +224,7 @@ type orchestratorState struct {
 	orchInstruction string
 	maxIter         int
 	roleTools       []string
+	sink            debug.Sink
 
 	// Mutable state, protected by mu.
 	mu     sync.Mutex

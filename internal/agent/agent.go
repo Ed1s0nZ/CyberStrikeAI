@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"cyberstrike-ai/internal/config"
+	"cyberstrike-ai/internal/debug"
 	"cyberstrike-ai/internal/mcp"
 	"cyberstrike-ai/internal/mcp/builtin"
 	"cyberstrike-ai/internal/openai"
@@ -68,6 +69,7 @@ type Agent struct {
 	mu                   sync.RWMutex      // mutex to support concurrent updates
 	toolNameMapping      map[string]string // tool name mapping: OpenAI format -> original format (for external MCP tools)
 	timeAwareness        *TimeAwareness    // temporal context for system prompts
+	debugSink            debug.Sink
 }
 
 // ResultStorage result storage interface (uses storage package types directly)
@@ -83,10 +85,13 @@ type ResultStorage interface {
 }
 
 // NewAgent creates a new Agent
-func NewAgent(cfg *config.OpenAIConfig, agentCfg *config.AgentConfig, mcpServer *mcp.Server, externalMCPMgr *mcp.ExternalMCPManager, logger *zap.Logger, maxIterations int) *Agent {
+func NewAgent(cfg *config.OpenAIConfig, agentCfg *config.AgentConfig, mcpServer *mcp.Server, externalMCPMgr *mcp.ExternalMCPManager, logger *zap.Logger, maxIterations int, sink debug.Sink) *Agent {
 	// if maxIterations is 0 or negative, use default value 30
 	if maxIterations <= 0 {
 		maxIterations = 30
+	}
+	if sink == nil {
+		sink = debug.NewSink(false, nil, logger)
 	}
 
 	// set large result threshold, default 50KB
@@ -204,6 +209,7 @@ func NewAgent(cfg *config.OpenAIConfig, agentCfg *config.AgentConfig, mcpServer 
 		largeResultThreshold: largeResultThreshold,
 		toolNameMapping:      make(map[string]string),
 		timeAwareness:        ta,
+		debugSink:            sink,
 	}
 }
 

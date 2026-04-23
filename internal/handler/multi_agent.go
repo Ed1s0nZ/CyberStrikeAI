@@ -160,6 +160,7 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 		prep.RoleTools,
 		progressCallback,
 		h.agentsMarkdownDir,
+		h.debugSink,
 	)
 
 	if runErr != nil {
@@ -262,6 +263,7 @@ func (h *AgentHandler) MultiAgentLoop(c *gin.Context) {
 		prep.RoleTools,
 		nil,
 		h.agentsMarkdownDir,
+		h.debugSink,
 	)
 	if runErr != nil {
 		h.logger.Error("multi-agent orchestrator: execution failed", zap.Error(runErr))

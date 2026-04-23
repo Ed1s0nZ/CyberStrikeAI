@@ -37,7 +37,7 @@ func setupTestAgent(t *testing.T) (*Agent, *storage.FileResultStorage) {
 		ResultStorageDir:     "",
 	}
 
-	agent := NewAgent(openAICfg, agentCfg, mcpServer, nil, logger, 10)
+	agent := NewAgent(openAICfg, agentCfg, mcpServer, nil, logger, 10, nil)
 
 	// create test storage
 	tmpDir := filepath.Join(os.TempDir(), "test_agent_storage_"+time.Now().Format("20060102_150405"))
@@ -244,7 +244,7 @@ func TestAgent_NewAgent_DefaultValues(t *testing.T) {
 	}
 
 	// test default configuration
-	agent := NewAgent(openAICfg, nil, mcpServer, nil, logger, 0)
+	agent := NewAgent(openAICfg, nil, mcpServer, nil, logger, 0, nil)
 
 	if agent.maxIterations != 30 {
 		t.Errorf("default iteration count mismatch. expected: 30, got: %d", agent.maxIterations)
@@ -275,7 +275,7 @@ func TestAgent_NewAgent_CustomConfig(t *testing.T) {
 		ResultStorageDir:     "custom_tmp",
 	}
 
-	agent := NewAgent(openAICfg, agentCfg, mcpServer, nil, logger, 15)
+	agent := NewAgent(openAICfg, agentCfg, mcpServer, nil, logger, 15, nil)
 
 	if agent.maxIterations != 15 {
 		t.Errorf("iteration count mismatch. expected: 15, got: %d", agent.maxIterations)
@@ -443,7 +443,7 @@ func TestAgentLoop_LastIterationSummaryWaitsForDeferredToolResults(t *testing.T)
 	}, &config.AgentConfig{
 		ParallelToolExecution: true,
 		LargeResultThreshold:  1024,
-	}, mcpServer, nil, logger, 1)
+	}, mcpServer, nil, logger, 1, nil)
 	_ = agent
 	// parallelToolWait was removed from the Agent struct during the eino-removal
 	// refactor; the parallel-tool path now relies on channel-based coordination
@@ -510,7 +510,7 @@ func TestAgentLoop_StopWaitsForDeferredToolResults(t *testing.T) {
 	}, &config.AgentConfig{
 		ParallelToolExecution: true,
 		LargeResultThreshold:  1024,
-	}, mcpServer, nil, logger, 5)
+	}, mcpServer, nil, logger, 5, nil)
 	_ = agent
 	// See the sibling test — same story. Skip until reworked against the new
 	// deferred-tool-delivery API.

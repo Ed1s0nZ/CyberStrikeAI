@@ -16,6 +16,7 @@ import (
 	"cyberstrike-ai/internal/agent"
 	"cyberstrike-ai/internal/config"
 	"cyberstrike-ai/internal/database"
+	"cyberstrike-ai/internal/debug"
 	"cyberstrike-ai/internal/handler"
 	"cyberstrike-ai/internal/knowledge"
 	"cyberstrike-ai/internal/logger"
@@ -200,12 +201,15 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 		return nil, fmt.Errorf("failed to initialize result storage: %w", err)
 	}
 
+	// create debug sink
+	sink := debug.NewSink(cfg.Debug.Enabled, db.DB, log.Logger)
+
 	// create Agent
 	maxIterations := cfg.Agent.MaxIterations
 	if maxIterations <= 0 {
 		maxIterations = 30 // default value
 	}
-	agent := agent.NewAgent(&cfg.OpenAI, &cfg.Agent, mcpServer, externalMCPMgr, log.Logger, maxIterations)
+	agent := agent.NewAgent(&cfg.OpenAI, &cfg.Agent, mcpServer, externalMCPMgr, log.Logger, maxIterations, sink)
 
 	// set result storage to Agent
 	agent.SetResultStorage(resultStorage)
@@ -397,7 +401,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	skills.RegisterSkillsToolWithStorage(mcpServer, skillsManager, skillStatsStorage, log.Logger)
 
 	// create handlers
-	agentHandler := handler.NewAgentHandler(agent, db, cfg, log.Logger)
+	agentHandler := handler.NewAgentHandler(agent, db, cfg, log.Logger, sink)
 	agentHandler.SetSkillsManager(skillsManager) // set Skills manager
 	agentHandler.SetAgentsMarkdownDir(agentsDir)
 	// knowledge base,knowledge base managerAgentHandlerrecordretrieval log
