@@ -140,6 +140,14 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 	taskStatus := "completed"
 	defer h.tasks.FinishTask(conversationID, taskStatus)
 
+	// Debug capture bookends: StartSession now, EndSession on function
+	// exit via defer-closure so it reads the final taskStatus value
+	// (mutated by cancelled/failed branches below after RunOrchestrator
+	// returns). Defer fires after RunOrchestrator but before the
+	// FinishTask defer (LIFO), which is the intended order.
+	h.debugSink.StartSession(conversationID)
+	defer func() { h.debugSink.EndSession(conversationID, taskStatus) }()
+
 	sendEvent("progress", "starting multi-agent orchestrator...", map[string]interface{}{
 		"conversationId": conversationID,
 	})
@@ -251,20 +259,28 @@ func (h *AgentHandler) MultiAgentLoop(c *gin.Context) {
 		return
 	}
 
-	result, runErr := multiagent.RunOrchestrator(
-		c.Request.Context(),
-		h.config,
-		&h.config.MultiAgent,
-		h.agent,
-		h.logger,
-		prep.ConversationID,
-		prep.FinalMessage,
-		prep.History,
-		prep.RoleTools,
-		nil,
-		h.agentsMarkdownDir,
-		h.debugSink,
-	)
+	var result *multiagent.RunResult
+	var runErr error
+	_, _ = wrapRunWithDebug(h.debugSink, prep.ConversationID, func() (string, error) {
+		result, runErr = multiagent.RunOrchestrator(
+			c.Request.Context(),
+			h.config,
+			&h.config.MultiAgent,
+			h.agent,
+			h.logger,
+			prep.ConversationID,
+			prep.FinalMessage,
+			prep.History,
+			prep.RoleTools,
+			nil,
+			h.agentsMarkdownDir,
+			h.debugSink,
+		)
+		if runErr != nil {
+			return "failed", runErr
+		}
+		return "completed", nil
+	})
 	if runErr != nil {
 		h.logger.Error("multi-agent orchestrator: execution failed", zap.Error(runErr))
 		errMsg := "execution failed: " + runErr.Error()
