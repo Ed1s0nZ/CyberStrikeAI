@@ -87,6 +87,10 @@ type AgentHandler struct {
 
 // NewAgentHandler creates a new Agent handler
 func NewAgentHandler(agent *agent.Agent, db *database.DB, cfg *config.Config, logger *zap.Logger, sink debug.Sink) *AgentHandler {
+	if sink == nil {
+		sink = debug.NewSink(false, nil, logger)
+	}
+
 	batchTaskManager := NewBatchTaskManager()
 	batchTaskManager.SetDB(db)
 
