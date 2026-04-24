@@ -1120,6 +1120,49 @@ function handleStreamEvent(event, progressElement, progressId,
             break;
         }
 
+        case 'eino_stream_error': {
+            const d = event.data || {};
+            const agent = d.einoAgent ? String(d.einoAgent) : '';
+            const title = typeof window.t === 'function'
+                ? window.t('chat.einoStreamErrorTitle', { agent: agent || '-' })
+                : (agent ? ('⚠️ Eino 流式中断（' + agent + '）') : '⚠️ Eino 流式中断');
+            addTimelineItem(timeline, 'warning', {
+                title: title,
+                message: event.message || (typeof window.t === 'function'
+                    ? window.t('chat.einoStreamErrorMessage')
+                    : '流式读取异常，系统将按策略重试或结束。'),
+                data: d
+            });
+            break;
+        }
+
+        case 'iteration_limit_reached': {
+            addTimelineItem(timeline, 'warning', {
+                title: typeof window.t === 'function' ? window.t('chat.iterationLimitReachedTitle') : '⛔ 达到迭代上限',
+                message: event.message || (typeof window.t === 'function'
+                    ? window.t('chat.iterationLimitReachedMessage')
+                    : '已达到最大迭代次数，任务已停止继续自动迭代。'),
+                data: event.data
+            });
+            finalizeOutstandingToolCallsForProgress(progressId, 'failed');
+            break;
+        }
+
+        case 'eino_pending_orphaned': {
+            const d = event.data || {};
+            const count = Number(d.pendingCount || 0);
+            const countText = Number.isFinite(count) && count > 0 ? String(count) : '?';
+            addTimelineItem(timeline, 'warning', {
+                title: typeof window.t === 'function' ? window.t('chat.einoPendingOrphanedTitle') : '🧹 工具调用收尾补偿',
+                message: event.message || (typeof window.t === 'function'
+                    ? window.t('chat.einoPendingOrphanedMessage', { count: countText })
+                    : ('检测到 ' + countText + ' 个未闭合工具调用，已自动标记为失败并收尾。')),
+                data: d
+            });
+            finalizeOutstandingToolCallsForProgress(progressId, 'failed');
+            break;
+        }
+
         case 'tool_call':
             const toolInfo = event.data || {};
             const toolName = toolInfo.toolName || (typeof window.t === 'function' ? window.t('chat.unknownTool') : '未知工具');
