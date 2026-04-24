@@ -1378,19 +1378,50 @@
  <h3 data-i18n="settingsBasic.basicTitle"></h3>
                                 </div>
                                 
- <!-- OpenAI -->
+                                <!-- LLM Provider configuration -->
                                 <div class="settings-subsection">
-                                    <h4 data-i18n="settingsBasic.openaiConfig">AI Provider</h4>
+                                    <h4 data-i18n="settingsBasic.openaiConfig">LLM Configuration</h4>
                                     <div class="settings-form">
                                         <div class="form-group">
-                                            <label for="openai-provider">Provider</label>
-                                            <select id="openai-provider" onchange="onProviderChange()">
+                                            <label for="llm-provider">Provider</label>
+                                            <select id="llm-provider" onchange="window.toggleProviderFields && window.toggleProviderFields()">
+                                                <option value="openai">OpenAI Compatible</option>
+                                                <option value="claude-cli">Claude CLI</option>
+                                            </select>
+                                            <small class="form-hint">Claude CLI uses the local <code>claude</code> binary — no API key needed</small>
+                                        </div>
+
+                                        <!-- Claude CLI settings (shown when claude-cli is selected) -->
+                                        <div id="claude-cli-fields-wrapper" style="display: none;">
+                                        <div class="form-group">
+                                            <label for="claude-cli-workdir">Working Directory</label>
+                                            <input type="text" id="claude-cli-workdir" placeholder="Leave empty to use server working directory" />
+                                            <small class="form-hint">Directory where Claude CLI operates (reads/writes files, runs tools)</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="claude-cli-max-turns">Max Turns</label>
+                                            <input type="number" id="claude-cli-max-turns" min="0" max="1000" placeholder="0" />
+                                            <small class="form-hint">Max agentic turns per request (0 = unlimited)</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="claude-cli-allowed-tools">Allowed Tools</label>
+                                            <input type="text" id="claude-cli-allowed-tools" placeholder="Leave empty for all tools" />
+                                            <small class="form-hint">Comma-separated list of allowed Claude tools (e.g. Read, Write, Bash)</small>
+                                        </div>
+                                        </div><!-- /claude-cli-fields-wrapper -->
+
+                                        <!-- OpenAI-compatible settings (shown when openai is selected) -->
+                                        <div id="openai-fields-wrapper">
+                                        <div class="form-group">
+                                            <label for="openai-provider">API Provider</label>
+                                            <select id="openai-provider" onchange="onProviderChange && onProviderChange()">
                                                 <option value="openai">OpenAI</option>
                                                 <option value="anthropic">Anthropic (Claude)</option>
                                             </select>
                                             <small class="form-hint">Select "Anthropic" for native Claude API support without a proxy.</small>
                                         </div>
                                         <div class="form-group">
+
                                             <label for="openai-base-url">Base URL <span style="color: red;">*</span></label>
                                             <input type="text" id="openai-base-url" data-i18n="settingsBasic.openaiBaseUrlPlaceholder" data-i18n-attr="placeholder" placeholder="https://api.openai.com/v1" required />
                                         </div>
@@ -1482,6 +1513,7 @@
                                                 <small class="form-hint">Anthropic only. 0 = default.</small>
                                             </div>
                                         </div>
+                                        </div><!-- /openai-fields-wrapper -->
                                     </div>
                                 </div>
 

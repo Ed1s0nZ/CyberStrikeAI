@@ -13,6 +13,7 @@ import (
 // CLIClient interacts with Claude via the CLI binary.
 type CLIClient struct {
 	binaryPath string
+	workdir    string // working directory for the claude process (empty = inherit)
 	logger     *zap.Logger
 }
 
@@ -38,6 +39,9 @@ func (c *CLIClient) SendPrompt(ctx context.Context, prompt string, opts *PromptO
 	c.logger.Debug("executing claude CLI", zap.String("binary", c.binaryPath), zap.Strings("args", args))
 
 	cmd := exec.CommandContext(ctx, c.binaryPath, args...)
+	if c.workdir != "" {
+		cmd.Dir = c.workdir
+	}
 	stdout, err := cmd.Output()
 	if err != nil {
 		return nil, c.handleError(err, stdout)
@@ -77,6 +81,9 @@ func (c *CLIClient) buildArgs(prompt string, opts *PromptOptions) []string {
 	}
 	if len(opts.AllowedTools) > 0 {
 		args = append(args, "--allowedTools", strings.Join(opts.AllowedTools, ","))
+	}
+	if opts.MCPConfig != "" {
+		args = append(args, "--mcp-config", opts.MCPConfig)
 	}
 
 	return args

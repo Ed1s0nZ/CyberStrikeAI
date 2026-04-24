@@ -13,6 +13,7 @@ type PromptOptions struct {
 	SessionID    string
 	MaxTurns     int
 	AllowedTools []string
+	MCPConfig    string // JSON string for --mcp-config (empty = no MCP)
 }
 
 // Result represents a Claude CLI response.

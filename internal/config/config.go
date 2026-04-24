@@ -15,12 +15,14 @@ import (
 )
 
 type Config struct {
-	Version     string                `yaml:"version,omitempty" json:"version,omitempty"` // Version number displayed in the frontend, e.g. v1.3.3
+	Version     string                `yaml:"version,omitempty" json:"version,omitempty"`       // Version number displayed in the frontend, e.g. v1.3.3
+	Provider    string                `yaml:"provider,omitempty" json:"provider,omitempty"`     // Top-level LLM provider: "openai" (default) or "claude-cli"
 	Server      ServerConfig          `yaml:"server"`
 	Log         LogConfig             `yaml:"log"`
 	Debug       DebugConfig           `yaml:"debug"`
 	MCP         MCPConfig             `yaml:"mcp"`
 	OpenAI      OpenAIConfig          `yaml:"openai"`
+	ClaudeCLI   ClaudeCLIConfig       `yaml:"claude_cli,omitempty" json:"claude_cli,omitempty"` // Claude CLI provider settings
 	FOFA        FofaConfig            `yaml:"fofa,omitempty" json:"fofa,omitempty"`
 	ZoomEye     ZoomEyeConfig         `yaml:"zoomeye,omitempty" json:"zoomeye,omitempty"`
 	Shodan      ShodanConfig          `yaml:"shodan,omitempty" json:"shodan,omitempty"`
@@ -80,6 +82,33 @@ type MultiAgentAPIUpdate struct {
 	DefaultMode        string `json:"default_mode"`
 	RobotUseMultiAgent bool   `json:"robot_use_multi_agent"`
 	BatchUseMultiAgent bool   `json:"batch_use_multi_agent"`
+}
+
+// MCPServerURL returns the URL for CyberStrikeAI's MCP server, or "" if MCP is disabled.
+func (c *Config) MCPServerURL() string {
+	if c == nil || !c.MCP.Enabled {
+		return ""
+	}
+	host := c.MCP.Host
+	if host == "0.0.0.0" {
+		host = "127.0.0.1"
+	}
+	return fmt.Sprintf("http://%s:%d/mcp", host, c.MCP.Port)
+}
+
+// EffectiveProvider returns the active LLM provider, defaulting to "openai".
+func (c *Config) EffectiveProvider() string {
+	if c == nil || strings.TrimSpace(c.Provider) == "" {
+		return "openai"
+	}
+	return strings.TrimSpace(c.Provider)
+}
+
+// ClaudeCLIConfig holds settings for the Claude CLI provider.
+type ClaudeCLIConfig struct {
+	Workdir      string   `yaml:"workdir,omitempty" json:"workdir,omitempty"`             // Working directory for claude binary (default: cwd)
+	MaxTurns     int      `yaml:"max_turns,omitempty" json:"max_turns,omitempty"`         // Max agentic turns (0 = unlimited)
+	AllowedTools []string `yaml:"allowed_tools,omitempty" json:"allowed_tools,omitempty"` // Restrict claude to these tools (empty = all)
 }
 
 // RobotsConfig holds bot configuration (Telegram only).

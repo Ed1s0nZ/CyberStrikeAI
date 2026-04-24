@@ -77,6 +77,7 @@ type ConfigHandler struct {
 	appUpdater                 AppUpdater                 // App updater (optional)
 	robotRestarter             RobotRestarter             // robot connection restarter; ApplyConfig restarts Telegram bot
 	debugSink                  debug.Sink                 // runtime debug toggle; SetEnabled flipped by PUT /api/config
+	claudeConfigUpdater        func(cfg *config.ClaudeCLIConfig) // optional: hot-reload Claude CLI config on apply
 	logger                     *zap.Logger
 	mu                         sync.RWMutex
 	lastEmbeddingConfig        *config.EmbeddingConfig // previous embedding model config(for detecting changes)
@@ -175,17 +176,32 @@ func (h *ConfigHandler) SetRobotRestarter(restarter RobotRestarter) {
 	h.robotRestarter = restarter
 }
 
+// SetClaudeConfigUpdater sets the callback to hot-reload Claude CLI config when ApplyConfig is called.
+func (h *ConfigHandler) SetClaudeConfigUpdater(updater func(cfg *config.ClaudeCLIConfig)) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.claudeConfigUpdater = updater
+}
+
+// SecuritySettingsResponse exposes the subset of SecurityConfig that is user-configurable.
+type SecuritySettingsResponse struct {
+	ToolDescriptionMode string `json:"tool_description_mode"`
+}
+
 // GetConfigResponse get config response
 type GetConfigResponse struct {
-	OpenAI     config.OpenAIConfig     `json:"openai"`
-	FOFA       config.FofaConfig       `json:"fofa"`
-	MCP        config.MCPConfig        `json:"mcp"`
-	Tools      []ToolConfigInfo        `json:"tools"`
-	Agent      config.AgentConfig      `json:"agent"`
-	Knowledge  config.KnowledgeConfig  `json:"knowledge"`
-	Robots     config.RobotsConfig     `json:"robots,omitempty"`
-	MultiAgent config.MultiAgentPublic `json:"multi_agent,omitempty"`
-	Debug      config.DebugConfig      `json:"debug,omitempty"`
+	Provider   string                   `json:"provider"`
+	OpenAI     config.OpenAIConfig      `json:"openai"`
+	ClaudeCLI  config.ClaudeCLIConfig   `json:"claude_cli"`
+	FOFA       config.FofaConfig        `json:"fofa"`
+	MCP        config.MCPConfig         `json:"mcp"`
+	Tools      []ToolConfigInfo         `json:"tools"`
+	Agent      config.AgentConfig       `json:"agent"`
+	Knowledge  config.KnowledgeConfig   `json:"knowledge"`
+	Robots     config.RobotsConfig      `json:"robots,omitempty"`
+	MultiAgent config.MultiAgentPublic  `json:"multi_agent,omitempty"`
+	Debug      config.DebugConfig       `json:"debug,omitempty"`
+	Security   SecuritySettingsResponse `json:"security"`
 }
 
 // ToolConfigInfo tool config info
@@ -274,7 +290,9 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, GetConfigResponse{
+		Provider:   h.config.EffectiveProvider(),
 		OpenAI:     h.config.OpenAI,
+		ClaudeCLI:  h.config.ClaudeCLI,
 		FOFA:       h.config.FOFA,
 		MCP:        h.config.MCP,
 		Tools:      tools,
@@ -283,6 +301,9 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 		Robots:     h.config.Robots,
 		MultiAgent: multiPub,
 		Debug:      h.config.Debug,
+		Security: SecuritySettingsResponse{
+			ToolDescriptionMode: h.config.Security.ToolDescriptionMode,
+		},
 	})
 }
 
@@ -532,9 +553,16 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 	})
 }
 
+// SecuritySettingsRequest holds the user-configurable subset of SecurityConfig.
+type SecuritySettingsRequest struct {
+	ToolDescriptionMode string `json:"tool_description_mode"`
+}
+
 // UpdateConfigRequest update config request
 type UpdateConfigRequest struct {
+	Provider   *string                     `json:"provider,omitempty"` // Top-level LLM provider: "openai" or "claude-cli"
 	OpenAI     *config.OpenAIConfig        `json:"openai,omitempty"`
+	ClaudeCLI  *config.ClaudeCLIConfig     `json:"claude_cli,omitempty"`
 	FOFA       *config.FofaConfig          `json:"fofa,omitempty"`
 	MCP        *config.MCPConfig           `json:"mcp,omitempty"`
 	Tools      []ToolEnableStatus          `json:"tools,omitempty"`
@@ -543,6 +571,7 @@ type UpdateConfigRequest struct {
 	Robots     *config.RobotsConfig        `json:"robots,omitempty"`
 	MultiAgent *config.MultiAgentAPIUpdate `json:"multi_agent,omitempty"`
 	Debug      *config.DebugConfig         `json:"debug,omitempty"`
+	Security   *SecuritySettingsRequest    `json:"security,omitempty"`
 }
 
 // ToolEnableStatus status
@@ -564,12 +593,27 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
+	// Update top-level provider
+	if req.Provider != nil {
+		h.config.Provider = *req.Provider
+		h.logger.Info("Updating LLM provider", zap.String("provider", h.config.Provider))
+	}
+
 	// update OpenAI config
 	if req.OpenAI != nil {
 		h.config.OpenAI = *req.OpenAI
 		h.logger.Info("update OpenAI config",
 			zap.String("base_url", h.config.OpenAI.BaseURL),
 			zap.String("model", h.config.OpenAI.Model),
+		)
+	}
+
+	// Update Claude CLI config
+	if req.ClaudeCLI != nil {
+		h.config.ClaudeCLI = *req.ClaudeCLI
+		h.logger.Info("Updating Claude CLI config",
+			zap.String("workdir", h.config.ClaudeCLI.Workdir),
+			zap.Int("max_turns", h.config.ClaudeCLI.MaxTurns),
 		)
 	}
 
@@ -903,6 +947,12 @@ func (h *ConfigHandler) ApplyConfig(c *gin.Context) {
 		h.agent.UpdateConfig(&h.config.OpenAI)
 		h.agent.UpdateMaxIterations(h.config.Agent.MaxIterations)
 		h.logger.Info("Agent config updated")
+	}
+
+	// Update Claude CLI config (hot-reload workdir, max_turns, etc.)
+	if h.claudeConfigUpdater != nil {
+		h.claudeConfigUpdater(&h.config.ClaudeCLI)
+		h.logger.Info("Claude CLI config updated")
 	}
 
 	// update AttackChainHandler OpenAI config

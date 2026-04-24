@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"cyberstrike-ai/internal/agent"
+	"cyberstrike-ai/internal/claude"
 	"cyberstrike-ai/internal/config"
 	"cyberstrike-ai/internal/database"
 	"cyberstrike-ai/internal/debug"
@@ -417,7 +418,24 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	agentHandler := handler.NewAgentHandler(agent, db, cfg, log.Logger, sink)
 	agentHandler.SetSkillsManager(skillsManager) // set Skills manager
 	agentHandler.SetAgentsMarkdownDir(agentsDir)
-	// knowledge base,knowledge base managerAgentHandlerrecordretrieval log
+	// Collect all registered MCP tool names so Claude CLI can auto-allow them
+	var mcpToolNames []string
+	for _, t := range mcpServer.GetAllTools() {
+		mcpToolNames = append(mcpToolNames, t.Name)
+	}
+	// Wire Claude CLI adapter so handler can route to Claude CLI when provider is "claude-cli".
+	// Forward MCP auth header so Claude CLI's MCP requests don't get 401'd by our own middleware.
+	claudeAdapter := claude.NewStreamAdapter(claude.CLIConfig{
+		Workdir:            cfg.ClaudeCLI.Workdir,
+		MaxTurns:           cfg.ClaudeCLI.MaxTurns,
+		AllowedTools:       cfg.ClaudeCLI.AllowedTools,
+		MCPServerURL:       cfg.MCPServerURL(),
+		MCPToolNames:       mcpToolNames,
+		MCPAuthHeader:      cfg.MCP.AuthHeader,
+		MCPAuthHeaderValue: cfg.MCP.AuthHeaderValue,
+	}, log.Logger)
+	agentHandler.SetClaudeAdapter(claudeAdapter)
+	// if knowledge base is enabled, set knowledge base manager on AgentHandler for retrieval log recording
 	if knowledgeManager != nil {
 		agentHandler.SetKnowledgeManager(knowledgeManager)
 	}
@@ -503,7 +521,25 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	}
 	configHandler.SetSkillsToolRegistrar(skillsRegistrar)
 
-	// knowledge base(, App )
+	// set Claude CLI config updater (hot-reload workdir, max_turns, etc.)
+	configHandler.SetClaudeConfigUpdater(func(cliCfg *config.ClaudeCLIConfig) {
+		// Re-collect MCP tool names in case tools were re-registered during config reload
+		var updatedToolNames []string
+		for _, t := range mcpServer.GetAllTools() {
+			updatedToolNames = append(updatedToolNames, t.Name)
+		}
+		agentHandler.UpdateClaudeConfig(claude.CLIConfig{
+			Workdir:            cliCfg.Workdir,
+			MaxTurns:           cliCfg.MaxTurns,
+			AllowedTools:       cliCfg.AllowedTools,
+			MCPServerURL:       cfg.MCPServerURL(),
+			MCPToolNames:       updatedToolNames,
+			MCPAuthHeader:      cfg.MCP.AuthHeader,
+			MCPAuthHeaderValue: cfg.MCP.AuthHeaderValue,
+		})
+	})
+
+	// set knowledge base initializer (for dynamic initialization, must be set after App is created)
 	configHandler.SetKnowledgeInitializer(func() (*handler.KnowledgeHandler, error) {
 		knowledgeHandler, err := initializeKnowledge(cfg, db, knowledgeDBConn, mcpServer, agentHandler, app, log.Logger)
 		if err != nil {
