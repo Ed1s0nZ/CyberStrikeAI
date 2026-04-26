@@ -424,26 +424,51 @@ type ProgressCallback func(eventType, message string, data interface{})
 
 // AgentLoop executes the Agent loop
 func (a *Agent) AgentLoop(ctx context.Context, userInput string, historyMessages []ChatMessage) (*AgentLoopResult, error) {
-	return a.AgentLoopWithProgress(ctx, userInput, historyMessages, "", nil, nil, nil)
+	return a.AgentLoopWithProgress(ctx, userInput, historyMessages, "", "", nil, nil, nil)
 }
 
 // AgentLoopWithConversationID executes the Agent loop (with conversation ID)
 func (a *Agent) AgentLoopWithConversationID(ctx context.Context, userInput string, historyMessages []ChatMessage, conversationID string) (*AgentLoopResult, error) {
-	return a.AgentLoopWithProgress(ctx, userInput, historyMessages, conversationID, nil, nil, nil)
+	return a.AgentLoopWithProgress(ctx, userInput, historyMessages, conversationID, "", nil, nil, nil)
 }
 
 // AgentLoopWithProgress executes the Agent loop (with progress callback and conversation ID)
 // roleSkills: role-configured skills list (hints AI in system prompt, not hardcoded content)
-func (a *Agent) AgentLoopWithProgress(ctx context.Context, userInput string, historyMessages []ChatMessage, conversationID string, callback ProgressCallback, roleTools []string, roleSkills []string) (*AgentLoopResult, error) {
+func (a *Agent) AgentLoopWithProgress(ctx context.Context, userInput string, historyMessages []ChatMessage, conversationID string, assistantMessageID string, callback ProgressCallback, roleTools []string, roleSkills []string) (*AgentLoopResult, error) {
 	// Scope this loop's tool dispatch to the caller's conversation via
 	// context, so executeToolViaMCP can read it back when auto-injecting
 	// conversation_id into tools like record_vulnerability.
 	ctx = withConversationID(ctx, conversationID)
-	// send progress update
+	// send progress update — user-facing callback fires first so a
+	// debug-sink failure can never suppress UI updates (F4).
 	sendProgress := func(eventType, message string, data interface{}) {
 		if callback != nil {
 			callback(eventType, message, data)
 		}
+		if a.debugSink == nil {
+			return
+		}
+		now := time.Now().UnixNano()
+		agentID := "single-agent"
+		var msgID string
+		if m, ok := data.(map[string]interface{}); ok {
+			if v, _ := m["agent"].(string); v != "" {
+				agentID = v
+			}
+			if v, _ := m["messageId"].(string); v != "" {
+				msgID = v
+			}
+		}
+		if msgID == "" {
+			msgID = assistantMessageID
+		}
+		payload, _ := json.Marshal(data)
+		a.debugSink.RecordEvent(conversationID, msgID, debug.Event{
+			EventType:   eventType,
+			AgentID:     agentID,
+			PayloadJSON: string(payload),
+			StartedAt:   now,
+		})
 	}
 
 	// system prompt, guiding AI on how to handle tool errors
@@ -660,6 +685,7 @@ LANGUAGE: You MUST respond ONLY in English. All output - including todo lists, t
 
 	maxIterations := a.maxIterations
 	thinkingStreamSeq := 0
+	callIdx := 0 // F3: per-session LLM call counter, mirrors orchestrator callSeq
 	for i := 0; i < maxIterations; i++ {
 		// get available tools and count tools tokens first, then compress, so compression reserves space for tools
 		tools := a.getAvailableTools(roleTools)
@@ -765,7 +791,13 @@ LANGUAGE: You MUST respond ONLY in English. All output - including todo lists, t
 		thinkingStreamId := fmt.Sprintf("thinking-stream-%s-%d-%d", conversationID, i+1, thinkingStreamSeq)
 		thinkingStreamStarted := false
 
-		response, err := a.callOpenAIStreamWithToolCalls(ctx, messages, tools, func(delta string) error {
+		// F3: wrap ctx with capture metadata so captureLLMCall records to
+		// debug_llm_calls. callIdx is monotonic across iterations, matching
+		// the orchestrator's callSeq pattern.
+		captureCtx := debug.WithCapture(ctx, conversationID, assistantMessageID, i+1, callIdx, "single-agent")
+		callIdx++
+
+		response, err := a.callOpenAIStreamWithToolCalls(captureCtx, messages, tools, func(delta string) error {
 			if delta == "" {
 				return nil
 			}
@@ -858,16 +890,35 @@ LANGUAGE: You MUST respond ONLY in English. All output - including todo lists, t
 
 			// execute all tool calls
 			for idx, toolCall := range choice.Message.ToolCalls {
+				// F5: inter-tool cancel check — re-evaluate ctx between tools so a
+				// stop-task signal is honored within a multi-tool batch without
+				// waiting for all remaining tools to complete. Append a synthetic
+				// tool-role message so the messages array stays well-formed: every
+				// assistant tool_call must have a matching tool response per the
+				// OpenAI contract, otherwise the next LLM call will be rejected.
+				if ctx.Err() != nil {
+					messages = append(messages, ChatMessage{
+						Role:       "tool",
+						ToolCallID: toolCall.ID,
+						Content:    "Tool call cancelled: task was stopped by operator before this call could execute.",
+					})
+					continue
+				}
+
 				// send tool call start event
 				toolArgsJSON, _ := json.Marshal(toolCall.Function.Arguments)
 				sendProgress("tool_call", fmt.Sprintf("calling tool: %s", toolCall.Function.Name), map[string]interface{}{
-					"toolName":     toolCall.Function.Name,
-					"arguments":    string(toolArgsJSON),
-					"argumentsObj": toolCall.Function.Arguments,
-					"toolCallId":   toolCall.ID,
-					"index":        idx + 1,
-					"total":        len(choice.Message.ToolCalls),
-					"iteration":    i + 1,
+					"toolName":       toolCall.Function.Name,
+					"arguments":      string(toolArgsJSON),
+					"argumentsObj":   toolCall.Function.Arguments,
+					"toolCallId":     toolCall.ID,
+					"index":          idx + 1,
+					"total":          len(choice.Message.ToolCalls),
+					"iteration":      i + 1,
+					"source":         "single-agent",
+					"agent":          "single-agent",
+					"agentRole":      "single",
+					"conversationId": conversationID,
 				})
 
 				// role-whitelist execution gate — mirrors the orchestrator's
@@ -884,12 +935,16 @@ LANGUAGE: You MUST respond ONLY in English. All output - including todo lists, t
 						Content:    denyMsg,
 					})
 					sendProgress("tool_result", fmt.Sprintf("Tool denied: %s", toolCall.Function.Name), map[string]interface{}{
-						"toolName":   toolCall.Function.Name,
-						"toolCallId": toolCall.ID,
-						"success":    false,
-						"isError":    true,
-						"result":     denyMsg,
-						"iteration":  i + 1,
+						"toolName":       toolCall.Function.Name,
+						"toolCallId":     toolCall.ID,
+						"success":        false,
+						"isError":        true,
+						"result":         denyMsg,
+						"iteration":      i + 1,
+						"source":         "single-agent",
+						"agent":          "single-agent",
+						"agentRole":      "single",
+						"conversationId": conversationID,
 					})
 					continue
 				}
@@ -900,11 +955,15 @@ LANGUAGE: You MUST respond ONLY in English. All output - including todo lists, t
 						return
 					}
 					sendProgress("tool_result_delta", chunk, map[string]interface{}{
-						"toolName":   toolCall.Function.Name,
-						"toolCallId": toolCall.ID,
-						"index":      idx + 1,
-						"total":      len(choice.Message.ToolCalls),
-						"iteration":  i + 1,
+						"toolName":       toolCall.Function.Name,
+						"toolCallId":     toolCall.ID,
+						"index":          idx + 1,
+						"total":          len(choice.Message.ToolCalls),
+						"iteration":      i + 1,
+						"source":         "single-agent",
+						"agent":          "single-agent",
+						"agentRole":      "single",
+						"conversationId": conversationID,
 						// success is determined by success/isError flag in final tool_result event
 					})
 				}))
@@ -921,14 +980,18 @@ LANGUAGE: You MUST respond ONLY in English. All output - including todo lists, t
 
 					// send tool execution failure event
 					sendProgress("tool_result", fmt.Sprintf("tool %s execution failed", toolCall.Function.Name), map[string]interface{}{
-						"toolName":   toolCall.Function.Name,
-						"success":    false,
-						"isError":    true,
-						"error":      err.Error(),
-						"toolCallId": toolCall.ID,
-						"index":      idx + 1,
-						"total":      len(choice.Message.ToolCalls),
-						"iteration":  i + 1,
+						"toolName":       toolCall.Function.Name,
+						"success":        false,
+						"isError":        true,
+						"error":          err.Error(),
+						"toolCallId":     toolCall.ID,
+						"index":          idx + 1,
+						"total":          len(choice.Message.ToolCalls),
+						"iteration":      i + 1,
+						"source":         "single-agent",
+						"agent":          "single-agent",
+						"agentRole":      "single",
+						"conversationId": conversationID,
 					})
 
 					a.logger.Warn("tool execution failed, detailed error returned",
@@ -953,16 +1016,20 @@ LANGUAGE: You MUST respond ONLY in English. All output - including todo lists, t
 						resultPreview = resultPreview[:200] + "..."
 					}
 					sendProgress("tool_result", fmt.Sprintf("tool %s execution complete", toolCall.Function.Name), map[string]interface{}{
-						"toolName":      toolCall.Function.Name,
-						"success":       !execResult.IsError,
-						"isError":       execResult.IsError,
-						"result":        execResult.Result, // full result
-						"resultPreview": resultPreview,     // result preview
-						"executionId":   execResult.ExecutionID,
-						"toolCallId":    toolCall.ID,
-						"index":         idx + 1,
-						"total":         len(choice.Message.ToolCalls),
-						"iteration":     i + 1,
+						"toolName":       toolCall.Function.Name,
+						"success":        !execResult.IsError,
+						"isError":        execResult.IsError,
+						"result":         execResult.Result, // full result
+						"resultPreview":  resultPreview,     // result preview
+						"executionId":    execResult.ExecutionID,
+						"toolCallId":     toolCall.ID,
+						"index":          idx + 1,
+						"total":          len(choice.Message.ToolCalls),
+						"iteration":      i + 1,
+						"source":         "single-agent",
+						"agent":          "single-agent",
+						"agentRole":      "single",
+						"conversationId": conversationID,
 					})
 
 					// if tool returned error, log but do not interrupt flow
@@ -990,7 +1057,9 @@ LANGUAGE: You MUST respond ONLY in English. All output - including todo lists, t
 					"mcpExecutionIds":    result.MCPExecutionIDs,
 					"messageGeneratedBy": "summary",
 				})
-				streamText, _ := a.callOpenAIStreamText(ctx, messages, []Tool{}, func(delta string) error {
+				summaryCaptureCtx := debug.WithCapture(ctx, conversationID, assistantMessageID, i+1, callIdx, "single-agent")
+				callIdx++
+				streamText, _ := a.callOpenAIStreamText(summaryCaptureCtx, messages, []Tool{}, func(delta string) error {
 					sendProgress("response_delta", delta, map[string]interface{}{
 						"conversationId": conversationID,
 					})
@@ -1037,7 +1106,9 @@ LANGUAGE: You MUST respond ONLY in English. All output - including todo lists, t
 				"mcpExecutionIds":    result.MCPExecutionIDs,
 				"messageGeneratedBy": "summary",
 			})
-			streamText, _ := a.callOpenAIStreamText(ctx, messages, []Tool{}, func(delta string) error {
+			summaryCaptureCtx2 := debug.WithCapture(ctx, conversationID, assistantMessageID, i+1, callIdx, "single-agent")
+			callIdx++
+			streamText, _ := a.callOpenAIStreamText(summaryCaptureCtx2, messages, []Tool{}, func(delta string) error {
 				sendProgress("response_delta", delta, map[string]interface{}{
 					"conversationId": conversationID,
 				})
@@ -1084,7 +1155,9 @@ LANGUAGE: You MUST respond ONLY in English. All output - including todo lists, t
 		"mcpExecutionIds":    result.MCPExecutionIDs,
 		"messageGeneratedBy": "max_iter_summary",
 	})
-	streamText, _ := a.callOpenAIStreamText(ctx, messages, []Tool{}, func(delta string) error {
+	maxIterSummaryCaptureCtx := debug.WithCapture(ctx, conversationID, assistantMessageID, maxIterations, callIdx, "single-agent")
+	callIdx++
+	streamText, _ := a.callOpenAIStreamText(maxIterSummaryCaptureCtx, messages, []Tool{}, func(delta string) error {
 		sendProgress("response_delta", delta, map[string]interface{}{
 			"conversationId": conversationID,
 		})

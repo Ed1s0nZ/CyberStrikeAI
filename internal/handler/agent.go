@@ -553,21 +553,30 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 		return
 	}
 
-	// execute Agent Loop,messageconversationID(rolefinalMessagerolelist)
-	// :skills,AIroleskills
-	result, err := h.agent.AgentLoopWithProgress(c.Request.Context(), finalMessage, agentHistoryMessages, conversationID, nil, roleTools, roleSkills)
-	if err != nil {
-		h.logger.Error("Agent Loop execution failed", zap.Error(err))
+	// F2: debug bookends via wrapRunWithDebug helper (non-streaming path has a
+	// simple success/error flow, so the helper is appropriate here).
+	var result *agent.AgentLoopResult
+	_, err = wrapRunWithDebug(h.debugSink, conversationID, func() (string, error) {
+		// execute Agent Loop,messageconversationID(rolefinalMessagerolelist)
+		// :skills,AIroleskills
+		var runErr error
+		result, runErr = h.agent.AgentLoopWithProgress(c.Request.Context(), finalMessage, agentHistoryMessages, conversationID, "", nil, roleTools, roleSkills)
+		if runErr != nil {
+			h.logger.Error("Agent Loop execution failed", zap.Error(runErr))
 
-		// execution failed,ReAct(result)
-		if result != nil && (result.LastReActInput != "" || result.LastReActOutput != "") {
-			if saveErr := h.db.SaveReActData(conversationID, result.LastReActInput, result.LastReActOutput); saveErr != nil {
-				h.logger.Warn("failed to save ReAct data for failed task", zap.Error(saveErr))
-			} else {
-				h.logger.Info("saved ReAct data for failed task", zap.String("conversationId", conversationID))
+			// execution failed,ReAct(result)
+			if result != nil && (result.LastReActInput != "" || result.LastReActOutput != "") {
+				if saveErr := h.db.SaveReActData(conversationID, result.LastReActInput, result.LastReActOutput); saveErr != nil {
+					h.logger.Warn("failed to save ReAct data for failed task", zap.Error(saveErr))
+				} else {
+					h.logger.Info("saved ReAct data for failed task", zap.String("conversationId", conversationID))
+				}
 			}
+			return "failed", runErr
 		}
-
+		return "completed", nil
+	})
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -700,7 +709,7 @@ func (h *AgentHandler) ProcessMessageForRobot(ctx context.Context, conversationI
 		return resultMA.Response, conversationID, nil
 	}
 
-	result, err := h.agent.AgentLoopWithProgress(ctx, finalMessage, agentHistoryMessages, conversationID, progressCallback, roleTools, roleSkills)
+	result, err := h.agent.AgentLoopWithProgress(ctx, finalMessage, agentHistoryMessages, conversationID, assistantMessageID, progressCallback, roleTools, roleSkills)
 	if err != nil {
 		errMsg := "execution failed: " + err.Error()
 		if assistantMessageID != "" {
@@ -1236,6 +1245,15 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	taskStatus := "completed"
 	defer h.tasks.FinishTask(conversationID, taskStatus)
 
+	// F2: Debug capture bookends — hoisted above the provider branch so both
+	// Claude CLI and OpenAI paths are covered by a single pair. Mirrors the
+	// MultiAgentLoopStream pattern in multi_agent.go:148-149. We use raw
+	// StartSession + defer-closure (not wrapRunWithDebug) because this handler
+	// mutates taskStatus across multiple return paths; the closure captures the
+	// mutable variable and reads its final value at defer-fire time.
+	h.debugSink.StartSession(conversationID)
+	defer func() { h.debugSink.EndSession(conversationID, taskStatus) }()
+
 	// Start SSE keepalive for the long-running agent work below
 	stopKeepalive := make(chan struct{})
 	go sseKeepalive(c, stopKeepalive, &sseWriteMu)
@@ -1254,13 +1272,6 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 				systemPrompt = role.UserPrompt
 			}
 		}
-
-		// Debug capture bookends: StartSession now, EndSession after the branch
-		// returns (mirrors the pattern in multi_agent.go:148-149). We cannot use
-		// wrapRunWithDebug here because this is a streaming handler that mutates
-		// taskStatus across multiple return paths.
-		h.debugSink.StartSession(conversationID)
-		defer func() { h.debugSink.EndSession(conversationID, taskStatus) }()
 
 		resultText, _, claudeErr := h.claudeAdapter.RunPrompt(taskCtx, finalMessage, systemPrompt, conversationID, roleTools, sendEvent)
 		if claudeErr != nil {
@@ -1299,7 +1310,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	// ── Default: OpenAI agent loop ──────────────────────────────────────────
 	sendEvent("progress", "analyzing your request...", nil)
 
-	result, err := h.agent.AgentLoopWithProgress(taskCtx, finalMessage, agentHistoryMessages, conversationID, progressCallback, roleTools, roleSkills)
+	result, err := h.agent.AgentLoopWithProgress(taskCtx, finalMessage, agentHistoryMessages, conversationID, assistantMessageID, progressCallback, roleTools, roleSkills)
 	if err != nil {
 		h.logger.Error("Agent Loop execution failed", zap.Error(err))
 		cause := context.Cause(baseCtx)
@@ -1859,7 +1870,7 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 		if useBatchMulti {
 			resultMA, runErr = multiagent.RunOrchestrator(ctx, h.config, &h.config.MultiAgent, h.agent, h.logger, conversationID, finalMessage, []agent.ChatMessage{}, roleTools, progressCallback, h.agentsMarkdownDir, h.debugSink)
 		} else {
-			result, runErr = h.agent.AgentLoopWithProgress(ctx, finalMessage, []agent.ChatMessage{}, conversationID, progressCallback, roleTools, roleSkills)
+			result, runErr = h.agent.AgentLoopWithProgress(ctx, finalMessage, []agent.ChatMessage{}, conversationID, assistantMessageID, progressCallback, roleTools, roleSkills)
 		}
 		// ,
 		h.batchTaskManager.SetTaskCancel(queueID, nil)

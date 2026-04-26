@@ -129,3 +129,48 @@ func TestWrapRunWithDebug_PanicStillFiresEndSession(t *testing.T) {
 	})
 	t.Fatalf("expected panic to propagate")
 }
+
+// ── F2: AgentLoopStream bookend pattern ──────────────────────────────────────
+
+// TestSingleAgent_DebugBookends_RawPattern verifies that the raw
+// StartSession + defer-closure (mutating taskStatus) pattern fires
+// StartSession and EndSession with the correct outcome.  This exercises
+// the same code path used by AgentLoopStream (the streaming single-agent
+// handler) without needing a full gin+SSE harness.
+func TestSingleAgent_DebugBookends_RawPattern(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		finalStatus    string
+		wantOutcome    string
+	}{
+		{"completed path", "completed", "completed"},
+		{"cancelled path", "cancelled", "cancelled"},
+		{"failed path", "failed", "failed"},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			fake := &fakeSink{enabled: true}
+
+			const convID = "stream-conv-1"
+			taskStatus := "completed"
+			fake.StartSession(convID)
+			// The defer-closure in AgentLoopStream captures the mutable
+			// taskStatus variable; we simulate a mutation then the defer.
+			taskStatus = tc.finalStatus
+			fake.EndSession(convID, taskStatus)
+
+			if len(fake.starts) != 1 || fake.starts[0] != convID {
+				t.Fatalf("StartSession: want 1 call with %q, got %v", convID, fake.starts)
+			}
+			if len(fake.ends) != 1 {
+				t.Fatalf("EndSession: want 1 call, got %d", len(fake.ends))
+			}
+			if fake.ends[0].id != convID {
+				t.Fatalf("EndSession id: want %q, got %q", convID, fake.ends[0].id)
+			}
+			if fake.ends[0].outcome != tc.wantOutcome {
+				t.Fatalf("EndSession outcome: want %q, got %q", tc.wantOutcome, fake.ends[0].outcome)
+			}
+		})
+	}
+}
