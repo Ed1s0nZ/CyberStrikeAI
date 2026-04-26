@@ -1111,6 +1111,17 @@ func (m *ExternalMCPManager) StartAllEnabled() {
 	}
 }
 
+// AddClientForTest injects a pre-built client and config directly into the
+// manager for use in unit tests. It bypasses the normal connect/initialize
+// flow so tests can supply a stub without running real subprocesses.
+// Must only be called before the manager is shared with other goroutines.
+func (m *ExternalMCPManager) AddClientForTest(name string, client ExternalMCPClient, cfg config.ExternalMCPServerConfig) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.clients[name] = client
+	m.configs[name] = cfg
+}
+
 // StopAll stops all clients and waits for background refresh goroutines to drain.
 //
 // Ordering matters: we stop the ticker and drain refreshWg *before* taking the

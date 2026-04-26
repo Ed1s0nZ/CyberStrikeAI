@@ -1160,10 +1160,10 @@ func (a *Agent) getAvailableTools(roleTools []string) []Tool {
 			// get external MCP config to check tool enable status
 			externalMCPConfigs := a.externalMCPMgr.GetConfigs()
 
-			// clear and rebuild tool name mapping
-			a.mu.Lock()
-			a.toolNameMapping = make(map[string]string)
-			a.mu.Unlock()
+			// Build the new name mapping locally — no lock held during the loop
+			// so concurrent readers of a.toolNameMapping never see an empty
+			// intermediate state (Finding 6: split-lock race).
+			newMapping := make(map[string]string, len(externalTools))
 
 			// add external MCP tools to tool list (only enabled tools)
 			for _, externalTool := range externalTools {
@@ -1223,10 +1223,8 @@ func (a *Agent) getAvailableTools(roleTools []string) []Tool {
 				// OpenAI requires tool names to only contain [a-zA-Z0-9_-]
 				openAIName := strings.ReplaceAll(externalTool.Name, "::", "__")
 
-				// save name mapping (OpenAI format -> original format)
-				a.mu.Lock()
-				a.toolNameMapping[openAIName] = externalTool.Name
-				a.mu.Unlock()
+				// record name mapping (OpenAI format -> original format) in local map
+				newMapping[openAIName] = externalTool.Name
 
 				tools = append(tools, Tool{
 					Type: "function",
@@ -1237,6 +1235,14 @@ func (a *Agent) getAvailableTools(roleTools []string) []Tool {
 					},
 				})
 			}
+
+			// Atomic swap: replace the entire mapping under a single Lock/Unlock.
+			// Readers in executeToolViaMCP using a.mu.RLock see either the old
+			// map or the new map — never the empty intermediate that the previous
+			// wipe-then-per-entry-repopulate pattern exposed.
+			a.mu.Lock()
+			a.toolNameMapping = newMapping
+			a.mu.Unlock()
 		}
 	}
 
