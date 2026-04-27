@@ -197,6 +197,8 @@ func (db *DB) initTables() error {
 	CREATE TABLE IF NOT EXISTS vulnerabilities (
 		id TEXT PRIMARY KEY,
 		conversation_id TEXT NOT NULL,
+		conversation_tag TEXT,
+		task_tag TEXT,
 		title TEXT NOT NULL,
 		description TEXT,
 		severity TEXT NOT NULL,
@@ -289,6 +291,8 @@ func (db *DB) initTables() error {
 	CREATE INDEX IF NOT EXISTS idx_conversation_group_mappings_group ON conversation_group_mappings(group_id);
 	CREATE INDEX IF NOT EXISTS idx_conversations_pinned ON conversations(pinned);
 	CREATE INDEX IF NOT EXISTS idx_vulnerabilities_conversation_id ON vulnerabilities(conversation_id);
+	CREATE INDEX IF NOT EXISTS idx_vulnerabilities_conversation_tag ON vulnerabilities(conversation_tag);
+	CREATE INDEX IF NOT EXISTS idx_vulnerabilities_task_tag ON vulnerabilities(task_tag);
 	CREATE INDEX IF NOT EXISTS idx_vulnerabilities_severity ON vulnerabilities(severity);
 	CREATE INDEX IF NOT EXISTS idx_vulnerabilities_status ON vulnerabilities(status);
 	CREATE INDEX IF NOT EXISTS idx_vulnerabilities_created_at ON vulnerabilities(created_at);
@@ -381,6 +385,10 @@ func (db *DB) initTables() error {
 
 	if err := db.migrateBatchTaskQueuesTable(); err != nil {
 		db.logger.Warn("迁移batch_task_queues表失败", zap.Error(err))
+		// 不返回错误，允许继续运行
+	}
+	if err := db.migrateVulnerabilitiesTable(); err != nil {
+		db.logger.Warn("迁移vulnerabilities表失败", zap.Error(err))
 		// 不返回错误，允许继续运行
 	}
 
@@ -680,6 +688,37 @@ func (db *DB) migrateBatchTaskQueuesTable() error {
 		}
 	}
 
+	return nil
+}
+
+// migrateVulnerabilitiesTable 迁移 vulnerabilities 表，补充标签字段
+func (db *DB) migrateVulnerabilitiesTable() error {
+	columns := []struct {
+		name string
+		stmt string
+	}{
+		{name: "conversation_tag", stmt: "ALTER TABLE vulnerabilities ADD COLUMN conversation_tag TEXT"},
+		{name: "task_tag", stmt: "ALTER TABLE vulnerabilities ADD COLUMN task_tag TEXT"},
+	}
+
+	for _, col := range columns {
+		var count int
+		err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('vulnerabilities') WHERE name=?", col.name).Scan(&count)
+		if err != nil {
+			if _, addErr := db.Exec(col.stmt); addErr != nil {
+				errMsg := strings.ToLower(addErr.Error())
+				if !strings.Contains(errMsg, "duplicate column") && !strings.Contains(errMsg, "already exists") {
+					db.logger.Warn("添加vulnerabilities字段失败", zap.String("field", col.name), zap.Error(addErr))
+				}
+			}
+			continue
+		}
+		if count == 0 {
+			if _, addErr := db.Exec(col.stmt); addErr != nil {
+				db.logger.Warn("添加vulnerabilities字段失败", zap.String("field", col.name), zap.Error(addErr))
+			}
+		}
+	}
 	return nil
 }
 
