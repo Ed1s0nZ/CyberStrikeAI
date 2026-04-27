@@ -682,6 +682,36 @@ func (h *AgentHandler) ProcessMessageForRobot(
 	}
 	progressCallback := h.createProgressCallback(conversationID, assistantMessageID, nil)
 
+	if h.config != nil && h.config.EffectiveProvider() == "claude-cli" && h.claudeAdapter != nil {
+		if progressFn != nil {
+			progressFn("Running through Claude CLI…")
+		}
+		// sendEvent shim — no SSE writer in bot context. The adapter's
+		// own debug-event capture still fires inside RunPrompt.
+		sendEvent := func(eventType, msg string, data interface{}) {}
+		systemPrompt := "" // bot path prepends role prompt into finalMessage
+		resultText, _, runErr := h.claudeAdapter.RunPrompt(ctx, finalMessage, systemPrompt, conversationID, roleTools, sendEvent)
+		if runErr != nil {
+			errMsg := "execution failed: " + runErr.Error()
+			if assistantMessageID != "" {
+				_, _ = h.db.Exec("UPDATE messages SET content = ? WHERE id = ?", errMsg, assistantMessageID)
+				_ = h.db.AddProcessDetail(assistantMessageID, conversationID, "error", errMsg, nil)
+			}
+			return "", conversationID, runErr
+		}
+		// Persist result — mirror the multi-agent post-success update.
+		if assistantMessageID != "" {
+			if _, updErr := h.db.Exec("UPDATE messages SET content = ? WHERE id = ?", resultText, assistantMessageID); updErr != nil {
+				h.logger.Warn("robot: failed to update assistant message (claude-cli)", zap.Error(updErr))
+			}
+		} else {
+			if _, addErr := h.db.AddMessage(conversationID, "assistant", resultText, nil); addErr != nil {
+				h.logger.Warn("robot: failed to save assistant message (claude-cli)", zap.Error(addErr))
+			}
+		}
+		return resultText, conversationID, nil
+	}
+
 	var useRobotMulti bool
 	switch forceMode {
 	case "multi":
