@@ -32,6 +32,7 @@ const (
 	robotCmdSwitchRole = "switchrole"
 	robotCmdDelete     = "delete"
 	robotCmdVersion    = "version"
+	robotCmdMode       = "mode"
 )
 
 // RobotHandler handles robot message callbacks (Telegram).
@@ -175,6 +176,11 @@ func (h *RobotHandler) handleInternal(platform, userID, text string, progressFn 
 			_ = h.db.UpdateConversationTitle(convID, newTitle)
 		}
 	}
+	// resolve per-chat mode override before creating the timeout context
+	var forceMode string
+	if sess, _ := h.db.GetBotSession(platform, userID); sess != nil {
+		forceMode = sess.CurrentMode
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	sk := h.sessionKey(platform, userID)
 	h.cancelMu.Lock()
@@ -186,11 +192,26 @@ func (h *RobotHandler) handleInternal(platform, userID, text string, progressFn 
 		delete(h.runningCancels, sk)
 		h.cancelMu.Unlock()
 	}()
+	// Per-conversation lock: prevent concurrent agent runs on the same
+	// chat. Adapter wraps cancel() as CancelCauseFunc; the cause is
+	// dropped because the bot reply doesn't surface it. Mirrors
+	// multi_agent.go:121-141 / web-UI semantics.
+	cancelWithCause := func(cause error) { cancel() }
+	if _, err := h.agentHandler.tasks.StartTask(convID, text, cancelWithCause); err != nil {
+		if errors.Is(err, ErrTaskAlreadyRunning) {
+			return "Another task is running for this chat. Say `stop` to cancel."
+		}
+		return "Failed to start task: " + err.Error()
+	}
+	taskStatus := "completed"
+	defer func() { h.agentHandler.tasks.FinishTask(convID, taskStatus) }()
 	role := h.getRole(platform, userID)
-	resp, newConvID, err := h.agentHandler.ProcessMessageForRobot(ctx, convID, text, role, "", progressFn)
+	resp, newConvID, err := h.agentHandler.ProcessMessageForRobot(ctx, convID, text, role, forceMode, progressFn)
 	if err != nil {
+		taskStatus = "failed"
 		h.logger.Warn("Agent execution failed", zap.String("platform", platform), zap.String("userID", userID), zap.Error(err))
 		if errors.Is(err, context.Canceled) {
+			taskStatus = "cancelled"
 			return "task cancelled."
 		}
 		return "processing failed: " + err.Error()
@@ -212,6 +233,7 @@ func (h *RobotHandler) cmdHelp() string {
 		"- `stop` -- Stop running task\n" +
 		"- `roles` -- List roles\n" +
 		"- `role <name>` -- Switch role\n" +
+		"- `mode <single|multi|default>` -- Set per-chat agent mode\n" +
 		"- `delete <ID>` -- Delete conversation\n" +
 		"- `version` -- Show version\n\n" +
 		"---\n" +
@@ -424,8 +446,65 @@ func (h *RobotHandler) handleRobotCommand(platform, userID, text string) (string
 		return h.cmdDelete(platform, userID, convID), true
 	case text == robotCmdVersion || text == "version":
 		return h.cmdVersion(), true
+	case text == robotCmdMode:
+		return h.cmdMode(platform, userID, ""), true
+	case strings.HasPrefix(text, robotCmdMode+" "):
+		arg := strings.TrimSpace(text[len(robotCmdMode)+1:])
+		return h.cmdMode(platform, userID, arg), true
 	default:
 		return "", false
+	}
+}
+
+// cmdMode handles the `mode <single|multi|default>` slash command.
+// Returns the reply string to send to the user. Does not invoke the
+// agent loop — pure session-state mutation.
+func (h *RobotHandler) cmdMode(platform, userID string, arg string) string {
+	switch arg {
+	case "":
+		sess, _ := h.db.GetBotSession(platform, userID)
+		override := ""
+		if sess != nil {
+			override = sess.CurrentMode
+		}
+		globalMulti := h.config != nil && h.config.MultiAgent.Enabled && h.config.MultiAgent.RobotUseMultiAgent
+		effective := "single"
+		if override == "multi" || (override == "" && globalMulti) {
+			effective = "multi"
+		}
+		if override == "" {
+			return fmt.Sprintf("Current mode: %s (inheriting global default).\nUse `mode single`, `mode multi`, or `mode default`.", effective)
+		}
+		return fmt.Sprintf("Current mode: %s (per-chat override).\nUse `mode default` to revert.", effective)
+
+	case "single":
+		if err := h.db.SetBotMode(platform, userID, "single"); err != nil {
+			return "Failed to set mode: " + err.Error()
+		}
+		return "This chat is now single-agent."
+
+	case "multi":
+		if h.config == nil || !h.config.MultiAgent.Enabled {
+			return "Multi-agent is disabled in this deployment. Ask the operator to enable it (config: multi_agent.enabled)."
+		}
+		if err := h.db.SetBotMode(platform, userID, "multi"); err != nil {
+			return "Failed to set mode: " + err.Error()
+		}
+		return "This chat is now multi-agent."
+
+	case "default":
+		if err := h.db.SetBotMode(platform, userID, ""); err != nil {
+			return "Failed to revert mode: " + err.Error()
+		}
+		globalMulti := h.config != nil && h.config.MultiAgent.Enabled && h.config.MultiAgent.RobotUseMultiAgent
+		fallbackName := "single"
+		if globalMulti {
+			fallbackName = "multi"
+		}
+		return fmt.Sprintf("Reverted to global default (%s).", fallbackName)
+
+	default:
+		return fmt.Sprintf("Unknown mode '%s'. Use: mode single | mode multi | mode default", arg)
 	}
 }
 
