@@ -164,7 +164,7 @@ func (h *RobotHandler) HandleMessage(platform, userID, text string) (reply strin
 		h.cancelMu.Unlock()
 	}()
 	role := h.getRole(platform, userID)
-	resp, newConvID, err := h.agentHandler.ProcessMessageForRobot(ctx, convID, text, role)
+	resp, newConvID, err := h.agentHandler.ProcessMessageForRobot(ctx, convID, text, role, "", nil)
 	if err != nil {
 		h.logger.Warn("Agent execution failed", zap.String("platform", platform), zap.String("userID", userID), zap.Error(err))
 		if errors.Is(err, context.Canceled) {
