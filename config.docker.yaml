@@ -1,0 +1,228 @@
+# ============================================
+# CyberStrikeAI 配置文件
+# ============================================
+# 本配置文件支持通过 Web 界面进行可视化配置
+# 点击右上角"设置"按钮即可修改配置
+# ============================================
+
+# ============================================
+# 系统设置
+# ============================================
+
+# 前端显示的版本号（可选，不填则显示默认版本）
+version: "v1.5.12"
+# 服务器配置
+server:
+  host: 0.0.0.0 # 监听地址，0.0.0.0 表示监听所有网络接口
+  port: 8080 # HTTP 服务端口，可通过浏览器访问 http://localhost:8080
+# 认证配置
+auth:
+  password:  # Web 登录密码，请修改为强密码
+  session_duration_hours: 12 # 登录有效期（小时），超时后需重新登录
+# 日志配置
+log:
+  level: info # 日志级别: debug(调试), info(信息), warn(警告), error(错误)
+  output: stdout # 日志输出位置: stdout(标准输出), stderr(标准错误), 或文件路径
+# ============================================
+# 对话相关配置
+# ============================================
+
+# AI 模型配置（支持 OpenAI 兼容 API）
+# 必填项：api_key, base_url, model 必须填写才能正常运行
+# 支持的 API 服务商：
+#   - OpenAI: https://api.openai.com/v1
+#   - DeepSeek: https://api.deepseek.com/v1
+#   - 其他兼容 OpenAI 协议的 API
+# 常用模型: gpt-4, gpt-3.5-turbo, deepseek-chat, claude-3-opus 等
+# provider: 可选值 openai(默认) | claude(自动桥接到 Anthropic Claude Messages API)
+openai:
+  provider: openai # API 提供商: openai(默认,兼容OpenAI协议) | claude(自动桥接到Anthropic Claude Messages API)
+  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1 # API 基础 URL（必填）
+  api_key: sk-xxxxxxx # API 密钥（必填）
+  model: qwen3-max # 模型名称（必填）
+  max_total_tokens: 120000 # LLM 相关上下文的最大 Token 数限制（内存压缩和攻击链构建会共用此配置）
+# ============================================
+# 信息收集（FOFA）配置（可选）
+# ============================================
+# 用于「信息收集」页面调用 FOFA API（后端代理，避免前端暴露 key）
+# 也可通过环境变量配置：FOFA_EMAIL / FOFA_API_KEY（优先级更高）
+fofa:
+  base_url: https://fofa.info/api/v1/search/all # 可选，留空则使用默认
+  email: "" # FOFA 账号邮箱（可选，建议在系统设置中填写）
+  api_key: "" # FOFA API Key（可选，建议在系统设置中填写）
+# Agent 配置
+# 达到最大迭代次数时，AI 会自动总结测试结果
+agent:
+  max_iterations: 120 # 最大迭代次数，AI 代理最多执行多少轮工具调用
+  large_result_threshold: 102400 # 大结果阈值（字节），默认50KB，超过此大小会自动保存到存储
+  result_storage_dir: tmp # 结果存储目录，大结果会保存在此目录下
+  tool_timeout_minutes: 30 # 单次工具执行最大时长（分钟），超时自动终止；0 表示不限制（不推荐，易出现长时间挂起）
+  # system_prompt_path: prompts/single-react.md # 可选：单代理系统提示文件（相对本配置文件所在目录）；非空且可读时替换内置提示
+# 人机协同（HITL）全局白名单：此处列出的工具始终免审批，与对话页「白名单工具（免审批，逗号分隔）」合并为并集；侧栏「应用」可合并写入本列表并立即生效。
+hitl:
+  # 按你环境里的真实工具名增删（与侧栏一致、小写不敏感）；不需要全局免审批可改为 []
+  tool_whitelist: [read_file, list_dir, glob, grep]
+# 多代理（CloudWeGo Eino DeepAgent，与上方单 Agent /api/agent-loop 并存）
+# 依赖在 go.mod 中拉取；若下载失败可设置: go env -w GOPROXY=https://goproxy.cn,direct
+# 启用后需重启服务才会注册 /api/multi-agent 与 /api/multi-agent/stream；Deep / Plan-Execute / Supervisor 由对话页与 WebShell 所选模式在请求体中传入；机器人/批量无请求体时固定按 deep
+multi_agent:
+  enabled: true
+  robot_use_multi_agent: true # true 时企业微信/钉钉/飞书机器人也走 Eino 多代理（成本更高）
+  batch_use_multi_agent: false # true 时「批量任务」队列中每个子任务也走 Eino 多代理（成本更高）
+  max_iteration: 0 # 主代理 / plan_execute 执行器最大轮次，0 表示沿用 agent.max_iterations
+  # plan_execute 专用：execute↔replan 外层循环上限，0 表示 Eino 默认 10。Executor 未暴露 Handlers：patch/reduction/plantask 不作用于 PE，但 tool_search 工具列表拆分仍通过共享 ToolsConfig 作用于执行器。
+  plan_execute_loop_max_iterations: 0
+  sub_agent_max_iterations: 120
+  sub_agent_user_context_max_runes: 0 # 子代理 task 描述中自动注入用户原始请求的字符上限；0=默认2000，负数=禁用
+  without_general_sub_agent: false # false 时保留 Deep 内置 general-purpose 子代理
+  without_write_todos: false
+  orchestrator_instruction: "" # Deep 主代理：agents/orchestrator.md（或 kind: orchestrator 的单个 .md）正文优先；正文为空时用此处；皆空则 Eino 默认
+  orchestrator_instruction_plan_execute: "" # plan_execute 主代理：agents/orchestrator-plan-execute.md 正文优先；正文为空时用此处；皆空则用内置 plan_execute 提示（不使用 Deep 的 orchestrator_instruction）
+  orchestrator_instruction_supervisor: "" # supervisor 主代理：agents/orchestrator-supervisor.md 正文优先；正文为空时用此处；皆空则用内置 supervisor 提示（transfer/exit 说明仍由运行追加；不使用 Deep 的 orchestrator_instruction）
+  # Eino 官方 Skills：渐进式披露 + 可选本机文件/Shell（eino-ext local backend）。Skills 目录见 skills_dir。
+  eino_skills:
+    disable: false # true：不注册 skill 渐进式披露中间件，也不挂本机 FS/Shell 工具；false：按下方开关加载
+    filesystem_tools: true # true：注册 read_file/glob/grep/write/edit/execute（授权环境慎用）；false：仅 skill，不暴露本机读写与 Shell
+    skill_tool_name: skill # 模型侧可调用的「加载技能」工具名，一般保持 skill；与技能包文档中的调用名一致即可
+  # Eino ADK 中间件与 Deep/Supervisor 调参（结构体见 internal/config/config.go → MultiAgentEinoMiddlewareConfig）
+  eino_middleware:
+    patch_tool_calls: true # true：修补历史中无 tool_result 的悬空 tool_call（流式中断/重试后更稳）；false：关闭；字段省略时默认等同 true
+    tool_search_enable: false # true：工具数 ≥ min 时启用 tool_search，仅前 N 个工具常驻，其余按正则按需解锁，省 token、减误选；false：全量工具进上下文
+    tool_search_min_tools: 20 # 达到该数量才启用 tool_search（避免工具很少时多此一举）；与 always_visible 配合使用
+    tool_search_always_visible: 12 # 始终直接暴露给模型的工具个数（顺序与角色工具列表一致）；其余工具进入动态池，需 tool_search 解锁
+    plantask_enable: false # true：主代理（Deep / Supervisor 主）挂载 TaskCreate/Get/Update/List；需 eino_skills 可用且 skills_dir 存在，否则仅打日志并跳过
+    plantask_rel_dir: .eino/plantask # 结构化任务文件相对 skills_dir 的子目录，其下再按会话 ID 分子目录存放
+    reduction_enable: false # true：大工具输出截断/落盘以控上下文；依赖与 plantask 相同的 eino local 写盘后端，无后端时不挂载
+    reduction_root_dir: "" # 非空：截断/清理内容落盘根路径；空：使用系统临时目录下按会话隔离的默认路径
+    reduction_clear_exclude: [] # 不参与「清理阶段」的工具名额外列表（会与 task/transfer/exit 等内置排除项合并）；需要时用 YAML 列表填写
+    reduction_sub_agents: false # true：子代理也挂 reduction；false：仅编排主代理使用 reduction
+    checkpoint_dir: "" # 非空：为 adk.NewRunner 启用按会话子目录的文件型 CheckPointStore，便于中断恢复持久化；Resume 的 HTTP/前端流程需另行对接
+    deep_output_key: "" # 非空：将最终助手输出写入 adk session 的键名（Deep 与 Supervisor 主代理）；空表示不写入
+    deep_model_retry_max_retries: 0 # >0：ChatModel 调用失败时的框架级最大重试次数（Deep 与 Supervisor 主）；0：不重试
+    task_tool_description_prefix: "" # 非空：仅 Deep 的 task 工具使用自定义描述前缀，运行时会拼接子代理名称；空则走 Eino 默认生成逻辑
+# 数据库配置
+database:
+  path: data/conversations.db # SQLite 数据库文件路径，用于存储对话历史和消息
+  knowledge_db_path: data/knowledge.db # 知识库数据库文件路径（可选，为空则使用会话数据库），用于存储知识库项和向量嵌入，可独立复制和复用
+# ============================================
+# 任务管理相关配置
+# ============================================
+# （配置项已包含在对话相关配置中）
+
+# ============================================
+# 漏洞管理相关配置
+# ============================================
+
+# 安全工具配置
+# 系统会从该目录加载所有 .yaml 格式的工具配置文件
+# 推荐方式：在 tools/ 目录下为每个工具创建独立的配置文件
+security:
+  tools_dir: tools # 工具配置文件目录（相对于配置文件所在目录）
+  # 工具描述模式：加载 tools 下工具时，暴露给 AI/API 使用的描述来源
+  #   short - 优先使用 short_description（简短描述，省 token），为空时用 description
+  #   full  - 使用 description（详细描述）
+  tool_description_mode: full
+# ============================================
+# MCP 相关配置
+# ============================================
+
+# MCP 协议配置
+# MCP (Model Context Protocol) 用于工具注册和调用
+mcp:
+  enabled: false # 是否启用 MCP 服务器（http模式）
+  host: 0.0.0.0 # MCP 服务器监听地址
+  port: 8081 # MCP 服务器端口
+  auth_header: "X-MCP-Token" # 鉴权：请求需携带该 header 且值与 auth_header_value 一致方可调用。留空表示不鉴权
+  auth_header_value: "" # 鉴权密钥值（与 auth_header 配合使用，建议使用随机字符串）
+# 外部 MCP 配置
+external_mcp:
+  servers: {}
+# ============================================
+# 知识库相关配置
+# ============================================
+knowledge:
+  enabled: false # 是否启用知识检索功能
+  base_path: knowledge_base # 知识库目录路径（相对于配置文件所在目录）
+  embedding:
+    provider: openai # 嵌入模型提供商（目前仅支持openai）
+    model: text-embedding-v4 # 嵌入模型名称
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1 # 留空则使用OpenAI配置的base_url
+    api_key: sk-xxxxxxx # 留空则使用OpenAI配置的api_key
+  retrieval:
+    top_k: 5 # 检索返回的Top-K结果数量
+    similarity_threshold: 0.4 # 余弦相似度阈值（0-1），低于此值的结果将被过滤
+    # 检索后处理：固定正文规范化去重；上下文预算；可选代码注入 DocumentReranker 做重排
+    post_retrieve:
+      prefetch_top_k: 0 # 0 与 top_k 相同；可设为 15~30 以便去重后仍填满 top_k
+      max_context_chars: 0 # 0 不限制；否则返回的正文总 Unicode 字符上限（整段 chunk）
+      max_context_tokens: 0 # 0 不限制；tiktoken 总 token 上限
+    sub_index_filter: ""
+  # ============================================
+  # 索引配置（用于解决 API 限制问题）
+  # ============================================
+  indexing:
+    # 分块配置
+    chunk_size: 512 # 每个块的最大 token 数（默认 512），长文本会被分割成多个块
+    chunk_overlap: 50 # 块之间的重叠 token 数（默认 50），保持上下文连贯性
+    max_chunks_per_item: 0 # 单个知识项的最大块数量（0 表示不限制），防止单个文件消耗过多 API 配额
+    # 速率限制配置（解决 429 错误）
+    max_rpm: 0 # 每分钟最大请求数（默认 0 表示不限制），如 OpenAI 默认 200 RPM
+    rate_limit_delay_ms: 300 # 请求间隔毫秒数（默认 300），用于避免 API 速率限制，设为 0 不限制
+    # 建议值：200 次/分钟≈300ms, 100 次/分钟≈600ms
+
+    # 重试配置
+    max_retries: 3 # 最大重试次数（默认 3），遇到速率限制或服务器错误时自动重试
+    retry_delay_ms: 1000 # 重试间隔毫秒数（默认 1000），每次重试会递增延迟
+    # 分块策略（Eino）：markdown_then_recursive = 先按 Markdown 标题切再递归；recursive = 仅递归切分。留空时程序内默认 markdown_then_recursive
+    chunk_strategy: markdown_then_recursive
+    # 嵌入 HTTP 请求超时（秒）。0 表示使用内置默认（一般为 120），与向量化 API 客户端一致
+    request_timeout_seconds: 120
+    # true：索引时优先用知识项 file_path 指向的磁盘文件内容（Eino FileLoader）；false：用数据库里存的正文。读盘失败会回退 DB
+    prefer_source_file: false
+    # 单次嵌入 API 请求的文本条数上限（索引写入按此分批）。须 ≤ 服务商限制（如部分兼容接口最多 10）；过大易 400
+    batch_size: 10
+    # Eino indexer.WithSubIndexes：逻辑分区标签列表，会写入向量表 sub_indexes，检索可用 sub_index_filter 过滤；无需求可 []
+    sub_indexes: []
+# ============================================
+# 机器人配置（企业微信、钉钉、飞书）
+# ============================================
+# 用于在手机端通过企业微信/钉钉/飞书与 CyberStrikeAI 对话，无需部署在服务器上也可使用
+# 在系统设置 -> 机器人设置 中可配置
+robots:
+  wecom: # 企业微信
+    enabled: false
+    token: ""
+    encoding_aes_key: ""
+    corp_id: ""
+    secret: ""
+    agent_id: 0
+  dingtalk: # 钉钉
+    enabled: false
+    client_id: ""
+    client_secret: ""
+  lark: # 飞书
+    enabled: false
+    app_id: ""
+    app_secret: ""
+    verify_token: ""
+# ============================================
+# Skills 相关配置
+# ============================================
+
+# 技能包目录：每个子目录仅标准 SKILL.md（Agent Skills：front matter 仅 name、description）+ 可选附属文件；无 SKILL.yaml
+# 示例：skills/cyberstrike-eino-demo/
+skills_dir: skills # Skills配置文件目录（相对于配置文件所在目录）
+# ============================================
+# 多代理子 Agent（Markdown，唯一维护处）
+# ============================================
+# 每个 .md：YAML front matter（name / id / description / tools / bind_role / max_iterations / 可选 kind: orchestrator）+ 正文为系统提示词
+# 主代理：固定文件名 orchestrator.md，或任意文件名 + front matter kind: orchestrator（全目录仅允许一个）；主代理不参与 task 子代理列表
+# 高级用法：仍可在 multi_agent 块内写 sub_agents，会与本文目录合并且同 id 时 YAML 可被 .md 覆盖
+agents_dir: agents
+# ============================================
+# 角色相关配置
+# ============================================
+
+# 系统会从该目录加载所有 .yaml 格式的角色配置文件
+# 每个角色应创建独立的配置文件，例如：roles/CTF.yaml, roles/默认.yaml 等
+roles_dir: roles # 角色配置文件目录（相对于配置文件所在目录）

@@ -1,0 +1,12 @@
+.git
+.worktrees
+worktrees
+.upgrade-backup
+.docker-runtime
+venv
+tmp
+data
+cyberstrike-ai
+cyberstrike-ai-mcp
+*.db
+*.log

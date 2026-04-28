@@ -1,0 +1,20 @@
+services:
+  cyberstrikeai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cyberstrikeai:local
+    container_name: cyberstrikeai
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    volumes:
+      - ./.docker-runtime:/app/runtime-config
+      - ./data:/app/data
+      - ./tmp:/app/tmp
+      - ./knowledge_base:/app/knowledge_base
+    # Uncomment if you need raw-socket or advanced scan modes.
+    # cap_add:
+    #   - NET_ADMIN
+    #   - NET_RAW

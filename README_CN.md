@@ -205,6 +205,23 @@ go build -o cyberstrike-ai cmd/server/main.go
 
 **说明：** Python 虚拟环境（`venv/`）由 `run.sh` 自动创建和管理。需要 Python 的工具（如 `api-fuzzer`、`http-framework-test` 等）会自动使用该环境。
 
+### Docker / Compose
+
+使用 Docker 构建并启动：
+
+```bash
+docker build -t cyberstrikeai:local .
+docker run -d --name cyberstrikeai -p 8080:8080 -p 8081:8081 -v "$(pwd)/.docker-runtime:/app/runtime-config" -v "$(pwd)/data:/app/data" -v "$(pwd)/tmp:/app/tmp" -v "$(pwd)/knowledge_base:/app/knowledge_base" cyberstrikeai:local
+```
+
+或者直接在仓库根目录使用 Compose：
+
+```bash
+docker compose up -d --build
+```
+
+仓库自带的 `docker-compose.yml` 会从当前源码本地构建镜像。Docker 会基于只读模板 `config.docker.yaml` 首次生成 `.docker-runtime/config.yaml` 作为可写运行态配置。GitHub Actions 会自动发布 `ghcr.io/ed1s0nz/cyberstrikeai`。卷挂载、权限和升级方式见 [Docker 部署文档](docs/deployment.md)。
+
 ### CyberStrikeAI 版本更新（无兼容性问题）
 
 1. （首次使用）启用脚本：`chmod +x upgrade.sh`
@@ -215,6 +232,8 @@ go build -o cyberstrike-ai cmd/server/main.go
 `chmod +x upgrade.sh && ./upgrade.sh --yes`
 
 如果升级失败，可以从 `.upgrade-backup/` 恢复，或按旧方式手动拷贝 `/data` 和 `config.yaml` 后再运行 `./run.sh`。
+
+**Docker 部署：** 不使用 `upgrade.sh`，而是拉取新镜像后重建容器；详见 [Docker 部署文档](docs/deployment.md)。
 
 依赖/提示：
 * 需要 `curl` 或 `wget` 用于下载 GitHub Release 包。
