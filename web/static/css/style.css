@@ -14180,12 +14180,31 @@ header {
     }
 }
 
-/* 漏洞严重程度分布：半环形图（浅色风格） */
+/* 漏洞严重程度分布：半环形图（浅色风格）
+   三列布局：[风险概览卡(结论)] [donut(分布图)] [legend(明细)]
+   —— 左列的「风险概览」填补原来 donut 左侧的留白，把"多危险 / 还有几个紧急项 / 多久前更新"这类
+   结论性信息前置，与右列的分类明细互补。 */
 .dashboard-severity-wrap {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(200px, 260px);
-    gap: 32px;
+    grid-template-columns: minmax(160px, 180px) minmax(0, 1fr) minmax(200px, 260px);
+    gap: 24px;
     align-items: center;
+}
+
+@media (max-width: 1100px) {
+    .dashboard-severity-wrap {
+        grid-template-columns: minmax(0, 1fr) minmax(200px, 260px);
+        gap: 24px;
+    }
+    .dashboard-severity-insights {
+        grid-column: 1 / -1;
+        flex-direction: row;
+        gap: 16px;
+    }
+    .dashboard-severity-insights > * {
+        flex: 1 1 0;
+        min-width: 0;
+    }
 }
 
 @media (max-width: 820px) {
@@ -14193,6 +14212,204 @@ header {
         grid-template-columns: minmax(0, 1fr);
         gap: 20px;
     }
+    .dashboard-severity-insights {
+        flex-direction: column;
+        gap: 12px;
+    }
+}
+
+/* 风险概览卡：竖向堆叠三块小模块（风险等级/待处理/最新时间） */
+.dashboard-severity-insights {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    align-self: stretch;
+    justify-content: center;
+    padding: 4px 0;
+}
+
+/* —— 风险等级模块 —— */
+.dashboard-severity-insight-risk {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: #fafbfc;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.dashboard-severity-insight-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.dashboard-severity-insight-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+.dashboard-severity-insight-risk-badge {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    letter-spacing: 0.02em;
+    line-height: 1.4;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* 风险等级着色：安全/低/中/高/极高 */
+.dashboard-severity-insight-risk[data-level="safe"]   { border-color: rgba(34, 197, 94, 0.20); background: rgba(34, 197, 94, 0.04); }
+.dashboard-severity-insight-risk[data-level="safe"]   .dashboard-severity-insight-risk-badge { background: rgba(34, 197, 94, 0.12); color: #16a34a; }
+.dashboard-severity-insight-risk[data-level="low"]    { border-color: rgba(59, 130, 246, 0.22); background: rgba(59, 130, 246, 0.04); }
+.dashboard-severity-insight-risk[data-level="low"]    .dashboard-severity-insight-risk-badge { background: rgba(59, 130, 246, 0.12); color: #2563eb; }
+.dashboard-severity-insight-risk[data-level="medium"] { border-color: rgba(234, 179, 8, 0.25);  background: rgba(234, 179, 8, 0.05); }
+.dashboard-severity-insight-risk[data-level="medium"] .dashboard-severity-insight-risk-badge { background: rgba(234, 179, 8, 0.15); color: #b45309; }
+.dashboard-severity-insight-risk[data-level="high"]   { border-color: rgba(249, 115, 22, 0.28); background: rgba(249, 115, 22, 0.05); }
+.dashboard-severity-insight-risk[data-level="high"]   .dashboard-severity-insight-risk-badge { background: rgba(249, 115, 22, 0.15); color: #c2410c; }
+.dashboard-severity-insight-risk[data-level="severe"] { border-color: rgba(239, 68, 68, 0.30);  background: rgba(239, 68, 68, 0.06); }
+.dashboard-severity-insight-risk[data-level="severe"] .dashboard-severity-insight-risk-badge { background: rgba(239, 68, 68, 0.15); color: #dc2626; }
+
+/* 风险分进度条 */
+.dashboard-severity-insight-score-track {
+    width: 100%;
+    height: 5px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+}
+
+.dashboard-severity-insight-score-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.4s ease, background 0.2s;
+    background: #94a3b8;
+}
+
+.dashboard-severity-insight-risk[data-level="safe"]   .dashboard-severity-insight-score-fill { background: linear-gradient(90deg, #4ade80, #16a34a); }
+.dashboard-severity-insight-risk[data-level="low"]    .dashboard-severity-insight-score-fill { background: linear-gradient(90deg, #60a5fa, #2563eb); }
+.dashboard-severity-insight-risk[data-level="medium"] .dashboard-severity-insight-score-fill { background: linear-gradient(90deg, #facc15, #ca8a04); }
+.dashboard-severity-insight-risk[data-level="high"]   .dashboard-severity-insight-score-fill { background: linear-gradient(90deg, #fb923c, #ea580c); }
+.dashboard-severity-insight-risk[data-level="severe"] .dashboard-severity-insight-score-fill { background: linear-gradient(90deg, #f87171, #dc2626); }
+
+.dashboard-severity-insight-score-meta {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.dashboard-severity-insight-score-label {
+    font-size: 0.6875rem;
+    color: var(--text-secondary);
+}
+
+.dashboard-severity-insight-score-value {
+    font-size: 0.9375rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+/* —— 待处理紧急项：分组（标题 + 两个小徽章） —— */
+.dashboard-severity-insight-urgent-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.dashboard-severity-insight-urgent {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.dashboard-severity-insight-urgent-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 10px 6px;
+    border-radius: 10px;
+    background: #fafbfc;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+    text-decoration: none;
+    color: inherit;
+    min-width: 0;
+}
+
+.dashboard-severity-insight-urgent-item:hover {
+    transform: translateY(-1px);
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.dashboard-severity-insight-urgent-item:focus-visible {
+    outline: 2px solid rgba(0, 102, 255, 0.5);
+    outline-offset: 2px;
+}
+
+.dashboard-severity-insight-urgent-item.u-critical { border-color: rgba(239, 68, 68, 0.22); }
+.dashboard-severity-insight-urgent-item.u-critical:hover { border-color: rgba(239, 68, 68, 0.40); }
+.dashboard-severity-insight-urgent-item.u-high { border-color: rgba(249, 115, 22, 0.22); }
+.dashboard-severity-insight-urgent-item.u-high:hover { border-color: rgba(249, 115, 22, 0.40); }
+
+.dashboard-severity-insight-urgent-value {
+    font-size: 1.25rem;
+    font-weight: 800;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+.dashboard-severity-insight-urgent-item.u-critical .dashboard-severity-insight-urgent-value { color: #dc2626; }
+.dashboard-severity-insight-urgent-item.u-high .dashboard-severity-insight-urgent-value { color: #ea580c; }
+
+/* 当数量为 0 时，数值变灰，避免在无紧急项时仍然引人注目 */
+.dashboard-severity-insight-urgent-item.is-zero .dashboard-severity-insight-urgent-value {
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+.dashboard-severity-insight-urgent-label {
+    font-size: 0.6875rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+/* —— 最近发现 —— */
+.dashboard-severity-insight-latest {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 2px 4px;
+}
+
+.dashboard-severity-insight-time {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.dashboard-severity-insight-time.is-empty {
+    color: var(--text-secondary);
+    font-weight: 500;
+    opacity: 0.75;
 }
 
 .dashboard-severity-chart {

@@ -388,6 +388,40 @@
                                             <a class="dashboard-section-link" onclick="switchPage('vulnerabilities')" data-i18n="dashboard.viewAll">查看全部 →</a>
                                         </div>
                                         <div class="dashboard-severity-wrap">
+                                            <!-- 风险概览卡：填充 donut 左侧留白；提供「结论性」洞察（风险等级/加权分/待处理计数/最新时间），
+                                                 与右侧 legend 的「明细」形成互补，避免和下方「最近漏洞」列表重复 -->
+                                            <aside class="dashboard-severity-insights" aria-label="风险概览">
+                                                <div class="dashboard-severity-insight-risk" data-level="safe">
+                                                    <div class="dashboard-severity-insight-head">
+                                                        <span class="dashboard-severity-insight-label" data-i18n="dashboard.riskLevel">风险等级</span>
+                                                        <span class="dashboard-severity-insight-risk-badge" id="dashboard-severity-risk-level" data-i18n="dashboard.riskSafe">安全</span>
+                                                    </div>
+                                                    <div class="dashboard-severity-insight-score-track" aria-hidden="true">
+                                                        <div class="dashboard-severity-insight-score-fill" id="dashboard-severity-risk-fill" style="width: 0%"></div>
+                                                    </div>
+                                                    <div class="dashboard-severity-insight-score-meta">
+                                                        <span class="dashboard-severity-insight-score-label" data-i18n="dashboard.riskScore">加权风险分</span>
+                                                        <span class="dashboard-severity-insight-score-value" id="dashboard-severity-risk-score">0</span>
+                                                    </div>
+                                                </div>
+                                                <div class="dashboard-severity-insight-urgent-group">
+                                                    <span class="dashboard-severity-insight-label" data-i18n="dashboard.statusOpen">待处理</span>
+                                                    <div class="dashboard-severity-insight-urgent">
+                                                        <div class="dashboard-severity-insight-urgent-item u-critical" role="button" tabindex="0" onclick="switchPage('vulnerabilities')" onkeydown="if(event.key==='Enter'||event.key===' ') { event.preventDefault(); switchPage('vulnerabilities'); }" title="查看待处理严重漏洞">
+                                                            <span class="dashboard-severity-insight-urgent-value" id="dashboard-severity-urgent-critical">0</span>
+                                                            <span class="dashboard-severity-insight-urgent-label" data-i18n="dashboard.severityCritical">严重</span>
+                                                        </div>
+                                                        <div class="dashboard-severity-insight-urgent-item u-high" role="button" tabindex="0" onclick="switchPage('vulnerabilities')" onkeydown="if(event.key==='Enter'||event.key===' ') { event.preventDefault(); switchPage('vulnerabilities'); }" title="查看待处理高危漏洞">
+                                                            <span class="dashboard-severity-insight-urgent-value" id="dashboard-severity-urgent-high">0</span>
+                                                            <span class="dashboard-severity-insight-urgent-label" data-i18n="dashboard.severityHigh">高危</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="dashboard-severity-insight-latest">
+                                                    <span class="dashboard-severity-insight-label" data-i18n="dashboard.latestFound">最近发现</span>
+                                                    <span class="dashboard-severity-insight-time" id="dashboard-severity-latest-time" data-i18n="dashboard.noneYet">暂无</span>
+                                                </div>
+                                            </aside>
                                             <div class="dashboard-severity-chart">
                                                 <svg class="dashboard-severity-donut" id="dashboard-severity-donut" viewBox="0 0 480 260" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
                                                     <g id="dashboard-severity-donut-track"></g>

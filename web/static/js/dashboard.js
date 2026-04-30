@@ -46,6 +46,7 @@ async function refreshDashboard() {
         if (severityTotalEl) severityTotalEl.textContent = '0';
         renderSeverityDonut({}, 0);
         renderVulnStatusPanel(null, 0);
+        renderSeverityInsights(null, 0, null);
         setDashboardOverviewPlaceholder('…');
         setEl('dashboard-kpi-tools-calls', '…');
         setEl('dashboard-kpi-success-rate', '…');
@@ -91,15 +92,16 @@ async function refreshDashboard() {
 
     try {
         // /api/vulnerabilities/stats 只给出 by_severity 与 by_status 两个独立维度，
-        // 无法得到「严重 × 待处理」的交叉计数。这里额外拉两次（limit=1，仅取 total），
-        // 用真实的「待处理严重 / 待处理高危」数量驱动告警条与 KPI 副标，避免修复后仍报警。
+        // 无法得到「严重 × 待处理」的交叉计数。这里按四档各拉一次（limit=1，仅取 total），
+        // 用真实的「待处理 × 各严重度」数量驱动告警条 / KPI 副标 / 风险概览卡的加权分，
+        // 避免「全部修复后风险等级仍显示极高」这类语义冲突。
         var openVulnQuery = function (sev) {
             return fetchJson('/api/vulnerabilities?severity=' + sev + '&status=open&limit=1');
         };
         const [
             tasksRes, vulnRes, batchRes, monitorRes, knowledgeRes, skillsRes,
             recentVulnsRes, rolesRes, agentsRes,
-            openCriticalRes, openHighRes, toolsConfigRes,
+            openCriticalRes, openHighRes, openMediumRes, openLowRes, toolsConfigRes,
             hitlPendingRes, notificationsRes, externalMcpStatsRes,
             webshellRes
         ] = await Promise.all([
@@ -114,6 +116,9 @@ async function refreshDashboard() {
             fetchJson('/api/multi-agent/markdown-agents'),
             openVulnQuery('critical'),
             openVulnQuery('high'),
+            // 中/低危的「待处理」计数：用于风险概览卡的加权风险分，使其反映"当前未处理风险"
+            openVulnQuery('medium'),
+            openVulnQuery('low'),
             // 拉取 MCP 工具的「配置总数」用于「能力总览」（区别于 monitor/stats 的「有调用记录」）。
             // 仅取 total 字段，page_size=1 减少传输；total 已涵盖内部 + 外部 MCP + 直接注册的工具。
             fetchJson('/api/config/tools?page=1&page_size=1'),
@@ -173,17 +178,25 @@ async function refreshDashboard() {
 
         let criticalCount = 0;
         let highCount = 0;
+        let mediumCount = 0;
+        let lowCount = 0;
         let openCriticalCount = 0;
         let openHighCount = 0;
+        let openMediumCount = 0;
+        let openLowCount = 0;
         if (vulnRes && typeof vulnRes.total === 'number') {
             if (vulnTotalEl) vulnTotalEl.textContent = String(vulnRes.total);
             const bySeverity = vulnRes.by_severity || {};
             const total = vulnRes.total || 0;
             criticalCount = bySeverity.critical || 0;
             highCount = bySeverity.high || 0;
+            mediumCount = bySeverity.medium || 0;
+            lowCount = bySeverity.low || 0;
             // 优先用专门拉的「待处理」计数；若专项接口失败，则退回 by_severity（宁可误报，不可漏报）
             openCriticalCount = pickOpenCount(openCriticalRes, criticalCount);
             openHighCount = pickOpenCount(openHighRes, highCount);
+            openMediumCount = pickOpenCount(openMediumRes, mediumCount);
+            openLowCount = pickOpenCount(openLowRes, lowCount);
             if (severityTotalEl) severityTotalEl.textContent = String(total);
             severityIds.forEach(sev => {
                 const count = bySeverity[sev] || 0;
@@ -197,6 +210,11 @@ async function refreshDashboard() {
             });
             renderSeverityDonut(bySeverity, total);
             renderVulnStatusPanel(vulnRes.by_status || {}, total);
+            renderSeverityInsights(
+                { critical: openCriticalCount, high: openHighCount, medium: openMediumCount, low: openLowCount },
+                openCriticalCount + openHighCount + openMediumCount + openLowCount,
+                recentVulnsRes
+            );
 
             // 漏洞 KPI 副标：徽章/文案均使用「待处理」口径
             const critBadge = document.getElementById('dashboard-kpi-vuln-critical-badge');
@@ -225,6 +243,7 @@ async function refreshDashboard() {
             });
             renderSeverityDonut({}, 0);
             renderVulnStatusPanel(null, 0);
+            renderSeverityInsights(null, 0, null);
             hideEl('dashboard-kpi-vuln-critical-badge');
             setKpiSubText('dashboard-kpi-vuln-sub-text', '-');
         }
@@ -1131,6 +1150,81 @@ function renderVulnStatusPanel(byStatus, total) {
     var confirmedBar = document.getElementById('dashboard-fix-progress-confirmed');
     if (fixedBar) fixedBar.style.width = fixedPct.toFixed(2) + '%';
     if (confirmedBar) confirmedBar.style.width = confirmedPct.toFixed(2) + '%';
+}
+
+// 风险概览卡：基于「待处理(open)」口径的严重度分布计算加权风险分 + 紧急徽章
+//
+// 为什么用 open 口径而不是全量：
+//   如果用全量，全部漏洞修复后 by_severity 不变，风险分仍然居高，
+//   但紧急徽章（待严重/待高危）已经归零——视觉上会出现「极高 + 0 待处理」的语义冲突。
+//   改成 open 口径后，修复即卸掉风险，风险等级与紧急计数完全同步。
+//
+// bySeverityOpen: { critical, high, medium, low }（只统计 status=open 的漏洞；info 不计入）
+// totalOpen:      待处理漏洞总数（= critical + high + medium + low），仅用于"全无待处理 → safe"判断
+// recentVulnsRes: /api/vulnerabilities?limit=5 响应（用于"最近发现"时间，口径是全量，与处置状态无关）
+function renderSeverityInsights(bySeverityOpen, totalOpen, recentVulnsRes) {
+    var riskBox = document.querySelector('.dashboard-severity-insight-risk');
+    var levelEl = document.getElementById('dashboard-severity-risk-level');
+    var fillEl = document.getElementById('dashboard-severity-risk-fill');
+    var scoreEl = document.getElementById('dashboard-severity-risk-score');
+    var urgentCriticalEl = document.getElementById('dashboard-severity-urgent-critical');
+    var urgentHighEl = document.getElementById('dashboard-severity-urgent-high');
+    var urgentCriticalCell = urgentCriticalEl ? urgentCriticalEl.closest('.dashboard-severity-insight-urgent-item') : null;
+    var urgentHighCell = urgentHighEl ? urgentHighEl.closest('.dashboard-severity-insight-urgent-item') : null;
+    var latestEl = document.getElementById('dashboard-severity-latest-time');
+
+    var sev = bySeverityOpen && typeof bySeverityOpen === 'object' ? bySeverityOpen : {};
+    var c = Number(sev.critical || 0) || 0;
+    var h = Number(sev.high || 0) || 0;
+    var m = Number(sev.medium || 0) || 0;
+    var l = Number(sev.low || 0) || 0;
+
+    // 加权分：严重 ×10、高危 ×5、中危 ×2、低危 ×0.5；信息忽略
+    // 阈值设计偏"保守"：1 个待处理严重就进"中"，2 个进"高"，≥4 个进"极高"
+    var score = c * 10 + h * 5 + m * 2 + l * 0.5;
+    var level, levelKey, levelFallback;
+    var t = Number(totalOpen || 0) || 0;
+    if (t === 0 || score === 0) {
+        level = 'safe'; levelKey = 'dashboard.riskSafe'; levelFallback = '安全';
+    } else if (score <= 3) {
+        level = 'low'; levelKey = 'dashboard.riskLow'; levelFallback = '低';
+    } else if (score <= 10) {
+        level = 'medium'; levelKey = 'dashboard.riskMedium'; levelFallback = '中';
+    } else if (score <= 30) {
+        level = 'high'; levelKey = 'dashboard.riskHigh'; levelFallback = '高';
+    } else {
+        level = 'severe'; levelKey = 'dashboard.riskSevere'; levelFallback = '极高';
+    }
+
+    if (riskBox) riskBox.setAttribute('data-level', level);
+    if (levelEl) levelEl.textContent = dt(levelKey, null, levelFallback);
+    // 进度条用 0-100 线性映射：>=100 直接满格
+    var pct = Math.max(0, Math.min(100, score));
+    if (fillEl) fillEl.style.width = pct.toFixed(1) + '%';
+    if (scoreEl) {
+        // 分数保留一位小数（低危 0.5 权重可能出现非整数）；整数直接显示
+        var displayScore = Math.round(score) === score ? String(score) : score.toFixed(1);
+        scoreEl.textContent = score >= 100 ? displayScore + '+' : displayScore;
+    }
+
+    // 紧急徽章直接复用 open 口径的 critical / high（与加权分完全同源，不会出现"风险极高 + 0 待处理"的矛盾）
+    if (urgentCriticalEl) urgentCriticalEl.textContent = formatNumber(c);
+    if (urgentHighEl) urgentHighEl.textContent = formatNumber(h);
+    if (urgentCriticalCell) urgentCriticalCell.classList.toggle('is-zero', c === 0);
+    if (urgentHighCell) urgentHighCell.classList.toggle('is-zero', h === 0);
+
+    if (latestEl) {
+        var list = recentVulnsRes && Array.isArray(recentVulnsRes.vulnerabilities) ? recentVulnsRes.vulnerabilities : [];
+        var latestIso = list.length > 0 ? list[0].created_at : null;
+        var timeStr = latestIso ? timeAgoStr(latestIso) : '';
+        if (timeStr) {
+            latestEl.textContent = timeStr;
+            latestEl.classList.remove('is-empty');
+        } else {
+            latestEl.textContent = dt('dashboard.noneYet', null, '暂无');
+            latestEl.classList.add('is-empty');
+        }
+    }
 }
 
 function renderDashboardToolsBar(monitorRes) {
