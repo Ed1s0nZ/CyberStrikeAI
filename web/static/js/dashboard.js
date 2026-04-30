@@ -730,7 +730,7 @@ function renderRecommendedActions(state) {
     if (state.openCriticalCount > 0) {
         actions.push({
             level: 'urgent',
-            icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+            icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>',
             title: dt('dashboard.recoFixCritical', { count: state.openCriticalCount },
                 '修复 ' + state.openCriticalCount + ' 个待处理严重漏洞'),
             desc: dt('dashboard.recoFixCriticalDesc', null, '严重等级的漏洞应优先处置'),

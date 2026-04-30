@@ -287,10 +287,18 @@
             closeDropdown();
             return;
         }
-        dropdown.style.display = 'block';
-        bellBtn.classList.add('active');
-        state.dropdownOpen = true;
-        await refreshNotifications();
+        // 从仪表盘「查看全部」等容器外入口打开时，同一 click 会冒泡到 document，
+        // handleDocumentClick 会误判为「点在外面」并立刻关掉。推迟到宏任务再展开即可。
+        const runOpen = async function () {
+            if (dropdown.style.display !== 'none') return;
+            dropdown.style.display = 'block';
+            bellBtn.classList.add('active');
+            state.dropdownOpen = true;
+            await refreshNotifications();
+        };
+        window.setTimeout(function () {
+            void runOpen();
+        }, 0);
     }
 
     async function markAllSeen() {
