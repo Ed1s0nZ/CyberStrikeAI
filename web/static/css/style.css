@@ -13647,6 +13647,9 @@ header {
     flex-direction: column;
     gap: 4px;
     min-height: 60px;
+    width: 100%;
+    min-width: 0;
+    align-items: stretch;
 }
 
 .dashboard-recent-vulns-empty {
@@ -13661,7 +13664,8 @@ header {
 
 .dashboard-recent-vuln-item {
     display: grid;
-    grid-template-columns: 56px minmax(0, 1.6fr) minmax(0, 1fr) auto auto;
+    /* 时间列固定宽度：每行独立 grid 时若用 auto，「刚刚」与「N 分钟前」列宽不同 + 右对齐会看起来歪 */
+    grid-template-columns: 56px minmax(0, 1.6fr) minmax(0, 1fr) auto 9.5rem;
     align-items: center;
     column-gap: 14px;
     padding: 12px 10px;
@@ -13671,6 +13675,11 @@ header {
     text-decoration: none;
     color: inherit;
     border-bottom: 1px solid #f3f4f6;
+    /* 占满卡片内容宽，避免无 href 的 <a> 或 flex 子项按内容收缩导致右侧大块留白 */
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .dashboard-recent-vuln-item:last-child {
@@ -13708,6 +13717,7 @@ header {
     font-weight: 600;
     color: var(--text-primary);
     font-size: 0.875rem;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -13716,6 +13726,7 @@ header {
 .dashboard-recent-vuln-target {
     color: var(--text-secondary);
     font-size: 0.8125rem;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -13725,9 +13736,12 @@ header {
 .dashboard-recent-vuln-time {
     color: var(--text-secondary);
     font-size: 0.75rem;
-    text-align: right;
+    text-align: left;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* 状态药丸：和处置状态卡片用同一套语义色，但采用更克制的尺寸 */
@@ -13778,7 +13792,7 @@ header {
 
 @media (max-width: 720px) {
     .dashboard-recent-vuln-item {
-        grid-template-columns: 56px minmax(0, 1fr) auto auto;
+        grid-template-columns: 56px minmax(0, 1fr) auto 8.25rem;
     }
     .dashboard-recent-vuln-target { display: none; }
 }
@@ -14518,8 +14532,9 @@ header {
 
 .dashboard-severity-legend-item {
     display: grid;
-    grid-template-columns: 12px minmax(0, 1fr) 2.5em 3em;
-    column-gap: 14px;
+    /* 标签列有上限；末尾 1fr 吸收侧栏余量，空白在百分比右侧而非标签与数字之间 */
+    grid-template-columns: 12px minmax(0, 5.5rem) 2.5em 3em minmax(0, 1fr);
+    column-gap: 10px;
     align-items: center;
     padding: 10px 4px;
     font-size: 0.9375rem;
@@ -14548,6 +14563,7 @@ header {
 .dashboard-severity-legend-label {
     color: var(--text-primary);
     font-weight: 500;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
