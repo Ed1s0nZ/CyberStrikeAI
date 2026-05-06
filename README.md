@@ -207,6 +207,23 @@ go build -o cyberstrike-ai cmd/server/main.go
 
 **Note:** The Python virtual environment (`venv/`) is automatically created and managed by `run.sh`. Tools that require Python (like `api-fuzzer`, `http-framework-test`, etc.) will automatically use this environment.
 
+### Docker / Compose
+
+Build and run with Docker:
+
+```bash
+docker build -t cyberstrikeai:local .
+docker run -d --name cyberstrikeai -p 8080:8080 -p 8081:8081 -v "$(pwd)/.docker-runtime:/app/runtime-config" -v "$(pwd)/data:/app/data" -v "$(pwd)/tmp:/app/tmp" -v "$(pwd)/knowledge_base:/app/knowledge_base" cyberstrikeai:local
+```
+
+Or start from the repo with Compose:
+
+```bash
+docker compose up -d --build
+```
+
+The bundled `docker-compose.yml` builds from the checked-out source tree. Docker bootstraps a writable runtime config in `.docker-runtime/config.yaml` from the immutable `config.docker.yaml` template. GitHub Actions also publishes `ghcr.io/ed1s0nz/cyberstrikeai`. See [Docker deployment guide](docs/deployment_en.md) for mounts, permissions, and upgrade notes.
+
 ### Version Update (No Breaking Changes)
 
 **CyberStrikeAI one-click upgrade (recommended):**
@@ -218,6 +235,8 @@ Recommended one-liner:
 `chmod +x upgrade.sh && ./upgrade.sh --yes`
 
 If something goes wrong, you can restore from `.upgrade-backup/` (or manually copy `/data` and `config.yaml` back) and run `./run.sh` again.
+
+**Docker deployment:** pull a newer image and recreate the container instead of using `upgrade.sh`; see [Docker deployment guide](docs/deployment_en.md).
 
 Requirements / tips:
 * You need `curl` or `wget` for downloading Release packages.
@@ -665,5 +684,3 @@ CyberStrikeAI is a professional security testing platform designed to assist sec
 ---
 
 Need help or want to contribute? Open an issue or PR—community tooling additions are welcome!
-
-
