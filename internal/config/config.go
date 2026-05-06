@@ -275,9 +275,23 @@ type MultiAgentAPIUpdate struct {
 
 // RobotsConfig 机器人配置（企业微信、钉钉、飞书等）
 type RobotsConfig struct {
+	Session  RobotSessionConfig  `yaml:"session,omitempty" json:"session,omitempty"`   // 机器人会话隔离策略
 	Wecom    RobotWecomConfig    `yaml:"wecom,omitempty" json:"wecom,omitempty"`       // 企业微信
 	Dingtalk RobotDingtalkConfig `yaml:"dingtalk,omitempty" json:"dingtalk,omitempty"` // 钉钉
 	Lark     RobotLarkConfig     `yaml:"lark,omitempty" json:"lark,omitempty"`         // 飞书
+}
+
+// RobotSessionConfig 机器人会话隔离策略
+type RobotSessionConfig struct {
+	StrictUserIdentity *bool `yaml:"strict_user_identity,omitempty" json:"strict_user_identity,omitempty"` // true 时只允许真实用户标识，不允许会话/群 ID 兜底
+}
+
+// StrictUserIdentityEnabled 返回是否启用严格用户身份模式；未配置时默认 true。
+func (c RobotSessionConfig) StrictUserIdentityEnabled() bool {
+	if c.StrictUserIdentity == nil {
+		return true
+	}
+	return *c.StrictUserIdentity
 }
 
 // RobotWecomConfig 企业微信机器人配置
@@ -292,17 +306,19 @@ type RobotWecomConfig struct {
 
 // RobotDingtalkConfig 钉钉机器人配置
 type RobotDingtalkConfig struct {
-	Enabled      bool   `yaml:"enabled" json:"enabled"`
-	ClientID     string `yaml:"client_id" json:"client_id"`         // 应用 Key (AppKey)
-	ClientSecret string `yaml:"client_secret" json:"client_secret"` // 应用 Secret
+	Enabled                    bool   `yaml:"enabled" json:"enabled"`
+	ClientID                   string `yaml:"client_id" json:"client_id"`                                       // 应用 Key (AppKey)
+	ClientSecret               string `yaml:"client_secret" json:"client_secret"`                               // 应用 Secret
+	AllowConversationIDFallback bool   `yaml:"allow_conversation_id_fallback" json:"allow_conversation_id_fallback"` // sender_id 缺失时是否允许回退到会话 ID
 }
 
 // RobotLarkConfig 飞书机器人配置
 type RobotLarkConfig struct {
-	Enabled     bool   `yaml:"enabled" json:"enabled"`
-	AppID       string `yaml:"app_id" json:"app_id"`             // 应用 App ID
-	AppSecret   string `yaml:"app_secret" json:"app_secret"`     // 应用 App Secret
-	VerifyToken string `yaml:"verify_token" json:"verify_token"` // 事件订阅 Verification Token（可选）
+	Enabled                 bool   `yaml:"enabled" json:"enabled"`
+	AppID                   string `yaml:"app_id" json:"app_id"`                                 // 应用 App ID
+	AppSecret               string `yaml:"app_secret" json:"app_secret"`                         // 应用 App Secret
+	VerifyToken             string `yaml:"verify_token" json:"verify_token"`                     // 事件订阅 Verification Token（可选）
+	AllowChatIDFallback     bool   `yaml:"allow_chat_id_fallback" json:"allow_chat_id_fallback"` // 用户 ID 缺失时是否允许回退到 chat_id
 }
 
 type ServerConfig struct {
@@ -465,7 +481,6 @@ func Load(path string) (*Config, error) {
 	if cfg.Auth.SessionDurationHours <= 0 {
 		cfg.Auth.SessionDurationHours = 12
 	}
-
 	if strings.TrimSpace(cfg.Auth.Password) == "" {
 		password, err := generateStrongPassword(24)
 		if err != nil {
@@ -934,6 +949,7 @@ func LoadRoleFromFile(path string) (*RoleConfig, error) {
 }
 
 func Default() *Config {
+	strictRobotIdentity := true
 	return &Config{
 		Server: ServerConfig{
 			Host: "0.0.0.0",
@@ -967,6 +983,11 @@ func Default() *Config {
 		},
 		Auth: AuthConfig{
 			SessionDurationHours: 12,
+		},
+		Robots: RobotsConfig{
+			Session: RobotSessionConfig{
+				StrictUserIdentity: &strictRobotIdentity,
+			},
 		},
 		Knowledge: KnowledgeConfig{
 			Enabled:  true,

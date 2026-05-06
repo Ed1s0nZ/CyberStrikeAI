@@ -811,8 +811,8 @@ func (b *Builder) callAIForChainGeneration(ctx context.Context, prompt string) (
 				"content": prompt,
 			},
 		},
-		"temperature": 0.3,
-		"max_tokens":  8000,
+		"temperature":           0.3,
+		"max_completion_tokens": 80000,
 	}
 
 	var apiResponse struct {
