@@ -268,8 +268,8 @@ func (h *FofaHandler) ParseNaturalLanguage(c *gin.Context) {
 			{"role": "system", "content": systemPrompt},
 			{"role": "user", "content": userPrompt},
 		},
-		"temperature": 0.1,
-		"max_tokens":  1200,
+		"temperature":           0.1,
+		"max_completion_tokens": 12000,
 	}
 
 	// OpenAI 返回结构：只需要 choices[0].message.content

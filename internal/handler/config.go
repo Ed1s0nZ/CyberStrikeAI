@@ -886,7 +886,7 @@ func (h *ConfigHandler) TestOpenAI(c *gin.Context) {
 		"messages": []map[string]string{
 			{"role": "user", "content": "Hi"},
 		},
-		"max_tokens": 5,
+		"max_completion_tokens": 5,
 	}
 
 	// 使用内部 openai Client 进行测试，若 provider 为 claude 会自动走桥接层
