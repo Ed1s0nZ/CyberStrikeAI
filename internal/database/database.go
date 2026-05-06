@@ -82,6 +82,7 @@ func (db *DB) initTables() error {
 		content TEXT NOT NULL,
 		mcp_execution_ids TEXT,
 		created_at DATETIME NOT NULL,
+		updated_at DATETIME NOT NULL,
 		FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
 	);`
 
@@ -518,6 +519,11 @@ func (db *DB) initTables() error {
 		// 不返回错误，允许继续运行
 	}
 
+	if err := db.migrateMessagesTable(); err != nil {
+		db.logger.Warn("迁移messages表失败", zap.Error(err))
+		// 不返回错误，允许继续运行
+	}
+
 	if err := db.migrateConversationGroupsTable(); err != nil {
 		db.logger.Warn("迁移conversation_groups表失败", zap.Error(err))
 		// 不返回错误，允许继续运行
@@ -547,6 +553,33 @@ func (db *DB) initTables() error {
 	}
 
 	db.logger.Info("数据库表初始化完成")
+	return nil
+}
+
+// migrateMessagesTable 迁移 messages 表，补充 updated_at 字段。
+// 语义：updated_at 表示该条消息最后一次被写入/更新的时间（例如助手占位消息在任务结束时更新正文）。
+func (db *DB) migrateMessagesTable() error {
+	var count int
+	err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('messages') WHERE name='updated_at'").Scan(&count)
+	if err != nil {
+		// 如果查询失败，尝试添加字段
+		if _, addErr := db.Exec("ALTER TABLE messages ADD COLUMN updated_at DATETIME"); addErr != nil {
+			errMsg := strings.ToLower(addErr.Error())
+			if !strings.Contains(errMsg, "duplicate column") && !strings.Contains(errMsg, "already exists") {
+				return fmt.Errorf("添加 messages.updated_at 字段失败: %w", addErr)
+			}
+		}
+	} else if count == 0 {
+		if _, err := db.Exec("ALTER TABLE messages ADD COLUMN updated_at DATETIME"); err != nil {
+			errMsg := strings.ToLower(err.Error())
+			if !strings.Contains(errMsg, "duplicate column") && !strings.Contains(errMsg, "already exists") {
+				return fmt.Errorf("添加 messages.updated_at 字段失败: %w", err)
+			}
+		}
+	}
+
+	// 回填已有数据：让 updated_at 至少等于 created_at，避免前端出现空/当前时间回退。
+	_, _ = db.Exec("UPDATE messages SET updated_at = created_at WHERE updated_at IS NULL OR updated_at = ''")
 	return nil
 }
 

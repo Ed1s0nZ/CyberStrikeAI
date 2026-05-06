@@ -152,7 +152,7 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 			sendEvent("error", errorMsg, nil)
 		}
 		if assistantMessageID != "" {
-			_, _ = h.db.Exec("UPDATE messages SET content = ? WHERE id = ?", errorMsg, assistantMessageID)
+			_, _ = h.db.Exec("UPDATE messages SET content = ?, updated_at = ? WHERE id = ?", errorMsg, time.Now(), assistantMessageID)
 		}
 		sendEvent("done", "", map[string]interface{}{"conversationId": conversationID})
 		return
@@ -192,7 +192,7 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 			h.tasks.UpdateTaskStatus(conversationID, taskStatus)
 			cancelMsg := "任务已被用户取消，后续操作已停止。"
 			if assistantMessageID != "" {
-				_, _ = h.db.Exec("UPDATE messages SET content = ? WHERE id = ?", cancelMsg, assistantMessageID)
+				_, _ = h.db.Exec("UPDATE messages SET content = ?, updated_at = ? WHERE id = ?", cancelMsg, time.Now(), assistantMessageID)
 				_ = h.db.AddProcessDetail(assistantMessageID, conversationID, "cancelled", cancelMsg, nil)
 			}
 			sendEvent("cancelled", cancelMsg, map[string]interface{}{
@@ -208,7 +208,7 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 			h.tasks.UpdateTaskStatus(conversationID, taskStatus)
 			timeoutMsg := "任务执行超时，已自动终止。"
 			if assistantMessageID != "" {
-				_, _ = h.db.Exec("UPDATE messages SET content = ? WHERE id = ?", timeoutMsg, assistantMessageID)
+				_, _ = h.db.Exec("UPDATE messages SET content = ?, updated_at = ? WHERE id = ?", timeoutMsg, time.Now(), assistantMessageID)
 				_ = h.db.AddProcessDetail(assistantMessageID, conversationID, "timeout", timeoutMsg, nil)
 			}
 			sendEvent("error", timeoutMsg, map[string]interface{}{
@@ -225,7 +225,7 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 		h.tasks.UpdateTaskStatus(conversationID, taskStatus)
 		errMsg := "执行失败: " + runErr.Error()
 		if assistantMessageID != "" {
-			_, _ = h.db.Exec("UPDATE messages SET content = ? WHERE id = ?", errMsg, assistantMessageID)
+			_, _ = h.db.Exec("UPDATE messages SET content = ?, updated_at = ? WHERE id = ?", errMsg, time.Now(), assistantMessageID)
 			_ = h.db.AddProcessDetail(assistantMessageID, conversationID, "error", errMsg, nil)
 		}
 		sendEvent("error", errMsg, map[string]interface{}{
@@ -243,9 +243,10 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 			mcpIDsJSON = string(jsonData)
 		}
 		_, _ = h.db.Exec(
-			"UPDATE messages SET content = ?, mcp_execution_ids = ? WHERE id = ?",
+			"UPDATE messages SET content = ?, mcp_execution_ids = ?, updated_at = ? WHERE id = ?",
 			result.Response,
 			mcpIDsJSON,
+			time.Now(),
 			assistantMessageID,
 		)
 	}
@@ -323,7 +324,7 @@ func (h *AgentHandler) MultiAgentLoop(c *gin.Context) {
 		h.logger.Error("Eino DeepAgent 执行失败", zap.Error(runErr))
 		errMsg := "执行失败: " + runErr.Error()
 		if prep.AssistantMessageID != "" {
-			_, _ = h.db.Exec("UPDATE messages SET content = ? WHERE id = ?", errMsg, prep.AssistantMessageID)
+			_, _ = h.db.Exec("UPDATE messages SET content = ?, updated_at = ? WHERE id = ?", errMsg, time.Now(), prep.AssistantMessageID)
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errMsg})
 		return
@@ -336,9 +337,10 @@ func (h *AgentHandler) MultiAgentLoop(c *gin.Context) {
 			mcpIDsJSON = string(jsonData)
 		}
 		_, _ = h.db.Exec(
-			"UPDATE messages SET content = ?, mcp_execution_ids = ? WHERE id = ?",
+			"UPDATE messages SET content = ?, mcp_execution_ids = ?, updated_at = ? WHERE id = ?",
 			result.Response,
 			mcpIDsJSON,
+			time.Now(),
 			prep.AssistantMessageID,
 		)
 	}

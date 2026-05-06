@@ -728,7 +728,7 @@ func (h *AgentHandler) ProcessMessageForRobot(ctx context.Context, conversationI
 			h.persistEinoAgentTraceForResume(conversationID, resultMA)
 			errMsg := "执行失败: " + errMA.Error()
 			if assistantMessageID != "" {
-				_, _ = h.db.Exec("UPDATE messages SET content = ? WHERE id = ?", errMsg, assistantMessageID)
+				_, _ = h.db.Exec("UPDATE messages SET content = ?, updated_at = ? WHERE id = ?", errMsg, time.Now(), assistantMessageID)
 				_ = h.db.AddProcessDetail(assistantMessageID, conversationID, "error", errMsg, nil)
 			}
 			return "", conversationID, errMA
@@ -740,8 +740,8 @@ func (h *AgentHandler) ProcessMessageForRobot(ctx context.Context, conversationI
 				mcpIDsJSON = string(jsonData)
 			}
 			_, err = h.db.Exec(
-				"UPDATE messages SET content = ?, mcp_execution_ids = ? WHERE id = ?",
-				resultMA.Response, mcpIDsJSON, assistantMessageID,
+				"UPDATE messages SET content = ?, mcp_execution_ids = ?, updated_at = ? WHERE id = ?",
+				resultMA.Response, mcpIDsJSON, time.Now(), assistantMessageID,
 			)
 			if err != nil {
 				h.logger.Warn("机器人：更新助手消息失败", zap.Error(err))
@@ -761,7 +761,7 @@ func (h *AgentHandler) ProcessMessageForRobot(ctx context.Context, conversationI
 	if err != nil {
 		errMsg := "执行失败: " + err.Error()
 		if assistantMessageID != "" {
-			_, _ = h.db.Exec("UPDATE messages SET content = ? WHERE id = ?", errMsg, assistantMessageID)
+			_, _ = h.db.Exec("UPDATE messages SET content = ?, updated_at = ? WHERE id = ?", errMsg, time.Now(), assistantMessageID)
 			_ = h.db.AddProcessDetail(assistantMessageID, conversationID, "error", errMsg, nil)
 		}
 		return "", conversationID, err
@@ -775,8 +775,8 @@ func (h *AgentHandler) ProcessMessageForRobot(ctx context.Context, conversationI
 			mcpIDsJSON = string(jsonData)
 		}
 		_, err = h.db.Exec(
-			"UPDATE messages SET content = ?, mcp_execution_ids = ? WHERE id = ?",
-			result.Response, mcpIDsJSON, assistantMessageID,
+		"UPDATE messages SET content = ?, mcp_execution_ids = ?, updated_at = ? WHERE id = ?",
+		result.Response, mcpIDsJSON, time.Now(), assistantMessageID,
 		)
 		if err != nil {
 			h.logger.Warn("机器人：更新助手消息失败", zap.Error(err))
@@ -1515,9 +1515,9 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 		// 更新助手消息内容并保存错误详情到数据库
 		if assistantMessageID != "" {
 			if _, updateErr := h.db.Exec(
-				"UPDATE messages SET content = ? WHERE id = ?",
+				"UPDATE messages SET content = ?, updated_at = ? WHERE id = ?",
 				errorMsg,
-				assistantMessageID,
+				time.Now(), assistantMessageID,
 			); updateErr != nil {
 				h.logger.Warn("更新错误后的助手消息失败", zap.Error(updateErr))
 			}
@@ -1569,9 +1569,9 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 
 			if assistantMessageID != "" {
 				if _, updateErr := h.db.Exec(
-					"UPDATE messages SET content = ? WHERE id = ?",
+					"UPDATE messages SET content = ?, updated_at = ? WHERE id = ?",
 					cancelMsg,
-					assistantMessageID,
+					time.Now(), assistantMessageID,
 				); updateErr != nil {
 					h.logger.Warn("更新取消后的助手消息失败", zap.Error(updateErr))
 				}
@@ -1604,9 +1604,9 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 
 			if assistantMessageID != "" {
 				if _, updateErr := h.db.Exec(
-					"UPDATE messages SET content = ? WHERE id = ?",
+					"UPDATE messages SET content = ?, updated_at = ? WHERE id = ?",
 					timeoutMsg,
-					assistantMessageID,
+					time.Now(), assistantMessageID,
 				); updateErr != nil {
 					h.logger.Warn("更新超时后的助手消息失败", zap.Error(updateErr))
 				}
@@ -1639,9 +1639,9 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 
 			if assistantMessageID != "" {
 				if _, updateErr := h.db.Exec(
-					"UPDATE messages SET content = ? WHERE id = ?",
+					"UPDATE messages SET content = ?, updated_at = ? WHERE id = ?",
 					errorMsg,
-					assistantMessageID,
+					time.Now(), assistantMessageID,
 				); updateErr != nil {
 					h.logger.Warn("更新失败后的助手消息失败", zap.Error(updateErr))
 				}
@@ -1671,7 +1671,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	// 更新助手消息内容
 	if assistantMsg != nil {
 		_, err = h.db.Exec(
-			"UPDATE messages SET content = ?, mcp_execution_ids = ? WHERE id = ?",
+			"UPDATE messages SET content = ?, mcp_execution_ids = ?, updated_at = ? WHERE id = ?",
 			result.Response,
 			func() string {
 				if len(result.MCPExecutionIDs) > 0 {
@@ -1680,7 +1680,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 				}
 				return ""
 			}(),
-			assistantMessageID,
+			time.Now(), assistantMessageID,
 		)
 		if err != nil {
 			h.logger.Error("更新助手消息失败", zap.Error(err))
@@ -2448,76 +2448,144 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 		if assistantMsg != nil {
 			assistantMessageID = assistantMsg.ID
 		}
-		progressCallback := h.createProgressCallback(context.Background(), nil, conversationID, assistantMessageID, nil)
+		// 注意：批量任务没有前端直连的 POST /stream，因此若要支持「刷新后补流」，
+		// 需要把进度事件镜像到 TaskEventBus（GET /api/agent-loop/task-events 会订阅这里）。
+		// progressCallback 将在子任务的 IIFE 内创建，以便拿到 taskCtx/cancelWithCause 与 sendEvent。
+		var progressCallback func(eventType, message string, data interface{})
 
 		// 执行任务（使用包含角色提示词的finalMessage和角色工具列表）
 		h.logger.Info("执行批量任务", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("message", task.Message), zap.String("role", queue.Role), zap.String("conversationId", conversationID))
 
-		// 单个子任务超时时间：从30分钟调整为6小时，适配长时间渗透/扫描任务
-		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Hour)
-		// 存储取消函数，以便在取消队列时能够取消当前任务
-		h.batchTaskManager.SetTaskCancel(queueID, cancel)
-		// 使用队列配置的角色工具列表（如果为空，表示使用所有工具）
-		useBatchMulti := false
-		useEinoSingle := false
-		batchOrch := "deep"
-		am := strings.TrimSpace(strings.ToLower(queue.AgentMode))
-		if am == "multi" {
-			am = "deep"
-		}
-		if am == "eino_single" {
-			useEinoSingle = true
-		} else if batchQueueWantsEino(queue.AgentMode) && h.config != nil && h.config.MultiAgent.Enabled {
-			useBatchMulti = true
-			batchOrch = config.NormalizeMultiAgentOrchestration(am)
-		} else if queue.AgentMode == "" {
-			// 兼容历史数据：未配置队列代理模式时，沿用旧的系统级开关
-			if h.config != nil && h.config.MultiAgent.Enabled && h.config.MultiAgent.BatchUseMultiAgent {
+		func() {
+			// 与对话流式接口一致：同 conversationId 仅允许一个运行中任务，并支持 /api/agent-loop/cancel 与会话锁对齐。
+			baseCtx, cancelWithCause := context.WithCancelCause(context.Background())
+			// 单个子任务超时：6 小时（与原先 WithTimeout(Background) 一致）
+			taskCtx, timeoutCancel := context.WithTimeout(baseCtx, 6*time.Hour)
+
+			registered := false
+			finishStatus := "completed"
+
+			defer func() {
+				h.batchTaskManager.SetTaskCancel(queueID, nil)
+				timeoutCancel()
+				if registered {
+					// 与流式接口保持一致：结束前补一个 done，便于前端 task-events 侧及时收口 UI。
+					if h.taskEventBus != nil {
+						ev := StreamEvent{Type: "done", Message: "", Data: map[string]interface{}{"conversationId": conversationID}}
+						if b, err := json.Marshal(ev); err == nil {
+							h.taskEventBus.Publish(conversationID, append(append([]byte("data: "), b...), '\n', '\n'))
+						}
+					}
+					h.tasks.FinishTask(conversationID, finishStatus)
+				}
+				cancelWithCause(nil)
+			}()
+
+			// 事件镜像：只发布到 TaskEventBus，不直接写 HTTP Response（用于刷新后的补流）。
+			sendEvent := func(eventType, message string, data interface{}) {
+				if h.taskEventBus == nil {
+					return
+				}
+				ev := StreamEvent{Type: eventType, Message: message, Data: data}
+				b, err := json.Marshal(ev)
+				if err != nil {
+					b = []byte(`{"type":"error","message":"marshal failed"}`)
+				}
+				line := make([]byte, 0, len(b)+8)
+				line = append(line, []byte("data: ")...)
+				line = append(line, b...)
+				line = append(line, '\n', '\n')
+				h.taskEventBus.Publish(conversationID, line)
+			}
+
+			if _, err := h.tasks.StartTask(conversationID, task.Message, cancelWithCause); err != nil {
+				h.logger.Warn("批量队列子任务注册会话运行状态失败",
+					zap.String("queueId", queueID),
+					zap.String("taskId", task.ID),
+					zap.String("conversationId", conversationID),
+					zap.Error(err))
+				failMsg := err.Error()
+				if errors.Is(err, ErrTaskAlreadyRunning) {
+					failMsg = "会话已有任务正在执行，无法在该会话上并行启动批量子任务"
+				}
+				h.batchTaskManager.UpdateTaskStatus(queueID, task.ID, "failed", "", failMsg)
+				return
+			}
+			registered = true
+			// 存储取消函数：暂停队列时取消子任务 context（与原先语义一致）
+			h.batchTaskManager.SetTaskCancel(queueID, timeoutCancel)
+
+			// 创建进度回调函数：写 DB + 镜像到 task-events，支持刷新后继续流式展示。
+			progressCallback = h.createProgressCallback(taskCtx, cancelWithCause, conversationID, assistantMessageID, sendEvent)
+
+			// 使用队列配置的角色工具列表（如果为空，表示使用所有工具）
+			useBatchMulti := false
+			useEinoSingle := false
+			batchOrch := "deep"
+			am := strings.TrimSpace(strings.ToLower(queue.AgentMode))
+			if am == "multi" {
+				am = "deep"
+			}
+			if am == "eino_single" {
+				useEinoSingle = true
+			} else if batchQueueWantsEino(queue.AgentMode) && h.config != nil && h.config.MultiAgent.Enabled {
 				useBatchMulti = true
-				batchOrch = "deep"
+				batchOrch = config.NormalizeMultiAgentOrchestration(am)
+			} else if queue.AgentMode == "" {
+				// 兼容历史数据：未配置队列代理模式时，沿用旧的系统级开关
+				if h.config != nil && h.config.MultiAgent.Enabled && h.config.MultiAgent.BatchUseMultiAgent {
+					useBatchMulti = true
+					batchOrch = "deep"
+				}
 			}
-		}
-		useRunResult := useBatchMulti || useEinoSingle
-		var result *agent.AgentLoopResult
-		var resultMA *multiagent.RunResult
-		var runErr error
-		switch {
-		case useBatchMulti:
-			resultMA, runErr = multiagent.RunDeepAgent(ctx, h.config, &h.config.MultiAgent, h.agent, h.logger, conversationID, finalMessage, []agent.ChatMessage{}, roleTools, progressCallback, h.agentsMarkdownDir, batchOrch)
-		case useEinoSingle:
-			if h.config == nil {
-				runErr = fmt.Errorf("服务器配置未加载")
-			} else {
-				resultMA, runErr = multiagent.RunEinoSingleChatModelAgent(ctx, h.config, &h.config.MultiAgent, h.agent, h.logger, conversationID, finalMessage, []agent.ChatMessage{}, roleTools, progressCallback)
+			useRunResult := useBatchMulti || useEinoSingle
+			var result *agent.AgentLoopResult
+			var resultMA *multiagent.RunResult
+			var runErr error
+			switch {
+			case useBatchMulti:
+				resultMA, runErr = multiagent.RunDeepAgent(taskCtx, h.config, &h.config.MultiAgent, h.agent, h.logger, conversationID, finalMessage, []agent.ChatMessage{}, roleTools, progressCallback, h.agentsMarkdownDir, batchOrch)
+			case useEinoSingle:
+				if h.config == nil {
+					runErr = fmt.Errorf("服务器配置未加载")
+				} else {
+					resultMA, runErr = multiagent.RunEinoSingleChatModelAgent(taskCtx, h.config, &h.config.MultiAgent, h.agent, h.logger, conversationID, finalMessage, []agent.ChatMessage{}, roleTools, progressCallback)
+				}
+			default:
+				result, runErr = h.agent.AgentLoopWithProgress(taskCtx, finalMessage, []agent.ChatMessage{}, conversationID, progressCallback, roleTools)
 			}
-		default:
-			result, runErr = h.agent.AgentLoopWithProgress(ctx, finalMessage, []agent.ChatMessage{}, conversationID, progressCallback, roleTools)
-		}
-		// 任务执行完成，清理取消函数
-		h.batchTaskManager.SetTaskCancel(queueID, nil)
-		cancel()
 
-		if runErr != nil {
-			if useRunResult {
-				h.persistEinoAgentTraceForResume(conversationID, resultMA)
-			}
-			// 检查是否是取消错误
-			// 1. 直接检查是否是 context.Canceled（包括包装后的错误）
-			// 2. 检查错误消息中是否包含"context canceled"或"cancelled"关键字
-			// 3. 检查 result.Response 中是否包含取消相关的消息
-			errStr := runErr.Error()
-			partialResp := ""
-			if useRunResult && resultMA != nil {
-				partialResp = resultMA.Response
-			} else if result != nil {
-				partialResp = result.Response
-			}
-			isCancelled := errors.Is(runErr, context.Canceled) ||
-				strings.Contains(strings.ToLower(errStr), "context canceled") ||
-				strings.Contains(strings.ToLower(errStr), "context cancelled") ||
-				(partialResp != "" && (strings.Contains(partialResp, "任务已被取消") || strings.Contains(partialResp, "任务执行中断")))
+			if runErr != nil {
+				if useRunResult {
+					h.persistEinoAgentTraceForResume(conversationID, resultMA)
+				}
+				// 检查是否是取消错误
+				// 1. 直接检查是否是 context.Canceled（包括包装后的错误）
+				// 2. 检查错误消息中是否包含"context canceled"或"cancelled"关键字
+				// 3. 检查 result.Response 中是否包含取消相关的消息
+				errStr := runErr.Error()
+				partialResp := ""
+				if useRunResult && resultMA != nil {
+					partialResp = resultMA.Response
+				} else if result != nil {
+					partialResp = result.Response
+				}
+				isCancelled := errors.Is(context.Cause(baseCtx), ErrTaskCancelled) ||
+					errors.Is(runErr, context.Canceled) ||
+					strings.Contains(strings.ToLower(errStr), "context canceled") ||
+					strings.Contains(strings.ToLower(errStr), "context cancelled") ||
+					(partialResp != "" && (strings.Contains(partialResp, "任务已被取消") || strings.Contains(partialResp, "任务执行中断")))
+				isTimeout := errors.Is(runErr, context.DeadlineExceeded) || errors.Is(context.Cause(taskCtx), context.DeadlineExceeded)
 
-			if isCancelled {
+				if isTimeout {
+					finishStatus = "timeout"
+				} else if isCancelled {
+					finishStatus = "cancelled"
+				} else {
+					finishStatus = "failed"
+				}
+
+				if isCancelled {
 				h.logger.Info("批量任务被取消", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("conversationId", conversationID))
 				cancelMsg := "任务已被用户取消，后续操作已停止。"
 				// 如果执行结果中有更具体的取消消息，使用它
@@ -2527,9 +2595,9 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 				// 更新助手消息内容
 				if assistantMessageID != "" {
 					if _, updateErr := h.db.Exec(
-						"UPDATE messages SET content = ? WHERE id = ?",
+						"UPDATE messages SET content = ?, updated_at = ? WHERE id = ?",
 						cancelMsg,
-						assistantMessageID,
+						time.Now(), assistantMessageID,
 					); updateErr != nil {
 						h.logger.Warn("更新取消后的助手消息失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(updateErr))
 					}
@@ -2561,9 +2629,9 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 				// 更新助手消息内容
 				if assistantMessageID != "" {
 					if _, updateErr := h.db.Exec(
-						"UPDATE messages SET content = ? WHERE id = ?",
+						"UPDATE messages SET content = ?, updated_at = ? WHERE id = ?",
 						errorMsg,
-						assistantMessageID,
+						time.Now(), assistantMessageID,
 					); updateErr != nil {
 						h.logger.Warn("更新失败后的助手消息失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(updateErr))
 					}
@@ -2600,10 +2668,10 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 					mcpIDsJSON = string(jsonData)
 				}
 				if _, updateErr := h.db.Exec(
-					"UPDATE messages SET content = ?, mcp_execution_ids = ? WHERE id = ?",
+					"UPDATE messages SET content = ?, mcp_execution_ids = ?, updated_at = ? WHERE id = ?",
 					resText,
 					mcpIDsJSON,
-					assistantMessageID,
+					time.Now(), assistantMessageID,
 				); updateErr != nil {
 					h.logger.Warn("更新助手消息失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(updateErr))
 					// 如果更新失败，尝试创建新消息
@@ -2632,6 +2700,7 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 			// 保存结果
 			h.batchTaskManager.UpdateTaskStatusWithConversationID(queueID, task.ID, "completed", resText, "", conversationID)
 		}
+		}()
 
 		// 移动到下一个任务
 		h.batchTaskManager.MoveToNextTask(queueID)

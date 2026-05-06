@@ -32,6 +32,7 @@ type Message struct {
 	MCPExecutionIDs []string                 `json:"mcpExecutionIds,omitempty"`
 	ProcessDetails  []map[string]interface{} `json:"processDetails,omitempty"`
 	CreatedAt       time.Time                `json:"createdAt"`
+	UpdatedAt       time.Time                `json:"updatedAt"`
 }
 
 // CreateConversation 创建新对话
@@ -484,6 +485,7 @@ func (db *DB) ConversationHasToolProcessDetails(conversationID string) (bool, er
 // AddMessage 添加消息
 func (db *DB) AddMessage(conversationID, role, content string, mcpExecutionIDs []string) (*Message, error) {
 	id := uuid.New().String()
+	now := time.Now()
 
 	var mcpIDsJSON string
 	if len(mcpExecutionIDs) > 0 {
@@ -496,8 +498,8 @@ func (db *DB) AddMessage(conversationID, role, content string, mcpExecutionIDs [
 	}
 
 	_, err := db.Exec(
-		"INSERT INTO messages (id, conversation_id, role, content, mcp_execution_ids, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-		id, conversationID, role, content, mcpIDsJSON, time.Now(),
+		"INSERT INTO messages (id, conversation_id, role, content, mcp_execution_ids, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		id, conversationID, role, content, mcpIDsJSON, now, now,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("添加消息失败: %w", err)
@@ -514,7 +516,8 @@ func (db *DB) AddMessage(conversationID, role, content string, mcpExecutionIDs [
 		Role:            role,
 		Content:         content,
 		MCPExecutionIDs: mcpExecutionIDs,
-		CreatedAt:       time.Now(),
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 
 	return message, nil
@@ -523,7 +526,7 @@ func (db *DB) AddMessage(conversationID, role, content string, mcpExecutionIDs [
 // GetMessages 获取对话的所有消息
 func (db *DB) GetMessages(conversationID string) ([]Message, error) {
 	rows, err := db.Query(
-		"SELECT id, conversation_id, role, content, mcp_execution_ids, created_at FROM messages WHERE conversation_id = ? ORDER BY created_at ASC",
+		"SELECT id, conversation_id, role, content, mcp_execution_ids, created_at, updated_at FROM messages WHERE conversation_id = ? ORDER BY created_at ASC",
 		conversationID,
 	)
 	if err != nil {
@@ -536,8 +539,9 @@ func (db *DB) GetMessages(conversationID string) ([]Message, error) {
 		var msg Message
 		var mcpIDsJSON sql.NullString
 		var createdAt string
+		var updatedAt sql.NullString
 
-		if err := rows.Scan(&msg.ID, &msg.ConversationID, &msg.Role, &msg.Content, &mcpIDsJSON, &createdAt); err != nil {
+		if err := rows.Scan(&msg.ID, &msg.ConversationID, &msg.Role, &msg.Content, &mcpIDsJSON, &createdAt, &updatedAt); err != nil {
 			return nil, fmt.Errorf("扫描消息失败: %w", err)
 		}
 
@@ -549,6 +553,20 @@ func (db *DB) GetMessages(conversationID string) ([]Message, error) {
 		}
 		if err != nil {
 			msg.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+		}
+
+		// updated_at 兼容老库：字段不存在/为空时回退为 created_at
+		if updatedAt.Valid && strings.TrimSpace(updatedAt.String) != "" {
+			msg.UpdatedAt, err = time.Parse("2006-01-02 15:04:05.999999999-07:00", updatedAt.String)
+			if err != nil {
+				msg.UpdatedAt, err = time.Parse("2006-01-02 15:04:05", updatedAt.String)
+			}
+			if err != nil {
+				msg.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt.String)
+			}
+		}
+		if msg.UpdatedAt.IsZero() {
+			msg.UpdatedAt = msg.CreatedAt
 		}
 
 		// 解析MCP执行ID
