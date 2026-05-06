@@ -23,22 +23,23 @@ const (
 
 // StartDing 启动钉钉 Stream 长连接（无需公网），收到消息后调用 handler 并通过 SessionWebhook 回复。
 // 断线（如笔记本睡眠、网络中断）后会自动重连；ctx 被取消时退出，便于配置变更时重启。
-func StartDing(ctx context.Context, cfg config.RobotDingtalkConfig, h MessageHandler, logger *zap.Logger) {
+func StartDing(ctx context.Context, robotsCfg config.RobotsConfig, h MessageHandler, logger *zap.Logger) {
+	cfg := robotsCfg.Dingtalk
 	if !cfg.Enabled || cfg.ClientID == "" || cfg.ClientSecret == "" {
 		return
 	}
-	go runDingLoop(ctx, cfg, h, logger)
+	go runDingLoop(ctx, cfg, robotsCfg.Session.StrictUserIdentityEnabled(), h, logger)
 }
 
 // runDingLoop 循环维持钉钉长连接：断开且 ctx 未取消时按退避间隔重连。
-func runDingLoop(ctx context.Context, cfg config.RobotDingtalkConfig, h MessageHandler, logger *zap.Logger) {
+func runDingLoop(ctx context.Context, cfg config.RobotDingtalkConfig, strictUserIdentity bool, h MessageHandler, logger *zap.Logger) {
 	backoff := dingReconnectInitial
 	for {
 		streamClient := client.NewStreamClient(
 			client.WithAppCredential(client.NewAppCredentialConfig(cfg.ClientID, cfg.ClientSecret)),
 			client.WithSubscription(dingutils.SubscriptionTypeKCallback, "/v1.0/im/bot/messages/get",
 				chatbot.NewDefaultChatBotFrameHandler(func(ctx context.Context, msg *chatbot.BotCallbackDataModel) ([]byte, error) {
-					go handleDingMessage(ctx, msg, h, logger)
+					go handleDingMessage(ctx, msg, cfg, strictUserIdentity, h, logger)
 					return nil, nil
 				}).OnEventReceived),
 		)
@@ -66,7 +67,7 @@ func runDingLoop(ctx context.Context, cfg config.RobotDingtalkConfig, h MessageH
 	}
 }
 
-func handleDingMessage(ctx context.Context, msg *chatbot.BotCallbackDataModel, h MessageHandler, logger *zap.Logger) {
+func handleDingMessage(ctx context.Context, msg *chatbot.BotCallbackDataModel, cfg config.RobotDingtalkConfig, strictUserIdentity bool, h MessageHandler, logger *zap.Logger) {
 	if msg == nil || msg.SessionWebhook == "" {
 		return
 	}
@@ -93,9 +94,22 @@ func handleDingMessage(ctx context.Context, msg *chatbot.BotCallbackDataModel, h
 		return
 	}
 	logger.Info("钉钉收到消息", zap.String("sender", msg.SenderId), zap.String("content", content))
-	userID := msg.SenderId
+	tenantKey := strings.TrimSpace(cfg.ClientID)
+	if tenantKey == "" {
+		tenantKey = "default"
+	}
+	userID := strings.TrimSpace(msg.SenderId)
+	if userID != "" {
+		userID = "t:" + tenantKey + "|u:" + userID
+	} else if cfg.AllowConversationIDFallback && !strictUserIdentity {
+		conversationID := strings.TrimSpace(msg.ConversationId)
+		if conversationID != "" {
+			userID = "t:" + tenantKey + "|c:" + conversationID
+		}
+	}
 	if userID == "" {
-		userID = msg.ConversationId
+		logger.Warn("钉钉消息缺少可用用户标识，已忽略")
+		return
 	}
 	reply := h.HandleMessage("dingtalk", userID, content)
 	// 使用 markdown 类型以便正确展示标题、列表、代码块等格式

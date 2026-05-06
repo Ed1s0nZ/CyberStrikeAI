@@ -599,12 +599,12 @@ func (a *App) startRobotConnections() {
 	if cfg.Robots.Lark.Enabled && cfg.Robots.Lark.AppID != "" && cfg.Robots.Lark.AppSecret != "" {
 		ctx, cancel := context.WithCancel(context.Background())
 		a.larkCancel = cancel
-		go robot.StartLark(ctx, cfg.Robots.Lark, a.robotHandler, a.logger.Logger)
+		go robot.StartLark(ctx, cfg.Robots, a.robotHandler, a.logger.Logger)
 	}
 	if cfg.Robots.Dingtalk.Enabled && cfg.Robots.Dingtalk.ClientID != "" && cfg.Robots.Dingtalk.ClientSecret != "" {
 		ctx, cancel := context.WithCancel(context.Background())
 		a.dingCancel = cancel
-		go robot.StartDing(ctx, cfg.Robots.Dingtalk, a.robotHandler, a.logger.Logger)
+		go robot.StartDing(ctx, cfg.Robots, a.robotHandler, a.logger.Logger)
 	}
 }
 

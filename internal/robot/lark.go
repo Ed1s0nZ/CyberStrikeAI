@@ -27,20 +27,21 @@ type larkTextContent struct {
 
 // StartLark 启动飞书长连接（无需公网），收到消息后调用 handler 并回复。
 // 断线（如笔记本睡眠、网络中断）后会自动重连；ctx 被取消时退出，便于配置变更时重启。
-func StartLark(ctx context.Context, cfg config.RobotLarkConfig, h MessageHandler, logger *zap.Logger) {
+func StartLark(ctx context.Context, robotsCfg config.RobotsConfig, h MessageHandler, logger *zap.Logger) {
+	cfg := robotsCfg.Lark
 	if !cfg.Enabled || cfg.AppID == "" || cfg.AppSecret == "" {
 		return
 	}
-	go runLarkLoop(ctx, cfg, h, logger)
+	go runLarkLoop(ctx, cfg, robotsCfg.Session.StrictUserIdentityEnabled(), h, logger)
 }
 
 // runLarkLoop 循环维持飞书长连接：断开且 ctx 未取消时按退避间隔重连。
-func runLarkLoop(ctx context.Context, cfg config.RobotLarkConfig, h MessageHandler, logger *zap.Logger) {
+func runLarkLoop(ctx context.Context, cfg config.RobotLarkConfig, strictUserIdentity bool, h MessageHandler, logger *zap.Logger) {
 	backoff := larkReconnectInitial
 	for {
 		larkClient := lark.NewClient(cfg.AppID, cfg.AppSecret)
 		eventHandler := dispatcher.NewEventDispatcher("", "").OnP2MessageReceiveV1(func(ctx context.Context, event *larkim.P2MessageReceiveV1) error {
-			go handleLarkMessage(ctx, event, h, larkClient, logger)
+			go handleLarkMessage(ctx, event, cfg, strictUserIdentity, h, larkClient, logger)
 			return nil
 		})
 		wsClient := larkws.NewClient(cfg.AppID, cfg.AppSecret,
@@ -70,7 +71,7 @@ func runLarkLoop(ctx context.Context, cfg config.RobotLarkConfig, h MessageHandl
 	}
 }
 
-func handleLarkMessage(ctx context.Context, event *larkim.P2MessageReceiveV1, h MessageHandler, client *lark.Client, logger *zap.Logger) {
+func handleLarkMessage(ctx context.Context, event *larkim.P2MessageReceiveV1, cfg config.RobotLarkConfig, strictUserIdentity bool, h MessageHandler, client *lark.Client, logger *zap.Logger) {
 	if event == nil || event.Event == nil || event.Event.Message == nil || event.Event.Sender == nil || event.Event.Sender.SenderId == nil {
 		return
 	}
@@ -89,9 +90,10 @@ func handleLarkMessage(ctx context.Context, event *larkim.P2MessageReceiveV1, h 
 	if text == "" {
 		return
 	}
-	userID := ""
-	if event.Event.Sender.SenderId.UserId != nil {
-		userID = *event.Event.Sender.SenderId.UserId
+	userID := resolveLarkUserID(event, cfg.AllowChatIDFallback && !strictUserIdentity)
+	if userID == "" {
+		logger.Warn("飞书消息缺少可用用户标识，已忽略")
+		return
 	}
 	messageID := larkcore.StringValue(msg.MessageId)
 	reply := h.HandleMessage("lark", userID, text)
@@ -108,4 +110,32 @@ func handleLarkMessage(ctx context.Context, event *larkim.P2MessageReceiveV1, h 
 		return
 	}
 	logger.Debug("飞书已回复", zap.String("message_id", messageID))
+}
+
+// resolveLarkUserID 提取飞书会话隔离键：
+// tenant_key + 稳定用户标识（user_id/open_id/union_id）；按配置可选 chat_id 兜底。
+func resolveLarkUserID(event *larkim.P2MessageReceiveV1, allowChatIDFallback bool) string {
+	if event == nil || event.Event == nil || event.Event.Sender == nil || event.Event.Sender.SenderId == nil {
+		return ""
+	}
+	tenantKey := strings.TrimSpace(larkcore.StringValue(event.Event.Sender.TenantKey))
+	if tenantKey == "" {
+		tenantKey = "default"
+	}
+	prefix := "t:" + tenantKey + "|"
+	if id := strings.TrimSpace(larkcore.StringValue(event.Event.Sender.SenderId.UserId)); id != "" {
+		return prefix + "u:" + id
+	}
+	if id := strings.TrimSpace(larkcore.StringValue(event.Event.Sender.SenderId.OpenId)); id != "" {
+		return prefix + "o:" + id
+	}
+	if id := strings.TrimSpace(larkcore.StringValue(event.Event.Sender.SenderId.UnionId)); id != "" {
+		return prefix + "n:" + id
+	}
+	if allowChatIDFallback && event.Event.Message != nil {
+		if id := strings.TrimSpace(larkcore.StringValue(event.Event.Message.ChatId)); id != "" {
+			return prefix + "c:" + id
+		}
+	}
+	return ""
 }

@@ -75,13 +75,57 @@ func (h *RobotHandler) sessionKey(platform, userID string) string {
 	return platform + "_" + userID
 }
 
+func (h *RobotHandler) loadSessionBinding(sk string) (convID, role string) {
+	if h.db == nil || strings.TrimSpace(sk) == "" {
+		return "", ""
+	}
+	binding, err := h.db.GetRobotSessionBinding(sk)
+	if err != nil {
+		h.logger.Warn("读取机器人会话绑定失败", zap.String("session_key", sk), zap.Error(err))
+		return "", ""
+	}
+	if binding == nil {
+		return "", ""
+	}
+	return binding.ConversationID, binding.RoleName
+}
+
+func (h *RobotHandler) persistSessionBinding(sk, convID, role string) {
+	if h.db == nil || strings.TrimSpace(sk) == "" || strings.TrimSpace(convID) == "" {
+		return
+	}
+	if err := h.db.UpsertRobotSessionBinding(sk, convID, role); err != nil {
+		h.logger.Warn("写入机器人会话绑定失败", zap.String("session_key", sk), zap.Error(err))
+	}
+}
+
+func (h *RobotHandler) deleteSessionBinding(sk string) {
+	if h.db == nil || strings.TrimSpace(sk) == "" {
+		return
+	}
+	if err := h.db.DeleteRobotSessionBinding(sk); err != nil {
+		h.logger.Warn("删除机器人会话绑定失败", zap.String("session_key", sk), zap.Error(err))
+	}
+}
+
 // getOrCreateConversation 获取或创建当前会话，title 用于新对话的标题（取用户首条消息前50字）
 func (h *RobotHandler) getOrCreateConversation(platform, userID, title string) (convID string, isNew bool) {
+	sk := h.sessionKey(platform, userID)
 	h.mu.RLock()
-	convID = h.sessions[h.sessionKey(platform, userID)]
+	convID = h.sessions[sk]
 	h.mu.RUnlock()
 	if convID != "" {
 		return convID, false
+	}
+	if persistedConvID, persistedRole := h.loadSessionBinding(sk); strings.TrimSpace(persistedConvID) != "" {
+		// 会话绑定持久化：服务重启后也可恢复当前对话和角色。
+		h.mu.Lock()
+		h.sessions[sk] = persistedConvID
+		if strings.TrimSpace(persistedRole) != "" {
+			h.sessionRoles[sk] = persistedRole
+		}
+		h.mu.Unlock()
+		return persistedConvID, false
 	}
 	t := strings.TrimSpace(title)
 	if t == "" {
@@ -96,34 +140,49 @@ func (h *RobotHandler) getOrCreateConversation(platform, userID, title string) (
 	}
 	convID = conv.ID
 	h.mu.Lock()
-	h.sessions[h.sessionKey(platform, userID)] = convID
+	role := h.sessionRoles[sk]
+	h.sessions[sk] = convID
 	h.mu.Unlock()
+	h.persistSessionBinding(sk, convID, role)
 	return convID, true
 }
 
 // setConversation 切换当前会话
 func (h *RobotHandler) setConversation(platform, userID, convID string) {
+	sk := h.sessionKey(platform, userID)
 	h.mu.Lock()
-	h.sessions[h.sessionKey(platform, userID)] = convID
+	role := h.sessionRoles[sk]
+	h.sessions[sk] = convID
 	h.mu.Unlock()
+	h.persistSessionBinding(sk, convID, role)
 }
 
 // getRole 获取当前用户使用的角色，未设置时返回"默认"
 func (h *RobotHandler) getRole(platform, userID string) string {
+	sk := h.sessionKey(platform, userID)
 	h.mu.RLock()
-	role := h.sessionRoles[h.sessionKey(platform, userID)]
+	role := h.sessionRoles[sk]
 	h.mu.RUnlock()
-	if role == "" {
-		return "默认"
+	if strings.TrimSpace(role) != "" {
+		return role
 	}
-	return role
+	if _, persistedRole := h.loadSessionBinding(sk); strings.TrimSpace(persistedRole) != "" {
+		h.mu.Lock()
+		h.sessionRoles[sk] = persistedRole
+		h.mu.Unlock()
+		return persistedRole
+	}
+	return "默认"
 }
 
 // setRole 设置当前用户使用的角色
 func (h *RobotHandler) setRole(platform, userID, roleName string) {
+	sk := h.sessionKey(platform, userID)
 	h.mu.Lock()
-	h.sessionRoles[h.sessionKey(platform, userID)] = roleName
+	h.sessionRoles[sk] = roleName
+	convID := h.sessions[sk]
 	h.mu.Unlock()
+	h.persistSessionBinding(sk, convID, roleName)
 }
 
 // clearConversation 清空当前会话（切换到新对话）
@@ -140,7 +199,16 @@ func (h *RobotHandler) clearConversation(platform, userID string) (newConvID str
 
 // HandleMessage 处理用户输入，返回回复文本（供各平台 webhook 调用）
 func (h *RobotHandler) HandleMessage(platform, userID, text string) (reply string) {
+	platform = strings.TrimSpace(platform)
+	userID = strings.TrimSpace(userID)
 	text = strings.TrimSpace(text)
+	if platform == "" {
+		platform = "unknown"
+	}
+	if userID == "" {
+		h.logger.Warn("机器人消息缺少用户标识，已拒绝处理", zap.String("platform", platform))
+		return "无法识别发送者身份，请检查机器人事件订阅权限（需返回可用的用户 ID）。"
+	}
 	if text == "" {
 		return "请输入内容或发送「帮助」/ help 查看命令。"
 	}
@@ -345,7 +413,9 @@ func (h *RobotHandler) cmdDelete(platform, userID, convID string) string {
 		// 删除当前对话时，先清空会话绑定
 		h.mu.Lock()
 		delete(h.sessions, sk)
+		delete(h.sessionRoles, sk)
 		h.mu.Unlock()
+		h.deleteSessionBinding(sk)
 	}
 	if err := h.db.DeleteConversation(convID); err != nil {
 		return "删除失败: " + err.Error()
@@ -647,8 +717,25 @@ func (h *RobotHandler) HandleWecomPOST(c *gin.Context) {
 		h.logger.Debug("企业微信内层 XML 解析成功", zap.String("FromUserName", body.FromUserName), zap.String("Content", body.Content))
 	}
 
-	userID := body.FromUserName
+	tenantKey := strings.TrimSpace(enterpriseID)
+	if tenantKey == "" {
+		tenantKey = strings.TrimSpace(h.config.Robots.Wecom.CorpID)
+	}
+	if tenantKey == "" {
+		tenantKey = "default"
+	}
+	rawUserID := strings.TrimSpace(body.FromUserName)
+	replyUserID := rawUserID
+	userID := ""
+	if rawUserID != "" {
+		userID = "t:" + tenantKey + "|u:" + rawUserID
+	}
 	text := strings.TrimSpace(body.Content)
+	if userID == "" {
+		h.logger.Warn("企业微信消息缺少可用用户标识，已忽略")
+		c.String(http.StatusOK, "success")
+		return
+	}
 
 	// 限制回复内容长度（企业微信限制 2048 字节）
 	maxReplyLen := 2000
@@ -661,14 +748,14 @@ func (h *RobotHandler) HandleWecomPOST(c *gin.Context) {
 
 	if body.MsgType != "text" {
 		h.logger.Debug("企业微信收到非文本消息", zap.String("MsgType", body.MsgType))
-		h.sendWecomReply(c, userID, enterpriseID, limitReply("暂仅支持文本消息，请发送文字。"), timestamp, nonce)
+		h.sendWecomReply(c, replyUserID, enterpriseID, limitReply("暂仅支持文本消息，请发送文字。"), timestamp, nonce)
 		return
 	}
 
 	// 文本消息：先判断是否为内置命令（如 帮助/列表/新对话 等），这类命令处理很快，可以直接走被动回复，避免依赖主动发送 API。
 	if cmdReply, ok := h.handleRobotCommand("wecom", userID, text); ok {
 		h.logger.Debug("企业微信收到命令消息，走被动回复", zap.String("userID", userID), zap.String("text", text))
-		h.sendWecomReply(c, userID, enterpriseID, limitReply(cmdReply), timestamp, nonce)
+		h.sendWecomReply(c, replyUserID, enterpriseID, limitReply(cmdReply), timestamp, nonce)
 		return
 	}
 
@@ -684,7 +771,7 @@ func (h *RobotHandler) HandleWecomPOST(c *gin.Context) {
 		reply = limitReply(reply)
 		h.logger.Debug("企业微信消息处理完成", zap.String("userID", userID), zap.String("reply", reply))
 		// 调用企业微信 API 主动发送消息
-		h.sendWecomMessageViaAPI(userID, enterpriseID, reply)
+		h.sendWecomMessageViaAPI(rawUserID, enterpriseID, reply)
 	}()
 }
 
