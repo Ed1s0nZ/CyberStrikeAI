@@ -203,6 +203,16 @@ func (db *DB) initTables() error {
 		UNIQUE(conversation_id, group_id)
 	);`
 
+	// 机器人会话绑定表（用于跨重启保持「平台+租户+用户」到 conversation 的映射）
+	createRobotUserSessionsTable := `
+	CREATE TABLE IF NOT EXISTS robot_user_sessions (
+		session_key TEXT PRIMARY KEY,
+		conversation_id TEXT NOT NULL,
+		role_name TEXT NOT NULL DEFAULT '默认',
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+	);`
+
 	// 创建漏洞表
 	createVulnerabilitiesTable := `
 	CREATE TABLE IF NOT EXISTS vulnerabilities (
@@ -409,6 +419,7 @@ func (db *DB) initTables() error {
 	CREATE INDEX IF NOT EXISTS idx_knowledge_retrieval_logs_created_at ON knowledge_retrieval_logs(created_at);
 	CREATE INDEX IF NOT EXISTS idx_conversation_group_mappings_conversation ON conversation_group_mappings(conversation_id);
 	CREATE INDEX IF NOT EXISTS idx_conversation_group_mappings_group ON conversation_group_mappings(group_id);
+	CREATE INDEX IF NOT EXISTS idx_robot_user_sessions_updated_at ON robot_user_sessions(updated_at);
 	CREATE INDEX IF NOT EXISTS idx_conversations_pinned ON conversations(pinned);
 	CREATE INDEX IF NOT EXISTS idx_vulnerabilities_conversation_id ON vulnerabilities(conversation_id);
 	CREATE INDEX IF NOT EXISTS idx_vulnerabilities_conversation_tag ON vulnerabilities(conversation_tag);
@@ -478,6 +489,9 @@ func (db *DB) initTables() error {
 
 	if _, err := db.Exec(createConversationGroupMappingsTable); err != nil {
 		return fmt.Errorf("创建conversation_group_mappings表失败: %w", err)
+	}
+	if _, err := db.Exec(createRobotUserSessionsTable); err != nil {
+		return fmt.Errorf("创建robot_user_sessions表失败: %w", err)
 	}
 
 	if _, err := db.Exec(createVulnerabilitiesTable); err != nil {
