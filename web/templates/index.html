@@ -170,6 +170,14 @@
                             <span data-i18n="nav.vulnerabilities">漏洞管理</span>
                         </div>
                     </div>
+                    <div class="nav-item" data-page="chat-files">
+                        <div class="nav-item-content" data-title="文件管理" onclick="switchPage('chat-files')" data-i18n="nav.chatFiles" data-i18n-attr="data-title" data-i18n-skip-text="true">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                            <span data-i18n="nav.chatFiles">文件管理</span>
+                        </div>
+                    </div>
                     <div class="nav-item" data-page="webshell">
                         <div class="nav-item-content" data-title="WebShell管理" onclick="switchPage('webshell')" data-i18n="nav.webshell" data-i18n-attr="data-title" data-i18n-skip-text="true">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -199,14 +207,6 @@
                             <div class="nav-submenu-item" data-page="c2-payloads" onclick="switchPage('c2-payloads')" data-i18n="nav.c2Payloads">Payload</div>
                             <div class="nav-submenu-item" data-page="c2-events" onclick="switchPage('c2-events')" data-i18n="nav.c2Events">事件</div>
                             <div class="nav-submenu-item" data-page="c2-profiles" onclick="switchPage('c2-profiles')" data-i18n="nav.c2Profiles">流量伪装</div>
-                        </div>
-                    </div>
-                    <div class="nav-item" data-page="chat-files">
-                        <div class="nav-item-content" data-title="文件管理" onclick="switchPage('chat-files')" data-i18n="nav.chatFiles" data-i18n-attr="data-title" data-i18n-skip-text="true">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                            </svg>
-                            <span data-i18n="nav.chatFiles">文件管理</span>
                         </div>
                     </div>
                     <div class="nav-item nav-item-has-submenu" data-page="mcp">
@@ -2548,7 +2548,7 @@
                 <h2 data-i18n="attackChainModal.title">攻击链可视化</h2>
                 <div class="modal-header-actions">
                     <button class="btn-primary attack-chain-action-btn" onclick="regenerateAttackChain()" data-i18n="attackChainModal.regenerateTitle" data-i18n-attr="title" data-i18n-skip-text="true" title="重新生成攻击链（包含最新对话内容）">
-                        🔄 <span data-i18n="attackChainModal.regenerate">重新生成</span>
+                        <span data-i18n="attackChainModal.regenerate">重新生成</span>
                     </button>
                     <button class="btn-secondary attack-chain-action-btn" onclick="exportAttackChain('png')" data-i18n="attackChainModal.exportPng" data-i18n-attr="title" title="导出为PNG">
                         📥 PNG
@@ -2557,7 +2557,7 @@
                         📥 SVG
                     </button>
                     <button class="btn-secondary attack-chain-action-btn" onclick="refreshAttackChain()" data-i18n="attackChainModal.refreshTitle" data-i18n-attr="title" title="刷新当前攻击链（不重新生成）">
-                        ↻ <span data-i18n="common.refresh">刷新</span>
+                        <span data-i18n="common.refresh">刷新</span>
                     </button>
                     <span class="modal-close" onclick="closeAttackChainModal()">&times;</span>
                 </div>

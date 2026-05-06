@@ -2852,7 +2852,11 @@ async function loadConversation(conversationId) {
                     }
                 }
 
-                const messageId = addMessage(msg.role, displayContent, msg.mcpExecutionIds || [], null, msg.createdAt);
+                // 消息时间口径：
+                // - user: createdAt 即可（发送后不会再更新）
+                // - assistant: 如果后端提供 updatedAt（任务完成时写回），优先用它，避免占位消息“任务开始时间”误导
+                const msgTime = (msg && msg.role === 'assistant' && msg.updatedAt) ? msg.updatedAt : (msg ? msg.createdAt : null);
+                const messageId = addMessage(msg.role, displayContent, msg.mcpExecutionIds || [], null, msgTime);
                 const messageEl = document.getElementById(messageId);
                 if (messageEl && msg && msg.id) {
                     messageEl.dataset.backendMessageId = String(msg.id);
