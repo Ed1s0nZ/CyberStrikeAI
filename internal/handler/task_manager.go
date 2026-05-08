@@ -15,12 +15,10 @@ var ErrTaskCancelled = errors.New("agent task cancelled by user")
 var ErrTaskAlreadyRunning = errors.New("agent task already running for conversation")
 
 // shouldPersistEinoAgentTraceAfterRunError：Eino 相关 Run 非成功返回时，是否仍写入 last_react_* 供下轮 loadHistoryFromAgentTrace。
-// 用户主动停止（WithCancelCause(ErrTaskCancelled)）时不写入半截轨迹，避免下一轮 Plan-Execute 等因损坏/不完整 tool 上下文出现 no tool call 等异常。
+// 当前策略：无论正常结束、异常结束或用户主动停止，都尽量保留最后可用轨迹，
+// 以便在同一会话继续时可基于原始上下文续跑，而不是回退到仅消息文本历史。
 func shouldPersistEinoAgentTraceAfterRunError(baseCtx context.Context) bool {
-	if baseCtx == nil {
-		return true
-	}
-	return !errors.Is(context.Cause(baseCtx), ErrTaskCancelled)
+	return true
 }
 
 // AgentTask 描述正在运行的Agent任务
