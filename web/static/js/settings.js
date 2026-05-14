@@ -1087,6 +1087,7 @@ async function applySettings() {
         
         const wecomAgentIdVal = document.getElementById('robot-wecom-agent-id')?.value.trim();
         const prevOpenai = (currentConfig && currentConfig.openai) ? currentConfig.openai : {};
+        const prevRobots = (currentConfig && currentConfig.robots) ? currentConfig.robots : {};
         const config = {
             openai: {
                 ...prevOpenai,
@@ -1118,7 +1119,7 @@ async function applySettings() {
                 return {
                     enabled: document.getElementById('multi-agent-enabled')?.checked === true,
                     robot_use_multi_agent: document.getElementById('multi-agent-robot-use')?.checked === true,
-                    batch_use_multi_agent: false,
+                    batch_use_multi_agent: currentConfig?.multi_agent?.batch_use_multi_agent === true,
                     plan_execute_loop_max_iterations: peLoop
                 };
             })(),
@@ -1127,6 +1128,7 @@ async function applySettings() {
                 enabled: c2Enabled
             },
             robots: {
+                ...(prevRobots.session && typeof prevRobots.session === 'object' ? { session: prevRobots.session } : {}),
                 wecom: {
                     enabled: document.getElementById('robot-wecom-enabled')?.checked === true,
                     token: document.getElementById('robot-wecom-token')?.value.trim() || '',
@@ -1138,13 +1140,15 @@ async function applySettings() {
                 dingtalk: {
                     enabled: document.getElementById('robot-dingtalk-enabled')?.checked === true,
                     client_id: document.getElementById('robot-dingtalk-client-id')?.value.trim() || '',
-                    client_secret: document.getElementById('robot-dingtalk-client-secret')?.value.trim() || ''
+                    client_secret: document.getElementById('robot-dingtalk-client-secret')?.value.trim() || '',
+                    allow_conversation_id_fallback: !!(prevRobots.dingtalk && prevRobots.dingtalk.allow_conversation_id_fallback)
                 },
                 lark: {
                     enabled: document.getElementById('robot-lark-enabled')?.checked === true,
                     app_id: document.getElementById('robot-lark-app-id')?.value.trim() || '',
                     app_secret: document.getElementById('robot-lark-app-secret')?.value.trim() || '',
-                    verify_token: document.getElementById('robot-lark-verify-token')?.value.trim() || ''
+                    verify_token: document.getElementById('robot-lark-verify-token')?.value.trim() || '',
+                    allow_chat_id_fallback: !!(prevRobots.lark && prevRobots.lark.allow_chat_id_fallback)
                 }
             },
             tools: []
