@@ -14,7 +14,16 @@ version: "v1.6.13"
 # 服务器配置
 server:
   host: 0.0.0.0 # 监听地址，0.0.0.0 表示监听所有网络接口
-  port: 8080 # HTTP 服务端口，可通过浏览器访问 http://localhost:8080
+  port: 8080 # 服务端口；未启用 TLS 时为 http://localhost:8080
+  # --- 可选：HTTPS + HTTP/2（缓解浏览器对同源 HTTP/1.1 的并发连接数限制，多路 Deep 流式更稳）---
+  # 启用 TLS 的条件（满足其一即可）：tls_enabled: true，或 tls_auto_self_sign: true，或同时配置了 tls_cert_path + tls_key_path。
+  # 启用后请用 https://127.0.0.1:<本端口>/ 访问；若仍用 http:// 连 HTTPS 端口，Chrome 常报「HTTP ERROR 400」。
+  tls_enabled: true
+  # 方式 A（推荐生产）：PEM 证书与私钥路径
+  # tls_cert_path: /path/to/fullchain.pem
+  # tls_key_path: /path/to/privkey.pem
+  # 方式 B（仅本地/测试）：无证书文件时内存自签（浏览器会提示不受信任；SAN 含 localhost / 127.0.0.1）
+  tls_auto_self_sign: true
 # 认证配置
 auth:
   password:  # Web 登录密码，请修改为强密码
