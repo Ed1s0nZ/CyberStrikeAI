@@ -339,9 +339,23 @@ async function loadConfig(loadTools = true) {
 
         // 填充机器人配置
         const robots = currentConfig.robots || {};
+        const wechat = robots.wechat || {};
         const wecom = robots.wecom || {};
         const dingtalk = robots.dingtalk || {};
         const lark = robots.lark || {};
+        const wechatEnabled = document.getElementById('robot-wechat-enabled');
+        if (wechatEnabled) wechatEnabled.checked = wechat.enabled === true;
+        const wechatBase = document.getElementById('robot-wechat-base-url');
+        if (wechatBase) wechatBase.value = wechat.base_url || 'https://ilinkai.weixin.qq.com';
+        const wechatBotType = document.getElementById('robot-wechat-bot-type');
+        if (wechatBotType) wechatBotType.value = wechat.bot_type || '3';
+        const wechatBotAgent = document.getElementById('robot-wechat-bot-agent');
+        if (wechatBotAgent) wechatBotAgent.value = wechat.bot_agent || 'CyberStrikeAI/1.0';
+        const wechatBotId = document.getElementById('robot-wechat-ilink-bot-id');
+        if (wechatBotId) wechatBotId.value = wechat.ilink_bot_id || '';
+        if (typeof refreshWechatRobotBoundUI === 'function') {
+            refreshWechatRobotBoundUI({ ...wechat, bound: !!(wechat.bot_token && wechat.ilink_bot_id) });
+        }
         const wecomEnabled = document.getElementById('robot-wecom-enabled');
         if (wecomEnabled) wecomEnabled.checked = wecom.enabled === true;
         const wecomToken = document.getElementById('robot-wecom-token');
@@ -1129,6 +1143,18 @@ async function applySettings() {
             },
             robots: {
                 ...(prevRobots.session && typeof prevRobots.session === 'object' ? { session: prevRobots.session } : {}),
+                wechat: {
+                    enabled: document.getElementById('robot-wechat-enabled')?.checked === true,
+                    base_url: document.getElementById('robot-wechat-base-url')?.value.trim() || 'https://ilinkai.weixin.qq.com',
+                    bot_type: document.getElementById('robot-wechat-bot-type')?.value.trim() || '3',
+                    bot_agent: document.getElementById('robot-wechat-bot-agent')?.value.trim() || 'CyberStrikeAI/1.0',
+                    ilink_bot_id: document.getElementById('robot-wechat-ilink-bot-id')?.value.trim() || (prevRobots.wechat && prevRobots.wechat.ilink_bot_id) || '',
+                    ...(prevRobots.wechat && typeof prevRobots.wechat === 'object' ? {
+                        bot_token: prevRobots.wechat.bot_token || '',
+                        ilink_user_id: prevRobots.wechat.ilink_user_id || '',
+                        get_updates_buf: prevRobots.wechat.get_updates_buf || ''
+                    } : {})
+                },
                 wecom: {
                     enabled: document.getElementById('robot-wecom-enabled')?.checked === true,
                     token: document.getElementById('robot-wecom-token')?.value.trim() || '',

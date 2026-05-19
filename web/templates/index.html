@@ -2379,6 +2379,73 @@
                                     <p class="settings-description" data-i18n="settings.robots.description">配置企业微信、钉钉、飞书等机器人，在手机端直接与 CyberStrikeAI 对话，无需在服务器上打开网页。</p>
                                 </div>
 
+                                <!-- 微信 / iLink -->
+                                <div class="settings-subsection robot-wechat-card" id="robot-wechat-subsection">
+                                    <div class="robot-wechat-header">
+                                        <div class="robot-wechat-header-text">
+                                            <h4 data-i18n="settings.robots.wechat.title">微信 / iLink</h4>
+                                            <p class="robot-wechat-subtitle" data-i18n="settings.robots.wechat.subtitle">扫码绑定个人微信，在手机端直接与 CyberStrikeAI 对话</p>
+                                        </div>
+                                        <span id="robot-wechat-status-badge" class="robot-wechat-badge robot-wechat-badge--idle" data-i18n="settings.robots.wechat.statusIdle">未绑定</span>
+                                    </div>
+                                    <div class="settings-form robot-wechat-form">
+                                        <div class="robot-wechat-toolbar">
+                                            <label class="checkbox-label">
+                                                <input type="checkbox" id="robot-wechat-enabled" class="modern-checkbox" />
+                                                <span class="checkbox-custom"></span>
+                                                <span class="checkbox-text" data-i18n="settings.robots.wechat.enabled">启用微信机器人</span>
+                                            </label>
+                                        </div>
+                                        <div class="robot-wechat-action-row">
+                                            <button type="button" class="btn-primary" id="robot-wechat-bind-btn" onclick="startWechatRobotBind()" data-i18n="settings.robots.wechat.bindButton">生成二维码并绑定</button>
+                                            <p class="robot-wechat-hint" id="robot-wechat-bind-hint" data-i18n="settings.robots.wechat.bindHint">用微信扫码确认后会自动保存并启用。</p>
+                                        </div>
+                                        <div id="robot-wechat-qr-wrap" class="robot-wechat-panel" hidden>
+                                            <div id="robot-wechat-bound-panel" class="robot-wechat-bound-panel" hidden>
+                                                <div class="robot-wechat-bound-icon" aria-hidden="true">
+                                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                                                </div>
+                                                <p class="robot-wechat-bound-msg" data-i18n="settings.robots.wechat.boundSuccess">绑定成功，微信机器人已启用</p>
+                                                <p id="robot-wechat-bound-id" class="robot-wechat-bound-id" hidden></p>
+                                            </div>
+                                            <div id="robot-wechat-scan-panel" class="robot-wechat-scan-panel" hidden>
+                                            <div id="robot-wechat-qr-loading" class="robot-wechat-qr-loading" hidden data-i18n="settings.robots.wechat.qrLoading">正在生成二维码…</div>
+                                            <img id="robot-wechat-qr-img" class="robot-wechat-qr-img" alt="" width="220" height="220" hidden />
+                                            <p class="robot-wechat-qr-fallback">
+                                                <a id="robot-wechat-qr-link" href="#" target="_blank" rel="noopener noreferrer" hidden data-i18n="settings.robots.wechat.openLink">无法显示二维码？点击用手机微信打开链接</a>
+                                            </p>
+                                            <p id="robot-wechat-qr-status" class="robot-wechat-qr-status"></p>
+                                            <div id="robot-wechat-verify-wrap" class="robot-wechat-verify-wrap" hidden>
+                                                <label for="robot-wechat-verify-code" data-i18n="settings.robots.wechat.verifyCodeLabel">手机显示的数字（仅部分账号需要）</label>
+                                                <div class="robot-wechat-verify-row">
+                                                    <input type="text" id="robot-wechat-verify-code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="000000" />
+                                                    <button type="button" class="btn-primary btn-sm" onclick="submitWechatVerifyCode()" data-i18n="settings.robots.wechat.verifyCodeSubmit">提交</button>
+                                                </div>
+                                            </div>
+                                            </div>
+                                        </div>
+                                        <details class="settings-collapsible robot-wechat-advanced" id="robot-wechat-advanced">
+                                            <summary data-i18n="settings.robots.wechat.advanced">高级设置</summary>
+                                            <div class="form-group">
+                                                <label for="robot-wechat-base-url" data-i18n="settings.robots.wechat.baseUrl">API Base URL</label>
+                                                <input type="text" id="robot-wechat-base-url" placeholder="https://ilinkai.weixin.qq.com" autocomplete="off" />
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="robot-wechat-bot-type" data-i18n="settings.robots.wechat.botType">Bot Type</label>
+                                                <input type="text" id="robot-wechat-bot-type" placeholder="3" autocomplete="off" />
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="robot-wechat-bot-agent" data-i18n="settings.robots.wechat.botAgent">Bot Agent</label>
+                                                <input type="text" id="robot-wechat-bot-agent" placeholder="CyberStrikeAI/1.0" autocomplete="off" />
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="robot-wechat-ilink-bot-id" data-i18n="settings.robots.wechat.ilinkBotId">iLink Bot ID（绑定后自动填充）</label>
+                                                <input type="text" id="robot-wechat-ilink-bot-id" readonly autocomplete="off" />
+                                            </div>
+                                        </details>
+                                    </div>
+                                </div>
+
                                 <!-- 企业微信 -->
                                 <div class="settings-subsection">
                                     <h4 data-i18n="settings.robots.wecom.title">企业微信</h4>
@@ -3548,6 +3615,7 @@
     <script src="/static/js/chat.js"></script>
     <script src="/static/js/hitl.js"></script>
     <script src="/static/js/settings.js"></script>
+    <script src="/static/js/wechat-robot.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm@4.19.0/lib/xterm.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.5.0/lib/xterm-addon-fit.js"></script>
     <script src="/static/js/terminal.js"></script>
