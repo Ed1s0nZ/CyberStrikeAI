@@ -23,12 +23,11 @@
         }
 
         const navLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
-        if (navLang.startsWith('zh')) {
-            return 'zh-CN';
-        }
         if (navLang.startsWith('en')) {
             return 'en-US';
         }
+        // Default to Simplified Chinese for zh-* and all other browser locales.
+        // Traditional Chinese (zh-TW) is only used when explicitly saved in localStorage.
         return DEFAULT_LANG;
     }
 
@@ -115,7 +114,11 @@
         if (!label || typeof i18next === 'undefined') return;
         const lang = (i18next.language || DEFAULT_LANG).toLowerCase();
         if (lang.indexOf('zh') === 0) {
-            label.textContent = i18next.t('lang.zhCN');
+            if (lang.startsWith('zh-tw')) {
+                label.textContent = i18next.t('lang.zhTW');
+            } else {
+                label.textContent = i18next.t('lang.zhCN');
+            }
         } else {
             label.textContent = i18next.t('lang.enUS');
         }

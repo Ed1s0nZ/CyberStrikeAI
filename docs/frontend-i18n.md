@@ -4,7 +4,7 @@
 
 当前目标：
 
-- **支持中英文切换（zh-CN / en-US）**
+- **支持中英文 + 繁體中文切换（zh-CN / zh-TW / en-US）**
 - 后续可方便扩展更多语言（如 ja-JP、ko-KR 等）
 
 ---
@@ -38,6 +38,7 @@
   - 前端 i18n 初始化与 DOM 应用逻辑（本方案新增）。
 - `web/static/i18n/`（新增目录）
   - `zh-CN.json`：中文文案（默认语言）
+  - `zh-TW.json`：繁體中文文案
   - `en-US.json`：英文文案
   - 未来可新增：`ja-JP.json`、`ko-KR.json` 等。
 
@@ -198,7 +199,7 @@ alert(t('settings.loadConfigFailed') + ': ' + error.message);
 - 默认语言：`zh-CN`。
 - 优先级（从高到低）：
   1. `localStorage` 中的用户选择（key：`csai_lang`）。
-  2. 浏览器 `navigator.language`（`zh` 开头 → `zh-CN`，否则 `en-US`）。
+  2. 浏览器 `navigator.language`（`en` 开头 → `en-US`，否则 → `zh-CN`；繁體中文仅通过用户手动选择并写入 `localStorage`）。
   3. 默认 `zh-CN`。
 
 ### 6.2 初始化流程（`i18n.js`）
@@ -264,8 +265,9 @@ function applyTranslations(root = document) {
     <span id="current-lang-label">中文</span>
   </button>
   <div id="lang-dropdown" class="lang-dropdown" style="display: none;">
-    <div class="lang-option" data-lang="zh-CN" onclick="onLanguageSelect('zh-CN')">中文</div>
-    <div class="lang-option" data-lang="en-US" onclick="onLanguageSelect('en-US')">English</div>
+    <div class="lang-option" data-lang="zh-CN" data-i18n="lang.zhCN" onclick="onLanguageSelect('zh-CN')">中文</div>
+    <div class="lang-option" data-lang="zh-TW" data-i18n="lang.zhTW" onclick="onLanguageSelect('zh-TW')">繁體中文</div>
+    <div class="lang-option" data-lang="en-US" data-i18n="lang.enUS" onclick="onLanguageSelect('en-US')">English</div>
   </div>
 </div>
 ```
@@ -282,7 +284,13 @@ function updateLangLabel() {
   const labelEl = document.getElementById('current-lang-label');
   if (!labelEl) return;
   const lang = i18next.language || 'zh-CN';
-  labelEl.textContent = lang.startsWith('zh') ? '中文' : 'English';
+  if (lang.startsWith('zh-tw')) {
+    labelEl.textContent = i18next.t('lang.zhTW');
+  } else if (lang.startsWith('zh')) {
+    labelEl.textContent = i18next.t('lang.zhCN');
+  } else {
+    labelEl.textContent = i18next.t('lang.enUS');
+  }
 }
 ```
 
