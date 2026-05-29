@@ -423,12 +423,108 @@ function _normalizeUnicodeBulletMarkersToMdDash(segment) {
  * 仅处理单行内容，避免跨段落误匹配。
  */
 function _normalizeEmphasisMarkersForMarkdown(segment) {
-    let s = String(segment);
-    s = s.replace(/\\\*\*([^\n*][^\n]*?[^\n*])\\\*\*/g, '**$1**');
-    s = s.replace(/\*\*\s+([^\n*][^\n]*?[^\n*])\s+\*\*/g, '**$1**');
-    // marked 在「中文紧邻 ** 且加粗内容首字符是引号/书名号」时常不触发 strong。
-    // 仅对“有闭合 ** 的同一行片段”补一个空格，尽量减少误判面。
-    s = s.replace(/([\u4e00-\u9fff])\*\*([“"‘'《（(][^\n*]*?\*\*)/g, '$1 **$2');
+    const raw = String(segment);
+    const maskInlineCode = (input) => {
+        const blocks = [];
+        const masked = input.replace(/`[^`\n]*`/g, (m) => {
+            const token = '__CS_INLINE_CODE_' + blocks.length + '__';
+            blocks.push(m);
+            return token;
+        });
+        return { masked, blocks };
+    };
+    const unmaskInlineCode = (input, blocks) => {
+        let out = input;
+        for (let i = 0; i < blocks.length; i++) {
+            out = out.replace('__CS_INLINE_CODE_' + i + '__', blocks[i]);
+        }
+        return out;
+    };
+    const isWordLike = (ch) => /[\u4e00-\u9fffA-Za-z0-9]/.test(ch || '');
+    const countUnescapedStrongMarkers = (text) => {
+        let count = 0;
+        for (let i = 0; i < text.length - 1; i++) {
+            if (text.charAt(i) === '*' && text.charAt(i + 1) === '*') {
+                if (i > 0 && text.charAt(i - 1) === '\\') {
+                    continue;
+                }
+                count++;
+                i++;
+            }
+        }
+        return count;
+    };
+    const normalizeLine = (line) => {
+        let lineWork = line;
+        // 奇数个 `**` 往往意味着有一个孤立标记；仅清理「空白夹着的 **」这类高置信噪声。
+        while (countUnescapedStrongMarkers(lineWork) % 2 === 1) {
+            const next = lineWork.replace(/\s\*\*\s/g, ' ');
+            if (next === lineWork) break;
+            lineWork = next;
+        }
+        let out = '';
+        let cursor = 0;
+        while (cursor < lineWork.length) {
+            const open = lineWork.indexOf('**', cursor);
+            if (open < 0) {
+                out += lineWork.slice(cursor);
+                break;
+            }
+            // 允许 `\*\*text\*\*` 先还原，escaped 星号本身不作为强调标记。
+            if (open > 0 && lineWork.charAt(open - 1) === '\\') {
+                out += lineWork.slice(cursor, open + 2);
+                cursor = open + 2;
+                continue;
+            }
+            let close = open + 2;
+            while (true) {
+                close = lineWork.indexOf('**', close);
+                if (close < 0) break;
+                if (close > 0 && lineWork.charAt(close - 1) === '\\') {
+                    close += 2;
+                    continue;
+                }
+                break;
+            }
+            if (close < 0) {
+                out += lineWork.slice(cursor);
+                break;
+            }
+
+            let prefix = lineWork.slice(cursor, open);
+            const innerRaw = lineWork.slice(open + 2, close);
+            const inner = innerRaw.trim();
+            const next = lineWork.charAt(close + 2);
+            const prevTail = prefix.charAt(prefix.length - 1);
+
+            // 内部为空时不改写，避免把 `****` 等异常输入改坏。
+            if (!inner) {
+                out += lineWork.slice(cursor, close + 2);
+                cursor = close + 2;
+                continue;
+            }
+
+            // CJK/字母数字与强调标记紧邻时补边界空格，提升解析稳定性。
+            if (isWordLike(prevTail) && !/\s$/.test(prefix)) {
+                prefix += ' ';
+            }
+            out += prefix + '**' + inner + '**';
+            if (isWordLike(next)) {
+                out += ' ';
+            }
+            cursor = close + 2;
+        }
+        return out;
+    };
+
+    // 先还原常见 escaped strong，再做成对规范化。
+    let s = raw.replace(/\\\*\*([^\n*][^\n]*?[^\n*])\\\*\*/g, '**$1**');
+    const masked = maskInlineCode(s);
+    s = masked.masked
+        .split('\n')
+        .map(normalizeLine)
+        .join('\n');
+    s = unmaskInlineCode(s, masked.blocks);
     return s;
 }
 
