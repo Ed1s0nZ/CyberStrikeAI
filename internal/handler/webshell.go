@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -22,6 +23,8 @@ import (
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
 )
+
+const defaultWebshellUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
 
 // webshellSupportedEncodings 允许的 WebShell 响应编码取值（小写，含空串代表 auto）
 // 仅暴露目前最常见的几种，其他需求可后续扩展（如 Big5、Shift_JIS 等）。
@@ -49,6 +52,47 @@ func normalizeWebshellEncoding(enc string) string {
 	return enc
 }
 
+func normalizeWebshellHeaderText(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "User-Agent: " + defaultWebshellUserAgent
+	}
+	if !strings.Contains(raw, ":") && !strings.ContainsAny(raw, "\r\n") {
+		return "User-Agent: " + raw
+	}
+	return raw
+}
+
+func applyWebshellHeaderText(req *http.Request, raw string) {
+	if req == nil {
+		return
+	}
+	headerText := normalizeWebshellHeaderText(raw)
+	hasUA := false
+	for _, line := range strings.Split(strings.ReplaceAll(headerText, "\r\n", "\n"), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		idx := strings.Index(line, ":")
+		if idx <= 0 {
+			continue
+		}
+		name := strings.TrimSpace(line[:idx])
+		value := strings.TrimSpace(line[idx+1:])
+		if name == "" {
+			continue
+		}
+		if strings.EqualFold(name, "User-Agent") {
+			hasUA = true
+		}
+		req.Header.Set(name, value)
+	}
+	if !hasUA {
+		req.Header.Set("User-Agent", defaultWebshellUserAgent)
+	}
+}
+
 // decodeWebshellOutput 把 WebShell 返回的字节按指定编码转换为合法 UTF-8 字符串。
 // 约定：
 //   - "" / "auto"：若已是合法 UTF-8 原样返回，否则依次尝试 GB18030（GBK 超集）解码。
@@ -56,6 +100,13 @@ func normalizeWebshellEncoding(enc string) string {
 //   - "gbk" / "gb18030"：强制按对应编码解码；失败则回退原始字节。
 //
 // 该函数对空输入直接返回空串，避免不必要的转换。
+// stripHTMLTags 移除 HTML 标签，用于清理 WebShell 响应中可能混入的 HTML 包装。
+var htmlTagRe = regexp.MustCompile("<[^>]*>")
+
+func stripHTMLTags(raw []byte) []byte {
+	return htmlTagRe.ReplaceAll(raw, nil)
+}
+
 func decodeWebshellOutput(raw []byte, encoding string) string {
 	if len(raw) == 0 {
 		return ""
@@ -81,6 +132,16 @@ func decodeWebshellOutput(raw []byte, encoding string) string {
 		// GB18030 是 GBK 的超集，覆盖范围最广，auto 模式统一用它兜底
 		if out, _, err := transform.Bytes(simplifiedchinese.GB18030.NewDecoder(), raw); err == nil {
 			return string(out)
+		}
+		// If GB18030 decode fails, try stripping HTML tags and retry
+		cleaned := stripHTMLTags(raw)
+		if len(cleaned) < len(raw) {
+			if utf8.Valid(cleaned) {
+				return string(cleaned)
+			}
+			if out, _, err := transform.Bytes(simplifiedchinese.GB18030.NewDecoder(), cleaned); err == nil {
+				return string(out)
+			}
 		}
 		return string(raw)
 	}
@@ -125,6 +186,25 @@ func resolveWebshellOS(osTag, shellType string) string {
 	return "linux"
 }
 
+// webshellSupportedProtocols 允许的 WebShell 协议类型
+var webshellSupportedProtocols = map[string]struct{}{
+	"":         {},
+	"classic":  {},
+	"behinder": {},
+}
+
+// normalizeWebshellProtocol 归一化协议标识
+func normalizeWebshellProtocol(proto string) string {
+	proto = strings.ToLower(strings.TrimSpace(proto))
+	if _, ok := webshellSupportedProtocols[proto]; !ok {
+		return "classic"
+	}
+	if proto == "" {
+		return "classic"
+	}
+	return proto
+}
+
 // quoteCmdPath 把路径按 Windows cmd.exe 规则转义。
 // 使用双引号包裹，内部双引号转义为 ""（cmd 接受的写法）。
 func quoteCmdPath(p string) string {
@@ -134,8 +214,7 @@ func quoteCmdPath(p string) string {
 	return "\"" + strings.ReplaceAll(p, "\"", "\"\"") + "\""
 }
 
-// normalizeWindowsCmdPath 把前端统一的 "/" 路径转换为 cmd 更稳定识别的 "\"。
-// 仅用于 Windows 命令构造，不改变语义（例如 "." / ".." 会保持不变）。
+// normalizeWindowsCmdPath
 func normalizeWindowsCmdPath(p string) string {
 	s := strings.TrimSpace(p)
 	if s == "" {
@@ -144,13 +223,13 @@ func normalizeWindowsCmdPath(p string) string {
 	return strings.ReplaceAll(s, "/", "\\")
 }
 
-// quotePsSingle 把字符串按 PowerShell 单引号字符串规则转义（内部 ' → ''）。
+// quotePsSingle 把字符串按 PowerShell 单引号字符串规则转义（内部 ' → ”）。
 // 供 PowerShell 脚本参数使用，全脚本只用单引号，外层 cmd 再用双引号包裹即可安全传递。
 func quotePsSingle(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "''") + "'"
 }
 
-// quoteShellSinglePosix 把路径按 POSIX sh 单引号规则转义（内部 ' → '\''）
+// quoteShellSinglePosix 把路径按 POSIX sh 单引号规则转义（内部 ' → '\”）
 func quoteShellSinglePosix(p string) string {
 	if p == "" {
 		return "."
@@ -208,7 +287,6 @@ func (h *WebShellHandler) buildFileCommand(in fileCommandInput) (string, error) 
 			p = "."
 		}
 		if targetOS == "windows" {
-			p = normalizeWindowsCmdPath(p)
 			return "dir /a " + quoteCmdPath(p), nil
 		}
 		return "ls -la " + quoteShellSinglePosix(p), nil
@@ -218,7 +296,6 @@ func (h *WebShellHandler) buildFileCommand(in fileCommandInput) (string, error) 
 			return "", errFileOpPathRequired
 		}
 		if targetOS == "windows" {
-			path = normalizeWindowsCmdPath(path)
 			return "type " + quoteCmdPath(path), nil
 		}
 		return "cat " + quoteShellSinglePosix(path), nil
@@ -228,7 +305,6 @@ func (h *WebShellHandler) buildFileCommand(in fileCommandInput) (string, error) 
 			return "", errFileOpPathRequired
 		}
 		if targetOS == "windows" {
-			path = normalizeWindowsCmdPath(path)
 			return "del /q /f " + quoteCmdPath(path), nil
 		}
 		return "rm -f " + quoteShellSinglePosix(path), nil
@@ -238,7 +314,6 @@ func (h *WebShellHandler) buildFileCommand(in fileCommandInput) (string, error) 
 			return "", errFileOpPathRequired
 		}
 		if targetOS == "windows" {
-			path = normalizeWindowsCmdPath(path)
 			// cmd 的 md 默认会自动创建中间目录（等价于 Linux 的 mkdir -p）
 			return "md " + quoteCmdPath(path), nil
 		}
@@ -251,8 +326,6 @@ func (h *WebShellHandler) buildFileCommand(in fileCommandInput) (string, error) 
 			return "", errFileOpRenameNeedsBothPaths
 		}
 		if targetOS == "windows" {
-			oldPath = normalizeWindowsCmdPath(oldPath)
-			newPath = normalizeWindowsCmdPath(newPath)
 			return "move /y " + quoteCmdPath(oldPath) + " " + quoteCmdPath(newPath), nil
 		}
 		return "mv -f " + quoteShellSinglePosix(oldPath) + " " + quoteShellSinglePosix(newPath), nil
@@ -265,7 +338,6 @@ func (h *WebShellHandler) buildFileCommand(in fileCommandInput) (string, error) 
 		// 这样既能写入任意二进制/含引号的文本，又避免各家 shell 的转义地狱。
 		b64 := base64.StdEncoding.EncodeToString([]byte(in.Content))
 		if targetOS == "windows" {
-			path = normalizeWindowsCmdPath(path)
 			return buildWindowsPowerShellWrite(path, b64), nil
 		}
 		return "echo '" + b64 + "' | base64 -d > " + quoteShellSinglePosix(path), nil
@@ -278,7 +350,6 @@ func (h *WebShellHandler) buildFileCommand(in fileCommandInput) (string, error) 
 			return "", errFileOpUploadTooLarge
 		}
 		if targetOS == "windows" {
-			path = normalizeWindowsCmdPath(path)
 			return buildWindowsPowerShellWrite(path, in.Content), nil
 		}
 		return "echo '" + in.Content + "' | base64 -d > " + quoteShellSinglePosix(path), nil
@@ -288,7 +359,6 @@ func (h *WebShellHandler) buildFileCommand(in fileCommandInput) (string, error) 
 			return "", errFileOpPathRequired
 		}
 		if targetOS == "windows" {
-			path = normalizeWindowsCmdPath(path)
 			if in.ChunkIndex == 0 {
 				return buildWindowsPowerShellWrite(path, in.Content), nil
 			}
@@ -322,10 +392,11 @@ func (e simpleError) Error() string { return string(e) }
 
 // WebShellHandler 代理执行 WebShell 命令（类似冰蝎/蚁剑），避免前端跨域并统一构建请求
 type WebShellHandler struct {
-	logger *zap.Logger
-	client *http.Client
-	db     *database.DB
-	audit  *audit.Service
+	logger   *zap.Logger
+	client   *http.Client
+	db       *database.DB
+	audit    *audit.Service
+	behinder *BehinderHandler
 }
 
 // SetAudit wires platform audit logging.
@@ -345,32 +416,35 @@ func NewWebShellHandler(logger *zap.Logger, db *database.DB) *WebShellHandler {
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // intentional for webshell proxy
 			},
 		},
-		db: db,
+		db:       db,
+		behinder: NewBehinderHandler(logger),
 	}
 }
 
 // CreateConnectionRequest 创建连接请求
 type CreateConnectionRequest struct {
-	URL      string `json:"url" binding:"required"`
-	Password string `json:"password"`
-	Type     string `json:"type"`
-	Method   string `json:"method"`
-	CmdParam string `json:"cmd_param"`
-	Remark   string `json:"remark"`
-	Encoding string `json:"encoding"`
-	OS       string `json:"os"`
+	URL       string `json:"url" binding:"required"`
+	Password  string `json:"password"`
+	Type      string `json:"type"`
+	Method    string `json:"method"`
+	Remark    string `json:"remark"`
+	Encoding  string `json:"encoding"`
+	OS        string `json:"os"`
+	Protocol  string `json:"protocol"`   // classic 或 behinder
+	UserAgent string `json:"user_agent"` // 自定义请求头文本（兼容旧 UA 字符串）
 }
 
 // UpdateConnectionRequest 更新连接请求
 type UpdateConnectionRequest struct {
-	URL      string `json:"url" binding:"required"`
-	Password string `json:"password"`
-	Type     string `json:"type"`
-	Method   string `json:"method"`
-	CmdParam string `json:"cmd_param"`
-	Remark   string `json:"remark"`
-	Encoding string `json:"encoding"`
-	OS       string `json:"os"`
+	URL       string `json:"url" binding:"required"`
+	Password  string `json:"password"`
+	Type      string `json:"type"`
+	Method    string `json:"method"`
+	Remark    string `json:"remark"`
+	Encoding  string `json:"encoding"`
+	OS        string `json:"os"`
+	Protocol  string `json:"protocol"`   // classic 或 behinder
+	UserAgent string `json:"user_agent"` // 自定义请求头文本（兼容旧 UA 字符串）
 }
 
 // ListConnections 列出所有 WebShell 连接（GET /api/webshell/connections）
@@ -424,10 +498,11 @@ func (h *WebShellHandler) CreateConnection(c *gin.Context) {
 		Password:  strings.TrimSpace(req.Password),
 		Type:      shellType,
 		Method:    method,
-		CmdParam:  strings.TrimSpace(req.CmdParam),
 		Remark:    strings.TrimSpace(req.Remark),
 		Encoding:  normalizeWebshellEncoding(req.Encoding),
 		OS:        normalizeWebshellOS(req.OS),
+		Protocol:  normalizeWebshellProtocol(req.Protocol),
+		UserAgent: normalizeWebshellHeaderText(req.UserAgent),
 		CreatedAt: time.Now(),
 	}
 	if err := h.db.CreateWebshellConnection(conn); err != nil {
@@ -480,15 +555,16 @@ func (h *WebShellHandler) UpdateConnection(c *gin.Context) {
 		shellType = "php"
 	}
 	conn := &database.WebShellConnection{
-		ID:       id,
-		URL:      req.URL,
-		Password: strings.TrimSpace(req.Password),
-		Type:     shellType,
-		Method:   method,
-		CmdParam: strings.TrimSpace(req.CmdParam),
-		Remark:   strings.TrimSpace(req.Remark),
-		Encoding: normalizeWebshellEncoding(req.Encoding),
-		OS:       normalizeWebshellOS(req.OS),
+		ID:        id,
+		URL:       req.URL,
+		Password:  strings.TrimSpace(req.Password),
+		Type:      shellType,
+		Method:    method,
+		Remark:    strings.TrimSpace(req.Remark),
+		Encoding:  normalizeWebshellEncoding(req.Encoding),
+		OS:        normalizeWebshellOS(req.OS),
+		Protocol:  normalizeWebshellProtocol(req.Protocol),
+		UserAgent: normalizeWebshellHeaderText(req.UserAgent),
 	}
 	if err := h.db.UpdateWebshellConnection(conn); err != nil {
 		if err == sql.ErrNoRows {
@@ -659,14 +735,15 @@ func (h *WebShellHandler) ListAIConversations(c *gin.Context) {
 
 // ExecRequest 执行命令请求（前端传入连接信息 + 命令）
 type ExecRequest struct {
-	URL      string `json:"url" binding:"required"`
-	Password string `json:"password"`
-	Type     string `json:"type"`      // php, asp, aspx, jsp, custom
-	Method   string `json:"method"`    // GET 或 POST，空则默认 POST
-	CmdParam string `json:"cmd_param"` // 命令参数名，如 cmd/xxx，空则默认 cmd
-	Encoding string `json:"encoding"`  // 响应编码：auto / utf-8 / gbk / gb18030，空则 auto
-	OS       string `json:"os"`        // 目标操作系统：auto / linux / windows，当前 exec 不用它，保留字段便于未来扩展
-	Command  string `json:"command" binding:"required"`
+	URL       string `json:"url" binding:"required"`
+	Password  string `json:"password"`
+	Type      string `json:"type"`       // php, asp, aspx, jsp, custom
+	Method    string `json:"method"`     // GET 或 POST，空则默认 POST
+	Encoding  string `json:"encoding"`   // 响应编码：auto / utf-8 / gbk / gb18030，空则 auto
+	OS        string `json:"os"`         // 目标操作系统：auto / linux / windows
+	Protocol  string `json:"protocol"`   // 协议：classic（默认）或 behinder
+	UserAgent string `json:"user_agent"` // 自定义请求头文本（兼容旧 UA 字符串）
+	Command   string `json:"command" binding:"required"`
 }
 
 // ExecResponse 执行命令响应
@@ -683,9 +760,10 @@ type FileOpRequest struct {
 	Password     string `json:"password"`
 	Type         string `json:"type"`
 	Method       string `json:"method"`                    // GET 或 POST，空则默认 POST
-	CmdParam     string `json:"cmd_param"`                 // 命令参数名，如 cmd/xxx，空则默认 cmd
 	Encoding     string `json:"encoding"`                  // 响应编码：auto / utf-8 / gbk / gb18030，空则 auto
 	OS           string `json:"os"`                        // 目标操作系统：auto / linux / windows，空则按 shellType 推断
+	Protocol     string `json:"protocol"`                  // 协议：classic（默认）或 behinder
+	UserAgent    string `json:"user_agent"`                // 自定义请求头文本（兼容旧 UA 字符串）
 	ConnectionID string `json:"connection_id,omitempty"`   // 可选：连接 ID；服务端探活出 OS 后会回写到此连接
 	Action       string `json:"action" binding:"required"` // list, read, delete, write, mkdir, rename, upload, upload_chunk
 	Path         string `json:"path"`
@@ -715,6 +793,18 @@ func (h *WebShellHandler) Exec(c *gin.Context) {
 		return
 	}
 
+	// behinder protocol handling
+	protocol := normalizeWebshellProtocol(req.Protocol)
+	if protocol == "behinder" {
+		output, ok, errMsg := h.behinder.ExecWithParamsHeaders(req.URL, req.Password, req.Type, req.Command, req.UserAgent)
+		if !ok {
+			c.JSON(http.StatusOK, ExecResponse{OK: false, Error: errMsg})
+			return
+		}
+		c.JSON(http.StatusOK, ExecResponse{OK: true, Output: output})
+		return
+	}
+
 	parsed, err := url.Parse(req.URL)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid url: only http(s) allowed"})
@@ -722,10 +812,7 @@ func (h *WebShellHandler) Exec(c *gin.Context) {
 	}
 
 	useGET := strings.ToUpper(strings.TrimSpace(req.Method)) == "GET"
-	cmdParam := strings.TrimSpace(req.CmdParam)
-	if cmdParam == "" {
-		cmdParam = "cmd"
-	}
+	cmdParam := "cmd"
 	var httpReq *http.Request
 	if useGET {
 		targetURL := h.buildExecURL(req.URL, req.Type, req.Password, cmdParam, req.Command)
@@ -740,7 +827,7 @@ func (h *WebShellHandler) Exec(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, ExecResponse{OK: false, Error: err.Error()})
 		return
 	}
-	httpReq.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CyberStrikeAI-WebShell/1.0)")
+	applyWebshellHeaderText(httpReq, req.UserAgent)
 
 	resp, err := h.client.Do(httpReq)
 	if err != nil {
@@ -808,6 +895,18 @@ func (h *WebShellHandler) FileOp(c *gin.Context) {
 		return
 	}
 
+	// 冰蝎协议处理
+	protocol := normalizeWebshellProtocol(req.Protocol)
+	if protocol == "behinder" {
+		output, ok, errMsg := h.behinder.FileOpWithParamsHeaders(req.URL, req.Password, req.Type, req.Action, req.Path, req.Content, req.TargetPath, req.ChunkIndex, req.UserAgent)
+		if !ok {
+			c.JSON(http.StatusOK, FileOpResponse{OK: false, Error: errMsg})
+			return
+		}
+		c.JSON(http.StatusOK, FileOpResponse{OK: true, Output: output})
+		return
+	}
+
 	parsed, err := url.Parse(req.URL)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid url: only http(s) allowed"})
@@ -819,7 +918,7 @@ func (h *WebShellHandler) FileOp(c *gin.Context) {
 	osTag := req.OS
 	detectedOS := ""
 	if normalizeWebshellOS(osTag) == "auto" {
-		if probed := probeWebshellOSViaExec(h.newHTTPExecFn(req.URL, req.Password, req.Type, req.Method, req.CmdParam, req.Encoding)); probed != "" {
+		if probed := probeWebshellOSViaExec(h.newHTTPExecFn(req.URL, req.Password, req.Type, req.Method, "cmd", req.Encoding, req.UserAgent)); probed != "" {
 			osTag = probed
 			detectedOS = probed
 			// 若前端带了 connection_id，顺带把探活结果持久化到该连接，后续刷新零成本
@@ -844,10 +943,7 @@ func (h *WebShellHandler) FileOp(c *gin.Context) {
 	}
 
 	useGET := strings.ToUpper(strings.TrimSpace(req.Method)) == "GET"
-	cmdParam := strings.TrimSpace(req.CmdParam)
-	if cmdParam == "" {
-		cmdParam = "cmd"
-	}
+	cmdParam := "cmd"
 	var httpReq *http.Request
 	if useGET {
 		targetURL := h.buildExecURL(req.URL, req.Type, req.Password, cmdParam, command)
@@ -861,7 +957,7 @@ func (h *WebShellHandler) FileOp(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, FileOpResponse{OK: false, Error: err.Error()})
 		return
 	}
-	httpReq.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CyberStrikeAI-WebShell/1.0)")
+	applyWebshellHeaderText(httpReq, req.UserAgent)
 
 	resp, err := h.client.Do(httpReq)
 	if err != nil {
@@ -892,11 +988,14 @@ func (h *WebShellHandler) ExecWithConnection(conn *database.WebShellConnection, 
 	if command == "" {
 		return "", false, "command is required"
 	}
-	useGET := strings.ToUpper(strings.TrimSpace(conn.Method)) == "GET"
-	cmdParam := strings.TrimSpace(conn.CmdParam)
-	if cmdParam == "" {
-		cmdParam = "cmd"
+
+	// Route to Behinder protocol handler if configured
+	if conn.Protocol == "behinder" {
+		return h.behinder.ExecWithParamsHeaders(conn.URL, conn.Password, conn.Type, command, conn.UserAgent)
 	}
+
+	useGET := strings.ToUpper(strings.TrimSpace(conn.Method)) == "GET"
+	cmdParam := "cmd"
 	var httpReq *http.Request
 	var err error
 	if useGET {
@@ -910,7 +1009,7 @@ func (h *WebShellHandler) ExecWithConnection(conn *database.WebShellConnection, 
 	if err != nil {
 		return "", false, err.Error()
 	}
-	httpReq.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CyberStrikeAI-WebShell/1.0)")
+	applyWebshellHeaderText(httpReq, conn.UserAgent)
 	resp, err := h.client.Do(httpReq)
 	if err != nil {
 		return "", false, err.Error()
@@ -928,6 +1027,12 @@ func (h *WebShellHandler) FileOpWithConnection(conn *database.WebShellConnection
 	if conn == nil {
 		return "", false, "connection is nil"
 	}
+
+	// Route to Behinder protocol handler if configured
+	if conn.Protocol == "behinder" {
+		return h.behinder.FileOpWithParamsHeaders(conn.URL, conn.Password, conn.Type, action, path, content, targetPath, 0, conn.UserAgent)
+	}
+
 	action = strings.ToLower(strings.TrimSpace(action))
 	// MCP 入口仅开放 list / read / write 三种动作，与工具文档的承诺保持一致
 	switch action {
@@ -962,10 +1067,7 @@ func (h *WebShellHandler) FileOpWithConnection(conn *database.WebShellConnection
 		return "", false, cmdErr.Error()
 	}
 	useGET := strings.ToUpper(strings.TrimSpace(conn.Method)) == "GET"
-	cmdParam := strings.TrimSpace(conn.CmdParam)
-	if cmdParam == "" {
-		cmdParam = "cmd"
-	}
+	cmdParam := "cmd"
 	var httpReq *http.Request
 	var err error
 	if useGET {
@@ -979,7 +1081,7 @@ func (h *WebShellHandler) FileOpWithConnection(conn *database.WebShellConnection
 	if err != nil {
 		return "", false, err.Error()
 	}
-	httpReq.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CyberStrikeAI-WebShell/1.0)")
+	applyWebshellHeaderText(httpReq, conn.UserAgent)
 	resp, err := h.client.Do(httpReq)
 	if err != nil {
 		return "", false, err.Error()

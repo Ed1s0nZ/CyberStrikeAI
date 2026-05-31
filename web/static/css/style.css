@@ -13224,7 +13224,7 @@ header {
 .webshell-file-table {
     width: 100%;
     border-collapse: collapse;
-    table-layout: fixed;
+    table-layout: auto;
     font-size: 0.9rem;
 }
 
@@ -13249,7 +13249,8 @@ header {
 }
 
 .webshell-col-name {
-    min-width: 0;
+    min-width: 220px;
+    width: auto;
 }
 
 .webshell-file-empty-state {
@@ -22639,4 +22640,3 @@ body.projects-modal-open {
         max-height: 220px;
     }
 }
-

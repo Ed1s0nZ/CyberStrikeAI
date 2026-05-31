@@ -3936,9 +3936,18 @@
                         <option value="get" data-i18n="webshell.methodGet">GET</option>
                     </select>
                 </div>
+                                <div class="form-group">
+                    <label for="webshell-protocol">协议类型</label>
+                    <select id="webshell-protocol">
+                        <option value="classic">经典 (Classic)</option>
+                        <option value="behinder">冰蝎 (Behinder)</option>
+                    </select>
+                    <small class="form-hint">经典协议使用明文通信，冰蝎协议使用AES加密</small>
+                </div>
                 <div class="form-group">
-                    <label for="webshell-cmd-param" data-i18n="webshell.cmdParam">命令参数名</label>
-                    <input type="text" id="webshell-cmd-param" data-i18n="webshell.cmdParamPlaceholder" data-i18n-attr="placeholder" placeholder="不填默认为 cmd，如 xxx 则请求为 xxx=命令" />
+                    <label for="webshell-headers">自定义请求头</label>
+                    <textarea id="webshell-headers" rows="5" spellcheck="false" autocomplete="off" placeholder="User-Agent: Mozilla/5.0 ..."></textarea>
+                    <small class="form-hint">请求包 Header，每行一个；User-Agent 默认模拟浏览器。</small>
                 </div>
                 <div class="form-group">
                     <label for="webshell-os" data-i18n="webshell.os">目标系统</label>
@@ -4225,4 +4234,3 @@
     <script src="/static/js/c2.js"></script>
 </body>
 </html>
-
