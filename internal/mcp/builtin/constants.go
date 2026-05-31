@@ -4,9 +4,9 @@ package builtin
 // 所有代码中使用内置工具名称的地方都应该使用这些常量，而不是硬编码字符串
 const (
 	// 漏洞管理工具
-	ToolRecordVulnerability  = "record_vulnerability"
-	ToolListVulnerabilities  = "list_vulnerabilities"
-	ToolGetVulnerability     = "get_vulnerability"
+	ToolRecordVulnerability = "record_vulnerability"
+	ToolListVulnerabilities = "list_vulnerabilities"
+	ToolGetVulnerability    = "get_vulnerability"
 
 	// 项目黑板（事实）工具
 	ToolUpsertProjectFact    = "upsert_project_fact"
@@ -25,6 +25,7 @@ const (
 	ToolWebshellFileList  = "webshell_file_list"
 	ToolWebshellFileRead  = "webshell_file_read"
 	ToolWebshellFileWrite = "webshell_file_write"
+	ToolWebshellFileOp    = "webshell_file_op"
 
 	// WebShell 连接管理工具（用于通过 MCP 管理 webshell 连接）
 	ToolManageWebshellList   = "manage_webshell_list"
@@ -77,6 +78,7 @@ func IsBuiltinTool(toolName string) bool {
 		ToolWebshellFileList,
 		ToolWebshellFileRead,
 		ToolWebshellFileWrite,
+		ToolWebshellFileOp,
 		ToolManageWebshellList,
 		ToolManageWebshellAdd,
 		ToolManageWebshellUpdate,
@@ -128,6 +130,7 @@ func GetAllBuiltinTools() []string {
 		ToolWebshellFileList,
 		ToolWebshellFileRead,
 		ToolWebshellFileWrite,
+		ToolWebshellFileOp,
 		ToolManageWebshellList,
 		ToolManageWebshellAdd,
 		ToolManageWebshellUpdate,
