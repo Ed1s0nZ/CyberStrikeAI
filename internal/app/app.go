@@ -1400,7 +1400,7 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 			sb.WriteString(fmt.Sprintf("  URL: %s\n", conn.URL))
 			sb.WriteString(fmt.Sprintf("  类型: %s\n", conn.Type))
 			sb.WriteString(fmt.Sprintf("  请求方式: %s\n", conn.Method))
-			sb.WriteString(fmt.Sprintf("  命令参数: %s\n", conn.CmdParam))
+			sb.WriteString(fmt.Sprintf("  命令参数: %s\n", "cmd"))
 			if conn.Remark != "" {
 				sb.WriteString(fmt.Sprintf("  备注: %s\n", conn.Remark))
 			}
@@ -1440,10 +1440,6 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 					"description": "请求方式：GET 或 POST，默认为 POST",
 					"enum":        []string{"GET", "POST"},
 				},
-				"cmd_param": map[string]interface{}{
-					"type":        "string",
-					"description": "命令参数名，不填默认为 cmd",
-				},
 				"remark": map[string]interface{}{
 					"type":        "string",
 					"description": "备注，便于识别的备注名",
@@ -1470,10 +1466,6 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 		if method == "" {
 			method = "post"
 		}
-		cmdParam, _ := args["cmd_param"].(string)
-		if cmdParam == "" {
-			cmdParam = "cmd"
-		}
 		remark, _ := args["remark"].(string)
 
 		// 生成连接ID
@@ -1484,7 +1476,6 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 			Password:  password,
 			Type:      strings.ToLower(shellType),
 			Method:    strings.ToLower(method),
-			CmdParam:  cmdParam,
 			Remark:    remark,
 			CreatedAt: time.Now(),
 		}
@@ -1499,7 +1490,7 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 		return &mcp.ToolResult{
 			Content: []mcp.Content{{
 				Type: "text",
-				Text: fmt.Sprintf("WebShell 连接添加成功！\n\n连接ID: %s\nURL: %s\n类型: %s\n请求方式: %s\n命令参数: %s", conn.ID, conn.URL, conn.Type, conn.Method, conn.CmdParam),
+				Text: fmt.Sprintf("WebShell 连接添加成功！\n\n连接ID: %s\nURL: %s\n类型: %s\n请求方式: %s\n命令参数: %s", conn.ID, conn.URL, conn.Type, conn.Method, "cmd"),
 			}},
 			IsError: false,
 		}, nil
@@ -1535,10 +1526,6 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 					"type":        "string",
 					"description": "新的请求方式：GET 或 POST",
 					"enum":        []string{"GET", "POST"},
-				},
-				"cmd_param": map[string]interface{}{
-					"type":        "string",
-					"description": "新的命令参数名",
 				},
 				"remark": map[string]interface{}{
 					"type":        "string",
@@ -1579,9 +1566,6 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 		if method, ok := args["method"].(string); ok && method != "" {
 			existing.Method = strings.ToLower(method)
 		}
-		if cmdParam, ok := args["cmd_param"].(string); ok && cmdParam != "" {
-			existing.CmdParam = cmdParam
-		}
 		if remark, ok := args["remark"].(string); ok {
 			existing.Remark = remark
 		}
@@ -1596,7 +1580,7 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 		return &mcp.ToolResult{
 			Content: []mcp.Content{{
 				Type: "text",
-				Text: fmt.Sprintf("WebShell 连接更新成功！\n\n连接ID: %s\nURL: %s\n类型: %s\n请求方式: %s\n命令参数: %s\n备注: %s", existing.ID, existing.URL, existing.Type, existing.Method, existing.CmdParam, existing.Remark),
+				Text: fmt.Sprintf("WebShell 连接更新成功！\n\n连接ID: %s\nURL: %s\n类型: %s\n请求方式: %s\n命令参数: %s\n备注: %s", existing.ID, existing.URL, existing.Type, existing.Method, "cmd", existing.Remark),
 			}},
 			IsError: false,
 		}, nil
