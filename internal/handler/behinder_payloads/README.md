@@ -1,11 +1,11 @@
-# Behinder Payload Assets
+# Embedded Behinder Payload Assets
 
 CyberStrikeAI's native Behinder protocol adapter needs the Java payload bytecode below when operating against authorized JSP Behinder webshells:
 
-- `net/rebeyond/behinder/payload/java/Cmd.class`
-- `net/rebeyond/behinder/payload/java/FileOperation.class`
+- `java/Cmd.class`
+- `java/FileOperation.class`
 
-At runtime CyberStrikeAI reads these class files, rewrites selected static string fields in memory, encrypts the modified bytecode with the configured Behinder password, and sends it to the target webshell. The files are kept in the repository so source deployments do not depend on `/opt/CyberStrikeAI` or a machine-specific absolute path.
+These files are embedded into the CyberStrikeAI binary with Go's `embed` package. At runtime CyberStrikeAI reads the embedded bytes, rewrites selected static string fields in memory, encrypts the modified bytecode with the configured Behinder password, and sends it to the target webshell. This avoids any dependency on `/opt/CyberStrikeAI`, the current working directory, or other machine-specific asset paths.
 
 ## Origin and compatibility
 

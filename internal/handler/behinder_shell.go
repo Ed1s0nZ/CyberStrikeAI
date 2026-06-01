@@ -3,13 +3,12 @@ package handler
 import (
 	"bytes"
 	"crypto/tls"
+	"embed"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -19,31 +18,15 @@ import (
 
 // BehinderHandler implements the Behinder (冰蝎) webshell protocol natively in Go.
 type BehinderHandler struct {
-	logger   *zap.Logger
-	client   *http.Client
-	classDir string // Directory containing Cmd.class and FileOperation.class (JSP only)
+	logger *zap.Logger
+	client *http.Client
 }
 
-const behinderClassRelativeDir = "tools/behinder/net/rebeyond/behinder/payload/java"
+//go:embed behinder_payloads/java/*.class
+var behinderPayloadFS embed.FS
 
-func resolveBehinderClassDir() string {
-	candidates := []string{}
-	if cwd, err := os.Getwd(); err == nil && cwd != "" {
-		candidates = append(candidates, filepath.Join(cwd, behinderClassRelativeDir))
-	}
-	if exe, err := os.Executable(); err == nil && exe != "" {
-		candidates = append(candidates, filepath.Join(filepath.Dir(exe), behinderClassRelativeDir))
-	}
-	candidates = append(candidates, filepath.Join("/opt/CyberStrikeAI", behinderClassRelativeDir))
-	for _, dir := range candidates {
-		if _, err := os.Stat(filepath.Join(dir, "Cmd.class")); err == nil {
-			return dir
-		}
-	}
-	if len(candidates) > 0 {
-		return candidates[0]
-	}
-	return behinderClassRelativeDir
+func readBehinderPayloadClass(className string) ([]byte, error) {
+	return behinderPayloadFS.ReadFile("behinder_payloads/java/" + className + ".class")
 }
 
 // NewBehinderHandler creates a Behinder protocol handler.
@@ -57,7 +40,6 @@ func NewBehinderHandler(logger *zap.Logger) *BehinderHandler {
 				TLSClientConfig:   &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
 			},
 		},
-		classDir: resolveBehinderClassDir(),
 	}
 }
 
@@ -88,8 +70,7 @@ func (h *BehinderHandler) buildPayload(shellType, className string, fields map[s
 	switch st {
 	case "jsp":
 		// JSP: modify class bytecode, encrypt, Base64 encode
-		classPath := filepath.Join(h.classDir, className+".class")
-		classBytes, err := os.ReadFile(classPath)
+		classBytes, err := readBehinderPayloadClass(className)
 		if err != nil {
 			return nil, fmt.Errorf("read %s.class: %w", className, err)
 		}

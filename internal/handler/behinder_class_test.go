@@ -2,13 +2,12 @@ package handler
 
 import (
 	"encoding/binary"
-	"os"
-	"path/filepath"
+	"strings"
 	"testing"
 )
 
 func TestModifyClassFieldsInjectsMultipleStaticStrings(t *testing.T) {
-	classBytes := readBehinderPayloadClass(t, "FileOperation.class")
+	classBytes := mustReadBehinderPayloadClass(t, "FileOperation.class")
 	modified, err := modifyClassFields(classBytes, map[string]string{
 		"mode":    "create",
 		"path":    "/tmp/cyberstrike.txt",
@@ -39,7 +38,7 @@ func TestModifyClassFieldsInjectsMultipleStaticStrings(t *testing.T) {
 }
 
 func TestModifyClassFieldsSupportsCmdPath(t *testing.T) {
-	classBytes := readBehinderPayloadClass(t, "Cmd.class")
+	classBytes := mustReadBehinderPayloadClass(t, "Cmd.class")
 	modified, err := modifyClassFields(classBytes, map[string]string{
 		"cmd":  "whoami",
 		"path": "/tmp",
@@ -53,12 +52,11 @@ func TestModifyClassFieldsSupportsCmdPath(t *testing.T) {
 	}
 }
 
-func readBehinderPayloadClass(t *testing.T, name string) []byte {
+func mustReadBehinderPayloadClass(t *testing.T, name string) []byte {
 	t.Helper()
-	path := filepath.Join("..", "..", "tools", "behinder", "net", "rebeyond", "behinder", "payload", "java", name)
-	data, err := os.ReadFile(path)
+	data, err := readBehinderPayloadClass(strings.TrimSuffix(name, ".class"))
 	if err != nil {
-		t.Fatalf("read %s: %v", path, err)
+		t.Fatalf("read %s: %v", name, err)
 	}
 	return data
 }
