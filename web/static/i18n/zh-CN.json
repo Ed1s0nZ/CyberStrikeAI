@@ -48,6 +48,7 @@
   },
   "login": {
     "title": "登录 CyberStrikeAI",
+    "titlePrefix": "登录",
     "subtitle": "请输入配置中的访问密码",
     "passwordLabel": "密码",
     "passwordPlaceholder": "输入登录密码",

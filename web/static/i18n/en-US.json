@@ -48,6 +48,7 @@
   },
   "login": {
     "title": "Sign in to CyberStrikeAI",
+    "titlePrefix": "Sign in to",
     "subtitle": "Enter the access password from config",
     "passwordLabel": "Password",
     "passwordPlaceholder": "Enter password",
