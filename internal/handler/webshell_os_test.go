@@ -68,11 +68,11 @@ func TestResolveWebshellOS(t *testing.T) {
 
 func TestQuoteCmdPath(t *testing.T) {
 	cases := map[string]string{
-		"":                     `"."`,
-		`C:\Windows\Temp`:      `"C:\Windows\Temp"`,
-		`C:\Program Files\a`:   `"C:\Program Files\a"`,
-		`C:\weird"name\f.txt`:  `"C:\weird""name\f.txt"`,
-		`.`:                    `"."`,
+		"":                    `"."`,
+		`C:\Windows\Temp`:     `"C:\Windows\Temp"`,
+		`C:\Program Files\a`:  `"C:\Program Files\a"`,
+		`C:\weird"name\f.txt`: `"C:\weird""name\f.txt"`,
+		`.`:                   `"."`,
 	}
 	for in, want := range cases {
 		if got := quoteCmdPath(in); got != want {
@@ -83,8 +83,8 @@ func TestQuoteCmdPath(t *testing.T) {
 
 func TestQuoteShellSinglePosix(t *testing.T) {
 	cases := map[string]string{
-		"":             ".",
-		"/tmp/a b":     "'/tmp/a b'",
+		"":              ".",
+		"/tmp/a b":      "'/tmp/a b'",
 		"/tmp/it's.txt": `'/tmp/it'\''s.txt'`,
 	}
 	for in, want := range cases {
@@ -135,7 +135,7 @@ func TestBuildFileCommand_LinuxBranch(t *testing.T) {
 	in.Action = "read"
 	in.Path = "/etc/passwd"
 	cmd, _ = h.buildFileCommand(in)
-	mustContain(t, cmd, "cat ", "'/etc/passwd'")
+	mustContain(t, cmd, "printf '"+classicReadBase64Prefix+"'", "base64 -w 0 ", "'/etc/passwd'")
 
 	// read without path → error
 	in.Path = ""
@@ -255,7 +255,7 @@ func TestBuildFileCommand_WindowsBranch(t *testing.T) {
 	in.Action = "read"
 	in.Path = `C:\flag.txt`
 	cmd, _ = h.buildFileCommand(in)
-	mustContain(t, cmd, "type ", `"C:\flag.txt"`)
+	mustContain(t, cmd, "powershell -NoProfile -NonInteractive -Command", classicReadBase64Prefix, "ToBase64String", "ReadAllBytes('C:\\flag.txt')")
 
 	// delete
 	in.Action = "delete"
