@@ -1358,6 +1358,59 @@ func registerWebshellTools(mcpServer *mcp.Server, db *database.DB, webshellHandl
 	}
 	mcpServer.RegisterTool(writeTool, writeHandler)
 
+	// webshell_file_op
+	fileOpTool := mcp.Tool{
+		Name:             builtin.ToolWebshellFileOp,
+		Description:      "在指定 WebShell 连接上执行完整文件操作。支持 list、read、delete、write、mkdir、rename、upload、upload_chunk。upload/upload_chunk 的 content 必须是 base64 内容；upload_chunk 使用 chunk_index，0 表示首块。",
+		ShortDescription: "在 WebShell 上执行完整文件操作",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"connection_id": map[string]interface{}{"type": "string", "description": "WebShell 连接 ID"},
+				"action": map[string]interface{}{
+					"type":        "string",
+					"description": "文件操作类型",
+					"enum":        []string{"list", "read", "delete", "write", "mkdir", "rename", "upload", "upload_chunk"},
+				},
+				"path":        map[string]interface{}{"type": "string", "description": "源路径、文件路径或目录路径"},
+				"content":     map[string]interface{}{"type": "string", "description": "write 的文本内容；upload/upload_chunk 的 base64 内容"},
+				"target_path": map[string]interface{}{"type": "string", "description": "rename 的目标路径"},
+				"chunk_index": map[string]interface{}{"type": "integer", "description": "upload_chunk 的分块序号，0 表示首块"},
+			},
+			"required": []string{"connection_id", "action"},
+		},
+	}
+	fileOpHandler := func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		cid, _ := args["connection_id"].(string)
+		action, _ := args["action"].(string)
+		path, _ := args["path"].(string)
+		content, _ := args["content"].(string)
+		targetPath, _ := args["target_path"].(string)
+		chunkIndex := 0
+		switch v := args["chunk_index"].(type) {
+		case int:
+			chunkIndex = v
+		case int64:
+			chunkIndex = int(v)
+		case float64:
+			chunkIndex = int(v)
+		}
+		action = strings.ToLower(strings.TrimSpace(action))
+		if cid == "" || action == "" {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "connection_id 和 action 必填"}}, IsError: true}, nil
+		}
+		conn, err := db.GetWebshellConnection(cid)
+		if err != nil || conn == nil {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "未找到该 WebShell 连接"}}, IsError: true}, nil
+		}
+		output, ok, errMsg := webshellHandler.FileOpWithConnection(conn, action, path, content, targetPath, chunkIndex)
+		if errMsg != "" {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: errMsg}}, IsError: true}, nil
+		}
+		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: output}}, IsError: !ok}, nil
+	}
+	mcpServer.RegisterTool(fileOpTool, fileOpHandler)
+
 	logger.Info("WebShell 工具注册成功")
 }
 
@@ -1399,6 +1452,7 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 			sb.WriteString(fmt.Sprintf("  URL: %s\n", conn.URL))
 			sb.WriteString(fmt.Sprintf("  类型: %s\n", conn.Type))
 			sb.WriteString(fmt.Sprintf("  请求方式: %s\n", conn.Method))
+			sb.WriteString(fmt.Sprintf("  协议: %s\n", conn.Protocol))
 			sb.WriteString(fmt.Sprintf("  命令参数: %s\n", conn.CmdParam))
 			if conn.Remark != "" {
 				sb.WriteString(fmt.Sprintf("  备注: %s\n", conn.Remark))
@@ -1441,7 +1495,16 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 				},
 				"cmd_param": map[string]interface{}{
 					"type":        "string",
-					"description": "命令参数名，不填默认为 cmd",
+					"description": "classic 协议命令参数名，默认为 cmd",
+				},
+				"protocol": map[string]interface{}{
+					"type":        "string",
+					"description": "协议类型：classic 或 behinder，默认为 classic",
+					"enum":        []string{"classic", "behinder"},
+				},
+				"user_agent": map[string]interface{}{
+					"type":        "string",
+					"description": "自定义请求头文本，每行一个 Header；兼容旧的单行 User-Agent 字符串",
 				},
 				"remark": map[string]interface{}{
 					"type":        "string",
@@ -1470,9 +1533,16 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 			method = "post"
 		}
 		cmdParam, _ := args["cmd_param"].(string)
+		cmdParam = strings.TrimSpace(cmdParam)
 		if cmdParam == "" {
 			cmdParam = "cmd"
 		}
+		protocol, _ := args["protocol"].(string)
+		protocol = strings.ToLower(strings.TrimSpace(protocol))
+		if protocol != "behinder" {
+			protocol = "classic"
+		}
+		userAgent, _ := args["user_agent"].(string)
 		remark, _ := args["remark"].(string)
 
 		// 生成连接ID
@@ -1484,6 +1554,8 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 			Type:      strings.ToLower(shellType),
 			Method:    strings.ToLower(method),
 			CmdParam:  cmdParam,
+			Protocol:  protocol,
+			UserAgent: userAgent,
 			Remark:    remark,
 			CreatedAt: time.Now(),
 		}
@@ -1498,7 +1570,7 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 		return &mcp.ToolResult{
 			Content: []mcp.Content{{
 				Type: "text",
-				Text: fmt.Sprintf("WebShell 连接添加成功！\n\n连接ID: %s\nURL: %s\n类型: %s\n请求方式: %s\n命令参数: %s", conn.ID, conn.URL, conn.Type, conn.Method, conn.CmdParam),
+				Text: fmt.Sprintf("WebShell 连接添加成功！\n\n连接ID: %s\nURL: %s\n类型: %s\n请求方式: %s\n协议: %s\n命令参数: %s", conn.ID, conn.URL, conn.Type, conn.Method, conn.Protocol, conn.CmdParam),
 			}},
 			IsError: false,
 		}, nil
@@ -1537,7 +1609,16 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 				},
 				"cmd_param": map[string]interface{}{
 					"type":        "string",
-					"description": "新的命令参数名",
+					"description": "新的 classic 协议命令参数名，默认为 cmd",
+				},
+				"protocol": map[string]interface{}{
+					"type":        "string",
+					"description": "新的协议类型：classic 或 behinder",
+					"enum":        []string{"classic", "behinder"},
+				},
+				"user_agent": map[string]interface{}{
+					"type":        "string",
+					"description": "新的自定义请求头文本，每行一个 Header；兼容旧的单行 User-Agent 字符串",
 				},
 				"remark": map[string]interface{}{
 					"type":        "string",
@@ -1578,8 +1659,22 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 		if method, ok := args["method"].(string); ok && method != "" {
 			existing.Method = strings.ToLower(method)
 		}
-		if cmdParam, ok := args["cmd_param"].(string); ok && cmdParam != "" {
+		if cmdParam, ok := args["cmd_param"].(string); ok {
+			cmdParam = strings.TrimSpace(cmdParam)
+			if cmdParam == "" {
+				cmdParam = "cmd"
+			}
 			existing.CmdParam = cmdParam
+		}
+		if protocol, ok := args["protocol"].(string); ok && protocol != "" {
+			protocol = strings.ToLower(strings.TrimSpace(protocol))
+			if protocol != "behinder" {
+				protocol = "classic"
+			}
+			existing.Protocol = protocol
+		}
+		if userAgent, ok := args["user_agent"].(string); ok {
+			existing.UserAgent = userAgent
 		}
 		if remark, ok := args["remark"].(string); ok {
 			existing.Remark = remark
@@ -1595,7 +1690,7 @@ func registerWebshellManagementTools(mcpServer *mcp.Server, db *database.DB, web
 		return &mcp.ToolResult{
 			Content: []mcp.Content{{
 				Type: "text",
-				Text: fmt.Sprintf("WebShell 连接更新成功！\n\n连接ID: %s\nURL: %s\n类型: %s\n请求方式: %s\n命令参数: %s\n备注: %s", existing.ID, existing.URL, existing.Type, existing.Method, existing.CmdParam, existing.Remark),
+				Text: fmt.Sprintf("WebShell 连接更新成功！\n\n连接ID: %s\nURL: %s\n类型: %s\n请求方式: %s\n协议: %s\n命令参数: %s\n备注: %s", existing.ID, existing.URL, existing.Type, existing.Method, existing.Protocol, existing.CmdParam, existing.Remark),
 			}},
 			IsError: false,
 		}, nil

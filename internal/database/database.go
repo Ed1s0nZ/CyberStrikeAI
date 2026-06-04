@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 	"strings"
+	"sync"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -426,10 +426,12 @@ func (db *DB) initTables() error {
 		password TEXT NOT NULL DEFAULT '',
 		type TEXT NOT NULL DEFAULT 'php',
 		method TEXT NOT NULL DEFAULT 'post',
-		cmd_param TEXT NOT NULL DEFAULT '',
+		cmd_param TEXT NOT NULL DEFAULT 'cmd',
 		remark TEXT NOT NULL DEFAULT '',
 		encoding TEXT NOT NULL DEFAULT '',
 		os TEXT NOT NULL DEFAULT '',
+		protocol TEXT NOT NULL DEFAULT 'classic',
+		user_agent TEXT NOT NULL DEFAULT '',
 		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);`
 
@@ -1219,8 +1221,11 @@ func (db *DB) migrateWebshellConnectionsTable() error {
 		name string
 		stmt string
 	}{
+		{name: "cmd_param", stmt: "ALTER TABLE webshell_connections ADD COLUMN cmd_param TEXT NOT NULL DEFAULT 'cmd'"},
 		{name: "encoding", stmt: "ALTER TABLE webshell_connections ADD COLUMN encoding TEXT NOT NULL DEFAULT ''"},
 		{name: "os", stmt: "ALTER TABLE webshell_connections ADD COLUMN os TEXT NOT NULL DEFAULT ''"},
+		{name: "protocol", stmt: "ALTER TABLE webshell_connections ADD COLUMN protocol TEXT NOT NULL DEFAULT 'classic'"},
+		{name: "user_agent", stmt: "ALTER TABLE webshell_connections ADD COLUMN user_agent TEXT NOT NULL DEFAULT ''"},
 	}
 
 	for _, col := range columns {

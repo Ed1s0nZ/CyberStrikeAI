@@ -14,13 +14,7 @@
     <div id="login-overlay" class="login-overlay" style="display: none;">
         <div class="login-card">
             <div class="login-brand">
-                <img src="/static/logo.png" alt="" class="login-brand-logo" width="56" height="56">
-                <h2 class="login-title">
-                    <span data-i18n="login.titlePrefix">登录</span>
-                    <span class="brand-wordmark brand-wordmark--sm" aria-label="CyberStrikeAI">
-                        <span class="brand-wordmark__core">CyberStrike</span><span class="brand-wordmark__ai">AI</span>
-                    </span>
-                </h2>
+                <h2 data-i18n="login.title">登录 CyberStrikeAI</h2>
                 <p class="login-subtitle" data-i18n="login.subtitle">请输入配置中的访问密码</p>
             </div>
             <form id="login-form" class="login-form">
@@ -40,10 +34,8 @@
         <header>
             <div class="header-content">
                 <div class="logo header-logo-link" onclick="switchPage('dashboard')" role="button" data-i18n="header.backToDashboard" data-i18n-attr="title" data-i18n-skip-text="true" title="返回仪表盘">
-                    <img src="/static/logo.png" alt="CyberStrikeAI Logo" class="brand-logo" width="36" height="36">
-                    <h1 class="brand-wordmark brand-wordmark--lg">
-                        <span class="brand-wordmark__core">CyberStrike</span><span class="brand-wordmark__ai">AI</span>
-                    </h1>
+                    <img src="/static/logo.png" alt="CyberStrikeAI Logo" style="width: 32px; height: 32px; margin-right: 8px;">
+                    <h1>CyberStrikeAI</h1>
                     <span class="version-badge" data-i18n="header.version" data-i18n-attr="title" data-i18n-skip-text="true" title="当前版本">{{.Version}}</span>
                 </div>
                 <div class="header-right">
@@ -774,10 +766,10 @@
                             <div class="sidebar-content">
                                 <!-- 全局搜索 -->
                                 <div class="conversation-search-box" style="margin-bottom: 16px; margin-top: 16px;">
-                                    <input type="text" id="conversation-search-input" data-i18n="chat.searchHistory" data-i18n-attr="placeholder" placeholder="搜索历史记录..." 
-                                           oninput="handleConversationSearch(this.value)" 
+                                    <input type="text" id="conversation-search-input" data-i18n="chat.searchHistory" data-i18n-attr="placeholder" placeholder="搜索历史记录..."
+                                           oninput="handleConversationSearch(this.value)"
                                            onkeypress="if(event.key === 'Enter') handleConversationSearch(this.value)" />
-                                    <button class="conversation-search-clear" id="conversation-search-clear" 
+                                    <button class="conversation-search-clear" id="conversation-search-clear"
                                             onclick="clearConversationSearch()" style="display: none;" data-i18n="common.clearSearch" data-i18n-attr="title" title="清除搜索">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                             <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
@@ -785,7 +777,7 @@
                                         </svg>
                                     </button>
                                 </div>
-                                
+
                                 <!-- 对话分组 -->
                                 <div class="conversation-groups-section">
                                     <div class="section-header">
@@ -798,7 +790,7 @@
                                     </div>
                                     <div id="conversation-groups-list" class="conversation-groups-list"></div>
                                 </div>
-                                
+
                                 <!-- 最近对话 -->
                                 <div class="recent-conversations-section">
                                     <div class="section-header">
@@ -898,7 +890,7 @@
                                 </div>
                             </div>
                         </aside>
-                        
+
                         <!-- 分组详情页面 -->
                         <div id="group-detail-page" class="group-detail-page" style="display: none;">
                             <div class="group-detail-header">
@@ -1539,14 +1531,8 @@
                                     </div>
                                 </div>
                                 <div id="project-panel-conversations" class="projects-panel" role="tabpanel" hidden>
-                                    <div class="projects-panel-toolbar projects-panel-toolbar--hint">
-                                        <p class="projects-fact-toolbar-hint" role="note">
-                                            <svg class="projects-fact-toolbar-hint-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-                                                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
-                                                <path d="M12 10v6M12 8h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                            </svg>
-                                            <span data-i18n="projects.boundConversationsHint">绑定到本项目的对话；点击可打开会话</span>
-                                        </p>
+                                    <div class="projects-panel-toolbar">
+                                        <span class="projects-panel-hint" data-i18n="projects.boundConversationsHint">绑定到本项目的对话；点击可打开会话</span>
                                     </div>
                                     <div class="projects-table-wrap">
                                         <table class="data-table data-table--projects">
@@ -1556,48 +1542,9 @@
                                     </div>
                                 </div>
                                 <div id="project-panel-vulns" class="projects-panel" role="tabpanel" hidden>
-                                    <div class="projects-fact-toolbar">
-                                        <div class="projects-vuln-toolbar-top">
-                                            <p class="projects-fact-toolbar-hint" role="note">
-                                                <svg class="projects-fact-toolbar-hint-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-                                                    <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
-                                                    <path d="M12 10v6M12 8h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                                </svg>
-                                                <span data-i18n="projects.projectVulnSummaryHint">本项目下记录的漏洞汇总</span>
-                                            </p>
-                                            <button type="button" class="btn-secondary btn-small" onclick="openVulnerabilitiesForProject()" data-i18n="projects.viewInVulnerabilityManagement">在漏洞管理中查看</button>
-                                        </div>
-                                        <div class="projects-fact-toolbar-filters" role="search">
-                                            <label class="projects-fact-filter-field projects-fact-filter-field--search">
-                                                <span class="sr-only" data-i18n="projects.searchVulnsSr">搜索漏洞</span>
-                                                <svg class="projects-fact-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-                                                    <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
-                                                    <path d="M20 20L16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                                </svg>
-                                                <input type="search" id="project-vulns-search" placeholder="搜索标题、描述、类型、目标…" oninput="debouncedLoadProjectVulnerabilities()" autocomplete="off" data-i18n="projects.searchVulnsPlaceholder" data-i18n-attr="placeholder">
-                                            </label>
-                                            <label class="projects-fact-filter-field">
-                                                <span class="projects-fact-filter-label" data-i18n="projects.severity">严重度</span>
-                                                <select id="project-vulns-filter-severity" onchange="loadProjectVulnerabilities()">
-                                                    <option value="" data-i18n="projects.all">全部</option>
-                                                    <option value="critical">critical</option>
-                                                    <option value="high">high</option>
-                                                    <option value="medium">medium</option>
-                                                    <option value="low">low</option>
-                                                    <option value="info">info</option>
-                                                </select>
-                                            </label>
-                                            <label class="projects-fact-filter-field">
-                                                <span class="projects-fact-filter-label" data-i18n="projects.status">状态</span>
-                                                <select id="project-vulns-filter-status" onchange="loadProjectVulnerabilities()">
-                                                    <option value="" data-i18n="projects.all">全部</option>
-                                                    <option value="open" data-i18n="vulnerabilityPage.statusOpen">待处理</option>
-                                                    <option value="confirmed" data-i18n="vulnerabilityPage.statusConfirmed">已确认</option>
-                                                    <option value="fixed" data-i18n="vulnerabilityPage.statusFixed">已修复</option>
-                                                    <option value="false_positive" data-i18n="vulnerabilityPage.statusFalsePositive">误报</option>
-                                                </select>
-                                            </label>
-                                        </div>
+                                    <div class="projects-panel-toolbar">
+                                        <span class="projects-panel-hint" data-i18n="projects.projectVulnSummaryHint">本项目下记录的漏洞汇总</span>
+                                        <button type="button" class="btn-secondary btn-small" onclick="openVulnerabilitiesForProject()" data-i18n="projects.viewInVulnerabilityManagement">在漏洞管理中查看</button>
                                     </div>
                                     <div class="projects-table-wrap">
                                         <table class="data-table data-table--projects">
@@ -1864,7 +1811,7 @@
                         <div id="vulnerabilities-list" class="vulnerabilities-list">
                             <div class="loading-spinner" data-i18n="vulnerabilityPage.loading">加载中...</div>
                         </div>
-                        
+
                         <!-- 分页控件 -->
                         <div id="vulnerability-pagination" class="pagination-container pagination-fixed"></div>
                     </div>
@@ -1980,7 +1927,7 @@
                                 </label>
                                 <label class="batch-queues-filters__search">
                                     <span data-i18n="tasksPage.searchQueuePlaceholder">搜索队列ID、标题或创建时间</span>
-                                    <input type="text" id="batch-queues-search" data-i18n="tasksPage.searchKeywordPlaceholder" data-i18n-attr="placeholder" placeholder="输入关键字搜索..." 
+                                    <input type="text" id="batch-queues-search" data-i18n="tasksPage.searchKeywordPlaceholder" data-i18n-attr="placeholder" placeholder="输入关键字搜索..."
                                            oninput="filterBatchQueues()">
                                 </label>
                             </div>
@@ -2398,7 +2345,7 @@
                                 </div>
                             </nav>
                         </aside>
-                        
+
                         <!-- 右侧内容区域 -->
                         <div class="settings-content">
                             <!-- 基本设置 -->
@@ -2406,7 +2353,7 @@
                                 <div class="settings-section-header">
                                     <h3 data-i18n="settingsBasic.basicTitle">基本设置</h3>
                                 </div>
-                                
+
                                 <!-- OpenAI配置 -->
                                 <div class="settings-subsection">
                                     <h4 data-i18n="settingsBasic.openaiConfig">OpenAI 配置</h4>
@@ -3115,7 +3062,7 @@
                                 <div class="settings-section-header">
                                     <h3 data-i18n="settings.nav.security">安全设置</h3>
                                 </div>
-                                
+
                                 <div class="settings-subsection">
                                     <h4 data-i18n="settingsSecurity.changePasswordTitle">修改密码</h4>
                                     <p class="settings-description" data-i18n="settingsSecurity.changePasswordDesc">修改登录密码后，需要使用新密码重新登录。</p>
@@ -3349,9 +3296,9 @@
                                 <span id="attack-chain-stats">Nodes: 0 | Edges: 0</span>
                             </div>
                             <div class="attack-chain-filters">
-                                <input type="text" id="attack-chain-search" data-i18n="attackChainModal.searchPlaceholder" data-i18n-attr="placeholder" placeholder="搜索节点..." 
+                                <input type="text" id="attack-chain-search" data-i18n="attackChainModal.searchPlaceholder" data-i18n-attr="placeholder" placeholder="搜索节点..."
                                        oninput="filterAttackChainNodes(this.value)">
-                                <select id="attack-chain-type-filter" 
+                                <select id="attack-chain-type-filter"
                                         onchange="filterAttackChainByType(this.value)">
                                     <option value="all" data-i18n="attackChainModal.allTypes">所有类型</option>
                                     <option value="target" data-i18n="attackChainModal.target">目标</option>
@@ -3673,7 +3620,7 @@
                             <span class="icon-option" onclick="selectGroupIcon('🔥')">🔥</span>
                             <span class="icon-option" onclick="selectGroupIcon('💡')">💡</span>
                             <span class="icon-option" onclick="selectGroupIcon('🎮')">🎮</span>
-                            <span class="icon-option" onclick="selectGroupIcon('🏴‍☠️')">🏴‍☠️</span>
+                            <span class="icon-option" onclick="selectGroupIcon('🏴☠️')">🏴☠️</span>
                             <span class="icon-option" onclick="selectGroupIcon('🕵️')">🕵️</span>
                             <span class="icon-option" onclick="selectGroupIcon('🔑')">🔑</span>
                             <span class="icon-option" onclick="selectGroupIcon('📡')">📡</span>
@@ -4035,7 +3982,20 @@
                 </div>
                 <div class="form-group">
                     <label for="webshell-cmd-param" data-i18n="webshell.cmdParam">命令参数名</label>
-                    <input type="text" id="webshell-cmd-param" data-i18n="webshell.cmdParamPlaceholder" data-i18n-attr="placeholder" placeholder="不填默认为 cmd，如 xxx 则请求为 xxx=命令" />
+                    <input type="text" id="webshell-cmd-param" data-i18n="webshell.cmdParamPlaceholder" data-i18n-attr="placeholder" placeholder="不填默认为 cmd，如填 xxx 则请求为 xxx=命令" />
+                </div>
+                <div class="form-group">
+                    <label for="webshell-protocol" data-i18n="webshell.protocol">协议类型</label>
+                    <select id="webshell-protocol">
+                        <option value="classic" data-i18n="webshell.protocolClassic">经典 (Classic)</option>
+                        <option value="behinder" data-i18n="webshell.protocolBehinder">冰蝎 (Behinder)</option>
+                    </select>
+                    <small class="form-hint" data-i18n="webshell.protocolHint">经典协议使用明文通信，冰蝎协议使用 AES 加密</small>
+                </div>
+                <div class="form-group">
+                    <label for="webshell-headers" data-i18n="webshell.requestHeaders">自定义请求头</label>
+                    <textarea id="webshell-headers" rows="5" spellcheck="false" autocomplete="off" data-i18n="webshell.requestHeadersPlaceholder" data-i18n-attr="placeholder" placeholder="User-Agent: Mozilla/5.0 ..."></textarea>
+                    <small class="form-hint" data-i18n="webshell.requestHeadersHint">请求包 Header，每行一个；User-Agent 默认模拟浏览器。</small>
                 </div>
                 <div class="form-group">
                     <label for="webshell-os" data-i18n="webshell.os">目标系统</label>
@@ -4129,10 +4089,10 @@
                                 <button type="button" class="btn-filter" data-filter="role_off" onclick="filterRoleToolsByStatus('role_off')" data-i18n="roleModal.filterRoleOff">本角色已关</button>
                             </div>
                             <div class="role-tools-search-box">
-                                <input type="text" id="role-tools-search" data-i18n="roleModal.searchToolsPlaceholder" data-i18n-attr="placeholder" placeholder="搜索工具..." 
-                                       oninput="searchRoleTools(this.value)" 
+                                <input type="text" id="role-tools-search" data-i18n="roleModal.searchToolsPlaceholder" data-i18n-attr="placeholder" placeholder="搜索工具..."
+                                       oninput="searchRoleTools(this.value)"
                                        onkeypress="if(event.key === 'Enter') searchRoleTools(this.value)" />
-                                <button class="role-tools-search-clear" id="role-tools-search-clear" 
+                                <button class="role-tools-search-clear" id="role-tools-search-clear"
                                         onclick="clearRoleToolsSearch()" style="display: none;" data-i18n="common.clearSearch" data-i18n-attr="title" title="清除搜索">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                         <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
@@ -4322,4 +4282,3 @@
     <script src="/static/js/c2.js"></script>
 </body>
 </html>
-
