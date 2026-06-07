@@ -27,7 +27,11 @@
         terminalFitAddon: null,
         terminalResizeObserver: null,
         terminalContainer: null,
-        terminalSessionId: 'main',
+        terminalSessionId: null,
+        terminalHistory: {},
+        terminalLogs: {},
+        terminalBusy: false,
+        terminalQueue: [],
         // 文件管理
         currentPath: '/',
         fileList: [],
@@ -90,6 +94,56 @@
         return status;
     }
 
+    function formatTaskCommand(task) {
+        if (!task) return '';
+        const type = String(task.taskType || '').toLowerCase();
+        const p = task.payload;
+        if (!p || typeof p !== 'object' || Object.keys(p).length === 0) {
+            if (type === 'pwd' || type === 'ps' || type === 'screenshot') return type;
+            return '';
+        }
+        switch (type) {
+            case 'shell':
+            case 'exec':
+                return p.command != null ? String(p.command) : '';
+            case 'ls':
+            case 'cd':
+                return p.path != null ? String(p.path) : '';
+            case 'download':
+                return p.remote_path != null ? String(p.remote_path) : '';
+            case 'upload':
+                if (p.remote_path) return String(p.remote_path);
+                if (p.file_id) return 'file:' + String(p.file_id);
+                return '';
+            case 'kill_proc':
+                return p.pid != null ? 'pid:' + String(p.pid) : '';
+            case 'sleep':
+                let sleepStr = p.seconds != null ? 'sleep ' + p.seconds + 's' : '';
+                if (p.jitter != null) sleepStr += (sleepStr ? ', ' : '') + 'jitter ' + p.jitter + '%';
+                return sleepStr;
+            case 'port_fwd':
+                return [p.action, p.remote_host, p.remote_port, p.local_port].filter(v => v != null && v !== '').join(':');
+            case 'socks_start':
+            case 'socks_stop':
+                return p.port != null ? 'port:' + String(p.port) : type;
+            case 'load_assembly':
+                if (p.args) return String(p.args);
+                if (p.file_id) return 'file:' + String(p.file_id);
+                return '';
+            case 'persist':
+                return p.method != null ? String(p.method) : '';
+            default:
+                try { return JSON.stringify(p); } catch (e) { return ''; }
+        }
+    }
+
+    function truncateCommand(cmd, maxLen) {
+        if (!cmd) return '';
+        const s = String(cmd);
+        if (!maxLen || s.length <= maxLen) return s;
+        return s.substring(0, maxLen - 1) + '\u2026';
+    }
+
     // ============================================================================
     // 工具函数
     // ============================================================================
@@ -116,10 +170,11 @@
         const container = document.getElementById('c2-toast-container') || (() => {
             const div = document.createElement('div');
             div.id = 'c2-toast-container';
-            div.style.cssText = 'position:fixed;top:20px;right:20px;z-index:10000;display:flex;flex-direction:column;gap:8px;';
+            div.style.cssText = 'position:fixed;top:20px;right:20px;z-index:10100;display:flex;flex-direction:column;gap:8px;';
             document.body.appendChild(div);
             return div;
         })();
+        container.style.zIndex = '10100';
         const toast = document.createElement('div');
         const colors = { error: '#e53e3e', success: '#38a169', info: '#3182ce', warn: '#d69e2e' };
         toast.style.cssText = `background:${colors[type] || colors.info};color:#fff;padding:10px 18px;border-radius:6px;font-size:0.875rem;box-shadow:0 4px 12px rgba(0,0,0,0.2);opacity:0;transition:opacity .3s;max-width:400px;word-break:break-word;`;
@@ -725,7 +780,6 @@
         C2.selectedSessionId = id;
         C2.renderSessions();
         C2.renderSessionDetail(id);
-        C2.initTerminal();
     };
 
     C2.renderSessionDetail = function(id) {
@@ -829,7 +883,10 @@
         if (panel) panel.style.display = 'block';
 
         if (tab === 'terminal') {
-            setTimeout(() => C2.fitTerminal(), 50);
+            setTimeout(function () {
+                C2.fitTerminal();
+                if (C2.terminalInstance) C2.terminalInstance.focus();
+            }, 50);
         }
     };
 
@@ -875,97 +932,57 @@
     // xterm 终端
     // ============================================================================
 
-    C2.initTerminal = function() {
-        const container = document.getElementById('c2-terminal-container');
-        if (!container || typeof Terminal === 'undefined') return;
-
-        if (C2.terminalInstance) {
-            C2.terminalInstance.dispose();
+    C2.serializeTerminalBuffer = function(term) {
+        if (!term || !term.buffer || !term.buffer.active) return '';
+        const buf = term.buffer.active;
+        const lines = [];
+        for (let i = 0; i < buf.length; i++) {
+            const line = buf.getLine(i);
+            if (line) lines.push(line.translateToString(true));
         }
-
-        const term = new Terminal({
-            cursorBlink: true,
-            cursorStyle: 'block',
-            fontSize: 14,
-            fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-            lineHeight: 1.3,
-            scrollback: 5000,
-            theme: {
-                background: '#0d1117',
-                foreground: '#e6edf3',
-                cursor: '#58a6ff',
-                selection: 'rgba(88, 166, 255, 0.3)'
-            }
-        });
-
-        if (typeof FitAddon !== 'undefined') {
-            const FitCtor = FitAddon.FitAddon || FitAddon;
-            C2.terminalFitAddon = new FitCtor();
-            term.loadAddon(C2.terminalFitAddon);
-        }
-
-        term.open(container);
-        
-        try {
-            if (C2.terminalFitAddon) C2.terminalFitAddon.fit();
-        } catch (e) {}
-
-        let lineBuffer = '';
-        const prompt = '$ ';
-        
-        term.writeln('\x1b[36m' + c2t('c2.sessions.terminalWelcome') + '\x1b[0m');
-        term.writeln('');
-        term.write(prompt);
-
-        term.onData(e => {
-            const code = e.charCodeAt(0);
-            if (code === 13) { // Enter
-                term.writeln('');
-                const cmd = lineBuffer.trim();
-                lineBuffer = '';
-                if (cmd) {
-                    C2.executeInTerminal(cmd, term);
-                } else {
-                    term.write(prompt);
-                }
-            } else if (code === 127) { // Backspace
-                if (lineBuffer.length > 0) {
-                    lineBuffer = lineBuffer.slice(0, -1);
-                    term.write('\b \b');
-                }
-            } else if (code >= 32) { // Printable
-                lineBuffer += e;
-                term.write(e);
-            }
-        });
-
-        C2.terminalInstance = term;
-
-        // Resize observer
-        if (C2.terminalResizeObserver) {
-            C2.terminalResizeObserver.disconnect();
-        }
-        C2.terminalResizeObserver = new ResizeObserver(() => {
-            C2.fitTerminal();
-        });
-        C2.terminalResizeObserver.observe(container);
+        return lines.join('\n');
     };
 
-    C2.fitTerminal = function() {
-        if (C2.terminalFitAddon && C2.terminalInstance) {
-            try {
-                C2.terminalFitAddon.fit();
-            } catch (e) {}
+    C2.pushTerminalHistory = function(cmd) {
+        const sid = C2.selectedSessionId;
+        if (!sid || !cmd) return;
+        if (!C2.terminalHistory[sid]) C2.terminalHistory[sid] = [];
+        const hist = C2.terminalHistory[sid];
+        if (hist.length === 0 || hist[hist.length - 1] !== cmd) {
+            hist.push(cmd);
+            if (hist.length > 200) hist.shift();
         }
     };
 
-    C2.executeInTerminal = function(cmd, term) {
+    C2.finishTerminalCommand = function(term, status) {
+        C2.terminalBusy = false;
+        const statusEl = document.getElementById('c2-terminal-status');
+        if (status === 'err' && statusEl) {
+            statusEl.textContent = c2t('c2.sessions.termStatusErr');
+        } else if (status === 'timeout' && statusEl) {
+            statusEl.textContent = c2t('c2.sessions.termStatusTimeout');
+        } else if (statusEl && C2.terminalQueue.length === 0) {
+            statusEl.textContent = c2t('c2.sessions.termStatusReady');
+        }
+        if (C2.terminalQueue.length > 0) {
+            const next = C2.terminalQueue.shift();
+            C2.runTerminalCommand(next, term);
+            return;
+        }
+        term.write('$ ');
+        if (statusEl && status !== 'err' && status !== 'timeout') {
+            statusEl.textContent = c2t('c2.sessions.termStatusReady');
+        }
+    };
+
+    C2.runTerminalCommand = function(cmd, term) {
         if (!C2.selectedSessionId) {
             term.writeln('\x1b[31m' + c2t('c2.sessions.termNoSession') + '\x1b[0m');
             term.write('$ ');
             return;
         }
-
+        C2.terminalBusy = true;
+        C2.pushTerminalHistory(cmd);
         const statusEl = document.getElementById('c2-terminal-status');
         if (statusEl) statusEl.textContent = c2t('c2.sessions.termStatusExec');
 
@@ -976,12 +993,27 @@
         }).then(data => {
             if (data.error) {
                 term.writeln(`\x1b[31mError: ${data.error}\x1b[0m`);
-                term.write('$ ');
-                if (statusEl) statusEl.textContent = c2t('c2.sessions.termStatusErr');
+                C2.finishTerminalCommand(term, 'err');
             } else {
                 C2.waitForTaskResult(data.task?.id || data.task_id, term);
             }
+        }).catch(function () {
+            term.writeln('\x1b[31mError: request failed\x1b[0m');
+            C2.finishTerminalCommand(term, 'err');
         });
+    };
+
+    C2.executeInTerminal = function(cmd, term) {
+        if (!cmd) {
+            term.write('$ ');
+            return;
+        }
+        if (C2.terminalBusy) {
+            C2.terminalQueue.push(cmd);
+            term.writeln('\x1b[33m' + c2t('c2.sessions.termQueued') + '\x1b[0m');
+            return;
+        }
+        C2.runTerminalCommand(cmd, term);
     };
 
     C2.waitForTaskResult = function(taskId, term) {
@@ -992,9 +1024,7 @@
         const check = () => {
             if (++attempts > maxAttempts) {
                 term.writeln('\x1b[33m' + c2t('c2.sessions.termWaitTimeout') + '\x1b[0m');
-                term.write('$ ');
-                const statusEl = document.getElementById('c2-terminal-status');
-                if (statusEl) statusEl.textContent = c2t('c2.sessions.termStatusTimeout');
+                C2.finishTerminalCommand(term, 'timeout');
                 return;
             }
             apiRequest('GET', `${API_BASE}/tasks/${taskId}`).then(data => {
@@ -1007,16 +1037,364 @@
                     if (task.error) {
                         term.writeln(`\x1b[31m${task.error}\x1b[0m`);
                     }
-                    term.write('$ ');
-                    const statusEl = document.getElementById('c2-terminal-status');
-                    if (statusEl) statusEl.textContent = c2t('c2.sessions.termStatusReady');
+                    C2.finishTerminalCommand(term, task.status === 'failed' ? 'err' : 'ready');
                 } else {
                     delay = Math.min(delay * 1.5, maxDelay);
                     setTimeout(check, delay);
                 }
+            }).catch(function () {
+                C2.finishTerminalCommand(term, 'err');
             });
         };
         check();
+    };
+
+    C2.initTerminal = function() {
+        const container = document.getElementById('c2-terminal-container');
+        if (!container || typeof Terminal === 'undefined') return;
+
+        if (C2.terminalInstance && C2.terminalSessionId) {
+            C2.terminalLogs[C2.terminalSessionId] = C2.serializeTerminalBuffer(C2.terminalInstance);
+        }
+        if (C2.terminalInstance) {
+            C2.terminalInstance.dispose();
+        }
+
+        const sessionId = C2.selectedSessionId || '_none';
+        C2.terminalSessionId = sessionId;
+        C2.terminalQueue = [];
+        C2.terminalBusy = false;
+
+        const term = new Terminal({
+            cursorBlink: true,
+            cursorStyle: 'block',
+            fontSize: 14,
+            fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+            lineHeight: 1.3,
+            scrollback: 5000,
+            theme: {
+                background: '#0d1117',
+                foreground: '#e6edf3',
+                cursor: '#58a6ff',
+                cursorAccent: '#0d1117',
+                selection: 'rgba(88, 166, 255, 0.3)'
+            }
+        });
+
+        if (typeof FitAddon !== 'undefined') {
+            const FitCtor = FitAddon.FitAddon || FitAddon;
+            C2.terminalFitAddon = new FitCtor();
+            term.loadAddon(C2.terminalFitAddon);
+        }
+
+        term.open(container);
+        try {
+            if (C2.terminalFitAddon) C2.terminalFitAddon.fit();
+        } catch (e) {}
+
+        let lineBuffer = '';
+        let cursorIndex = 0;
+        let historyIndex = -1;
+        let lastPasteAt = 0;
+        let lastPasteText = '';
+        const prompt = '$ ';
+
+        function redrawInputLine() {
+            term.write('\x1b[2K\r' + prompt + lineBuffer);
+            const tail = lineBuffer.length - cursorIndex;
+            if (tail > 0) term.write('\x1b[' + tail + 'D');
+        }
+
+        function resetInputLine() {
+            lineBuffer = '';
+            cursorIndex = 0;
+            historyIndex = -1;
+            term.write('\x1b[2K\r' + prompt);
+        }
+
+        function insertPlainText(text) {
+            const safe = String(text).replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '');
+            if (!safe) return;
+            lineBuffer = lineBuffer.slice(0, cursorIndex) + safe + lineBuffer.slice(cursorIndex);
+            cursorIndex += safe.length;
+            redrawInputLine();
+        }
+
+        function deleteWordBeforeCursor() {
+            if (cursorIndex === 0) return;
+            let start = cursorIndex;
+            while (start > 0 && /\s/.test(lineBuffer[start - 1])) start--;
+            while (start > 0 && !/\s/.test(lineBuffer[start - 1])) start--;
+            lineBuffer = lineBuffer.slice(0, start) + lineBuffer.slice(cursorIndex);
+            cursorIndex = start;
+            redrawInputLine();
+        }
+
+        function moveWordLeft() {
+            if (cursorIndex === 0) return;
+            let pos = cursorIndex;
+            while (pos > 0 && /\s/.test(lineBuffer[pos - 1])) pos--;
+            while (pos > 0 && !/\s/.test(lineBuffer[pos - 1])) pos--;
+            const delta = cursorIndex - pos;
+            if (delta > 0) {
+                term.write('\x1b[' + delta + 'D');
+                cursorIndex = pos;
+            }
+        }
+
+        function moveWordRight() {
+            if (cursorIndex >= lineBuffer.length) return;
+            let pos = cursorIndex;
+            while (pos < lineBuffer.length && /\s/.test(lineBuffer[pos])) pos++;
+            while (pos < lineBuffer.length && !/\s/.test(lineBuffer[pos])) pos++;
+            const delta = pos - cursorIndex;
+            if (delta > 0) {
+                term.write('\x1b[' + delta + 'C');
+                cursorIndex = pos;
+            }
+        }
+
+        function showHistoryEntry(entry) {
+            lineBuffer = entry || '';
+            cursorIndex = lineBuffer.length;
+            term.write('\x1b[2K\r' + prompt + lineBuffer);
+        }
+
+        function submitCurrentLine() {
+            if (C2.terminalBusy) {
+                term.writeln('');
+                term.writeln('\x1b[33m' + c2t('c2.sessions.termWaitFinish') + '\x1b[0m');
+                term.write(prompt + lineBuffer);
+                const tail = lineBuffer.length - cursorIndex;
+                if (tail > 0) term.write('\x1b[' + tail + 'D');
+                return;
+            }
+            term.writeln('');
+            const cmd = lineBuffer.trim();
+            lineBuffer = '';
+            cursorIndex = 0;
+            historyIndex = -1;
+            if (cmd) {
+                C2.executeInTerminal(cmd, term);
+            } else {
+                term.write(prompt);
+            }
+        }
+
+        function handlePasteText(text) {
+            const now = Date.now();
+            if (text === lastPasteText && now - lastPasteAt < 80) return;
+            lastPasteAt = now;
+            lastPasteText = text;
+
+            const normalized = String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            if (normalized.indexOf('\n') === -1) {
+                insertPlainText(normalized);
+                return;
+            }
+            const endsWithNewline = normalized.endsWith('\n');
+            const parts = normalized.split('\n');
+            const tail = parts.pop() || '';
+            parts.forEach(function (part) {
+                insertPlainText(part);
+                submitCurrentLine();
+            });
+            if (tail) insertPlainText(tail);
+            else if (endsWithNewline && parts.length === 0) submitCurrentLine();
+        }
+
+        const savedLog = C2.terminalLogs[sessionId];
+        if (savedLog) {
+            term.write(String(savedLog).replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n/g, '\r\n'));
+            if (!savedLog.endsWith('\n')) term.write('\r\n');
+        } else {
+            term.writeln('\x1b[36m' + c2t('c2.sessions.terminalWelcome') + '\x1b[0m');
+            term.writeln('');
+        }
+        term.write(prompt);
+
+        term.onData(function (e) {
+            if (e === '\x0c') {
+                term.clear();
+                resetInputLine();
+                C2.terminalLogs[sessionId] = '';
+                return;
+            }
+            if (e === '\x03') {
+                if (C2.terminalBusy) {
+                    term.writeln('');
+                    term.writeln('\x1b[33m^C (' + c2t('c2.sessions.termCtrlC') + ')\x1b[0m');
+                }
+                resetInputLine();
+                return;
+            }
+            if (e === '\x16') {
+                if (navigator.clipboard && navigator.clipboard.readText) {
+                    navigator.clipboard.readText().then(handlePasteText).catch(function () {});
+                }
+                return;
+            }
+            if (e.length > 1 && e.indexOf('\x1b') !== 0) {
+                handlePasteText(e);
+                return;
+            }
+            if (e === '\x1b[D' || e === '\x1bOD') {
+                if (cursorIndex > 0) {
+                    cursorIndex--;
+                    term.write('\x1b[D');
+                }
+                return;
+            }
+            if (e === '\x1b[C' || e === '\x1bOC') {
+                if (cursorIndex < lineBuffer.length) {
+                    cursorIndex++;
+                    term.write('\x1b[C');
+                }
+                return;
+            }
+            if (e === '\x1b[1;3D' || e === '\x1bb') {
+                moveWordLeft();
+                return;
+            }
+            if (e === '\x1b[1;3C' || e === '\x1bf') {
+                moveWordRight();
+                return;
+            }
+            if (e === '\x1b[A' || e === '\x1bOA') {
+                const hist = C2.terminalHistory[sessionId] || [];
+                if (hist.length === 0) return;
+                historyIndex = historyIndex < 0 ? hist.length - 1 : Math.max(0, historyIndex - 1);
+                showHistoryEntry(hist[historyIndex]);
+                return;
+            }
+            if (e === '\x1b[B' || e === '\x1bOB') {
+                const hist = C2.terminalHistory[sessionId] || [];
+                if (hist.length === 0) return;
+                historyIndex = historyIndex < 0 ? -1 : Math.min(hist.length - 1, historyIndex + 1);
+                if (historyIndex < 0) showHistoryEntry('');
+                else showHistoryEntry(hist[historyIndex]);
+                return;
+            }
+            if (e === '\x1b[H' || e === '\x1bOH' || e === '\x01') {
+                if (cursorIndex > 0) {
+                    term.write('\x1b[' + cursorIndex + 'D');
+                    cursorIndex = 0;
+                }
+                return;
+            }
+            if (e === '\x1b[F' || e === '\x1bOF' || e === '\x05') {
+                const move = lineBuffer.length - cursorIndex;
+                if (move > 0) {
+                    term.write('\x1b[' + move + 'C');
+                    cursorIndex = lineBuffer.length;
+                }
+                return;
+            }
+            if (e === '\x1b[3~') {
+                if (cursorIndex < lineBuffer.length) {
+                    lineBuffer = lineBuffer.slice(0, cursorIndex) + lineBuffer.slice(cursorIndex + 1);
+                    redrawInputLine();
+                }
+                return;
+            }
+            if (e === '\x15') {
+                resetInputLine();
+                return;
+            }
+            if (e === '\x0b') {
+                lineBuffer = lineBuffer.slice(0, cursorIndex);
+                redrawInputLine();
+                return;
+            }
+            if (e === '\x17') {
+                deleteWordBeforeCursor();
+                return;
+            }
+            if (e === '\x1b\x7f') {
+                deleteWordBeforeCursor();
+                return;
+            }
+
+            const code = e.charCodeAt(0);
+            if (code === 13 || code === 10) {
+                submitCurrentLine();
+            } else if (code === 127 || code === 8) {
+                if (cursorIndex > 0) {
+                    lineBuffer = lineBuffer.slice(0, cursorIndex - 1) + lineBuffer.slice(cursorIndex);
+                    cursorIndex--;
+                    redrawInputLine();
+                }
+            } else if (e.length === 1 && code >= 32) {
+                historyIndex = -1;
+                lineBuffer = lineBuffer.slice(0, cursorIndex) + e + lineBuffer.slice(cursorIndex);
+                cursorIndex++;
+                if (cursorIndex === lineBuffer.length) {
+                    term.write(e);
+                } else {
+                    redrawInputLine();
+                }
+            }
+        });
+
+        const onTerminalPaste = function (ev) {
+            const text = ev.clipboardData && ev.clipboardData.getData('text');
+            if (!text) return;
+            ev.preventDefault();
+            handlePasteText(text);
+        };
+        if (term.element) {
+            term.element.addEventListener('paste', onTerminalPaste);
+        }
+
+        term.attachCustomKeyEventHandler(function (ev) {
+            if (ev.type !== 'keydown') return true;
+            if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && (ev.key === 'c' || ev.key === 'C')) {
+                if (term.getSelection()) return true;
+            }
+            const isPaste = (ev.ctrlKey || ev.metaKey) && !ev.shiftKey && !ev.altKey
+                && (ev.key === 'v' || ev.key === 'V');
+            if (isPaste && navigator.clipboard && navigator.clipboard.readText) {
+                ev.preventDefault();
+                navigator.clipboard.readText().then(handlePasteText).catch(function () {});
+                return false;
+            }
+            if (ev.shiftKey && ev.key === 'Insert' && navigator.clipboard && navigator.clipboard.readText) {
+                ev.preventDefault();
+                navigator.clipboard.readText().then(handlePasteText).catch(function () {});
+                return false;
+            }
+            return true;
+        });
+
+        container.addEventListener('click', function () {
+            term.focus();
+        });
+        container.setAttribute('tabindex', '0');
+
+        C2.terminalInstance = term;
+
+        if (C2.terminalResizeObserver) {
+            C2.terminalResizeObserver.disconnect();
+        }
+        C2.terminalResizeObserver = new ResizeObserver(function () {
+            C2.fitTerminal();
+        });
+        C2.terminalResizeObserver.observe(container);
+
+        setTimeout(function () {
+            try {
+                if (C2.terminalFitAddon) C2.terminalFitAddon.fit();
+                term.focus();
+            } catch (e) {}
+        }, 100);
+    };
+
+    C2.fitTerminal = function() {
+        if (C2.terminalFitAddon && C2.terminalInstance) {
+            try {
+                C2.terminalFitAddon.fit();
+            } catch (e) {}
+        }
     };
 
     C2.clearTerminal = function() {
@@ -1024,7 +1402,11 @@
             C2.terminalInstance.clear();
             C2.terminalInstance.writeln('\x1b[36m' + c2t('c2.sessions.termCleared') + '\x1b[0m');
             C2.terminalInstance.write('$ ');
+            if (C2.terminalSessionId) {
+                C2.terminalLogs[C2.terminalSessionId] = C2.serializeTerminalBuffer(C2.terminalInstance);
+            }
         }
+        C2.terminalQueue = [];
     };
 
     C2.copyTerminal = function() {
@@ -1314,10 +1696,13 @@
             
             container.innerHTML = tasks.map(t => {
                 const rawId = t.id || '';
+                const cmd = formatTaskCommand(t);
+                const cmdShort = truncateCommand(cmd, 40);
                 return `
                 <div class="c2-task-item-compact">
                     <span class="c2-task-status-dot ${escapeHtml(t.status || '')}"></span>
                     <span class="c2-task-type">${escapeHtml(t.taskType || '')}</span>
+                    ${cmdShort ? `<span class="c2-task-command" title="${escapeHtml(cmd)}">${escapeHtml(cmdShort)}</span>` : ''}
                     <span class="c2-task-meta">${escapeHtml(taskStatusLabel(t.status))} | ${formatDuration(t.durationMs)}</span>
                     <button type="button" class="btn-secondary btn-small" data-c2-task-action="view" data-task-id="${escapeHtml(rawId)}">${escapeHtml(c2t('c2.tasks.view'))}</button>
                 </div>
@@ -1353,6 +1738,7 @@
                         <th>${escapeHtml(c2t('c2.tasks.colTask'))}</th>
                         <th>${escapeHtml(c2t('c2.tasks.colSession'))}</th>
                         <th>${escapeHtml(c2t('c2.tasks.colType'))}</th>
+                        <th>${escapeHtml(c2t('c2.tasks.colCommand'))}</th>
                         <th>${escapeHtml(c2t('c2.tasks.colStatus'))}</th>
                         <th>${escapeHtml(c2t('c2.tasks.colDuration'))}</th>
                         <th>${escapeHtml(c2t('c2.tasks.colCreated'))}</th>
@@ -1364,6 +1750,8 @@
                         const rawId = t.id || '';
                         const shortTaskId = rawId.length > 14 ? escapeHtml(rawId.substring(0, 12)) + '\u2026' : escapeHtml(rawId);
                         const sid = t.sessionId ? escapeHtml(String(t.sessionId).substring(0, 8)) + '\u2026' : '-';
+                        const cmd = formatTaskCommand(t);
+                        const cmdShort = truncateCommand(cmd, 48);
                         return `
                         <tr>
                             <td class="c2-task-table-col-check">
@@ -1374,6 +1762,7 @@
                             <td>${shortTaskId}</td>
                             <td>${sid}</td>
                             <td>${escapeHtml(t.taskType || '')}</td>
+                            <td class="c2-task-command-cell" title="${escapeHtml(cmd)}">${cmdShort ? escapeHtml(cmdShort) : '<span class="c2-muted">-</span>'}</td>
                             <td><span class="c2-status-badge ${escapeHtml(t.status || '')}">${escapeHtml(taskStatusLabel(t.status))}</span></td>
                             <td>${formatDuration(t.durationMs)}</td>
                             <td>${formatTime(t.createdAt)}</td>
@@ -1403,26 +1792,87 @@
 
         const renderTaskModal = function(t) {
             if (!t || !modal) return;
+            const cmd = formatTaskCommand(t);
+            const hasPayload = t.payload && typeof t.payload === 'object' && Object.keys(t.payload).length > 0;
+            const modalBox = modal.querySelector('.c2-modal');
+            if (modalBox) modalBox.classList.add('c2-modal--wide');
             content.innerHTML = `
-            <div class="c2-modal-header">
-                <h3>${escapeHtml(c2t('c2.tasks.modalTitle'))}</h3>
+            <div class="c2-modal-header c2-task-modal-header">
+                <div class="c2-task-modal-heading">
+                    <h3>${escapeHtml(c2t('c2.tasks.modalTitle'))}</h3>
+                    <span class="c2-status-badge ${escapeHtml(t.status || '')}">${escapeHtml(taskStatusLabel(t.status))}</span>
+                </div>
                 <button class="c2-modal-close" onclick="C2.closeModal()">&times;</button>
             </div>
             <div class="c2-modal-body">
                 <div class="c2-task-detail">
-                    <div><strong>${escapeHtml(c2t('c2.tasks.labelId'))}:</strong> ${escapeHtml(t.id || '')}</div>
-                    <div><strong>${escapeHtml(c2t('c2.tasks.labelSession'))}:</strong> ${escapeHtml(t.sessionId || '')}</div>
-                    <div><strong>${escapeHtml(c2t('c2.tasks.labelType'))}:</strong> ${escapeHtml(t.taskType || '')}</div>
-                    <div><strong>${escapeHtml(c2t('c2.tasks.labelStatus'))}:</strong> <span class="c2-status-badge ${escapeHtml(t.status || '')}">${escapeHtml(taskStatusLabel(t.status))}</span></div>
-                    <div><strong>${escapeHtml(c2t('c2.tasks.labelCreated'))}:</strong> ${formatTime(t.createdAt)}</div>
-                    <div><strong>${escapeHtml(c2t('c2.tasks.labelSent'))}:</strong> ${formatTime(t.sentAt)}</div>
-                    <div><strong>${escapeHtml(c2t('c2.tasks.labelCompleted'))}:</strong> ${formatTime(t.completedAt)}</div>
-                    <div><strong>${escapeHtml(c2t('c2.tasks.labelDuration'))}:</strong> ${formatDuration(t.durationMs)}</div>
-                    ${t.error ? `<div class="c2-task-error"><strong>${escapeHtml(c2t('c2.tasks.labelError'))}:</strong> ${escapeHtml(t.error)}</div>` : ''}
+                    <div class="c2-task-detail-grid">
+                        <div class="c2-task-kv">
+                            <span class="c2-task-kv__label">${escapeHtml(c2t('c2.tasks.labelId'))}</span>
+                            <span class="c2-task-kv__value c2-task-kv__value--mono">${escapeHtml(t.id || '-')}</span>
+                        </div>
+                        <div class="c2-task-kv">
+                            <span class="c2-task-kv__label">${escapeHtml(c2t('c2.tasks.labelSession'))}</span>
+                            <span class="c2-task-kv__value c2-task-kv__value--mono">${escapeHtml(t.sessionId || '-')}</span>
+                        </div>
+                        <div class="c2-task-kv">
+                            <span class="c2-task-kv__label">${escapeHtml(c2t('c2.tasks.labelType'))}</span>
+                            <span class="c2-task-kv__value">${escapeHtml(t.taskType || '-')}</span>
+                        </div>
+                        <div class="c2-task-kv">
+                            <span class="c2-task-kv__label">${escapeHtml(c2t('c2.tasks.labelDuration'))}</span>
+                            <span class="c2-task-kv__value c2-task-kv__value--accent">${formatDuration(t.durationMs)}</span>
+                        </div>
+                    </div>
+
+                    <div class="c2-task-timeline">
+                        <div class="c2-task-time-card">
+                            <span class="c2-task-kv__label">${escapeHtml(c2t('c2.tasks.labelCreated'))}</span>
+                            <span class="c2-task-kv__value">${formatTime(t.createdAt) || '-'}</span>
+                        </div>
+                        <div class="c2-task-time-card">
+                            <span class="c2-task-kv__label">${escapeHtml(c2t('c2.tasks.labelSent'))}</span>
+                            <span class="c2-task-kv__value">${formatTime(t.sentAt) || '-'}</span>
+                        </div>
+                        <div class="c2-task-time-card">
+                            <span class="c2-task-kv__label">${escapeHtml(c2t('c2.tasks.labelCompleted'))}</span>
+                            <span class="c2-task-kv__value">${formatTime(t.completedAt) || '-'}</span>
+                        </div>
+                    </div>
+
+                    ${cmd ? `
+                        <div class="c2-task-code-section">
+                            <div class="c2-task-code-header">
+                                <span class="c2-task-code-title">${escapeHtml(c2t('c2.tasks.labelCommand'))}</span>
+                                <button type="button" class="btn-ghost btn-sm" onclick="C2.copyTaskBlock('c2-task-cmd-pre')">${escapeHtml(c2t('common.copy'))}</button>
+                            </div>
+                            <pre class="c2-task-command-pre" id="c2-task-cmd-pre">${escapeHtml(cmd)}</pre>
+                        </div>
+                    ` : ''}
+                    ${hasPayload && !cmd ? `
+                        <div class="c2-task-code-section">
+                            <div class="c2-task-code-header">
+                                <span class="c2-task-code-title">${escapeHtml(c2t('c2.tasks.labelPayload'))}</span>
+                                <button type="button" class="btn-ghost btn-sm" onclick="C2.copyTaskBlock('c2-task-payload-pre')">${escapeHtml(c2t('common.copy'))}</button>
+                            </div>
+                            <pre class="c2-task-command-pre" id="c2-task-payload-pre">${escapeHtml(JSON.stringify(t.payload, null, 2))}</pre>
+                        </div>
+                    ` : ''}
+                    ${t.error ? `
+                        <div class="c2-task-error-section">
+                            <div class="c2-task-code-header">
+                                <span class="c2-task-code-title">${escapeHtml(c2t('c2.tasks.labelError'))}</span>
+                            </div>
+                            <div class="c2-task-error">${escapeHtml(t.error)}</div>
+                        </div>
+                    ` : ''}
                     ${t.resultText ? `
-                        <div class="c2-task-result">
-                            <strong>${escapeHtml(c2t('c2.tasks.labelResult'))}:</strong>
-                            <pre>${escapeHtml(t.resultText)}</pre>
+                        <div class="c2-task-code-section">
+                            <div class="c2-task-code-header">
+                                <span class="c2-task-code-title">${escapeHtml(c2t('c2.tasks.labelResult'))}</span>
+                                <button type="button" class="btn-ghost btn-sm" onclick="C2.copyTaskBlock('c2-task-result-pre')">${escapeHtml(c2t('common.copy'))}</button>
+                            </div>
+                            <pre class="c2-task-result-pre" id="c2-task-result-pre">${escapeHtml(t.resultText)}</pre>
                         </div>
                     ` : ''}
                 </div>
@@ -2049,9 +2499,18 @@
     // 模态框
     // ============================================================================
 
+    C2.copyTaskBlock = function(elementId) {
+        const el = document.getElementById(elementId);
+        if (el && el.textContent) copyToClipboard(el.textContent);
+    };
+
     C2.closeModal = function() {
         const modal = document.getElementById('c2-modal');
-        if (modal) modal.style.display = 'none';
+        if (modal) {
+            modal.style.display = 'none';
+            const modalBox = modal.querySelector('.c2-modal');
+            if (modalBox) modalBox.classList.remove('c2-modal--wide');
+        }
     };
 
     // ============================================================================

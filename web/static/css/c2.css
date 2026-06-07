@@ -1218,32 +1218,172 @@
    Task Detail Modal
    ============================================================================ */
 
-.c2-task-detail { line-height: 2; }
-.c2-task-detail > div { margin-bottom: 6px; font-size: 13px; }
+.c2-modal.c2-modal--wide {
+    max-width: 720px;
+}
+
+.c2-task-modal-header {
+    align-items: flex-start;
+}
+
+.c2-task-modal-heading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.c2-task-modal-heading h3 {
+    margin: 0;
+}
+
+.c2-task-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.c2-task-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.c2-task-kv {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 14px;
+    background: var(--c2-surface-alt);
+    border: 1px solid var(--c2-border);
+    border-radius: var(--c2-radius-sm);
+}
+
+.c2-task-kv__label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--c2-text-muted);
+}
+
+.c2-task-kv__value {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--c2-text);
+    word-break: break-all;
+    line-height: 1.45;
+}
+
+.c2-task-kv__value--mono {
+    font-family: var(--c2-mono);
+    font-size: 12px;
+    color: var(--c2-text-dim);
+}
+
+.c2-task-kv__value--accent {
+    font-family: var(--c2-mono);
+    font-weight: 600;
+    color: var(--c2-accent);
+}
+
+.c2-task-timeline {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.06), rgba(59, 130, 246, 0.02));
+    border: 1px solid rgba(59, 130, 246, 0.14);
+    border-radius: var(--c2-radius-sm);
+}
+
+.c2-task-time-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.c2-task-time-card:not(:last-child) {
+    padding-right: 10px;
+    border-right: 1px solid rgba(59, 130, 246, 0.12);
+}
+
+.c2-task-code-section,
+.c2-task-error-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.c2-task-code-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.c2-task-code-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--c2-text-dim);
+}
 
 .c2-task-error {
     color: var(--c2-red);
-    padding: 14px;
+    padding: 14px 16px;
     background: var(--c2-red-dim);
     border: 1px solid rgba(239, 68, 68, 0.15);
     border-radius: var(--c2-radius-sm);
-    margin-top: 12px;
     font-size: 13px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
-.c2-task-result pre {
+.c2-task-result-pre,
+.c2-task-command-pre {
     background: #0f172a;
     color: #e2e8f0;
-    padding: 16px;
+    padding: 14px 16px;
     border-radius: var(--c2-radius-sm);
     overflow-x: auto;
     font-family: var(--c2-mono);
     font-size: 12px;
-    margin-top: 8px;
-    max-height: 400px;
+    margin: 0;
+    max-height: 360px;
     overflow-y: auto;
     border: 1px solid #1e293b;
     line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.c2-task-command-pre {
+    max-height: 140px;
+}
+
+.c2-task-command-cell {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--c2-mono);
+    font-size: 12px;
+    color: var(--c2-text-muted, #64748b);
+}
+
+.c2-task-item-compact .c2-task-command {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--c2-mono);
+    font-size: 11px;
+    color: var(--c2-text-muted, #64748b);
 }
 
 /* ============================================================================
@@ -1276,6 +1416,11 @@
 /* ============================================================================
    Modal
    ============================================================================ */
+
+/* Toast 须高于模态遮罩 (10050)，避免被 backdrop-filter 模糊 */
+#c2-toast-container {
+    z-index: 10100 !important;
+}
 
 .c2-modal-overlay {
     position: fixed;
@@ -1388,4 +1533,13 @@
     .c2-stats { flex-direction: column; gap: 12px; }
     .c2-payload-grid { grid-template-columns: 1fr; }
     .c2-listener-grid { grid-template-columns: 1fr; padding: 16px; }
+    .c2-task-detail-grid { grid-template-columns: 1fr; }
+    .c2-task-timeline { grid-template-columns: 1fr; }
+    .c2-task-time-card:not(:last-child) {
+        padding-right: 0;
+        padding-bottom: 10px;
+        border-right: none;
+        border-bottom: 1px solid rgba(59, 130, 246, 0.12);
+    }
+    .c2-modal.c2-modal--wide { max-width: 100%; }
 }

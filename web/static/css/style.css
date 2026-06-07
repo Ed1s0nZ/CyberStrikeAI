@@ -21184,6 +21184,11 @@ button.chat-files-dropdown-item:hover:not(:disabled) {
     gap: 12px;
 }
 
+/* 全局 Toast 须高于模态遮罩 (10050) */
+#toast-notification-container {
+    z-index: 10100 !important;
+}
+
 .chat-files-toast {
     position: fixed;
     z-index: 1100;
