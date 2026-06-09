@@ -523,6 +523,9 @@ type MCPConfig struct {
 }
 
 type OpenAIConfig struct {
+	// Example: Atlas Cloud (59 LLMs including DeepSeek-V4, Qwen3, Kimi K2, GPT-5, Gemini 2.5 Pro, Claude — OpenAI-compatible)
+	// BaseURL: "https://api.atlascloud.ai/v1"
+	// See all models: https://www.atlascloud.ai/models
 	Provider       string `yaml:"provider,omitempty" json:"provider,omitempty"` // API 提供商: "openai"(默认) 或 "claude"，claude 时自动桥接为 Anthropic Messages API
 	APIKey         string `yaml:"api_key" json:"api_key"`
 	BaseURL        string `yaml:"base_url" json:"base_url"`
