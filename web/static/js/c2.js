@@ -1477,10 +1477,32 @@
         return '/' + stack.join('/');
     };
 
+    /** 将 /d:/path/file 转为 Windows 远程路径 d:\path\file */
+    C2.toWindowsRemotePath = function(path) {
+        var p = String(path || '').trim().replace(/\\/g, '/');
+        if (/^\/[a-zA-Z]:\//.test(p)) {
+            p = p.slice(1);
+        }
+        return p.replace(/\//g, '\\');
+    };
+
+    C2.sessionIsWindows = function(session) {
+        if (!session) return false;
+        return String(session.os || '').toLowerCase().indexOf('windows') >= 0;
+    };
+
     C2.resolveRemotePath = function(browsePath, filename) {
         var joined = C2.joinFilePath(browsePath || '.', filename);
         if (!C2.implantPwd) return joined;
-        return C2.resolvePathAgainstPwd(C2.implantPwd, joined);
+        var resolved = C2.resolvePathAgainstPwd(C2.implantPwd, joined);
+        var session = null;
+        if (C2.selectedSessionId && C2.sessions) {
+            session = C2.sessions.find(function(s) { return s.id === C2.selectedSessionId; });
+        }
+        if (C2.sessionIsWindows(session)) {
+            return C2.toWindowsRemotePath(resolved);
+        }
+        return resolved;
     };
 
     C2.updateFileBreadcrumb = function(browsePath) {
