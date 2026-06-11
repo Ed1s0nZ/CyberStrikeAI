@@ -346,6 +346,71 @@ func (db *DB) UpdateBatchTaskStatus(queueID, taskID, status string, conversation
 	return nil
 }
 
+// RecoverInterruptedBatchQueues marks tasks that were running before a process
+// restart as failed without changing their queue status. The caller can then
+// decide whether to continue recovered running queues.
+func (db *DB) RecoverInterruptedBatchQueues(errorMsg string) ([]string, int64, error) {
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, 0, fmt.Errorf("开始事务失败: %w", err)
+	}
+	defer tx.Rollback()
+
+	rows, err := tx.Query(
+		"SELECT id FROM batch_task_queues WHERE status = ? ORDER BY created_at ASC",
+		"running",
+	)
+	if err != nil {
+		return nil, 0, fmt.Errorf("查询重启前运行中的批量任务队列失败: %w", err)
+	}
+	defer rows.Close()
+
+	var queueIDs []string
+	for rows.Next() {
+		var queueID string
+		if err := rows.Scan(&queueID); err != nil {
+			return nil, 0, fmt.Errorf("扫描重启前运行中的批量任务队列失败: %w", err)
+		}
+		queueIDs = append(queueIDs, queueID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("遍历重启前运行中的批量任务队列失败: %w", err)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, 0, fmt.Errorf("关闭重启前运行中的批量任务队列查询失败: %w", err)
+	}
+	if len(queueIDs) == 0 {
+		if err := tx.Commit(); err != nil {
+			return nil, 0, fmt.Errorf("提交事务失败: %w", err)
+		}
+		return nil, 0, nil
+	}
+
+	now := time.Now()
+	var failedTasks int64
+	for _, queueID := range queueIDs {
+		res, err := tx.Exec(
+			`UPDATE batch_tasks
+			 SET status = ?, completed_at = COALESCE(completed_at, ?),
+			     error = CASE WHEN TRIM(COALESCE(error, '')) = '' THEN ? ELSE error END
+			 WHERE queue_id = ? AND status = ?`,
+			"failed", now, errorMsg, queueID, "running",
+		)
+		if err != nil {
+			return nil, 0, fmt.Errorf("标记重启中断的批量子任务失败: %w", err)
+		}
+		if n, nerr := res.RowsAffected(); nerr == nil {
+			failedTasks += n
+		}
+
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, 0, fmt.Errorf("提交事务失败: %w", err)
+	}
+	return queueIDs, failedTasks, nil
+}
+
 // UpdateBatchQueueCurrentIndex 更新批量任务队列的当前索引
 func (db *DB) UpdateBatchQueueCurrentIndex(queueID string, currentIndex int) error {
 	_, err := db.Exec(

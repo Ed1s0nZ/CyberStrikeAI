@@ -200,6 +200,34 @@ func NewAgentHandler(agent *agent.Agent, db *database.DB, cfg *config.Config, lo
 	batchTaskManager := NewBatchTaskManager(logger)
 	batchTaskManager.SetDB(db)
 
+	const interruptedTaskMessage = "服务重启，任务已中断，请重新发起或继续"
+
+	var recoveredBatchQueueIDs []string
+	if db != nil {
+		queueIDs, failedTasks, err := db.RecoverInterruptedBatchQueues(interruptedTaskMessage)
+		if err != nil {
+			logger.Warn("恢复重启中断的批量任务队列失败", zap.Error(err))
+		} else if len(queueIDs) > 0 {
+			recoveredBatchQueueIDs = queueIDs
+			logger.Info("恢复重启中断的批量任务队列",
+				zap.Int("queue_count", len(queueIDs)),
+				zap.Int64("failed_task_count", failedTasks),
+			)
+		}
+
+		if n, err := db.RecoverInterruptedToolExecutions(interruptedTaskMessage); err != nil {
+			logger.Warn("恢复重启中断的工具执行记录失败", zap.Error(err))
+		} else if n > 0 {
+			logger.Info("恢复重启中断的工具执行记录", zap.Int64("count", n))
+		}
+
+		if n, err := db.RecoverInterruptedAssistantPlaceholders(interruptedTaskMessage); err != nil {
+			logger.Warn("恢复重启中断的助手占位消息失败", zap.Error(err))
+		} else if n > 0 {
+			logger.Info("恢复重启中断的助手占位消息", zap.Int64("count", n))
+		}
+	}
+
 	// 从数据库加载所有批量任务队列
 	if err := batchTaskManager.LoadFromDB(); err != nil {
 		logger.Warn("从数据库加载批量任务队列失败", zap.Error(err))
@@ -223,8 +251,41 @@ func NewAgentHandler(agent *agent.Agent, db *database.DB, cfg *config.Config, lo
 	if err := handler.hitlManager.EnsureSchema(); err != nil {
 		logger.Warn("初始化 HITL 表失败", zap.Error(err))
 	}
+	if len(recoveredBatchQueueIDs) > 0 {
+		go handler.resumeRecoveredBatchQueues(recoveredBatchQueueIDs)
+	}
 	go handler.batchQueueSchedulerLoop()
 	return handler
+}
+
+func (h *AgentHandler) resumeRecoveredBatchQueues(queueIDs []string) {
+	for _, queueID := range queueIDs {
+		queueID = strings.TrimSpace(queueID)
+		if queueID == "" {
+			continue
+		}
+		if !h.markBatchQueueRunning(queueID) {
+			continue
+		}
+
+		queue, exists := h.batchTaskManager.GetBatchQueue(queueID)
+		if !exists {
+			h.unmarkBatchQueueRunning(queueID)
+			h.logger.Warn("重启后继续批量任务队列失败，队列不存在", zap.String("queueId", queueID))
+			continue
+		}
+		if queue.Status != BatchQueueStatusRunning {
+			h.unmarkBatchQueueRunning(queueID)
+			continue
+		}
+		if batchQueueWantsEino(queue.AgentMode) && (h.config == nil || !h.config.MultiAgent.Enabled) {
+			h.unmarkBatchQueueRunning(queueID)
+			h.logger.Warn("重启后继续批量任务队列失败，Eino 多代理未启用", zap.String("queueId", queueID))
+			continue
+		}
+
+		go h.executeBatchQueue(queueID)
+	}
 }
 
 // SetKnowledgeManager 设置知识库管理器（用于记录检索日志）
@@ -2293,86 +2354,86 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 				}
 
 				if isCancelled {
-				h.logger.Info("批量任务被取消", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("conversationId", conversationID))
-				cancelMsg := "任务已被用户取消，后续操作已停止。"
-				// 如果执行结果中有更具体的取消消息，使用它
-				if partialResp != "" && (strings.Contains(partialResp, "任务已被取消") || strings.Contains(partialResp, "任务执行中断")) {
-					cancelMsg = partialResp
+					h.logger.Info("批量任务被取消", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("conversationId", conversationID))
+					cancelMsg := "任务已被用户取消，后续操作已停止。"
+					// 如果执行结果中有更具体的取消消息，使用它
+					if partialResp != "" && (strings.Contains(partialResp, "任务已被取消") || strings.Contains(partialResp, "任务执行中断")) {
+						cancelMsg = partialResp
+					}
+					// 更新助手消息内容
+					if assistantMessageID != "" {
+						if updateErr := h.appendAssistantMessageNotice(assistantMessageID, cancelMsg); updateErr != nil {
+							h.logger.Warn("更新取消后的助手消息失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(updateErr))
+						}
+						// 保存取消详情到数据库
+						if err := h.db.AddProcessDetail(assistantMessageID, conversationID, "cancelled", cancelMsg, nil); err != nil {
+							h.logger.Warn("保存取消详情失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(err))
+						}
+					} else {
+						// 如果没有预先创建的助手消息，创建一个新的
+						_, errMsg := h.db.AddMessage(conversationID, "assistant", cancelMsg, nil)
+						if errMsg != nil {
+							h.logger.Warn("保存取消消息失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(errMsg))
+						}
+					}
+					h.batchTaskManager.UpdateTaskStatusWithConversationID(queueID, task.ID, "cancelled", cancelMsg, "", conversationID)
+				} else {
+					h.logger.Error("批量任务执行失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("conversationId", conversationID), zap.Error(runErr))
+					errorMsg := "执行失败: " + runErr.Error()
+					// 更新助手消息内容
+					if assistantMessageID != "" {
+						if _, updateErr := h.db.Exec(
+							"UPDATE messages SET content = ?, updated_at = ? WHERE id = ?",
+							errorMsg,
+							time.Now(), assistantMessageID,
+						); updateErr != nil {
+							h.logger.Warn("更新失败后的助手消息失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(updateErr))
+						}
+						// 保存错误详情到数据库
+						if err := h.db.AddProcessDetail(assistantMessageID, conversationID, "error", errorMsg, nil); err != nil {
+							h.logger.Warn("保存错误详情失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(err))
+						}
+					}
+					h.batchTaskManager.UpdateTaskStatus(queueID, task.ID, "failed", "", runErr.Error())
 				}
+			} else {
+				h.logger.Info("批量任务执行成功", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("conversationId", conversationID))
+
+				resText := resultMA.Response
+				mcpIDs := resultMA.MCPExecutionIDs
+				lastIn := resultMA.LastAgentTraceInput
+				lastOut := resultMA.LastAgentTraceOutput
+
 				// 更新助手消息内容
 				if assistantMessageID != "" {
-					if updateErr := h.appendAssistantMessageNotice(assistantMessageID, cancelMsg); updateErr != nil {
-						h.logger.Warn("更新取消后的助手消息失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(updateErr))
-					}
-					// 保存取消详情到数据库
-					if err := h.db.AddProcessDetail(assistantMessageID, conversationID, "cancelled", cancelMsg, nil); err != nil {
-						h.logger.Warn("保存取消详情失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(err))
+					if updateErr := h.db.UpdateAssistantMessageFinalize(assistantMessageID, resText, mcpIDs, multiagent.AggregatedReasoningFromTraceJSON(lastIn)); updateErr != nil {
+						h.logger.Warn("更新助手消息失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(updateErr))
+						// 如果更新失败，尝试创建新消息
+						_, err = h.db.AddMessage(conversationID, "assistant", resText, mcpIDs)
+						if err != nil {
+							h.logger.Error("保存助手消息失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("conversationId", conversationID), zap.Error(err))
+						}
 					}
 				} else {
 					// 如果没有预先创建的助手消息，创建一个新的
-					_, errMsg := h.db.AddMessage(conversationID, "assistant", cancelMsg, nil)
-					if errMsg != nil {
-						h.logger.Warn("保存取消消息失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(errMsg))
-					}
-				}
-				h.batchTaskManager.UpdateTaskStatusWithConversationID(queueID, task.ID, "cancelled", cancelMsg, "", conversationID)
-			} else {
-				h.logger.Error("批量任务执行失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("conversationId", conversationID), zap.Error(runErr))
-				errorMsg := "执行失败: " + runErr.Error()
-				// 更新助手消息内容
-				if assistantMessageID != "" {
-					if _, updateErr := h.db.Exec(
-						"UPDATE messages SET content = ?, updated_at = ? WHERE id = ?",
-						errorMsg,
-						time.Now(), assistantMessageID,
-					); updateErr != nil {
-						h.logger.Warn("更新失败后的助手消息失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(updateErr))
-					}
-					// 保存错误详情到数据库
-					if err := h.db.AddProcessDetail(assistantMessageID, conversationID, "error", errorMsg, nil); err != nil {
-						h.logger.Warn("保存错误详情失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(err))
-					}
-				}
-				h.batchTaskManager.UpdateTaskStatus(queueID, task.ID, "failed", "", runErr.Error())
-			}
-		} else {
-			h.logger.Info("批量任务执行成功", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("conversationId", conversationID))
-
-			resText := resultMA.Response
-			mcpIDs := resultMA.MCPExecutionIDs
-			lastIn := resultMA.LastAgentTraceInput
-			lastOut := resultMA.LastAgentTraceOutput
-
-			// 更新助手消息内容
-			if assistantMessageID != "" {
-				if updateErr := h.db.UpdateAssistantMessageFinalize(assistantMessageID, resText, mcpIDs, multiagent.AggregatedReasoningFromTraceJSON(lastIn)); updateErr != nil {
-					h.logger.Warn("更新助手消息失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(updateErr))
-					// 如果更新失败，尝试创建新消息
 					_, err = h.db.AddMessage(conversationID, "assistant", resText, mcpIDs)
 					if err != nil {
 						h.logger.Error("保存助手消息失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("conversationId", conversationID), zap.Error(err))
 					}
 				}
-			} else {
-				// 如果没有预先创建的助手消息，创建一个新的
-				_, err = h.db.AddMessage(conversationID, "assistant", resText, mcpIDs)
-				if err != nil {
-					h.logger.Error("保存助手消息失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("conversationId", conversationID), zap.Error(err))
-				}
-			}
 
-			// 保存代理轨迹
-			if lastIn != "" || lastOut != "" {
-				if err := h.db.SaveAgentTrace(conversationID, lastIn, lastOut); err != nil {
-					h.logger.Warn("保存代理轨迹失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(err))
-				} else {
-					h.logger.Info("已保存代理轨迹", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("conversationId", conversationID))
+				// 保存代理轨迹
+				if lastIn != "" || lastOut != "" {
+					if err := h.db.SaveAgentTrace(conversationID, lastIn, lastOut); err != nil {
+						h.logger.Warn("保存代理轨迹失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(err))
+					} else {
+						h.logger.Info("已保存代理轨迹", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("conversationId", conversationID))
+					}
 				}
-			}
 
-			// 保存结果
-			h.batchTaskManager.UpdateTaskStatusWithConversationID(queueID, task.ID, "completed", resText, "", conversationID)
-		}
+				// 保存结果
+				h.batchTaskManager.UpdateTaskStatusWithConversationID(queueID, task.ID, "completed", resText, "", conversationID)
+			}
 		}()
 
 		// 移动到下一个任务

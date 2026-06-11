@@ -752,6 +752,61 @@ func (db *DB) UpdateAssistantMessageFinalize(messageID, content string, mcpExecu
 	return nil
 }
 
+// RecoverInterruptedAssistantPlaceholders finalizes assistant placeholders that
+// were left as the latest message in a conversation by a previous process exit.
+func (db *DB) RecoverInterruptedAssistantPlaceholders(content string) (int64, error) {
+	rows, err := db.Query(
+		`SELECT m.id, m.conversation_id
+		 FROM messages m
+		 WHERE m.role = 'assistant'
+		   AND TRIM(m.content) = '处理中...'
+		   AND NOT EXISTS (
+		       SELECT 1 FROM messages newer
+		       WHERE newer.conversation_id = m.conversation_id
+		         AND (
+		             newer.created_at > m.created_at
+		             OR (newer.created_at = m.created_at AND newer.rowid > m.rowid)
+		         )
+		   )`,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("查询重启中断的助手占位消息失败: %w", err)
+	}
+	defer rows.Close()
+
+	type placeholder struct {
+		messageID      string
+		conversationID string
+	}
+	var placeholders []placeholder
+	for rows.Next() {
+		var p placeholder
+		if err := rows.Scan(&p.messageID, &p.conversationID); err != nil {
+			return 0, fmt.Errorf("扫描重启中断的助手占位消息失败: %w", err)
+		}
+		placeholders = append(placeholders, p)
+	}
+	if err := rows.Err(); err != nil {
+		return 0, fmt.Errorf("遍历重启中断的助手占位消息失败: %w", err)
+	}
+
+	for _, p := range placeholders {
+		if _, err := db.Exec(
+			"UPDATE messages SET content = ?, updated_at = ? WHERE id = ? AND role = 'assistant' AND TRIM(content) = '处理中...'",
+			content, time.Now(), p.messageID,
+		); err != nil {
+			return 0, fmt.Errorf("更新重启中断的助手占位消息失败: %w", err)
+		}
+		if err := db.AddProcessDetail(p.messageID, p.conversationID, "error", content, map[string]interface{}{
+			"reason": "process_restarted",
+		}); err != nil {
+			db.logger.Warn("保存重启中断详情失败", zap.String("messageId", p.messageID), zap.Error(err))
+		}
+	}
+
+	return int64(len(placeholders)), nil
+}
+
 // GetMessages 获取对话的所有消息
 func (db *DB) GetMessages(conversationID string) ([]Message, error) {
 	rows, err := db.Query(

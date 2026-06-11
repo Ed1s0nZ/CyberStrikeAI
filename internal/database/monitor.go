@@ -72,6 +72,32 @@ func (db *DB) SaveToolExecution(exec *mcp.ToolExecution) error {
 	return nil
 }
 
+// RecoverInterruptedToolExecutions marks persisted running tool executions from
+// a previous process as failed so the monitor view does not stay stuck.
+func (db *DB) RecoverInterruptedToolExecutions(errorMsg string) (int64, error) {
+	now := time.Now()
+	res, err := db.Exec(
+		`UPDATE tool_executions
+		 SET status = ?,
+		     error = CASE WHEN TRIM(COALESCE(error, '')) = '' THEN ? ELSE error END,
+		     end_time = COALESCE(end_time, ?),
+		     duration_ms = CASE
+		         WHEN duration_ms IS NULL THEN CAST((julianday(?) - julianday(start_time)) * 86400000 AS INTEGER)
+		         ELSE duration_ms
+		     END
+		 WHERE status = ?`,
+		"failed", errorMsg, now, now, "running",
+	)
+	if err != nil {
+		return 0, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
 // CountToolExecutions 统计工具执行记录总数
 func (db *DB) CountToolExecutions(status, toolName string) (int, error) {
 	query := `SELECT COUNT(*) FROM tool_executions`

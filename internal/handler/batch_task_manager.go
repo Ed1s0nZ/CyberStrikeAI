@@ -946,7 +946,7 @@ func (m *BatchTaskManager) GetNextTask(queueID string) (*BatchTask, bool) {
 		return nil, false
 	}
 
-	for i := queue.CurrentIndex; i < len(queue.Tasks); i++ {
+	for i := 0; i < len(queue.Tasks); i++ {
 		task := queue.Tasks[i]
 		if task.Status == BatchTaskStatusPending {
 			queue.CurrentIndex = i
