@@ -3369,7 +3369,7 @@ async function deleteConversationTurnFromUI(anchorBackendMessageId) {
 async function deleteConversation(conversationId, skipConfirm = false) {
     // 确认删除（如果调用者没有跳过确认）
     if (!skipConfirm) {
-        if (!confirm('确定要删除这个对话吗？此操作不可恢复。')) {
+        if (!confirm('确定要删除这个对话吗？对话消息将不可恢复，但已记录的漏洞会保留在漏洞库中。')) {
             return;
         }
     }

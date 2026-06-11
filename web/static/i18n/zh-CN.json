@@ -452,7 +452,7 @@
     "noHistoryConversations": "暂无历史对话",
     "renameGroupPrompt": "请输入新名称：",
     "deleteGroupConfirm": "确定要删除此分组吗？分组中的对话不会被删除，但会从分组中移除。",
-    "deleteConversationConfirm": "确定要删除此对话吗？",
+    "deleteConversationConfirm": "确定要删除此对话吗？对话消息将不可恢复，但已记录的漏洞会保留在漏洞库中。",
     "renameFailed": "重命名失败",
     "downloadConversationFailed": "下载对话失败",
     "viewAttackChainSelectConv": "请选择一个对话以查看攻击链",
@@ -2309,7 +2309,7 @@
     "selectAll": "全选",
     "deleteSelected": "删除所选",
     "confirmDeleteNone": "请先选择要删除的对话",
-    "confirmDeleteN": "确定要删除选中的 {{count}} 条对话吗？",
+    "confirmDeleteN": "确定要删除选中的 {{count}} 条对话吗？对话消息将不可恢复，但已记录的漏洞会保留在漏洞库中。",
     "deleteFailed": "删除失败",
     "unnamedConversation": "未命名对话"
   },

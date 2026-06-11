@@ -464,7 +464,7 @@
     "noHistoryConversations": "No conversation history yet",
     "renameGroupPrompt": "Please enter new name:",
     "deleteGroupConfirm": "Are you sure you want to delete this group? Conversations in the group will not be deleted, but will be removed from the group.",
-    "deleteConversationConfirm": "Are you sure you want to delete this conversation?",
+    "deleteConversationConfirm": "Delete this conversation? Chat messages cannot be recovered, but recorded vulnerabilities will remain in the vulnerability library.",
     "renameFailed": "Rename failed",
     "downloadConversationFailed": "Failed to download conversation",
     "viewAttackChainSelectConv": "Please select a conversation to view attack chain",
@@ -2321,7 +2321,7 @@
     "selectAll": "Select all",
     "deleteSelected": "Delete selected",
     "confirmDeleteNone": "Please select at least one conversation to delete",
-    "confirmDeleteN": "Delete {{count}} selected conversation(s)?",
+    "confirmDeleteN": "Delete {{count}} selected conversation(s)? Chat messages cannot be recovered, but recorded vulnerabilities will remain in the vulnerability library.",
     "deleteFailed": "Delete failed",
     "unnamedConversation": "Unnamed conversation"
   },
