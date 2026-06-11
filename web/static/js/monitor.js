@@ -3442,11 +3442,12 @@ function renderActiveTasks(tasks) {
         const isFinalStatus = ['failed', 'timeout', 'cancelled', 'completed'].includes(task.status);
         const unnamedTaskText = _t('tasks.unnamedTask');
         const stopTaskBtnText = _t('tasks.stopTask');
+        const taskLabel = task.taskTitle || task.message || unnamedTaskText;
 
         item.innerHTML = `
             <div class="active-task-info">
                 <span class="active-task-status">${statusText}</span>
-                <span class="active-task-message">${escapeHtml(task.message || unnamedTaskText)}</span>
+                <span class="active-task-message">${escapeHtml(taskLabel)}</span>
             </div>
             <div class="active-task-actions">
                 ${timeText ? `<span class="active-task-time">${timeText}</span>` : ''}

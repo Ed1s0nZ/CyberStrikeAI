@@ -395,13 +395,13 @@ func (db *DB) ListConversations(limit, offset int, search string) ([]*Conversati
 			 FROM conversations c
 			 WHERE c.title LIKE ?
 			    OR EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.content LIKE ?)
-			 ORDER BY c.updated_at DESC
+			 ORDER BY c.created_at DESC, c.id DESC
 			 LIMIT ? OFFSET ?`,
 			searchPattern, searchPattern, limit, offset,
 		)
 	} else {
 		rows, err = db.Query(
-			"SELECT id, title, COALESCE(pinned, 0), created_at, updated_at, project_id FROM conversations ORDER BY updated_at DESC LIMIT ? OFFSET ?",
+			"SELECT id, title, COALESCE(pinned, 0), created_at, updated_at, project_id FROM conversations ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
 			limit, offset,
 		)
 	}
@@ -471,7 +471,7 @@ func (db *DB) ListUngroupedConversations(limit, offset int) ([]*Conversation, er
 	rows, err := db.Query(
 		`SELECT c.id, c.title, COALESCE(c.pinned, 0), c.created_at, c.updated_at, c.project_id `+
 			ungroupedConversationsSQL+`
-		 ORDER BY c.updated_at DESC
+		 ORDER BY c.created_at DESC, c.id DESC
 		 LIMIT ? OFFSET ?`,
 		limit, offset,
 	)
@@ -711,6 +711,25 @@ func (db *DB) AddMessage(conversationID, role, content string, mcpExecutionIDs [
 	}
 
 	return message, nil
+}
+
+// GetFirstUserMessageContent returns the first user message in a conversation.
+func (db *DB) GetFirstUserMessageContent(conversationID string) (string, error) {
+	var content string
+	err := db.QueryRow(
+		`SELECT content FROM messages
+		 WHERE conversation_id = ? AND role = 'user'
+		 ORDER BY created_at ASC, rowid ASC
+		 LIMIT 1`,
+		conversationID,
+	).Scan(&content)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("查询首条用户消息失败: %w", err)
+	}
+	return strings.TrimSpace(content), nil
 }
 
 // UpdateAssistantMessageFinalize 更新助手消息终态（正文、MCP id、思考链聚合文本，供无轨迹回退时回放）。

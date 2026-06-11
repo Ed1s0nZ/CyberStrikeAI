@@ -105,6 +105,12 @@ const tasksState = {
     showHistory: true // 是否显示历史记录
 };
 
+function getTaskDisplayTitle(task) {
+    const fixedTitle = task && typeof task.taskTitle === 'string' ? task.taskTitle.trim() : '';
+    const message = task && typeof task.message === 'string' ? task.message.trim() : '';
+    return fixedTitle || message || _t('tasks.unnamedTask');
+}
+
 // 从localStorage加载已完成任务历史
 function loadCompletedTasksHistory() {
     try {
@@ -167,6 +173,7 @@ function updateCompletedTasksHistory(currentTasks) {
             tasksState.completedTasksHistory.push({
                 conversationId: task.conversationId,
                 message: task.message || '未命名任务',
+                taskTitle: task.taskTitle || '',
                 startedAt: task.startedAt,
                 status: finalStatus,
                 completedAt: new Date().toISOString()
@@ -233,6 +240,7 @@ async function loadTasks() {
                 ...completedTasks.map(t => ({
                     conversationId: t.conversationId,
                     message: t.message || '未命名任务',
+                    taskTitle: t.taskTitle || '',
                     startedAt: t.startedAt,
                     status: t.status || 'completed',
                     completedAt: t.completedAt || new Date().toISOString()
@@ -359,7 +367,7 @@ function filterAndSortTasks() {
             case 'status':
                 return (a.status || '').localeCompare(b.status || '');
             case 'message':
-                return (a.message || '').localeCompare(b.message || '');
+                return getTaskDisplayTitle(a).localeCompare(getTaskDisplayTitle(b));
             default:
                 return 0;
         }
@@ -509,6 +517,7 @@ function renderTaskItem(task, statusMap, isHistory = false) {
     const duration = (task.status === 'running' || task.status === 'cancelling') 
         ? calculateDuration(task.startedAt) 
         : '';
+    const displayTitle = getTaskDisplayTitle(task);
 
     return `
         <div class="task-item ${isHistory ? 'task-item-history' : ''}" data-task-id="${task.conversationId}" data-started-at="${task.startedAt}" data-status="${task.status}">
@@ -522,7 +531,7 @@ function renderTaskItem(task, statusMap, isHistory = false) {
                     ` : '<div class="task-checkbox-placeholder"></div>'}
                     <span class="task-status ${status.class}">${status.text}</span>
                     ${isHistory ? '<span class="task-history-badge" title="' + _t('tasks.historyBadge') + '">📜</span>' : ''}
-                    <span class="task-message" title="${escapeHtml(task.message || _t('tasks.unnamedTask'))}">${escapeHtml(task.message || _t('tasks.unnamedTask'))}</span>
+                    <span class="task-message" title="${escapeHtml(displayTitle)}">${escapeHtml(displayTitle)}</span>
                 </div>
                 <div class="task-actions">
                     ${duration ? `<span class="task-duration" title="${_t('tasks.duration')}">⏱ ${duration}</span>` : ''}

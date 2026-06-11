@@ -1458,15 +1458,56 @@ func (h *AgentHandler) SubscribeAgentTaskEvents(c *gin.Context) {
 
 // ListAgentTasks 列出所有运行中的任务
 func (h *AgentHandler) ListAgentTasks(c *gin.Context) {
+	tasks := h.tasks.GetActiveTasks()
+	items := make([]gin.H, 0, len(tasks))
+	for _, task := range tasks {
+		if task == nil {
+			continue
+		}
+		taskTitle := ""
+		if h.db != nil && strings.TrimSpace(task.ConversationID) != "" {
+			if firstUserMessage, err := h.db.GetFirstUserMessageContent(task.ConversationID); err == nil {
+				taskTitle = strings.TrimSpace(firstUserMessage)
+			}
+		}
+		items = append(items, gin.H{
+			"conversationId": task.ConversationID,
+			"message":        task.Message,
+			"taskTitle":      taskTitle,
+			"startedAt":      task.StartedAt,
+			"status":         task.Status,
+		})
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"tasks": h.tasks.GetActiveTasks(),
+		"tasks": items,
 	})
 }
 
 // ListCompletedTasks 列出最近完成的任务历史
 func (h *AgentHandler) ListCompletedTasks(c *gin.Context) {
+	tasks := h.tasks.GetCompletedTasks()
+	items := make([]gin.H, 0, len(tasks))
+	for _, task := range tasks {
+		if task == nil {
+			continue
+		}
+		taskTitle := ""
+		if h.db != nil && strings.TrimSpace(task.ConversationID) != "" {
+			if firstUserMessage, err := h.db.GetFirstUserMessageContent(task.ConversationID); err == nil {
+				taskTitle = strings.TrimSpace(firstUserMessage)
+			}
+		}
+		items = append(items, gin.H{
+			"conversationId": task.ConversationID,
+			"message":        task.Message,
+			"taskTitle":      taskTitle,
+			"startedAt":      task.StartedAt,
+			"completedAt":    task.CompletedAt,
+			"status":         task.Status,
+		})
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"tasks": h.tasks.GetCompletedTasks(),
+		"tasks": items,
 	})
 }
 
