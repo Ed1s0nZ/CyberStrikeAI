@@ -20,11 +20,11 @@ import (
 	"cyberstrike-ai/internal/audit"
 	"cyberstrike-ai/internal/config"
 	"cyberstrike-ai/internal/database"
-	"cyberstrike-ai/internal/reasoning"
 	"cyberstrike-ai/internal/mcp"
 	"cyberstrike-ai/internal/mcp/builtin"
 	"cyberstrike-ai/internal/multiagent"
 	"cyberstrike-ai/internal/openai"
+	"cyberstrike-ai/internal/reasoning"
 
 	"github.com/gin-gonic/gin"
 	"github.com/robfig/cron/v3"
@@ -204,15 +204,35 @@ func NewAgentHandler(agent *agent.Agent, db *database.DB, cfg *config.Config, lo
 
 	var recoveredBatchQueueIDs []string
 	if db != nil {
-		queueIDs, failedTasks, err := db.RecoverInterruptedBatchQueues(interruptedTaskMessage)
+		startupMaxMessageRowID, err := db.MaxMessageRowID()
+		if err != nil {
+			logger.Warn("获取启动恢复消息快照失败", zap.Error(err))
+		}
+		startupBatchConversationIDs, err := db.ListBatchTaskConversationIDs()
+		if err != nil {
+			logger.Warn("获取启动恢复批量任务对话快照失败", zap.Error(err))
+		}
+		startupMaxBatchTaskRowID, err := db.MaxBatchTaskRowID()
+		if err != nil {
+			logger.Warn("获取启动恢复批量任务快照失败", zap.Error(err))
+		}
+
+		queueIDs, interruptedBatchConversationIDs, failedTasks, err := db.RecoverInterruptedBatchQueuesBefore(interruptedTaskMessage, startupMaxBatchTaskRowID)
 		if err != nil {
 			logger.Warn("恢复重启中断的批量任务队列失败", zap.Error(err))
-		} else if len(queueIDs) > 0 {
-			recoveredBatchQueueIDs = queueIDs
+		} else if len(queueIDs) > 0 || failedTasks > 0 {
+			recoveredBatchQueueIDs = append(recoveredBatchQueueIDs, queueIDs...)
 			logger.Info("恢复重启中断的批量任务队列",
-				zap.Int("queue_count", len(queueIDs)),
+				zap.Int("resume_queue_count", len(queueIDs)),
 				zap.Int64("failed_task_count", failedTasks),
 			)
+		}
+		if len(interruptedBatchConversationIDs) > 0 {
+			if n, err := db.RecoverInterruptedAssistantPlaceholdersForConversations(interruptedTaskMessage, interruptedBatchConversationIDs); err != nil {
+				logger.Warn("恢复重启中断的批量任务助手占位消息失败", zap.Error(err))
+			} else if n > 0 {
+				logger.Info("恢复重启中断的批量任务助手占位消息", zap.Int64("count", n))
+			}
 		}
 
 		if n, err := db.RecoverInterruptedToolExecutions(interruptedTaskMessage); err != nil {
@@ -221,7 +241,7 @@ func NewAgentHandler(agent *agent.Agent, db *database.DB, cfg *config.Config, lo
 			logger.Info("恢复重启中断的工具执行记录", zap.Int64("count", n))
 		}
 
-		if n, err := db.RecoverInterruptedAssistantPlaceholders(interruptedTaskMessage); err != nil {
+		if n, err := db.RecoverInterruptedAssistantPlaceholdersBefore(interruptedTaskMessage, startupMaxMessageRowID, startupBatchConversationIDs); err != nil {
 			logger.Warn("恢复重启中断的助手占位消息失败", zap.Error(err))
 		} else if n > 0 {
 			logger.Info("恢复重启中断的助手占位消息", zap.Int64("count", n))
@@ -256,36 +276,6 @@ func NewAgentHandler(agent *agent.Agent, db *database.DB, cfg *config.Config, lo
 	}
 	go handler.batchQueueSchedulerLoop()
 	return handler
-}
-
-func (h *AgentHandler) resumeRecoveredBatchQueues(queueIDs []string) {
-	for _, queueID := range queueIDs {
-		queueID = strings.TrimSpace(queueID)
-		if queueID == "" {
-			continue
-		}
-		if !h.markBatchQueueRunning(queueID) {
-			continue
-		}
-
-		queue, exists := h.batchTaskManager.GetBatchQueue(queueID)
-		if !exists {
-			h.unmarkBatchQueueRunning(queueID)
-			h.logger.Warn("重启后继续批量任务队列失败，队列不存在", zap.String("queueId", queueID))
-			continue
-		}
-		if queue.Status != BatchQueueStatusRunning {
-			h.unmarkBatchQueueRunning(queueID)
-			continue
-		}
-		if batchQueueWantsEino(queue.AgentMode) && (h.config == nil || !h.config.MultiAgent.Enabled) {
-			h.unmarkBatchQueueRunning(queueID)
-			h.logger.Warn("重启后继续批量任务队列失败，Eino 多代理未启用", zap.String("queueId", queueID))
-			continue
-		}
-
-		go h.executeBatchQueue(queueID)
-	}
 }
 
 // SetKnowledgeManager 设置知识库管理器（用于记录检索日志）
@@ -331,13 +321,13 @@ type ChatReasoningRequest struct {
 
 // ChatRequest 聊天请求
 type ChatRequest struct {
-	Message              string           `json:"message" binding:"required"`
-	ConversationID       string           `json:"conversationId,omitempty"`
-	ProjectID            string           `json:"projectId,omitempty"` // 新对话绑定的项目（可选；未指定时可用 config.project.default_project_id）
-	Role                 string           `json:"role,omitempty"` // 角色名称
-	Attachments          []ChatAttachment `json:"attachments,omitempty"`
-	WebShellConnectionID string           `json:"webshellConnectionId,omitempty"` // WebShell 管理 - AI 助手：当前选中的连接 ID，仅使用 webshell_* 工具
-	Hitl                 *HITLRequest     `json:"hitl,omitempty"`
+	Message              string                `json:"message" binding:"required"`
+	ConversationID       string                `json:"conversationId,omitempty"`
+	ProjectID            string                `json:"projectId,omitempty"` // 新对话绑定的项目（可选；未指定时可用 config.project.default_project_id）
+	Role                 string                `json:"role,omitempty"`      // 角色名称
+	Attachments          []ChatAttachment      `json:"attachments,omitempty"`
+	WebShellConnectionID string                `json:"webshellConnectionId,omitempty"` // WebShell 管理 - AI 助手：当前选中的连接 ID，仅使用 webshell_* 工具
+	Hitl                 *HITLRequest          `json:"hitl,omitempty"`
 	Reasoning            *ChatReasoningRequest `json:"reasoning,omitempty"`
 	// Orchestration 仅对 /api/multi-agent、/api/multi-agent/stream：deep | plan_execute | supervisor；空则等同 deep。机器人/批量等无请求体时由服务端默认 deep。/api/eino-agent* 不使用此字段。
 	Orchestration string `json:"orchestration,omitempty"`
@@ -597,7 +587,7 @@ func appendAttachmentsToMessage(msg string, attachments []ChatAttachment, savedP
 }
 
 // appendAssistantMessageNotice 在助手消息末尾追加提示，避免覆盖已生成内容。
-// 若消息为空则直接写入提示；若已包含相同提示则保持不变。
+// 若消息为空或仍是占位内容则直接写入提示；若已包含相同提示则保持不变。
 func (h *AgentHandler) appendAssistantMessageNotice(messageID, notice string) error {
 	trimmedNotice := strings.TrimSpace(notice)
 	if strings.TrimSpace(messageID) == "" || trimmedNotice == "" {
@@ -606,14 +596,15 @@ func (h *AgentHandler) appendAssistantMessageNotice(messageID, notice string) er
 	_, err := h.db.Exec(
 		`UPDATE messages
 		 SET content = CASE
-			WHEN content IS NULL OR TRIM(content) = '' THEN ?
+			WHEN content IS NULL OR TRIM(content) = '' OR TRIM(content) = '处理中...' THEN ?
 			WHEN INSTR(content, ?) > 0 THEN content
-			ELSE content || '\n\n' || ?
+			ELSE content || ? || ?
 		 END,
 		     updated_at = ?
 		 WHERE id = ?`,
 		trimmedNotice,
 		trimmedNotice,
+		"\n\n",
 		trimmedNotice,
 		time.Now(),
 		messageID,
@@ -1464,10 +1455,10 @@ func (h *AgentHandler) CancelAgentLoop(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":           "cancelling",
-		"conversationId": req.ConversationID,
-		"message":          msg,
-		"continueAfter":    false,
+		"status":            "cancelling",
+		"conversationId":    req.ConversationID,
+		"message":           msg,
+		"continueAfter":     false,
 		"interruptWithNote": false,
 	})
 }
@@ -1582,6 +1573,7 @@ type BatchTaskRequest struct {
 	CronExpr     string   `json:"cronExpr,omitempty"`       // scheduleMode=cron 时必填
 	ExecuteNow   bool     `json:"executeNow,omitempty"`     // 创建后是否立即执行（默认 false）
 	ProjectID    string   `json:"projectId,omitempty"`      // 队列内子对话绑定的项目（可选）
+	Concurrency  int      `json:"concurrency,omitempty"`    // 并发执行的子任务数，默认 1
 }
 
 // batchQueueWantsEino 队列是否配置为走 Eino 多代理。
@@ -1641,7 +1633,7 @@ func (h *AgentHandler) CreateBatchQueue(c *gin.Context) {
 		nextRunAt = &next
 	}
 
-	queue, createErr := h.batchTaskManager.CreateBatchQueue(req.Title, req.Role, agentMode, scheduleMode, cronExpr, req.ProjectID, nextRunAt, validTasks)
+	queue, createErr := h.batchTaskManager.CreateBatchQueue(req.Title, req.Role, agentMode, scheduleMode, cronExpr, req.ProjectID, nextRunAt, req.Concurrency, validTasks)
 	if createErr != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": createErr.Error()})
 		return
@@ -1838,6 +1830,24 @@ func (h *AgentHandler) UpdateBatchQueueMetadata(c *gin.Context) {
 		return
 	}
 	if err := h.batchTaskManager.UpdateQueueMetadata(queueID, req.Title, req.Role, req.AgentMode); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	updated, _ := h.batchTaskManager.GetBatchQueue(queueID)
+	c.JSON(http.StatusOK, gin.H{"queue": updated})
+}
+
+// UpdateBatchQueueConcurrency 修改批量任务队列的并发数
+func (h *AgentHandler) UpdateBatchQueueConcurrency(c *gin.Context) {
+	queueID := c.Param("queueId")
+	var req struct {
+		Concurrency int `json:"concurrency"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.batchTaskManager.UpdateQueueConcurrency(queueID, req.Concurrency); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -2086,6 +2096,18 @@ func (h *AgentHandler) startBatchQueueExecution(queueID string, scheduled bool) 
 		return true, fmt.Errorf("队列状态不允许启动")
 	}
 
+	if h.db != nil {
+		pendingCount, err := h.db.CountBatchTasksByStatus(queueID, BatchTaskStatusPending)
+		if err != nil {
+			h.unmarkBatchQueueRunning(queueID)
+			return true, err
+		}
+		if pendingCount == 0 {
+			h.unmarkBatchQueueRunning(queueID)
+			return true, fmt.Errorf("没有待执行的子任务")
+		}
+	}
+
 	if queue != nil && batchQueueWantsEino(queue.AgentMode) && (h.config == nil || !h.config.MultiAgent.Enabled) {
 		h.unmarkBatchQueueRunning(queueID)
 		err := fmt.Errorf("当前队列配置为 Eino 多代理，但系统未启用多代理")
@@ -2108,6 +2130,36 @@ func (h *AgentHandler) startBatchQueueExecution(queueID string, scheduled bool) 
 
 	go h.executeBatchQueue(queueID)
 	return true, nil
+}
+
+func (h *AgentHandler) resumeRecoveredBatchQueues(queueIDs []string) {
+	for _, queueID := range queueIDs {
+		queueID = strings.TrimSpace(queueID)
+		if queueID == "" {
+			continue
+		}
+		queue, exists := h.batchTaskManager.GetBatchQueue(queueID)
+		if !exists || queue.Status != BatchQueueStatusRunning {
+			continue
+		}
+
+		if h.db != nil {
+			pendingCount, err := h.db.CountBatchTasksByStatus(queueID, BatchTaskStatusPending)
+			if err != nil {
+				h.logger.Warn("恢复批量任务队列时统计待执行子任务失败", zap.String("queueId", queueID), zap.Error(err))
+				continue
+			}
+			if pendingCount == 0 {
+				continue
+			}
+		}
+
+		if !h.markBatchQueueRunning(queueID) {
+			continue
+		}
+		h.logger.Info("继续执行重启前运行中的批量任务队列", zap.String("queueId", queueID))
+		go h.executeBatchQueue(queueID)
+	}
 }
 
 func (h *AgentHandler) batchQueueSchedulerLoop() {
@@ -2142,8 +2194,26 @@ func (h *AgentHandler) batchQueueSchedulerLoop() {
 // executeBatchQueue 执行批量任务队列
 func (h *AgentHandler) executeBatchQueue(queueID string) {
 	defer h.unmarkBatchQueueRunning(queueID)
-	h.logger.Info("开始执行批量任务队列", zap.String("queueId", queueID))
 
+	queue, exists := h.batchTaskManager.GetBatchQueue(queueID)
+	if !exists {
+		return
+	}
+	concurrency := normalizeBatchQueueConcurrency(queue.Concurrency)
+	h.logger.Info("开始执行批量任务队列", zap.String("queueId", queueID), zap.Int("concurrency", concurrency))
+
+	var wg sync.WaitGroup
+	for workerID := 0; workerID < concurrency; workerID++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+			h.executeBatchQueueWorker(queueID, workerID)
+		}(workerID)
+	}
+	wg.Wait()
+}
+
+func (h *AgentHandler) executeBatchQueueWorker(queueID string, workerID int) {
 	for {
 		// 检查队列状态
 		queue, exists := h.batchTaskManager.GetBatchQueue(queueID)
@@ -2151,27 +2221,27 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 			break
 		}
 
-		// 获取下一个任务
-		task, hasNext := h.batchTaskManager.GetNextTask(queueID)
+		// 领取下一个任务。领取与 running 状态更新在同一把锁内完成，避免并发 worker 重复执行同一子任务。
+		task, hasNext := h.batchTaskManager.ClaimNextTask(queueID)
 		if !hasNext {
-			// 所有任务完成：汇总子任务失败信息便于排障
-			q, ok := h.batchTaskManager.GetBatchQueue(queueID)
-			lastRunErr := ""
-			if ok {
-				for _, t := range q.Tasks {
-					if t.Status == "failed" && t.Error != "" {
-						lastRunErr = t.Error
+			pending, running, ok := h.batchTaskManager.QueueHasActiveTasks(queueID)
+			if ok && !pending && !running {
+				// 所有任务完成：汇总子任务失败信息便于排障
+				q, ok := h.batchTaskManager.GetBatchQueue(queueID)
+				lastRunErr := ""
+				if ok {
+					for _, t := range q.Tasks {
+						if t.Status == "failed" && t.Error != "" {
+							lastRunErr = t.Error
+						}
 					}
 				}
+				h.batchTaskManager.SetLastRunError(queueID, lastRunErr)
+				h.batchTaskManager.UpdateQueueStatus(queueID, "completed")
+				h.logger.Info("批量任务队列执行完成", zap.String("queueId", queueID))
 			}
-			h.batchTaskManager.SetLastRunError(queueID, lastRunErr)
-			h.batchTaskManager.UpdateQueueStatus(queueID, "completed")
-			h.logger.Info("批量任务队列执行完成", zap.String("queueId", queueID))
 			break
 		}
-
-		// 更新任务状态为运行中
-		h.batchTaskManager.UpdateTaskStatus(queueID, task.ID, "running", "", "")
 
 		// 创建新对话
 		title := safeTruncateString(task.Message, 50)
@@ -2182,7 +2252,6 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 		if err != nil {
 			h.logger.Error("创建对话失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(err))
 			h.batchTaskManager.UpdateTaskStatus(queueID, task.ID, "failed", "", "创建对话失败: "+err.Error())
-			h.batchTaskManager.MoveToNextTask(queueID)
 			continue
 		}
 		conversationID = conv.ID
@@ -2247,7 +2316,7 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 			finishStatus := "completed"
 
 			defer func() {
-				h.batchTaskManager.SetTaskCancel(queueID, nil)
+				h.batchTaskManager.SetTaskCancel(queueID, task.ID, nil)
 				timeoutCancel()
 				if registered {
 					// 与流式接口保持一致：结束前补一个 done，便于前端 task-events 侧及时收口 UI。
@@ -2294,7 +2363,7 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 			}
 			registered = true
 			// 存储取消函数：暂停队列时取消子任务 context（与原先语义一致）
-			h.batchTaskManager.SetTaskCancel(queueID, timeoutCancel)
+			h.batchTaskManager.SetTaskCancel(queueID, task.ID, timeoutCancel)
 
 			// 创建进度回调函数：写 DB + 镜像到 task-events，支持刷新后继续流式展示。
 			progressCallback = h.createProgressCallback(taskCtx, cancelWithCause, conversationID, assistantMessageID, sendEvent)
@@ -2435,10 +2504,6 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 				h.batchTaskManager.UpdateTaskStatusWithConversationID(queueID, task.ID, "completed", resText, "", conversationID)
 			}
 		}()
-
-		// 移动到下一个任务
-		h.batchTaskManager.MoveToNextTask(queueID)
-
 		// 检查是否被取消或暂停
 		queue, _ = h.batchTaskManager.GetBatchQueue(queueID)
 		if queue.Status == "cancelled" || queue.Status == "paused" {

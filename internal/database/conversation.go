@@ -752,14 +752,97 @@ func (db *DB) UpdateAssistantMessageFinalize(messageID, content string, mcpExecu
 	return nil
 }
 
-// RecoverInterruptedAssistantPlaceholders finalizes assistant placeholders that
-// were left as the latest message in a conversation by a previous process exit.
+// RecoverInterruptedAssistantPlaceholders finalizes non-batch assistant
+// placeholders that were left as the latest message in a conversation by a
+// previous process exit.
 func (db *DB) RecoverInterruptedAssistantPlaceholders(content string) (int64, error) {
+	return db.RecoverInterruptedAssistantPlaceholdersBefore(content, 0, nil)
+}
+
+// RecoverInterruptedAssistantPlaceholdersBefore finalizes non-batch assistant
+// placeholders from the startup snapshot only. Excluded conversation IDs are
+// usually batch task conversations that existed before recovery began.
+func (db *DB) RecoverInterruptedAssistantPlaceholdersBefore(content string, maxMessageRowID int64, excludedConversationIDs []string) (int64, error) {
+	return db.recoverInterruptedAssistantPlaceholders(content, nil, true, maxMessageRowID, excludedConversationIDs)
+}
+
+// RecoverInterruptedAssistantPlaceholdersForConversations finalizes assistant
+// placeholders only for the provided conversations, used for batch subtasks
+// that were actually running before a restart.
+func (db *DB) RecoverInterruptedAssistantPlaceholdersForConversations(content string, conversationIDs []string) (int64, error) {
+	return db.recoverInterruptedAssistantPlaceholders(content, conversationIDs, false, 0, nil)
+}
+
+func (db *DB) MaxMessageRowID() (int64, error) {
+	var rowID sql.NullInt64
+	if err := db.QueryRow("SELECT MAX(rowid) FROM messages").Scan(&rowID); err != nil {
+		return 0, fmt.Errorf("查询消息快照失败: %w", err)
+	}
+	if !rowID.Valid {
+		return 0, nil
+	}
+	return rowID.Int64, nil
+}
+
+func (db *DB) recoverInterruptedAssistantPlaceholders(content string, conversationIDs []string, excludeBatchConversations bool, maxMessageRowID int64, excludedConversationIDs []string) (int64, error) {
+	args := make([]interface{}, 0, len(conversationIDs)+len(excludedConversationIDs)+1)
+	filter := ""
+	if len(conversationIDs) > 0 {
+		placeholders := make([]string, 0, len(conversationIDs))
+		seen := make(map[string]struct{}, len(conversationIDs))
+		for _, conversationID := range conversationIDs {
+			conversationID = strings.TrimSpace(conversationID)
+			if conversationID == "" {
+				continue
+			}
+			if _, ok := seen[conversationID]; ok {
+				continue
+			}
+			seen[conversationID] = struct{}{}
+			placeholders = append(placeholders, "?")
+			args = append(args, conversationID)
+		}
+		if len(placeholders) == 0 {
+			return 0, nil
+		}
+		filter += " AND m.conversation_id IN (" + strings.Join(placeholders, ",") + ")"
+	}
+	if maxMessageRowID > 0 {
+		filter += " AND m.rowid <= ?"
+		args = append(args, maxMessageRowID)
+	}
+	if len(excludedConversationIDs) > 0 {
+		placeholders := make([]string, 0, len(excludedConversationIDs))
+		seen := make(map[string]struct{}, len(excludedConversationIDs))
+		for _, conversationID := range excludedConversationIDs {
+			conversationID = strings.TrimSpace(conversationID)
+			if conversationID == "" {
+				continue
+			}
+			if _, ok := seen[conversationID]; ok {
+				continue
+			}
+			seen[conversationID] = struct{}{}
+			placeholders = append(placeholders, "?")
+			args = append(args, conversationID)
+		}
+		if len(placeholders) > 0 {
+			filter += " AND m.conversation_id NOT IN (" + strings.Join(placeholders, ",") + ")"
+		}
+	}
+	if excludeBatchConversations {
+		filter += ` AND NOT EXISTS (
+		       SELECT 1 FROM batch_tasks bt
+		       WHERE bt.conversation_id = m.conversation_id
+		   )`
+	}
+
 	rows, err := db.Query(
 		`SELECT m.id, m.conversation_id
 		 FROM messages m
 		 WHERE m.role = 'assistant'
 		   AND TRIM(m.content) = '处理中...'
+		   `+filter+`
 		   AND NOT EXISTS (
 		       SELECT 1 FROM messages newer
 		       WHERE newer.conversation_id = m.conversation_id
@@ -768,6 +851,7 @@ func (db *DB) RecoverInterruptedAssistantPlaceholders(content string) (int64, er
 		             OR (newer.created_at = m.created_at AND newer.rowid > m.rowid)
 		         )
 		   )`,
+		args...,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("查询重启中断的助手占位消息失败: %w", err)

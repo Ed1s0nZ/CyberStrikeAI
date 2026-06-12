@@ -3813,6 +3813,11 @@
                     <div class="form-hint" style="margin-top: 4px;" data-i18n="batchImportModal.agentModeHint">与对话页一致：Eino 单代理（ADK），或 Deep / Plan-Execute / Supervisor（后三种需已启用多代理）。</div>
                 </div>
                 <div class="form-group">
+                    <label for="batch-queue-concurrency" data-i18n="batchImportModal.concurrency">并发数</label>
+                    <input type="number" id="batch-queue-concurrency" min="1" max="25" value="1" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.875rem;" />
+                    <div class="form-hint" style="margin-top: 4px;" data-i18n="batchImportModal.concurrencyHint">同时运行的子任务/对话数量；填 2 会同时创建并运行 2 个对话，最大 25。并发越高，对模型 API、工具执行和数据库写入压力越大。</div>
+                </div>
+                <div class="form-group">
                     <label for="batch-queue-schedule-mode" data-i18n="batchImportModal.scheduleMode">调度方式</label>
                     <select id="batch-queue-schedule-mode" onchange="handleBatchScheduleModeChange()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.875rem;">
                         <option value="manual" data-i18n="batchImportModal.scheduleModeManual">手工执行</option>
@@ -4295,4 +4300,3 @@
     <script src="/static/js/c2.js"></script>
 </body>
 </html>
-

@@ -2362,6 +2362,8 @@
     "agentModeSingle": "单代理（Eino ADK）",
     "agentModeMulti": "多代理（Eino）",
     "agentModeHint": "与对话页一致：Eino 单代理（ADK），或 Deep / Plan-Execute / Supervisor（后三种需已启用多代理）。",
+    "concurrency": "并发数",
+    "concurrencyHint": "同时运行的子任务/对话数量；填 2 会同时创建并运行 2 个对话，最大 25。并发越高，对模型 API、工具执行和数据库写入压力越大。",
     "scheduleMode": "调度方式",
     "scheduleModeManual": "手工执行",
     "scheduleModeCron": "调度表达式（Cron）",

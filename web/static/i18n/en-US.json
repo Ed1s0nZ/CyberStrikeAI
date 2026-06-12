@@ -2374,6 +2374,8 @@
     "agentModeSingle": "Single-agent (Eino ADK)",
     "agentModeMulti": "Multi-agent (Eino)",
     "agentModeHint": "Same as chat: Eino single-agent (ADK), or Deep / Plan-Execute / Supervisor (last three require multi_agent.enabled).",
+    "concurrency": "Concurrency",
+    "concurrencyHint": "Number of subtasks/conversations to run at the same time. Enter 2 to create and run 2 conversations concurrently. Maximum 25; higher concurrency increases model API, tool execution, and database write load.",
     "scheduleMode": "Schedule mode",
     "scheduleModeManual": "Manual",
     "scheduleModeCron": "Cron expression",

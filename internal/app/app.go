@@ -849,6 +849,7 @@ func setupRoutes(
 		protected.POST("/batch-tasks/:queueId/rerun", agentHandler.RerunBatchQueue)
 		protected.POST("/batch-tasks/:queueId/pause", agentHandler.PauseBatchQueue)
 		protected.PUT("/batch-tasks/:queueId/metadata", agentHandler.UpdateBatchQueueMetadata)
+		protected.PUT("/batch-tasks/:queueId/concurrency", agentHandler.UpdateBatchQueueConcurrency)
 		protected.PUT("/batch-tasks/:queueId/schedule", agentHandler.UpdateBatchQueueSchedule)
 		protected.PUT("/batch-tasks/:queueId/schedule-enabled", agentHandler.SetBatchQueueScheduleEnabled)
 		protected.DELETE("/batch-tasks/:queueId", agentHandler.DeleteBatchQueue)

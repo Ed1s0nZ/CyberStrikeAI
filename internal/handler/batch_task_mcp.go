@@ -177,6 +177,10 @@ func RegisterBatchTaskMCPTools(mcpServer *mcp.Server, h *AgentHandler, logger *z
 					"type":        "boolean",
 					"description": "创建后是否立即开始执行队列，默认 false（pending，需 batch_task_start）",
 				},
+				"concurrency": map[string]interface{}{
+					"type":        "integer",
+					"description": fmt.Sprintf("并发执行的子任务数，默认 1，最大 %d", MaxBatchQueueConcurrency),
+				},
 				"project_id": map[string]interface{}{
 					"type":        "string",
 					"description": "队列内子对话绑定的项目 ID（可选，未指定时使用 config.project.default_project_id）",
@@ -209,8 +213,9 @@ func RegisterBatchTaskMCPTools(mcpServer *mcp.Server, h *AgentHandler, logger *z
 		if !ok {
 			executeNow = false
 		}
+		concurrency := int(mcpArgFloat(args, "concurrency"))
 		projectID := strings.TrimSpace(mcpArgString(args, "project_id"))
-		queue, createErr := h.batchTaskManager.CreateBatchQueue(title, role, agentMode, scheduleMode, cronExpr, projectID, nextRunAt, tasks)
+		queue, createErr := h.batchTaskManager.CreateBatchQueue(title, role, agentMode, scheduleMode, cronExpr, projectID, nextRunAt, concurrency, tasks)
 		if createErr != nil {
 			return batchMCPTextResult("创建队列失败: "+createErr.Error(), true), nil
 		}
@@ -647,6 +652,7 @@ type batchTaskQueueMCPListItem struct {
 	NextRunAt             *time.Time                `json:"nextRunAt,omitempty"`
 	ScheduleEnabled       bool                      `json:"scheduleEnabled"`
 	LastScheduleTriggerAt *time.Time                `json:"lastScheduleTriggerAt,omitempty"`
+	Concurrency           int                       `json:"concurrency"`
 	Status                string                    `json:"status"`
 	CreatedAt             time.Time                 `json:"createdAt"`
 	StartedAt             *time.Time                `json:"startedAt,omitempty"`
@@ -710,6 +716,7 @@ func toBatchTaskQueueMCPListItem(q *BatchTaskQueue) batchTaskQueueMCPListItem {
 		NextRunAt:             q.NextRunAt,
 		ScheduleEnabled:       q.ScheduleEnabled,
 		LastScheduleTriggerAt: q.LastScheduleTriggerAt,
+		Concurrency:           normalizeBatchQueueConcurrency(q.Concurrency),
 		Status:                q.Status,
 		CreatedAt:             q.CreatedAt,
 		StartedAt:             q.StartedAt,
