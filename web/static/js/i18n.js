@@ -1,6 +1,6 @@
 // 前端国际化初始化（基于 i18next 浏览器版本）
 (function () {
-    const DEFAULT_LANG = 'zh-CN';
+    const DEFAULT_LANG = 'fa-IR';
     const STORAGE_KEY = 'csai_lang';
     const RESOURCES_PREFIX = '/static/i18n';
 
@@ -23,6 +23,9 @@
         }
 
         const navLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
+        if (navLang.startsWith('fa')) {
+            return 'fa-IR';
+        }
         if (navLang.startsWith('zh')) {
             return 'zh-CN';
         }
@@ -100,24 +103,34 @@
             }
         } catch (e) { /* ignore */ }
 
-        // 更新 html lang 属性
-        try {
-            if (document && document.documentElement) {
-                document.documentElement.lang = i18next.language || DEFAULT_LANG;
-            }
-        } catch (e) {
-            // ignore
-        }
+        // 更新 html lang / dir 属性
+        applyDocumentLanguage(i18next.language || DEFAULT_LANG);
     }
 
     function updateLangLabel() {
         const label = document.getElementById('current-lang-label');
         if (!label || typeof i18next === 'undefined') return;
         const lang = (i18next.language || DEFAULT_LANG).toLowerCase();
-        if (lang.indexOf('zh') === 0) {
-            label.textContent = i18next.t('lang.zhCN');
-        } else {
-            label.textContent = i18next.t('lang.enUS');
+        let key = 'lang.enUS';
+        if (lang.indexOf('fa') === 0) {
+            key = 'lang.faIR';
+        } else if (lang.indexOf('zh') === 0) {
+            key = 'lang.zhCN';
+        }
+        label.textContent = i18next.t(key);
+    }
+
+    function applyDocumentLanguage(lang) {
+        try {
+            if (document && document.documentElement) {
+                document.documentElement.lang = lang || DEFAULT_LANG;
+                document.documentElement.dir = (lang || DEFAULT_LANG).indexOf('fa') === 0 ? 'rtl' : 'ltr';
+            }
+            if (document && document.body) {
+                document.body.dir = (lang || DEFAULT_LANG).indexOf('fa') === 0 ? 'rtl' : 'ltr';
+            }
+        } catch (e) {
+            // ignore
         }
     }
 
@@ -154,6 +167,7 @@
         }
         applyTranslations(document);
         updateLangLabel();
+        applyDocumentLanguage(lang);
         try {
             window.__locale = lang;
         } catch (e) { /* ignore */ }
@@ -172,17 +186,25 @@
         const initialLang = detectInitialLang();
         await i18next.init({
             lng: initialLang,
-            fallbackLng: DEFAULT_LANG,
+            fallbackLng: ['en-US', 'zh-CN'],
             debug: false,
+            supportedLngs: ['fa-IR', 'en-US', 'zh-CN'],
             resources: {}
         });
 
-        await loadLanguageResources(initialLang);
+        await Promise.all([
+            loadLanguageResources('fa-IR'),
+            loadLanguageResources('en-US'),
+            loadLanguageResources('zh-CN'),
+            loadLanguageResources(initialLang)
+        ]);
         applyTranslations(document);
         updateLangLabel();
+        const currentLang = i18next.language || initialLang;
         try {
-            window.__locale = i18next.language || initialLang;
+            window.__locale = currentLang;
         } catch (e) { /* ignore */ }
+        applyDocumentLanguage(currentLang);
 
         // 导出全局函数供其他脚本调用（支持插值参数，如 _t('key', { count: 2 })）
         window.t = function (key, opts) {
