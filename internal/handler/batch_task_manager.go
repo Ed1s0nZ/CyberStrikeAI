@@ -445,6 +445,15 @@ func (m *BatchTaskManager) LoadFromDB() error {
 		return nil
 	}
 
+	const interruptedReason = "服务重启导致批量任务中断，已自动标记当前子任务失败"
+	if summary, err := m.db.RepairInterruptedBatchRuns(interruptedReason); err != nil {
+		m.logger.Warn("repair interrupted batch runs failed", zap.Error(err))
+	} else if summary != nil && (summary.QueuesRepaired > 0 || summary.TasksFailed > 0) {
+		m.logger.Info("repaired interrupted batch runs on startup",
+			zap.Int64("queues", summary.QueuesRepaired),
+			zap.Int64("tasks", summary.TasksFailed))
+	}
+
 	queueRows, err := m.db.GetAllBatchQueues()
 	if err != nil {
 		return err

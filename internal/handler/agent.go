@@ -204,6 +204,15 @@ func NewAgentHandler(agent *agent.Agent, db *database.DB, cfg *config.Config, lo
 	if err := batchTaskManager.LoadFromDB(); err != nil {
 		logger.Warn("从数据库加载批量任务队列失败", zap.Error(err))
 	}
+	manualInterruptedReason := "服务重启导致任务中断，已自动标记失败"
+	if summary, err := db.RepairInterruptedManualAgentMessages(manualInterruptedReason); err != nil {
+		logger.Warn("修复中断手动任务占位消息失败", zap.Error(err))
+	} else if summary != nil && (summary.MessagesRepaired > 0 || summary.DetailsInserted > 0) {
+		logger.Info("已修复中断手动任务占位消息",
+			zap.Int64("messagesRepaired", summary.MessagesRepaired),
+			zap.Int64("detailsInserted", summary.DetailsInserted),
+		)
+	}
 
 	bus := NewTaskEventBus()
 	tm := NewAgentTaskManager()
