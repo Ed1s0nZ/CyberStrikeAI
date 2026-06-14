@@ -12,6 +12,16 @@ import (
 	"go.uber.org/zap"
 )
 
+const maxProjectDescriptionRunes = 4000
+
+func clampProjectDescription(s string) string {
+	r := []rune(s)
+	if len(r) <= maxProjectDescriptionRunes {
+		return s
+	}
+	return string(r[:maxProjectDescriptionRunes])
+}
+
 // ProjectHandler 项目管理处理器。
 type ProjectHandler struct {
 	db     *database.DB
@@ -48,7 +58,7 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 	}
 	p := &database.Project{
 		Name:        strings.TrimSpace(req.Name),
-		Description: req.Description,
+		Description: clampProjectDescription(req.Description),
 		ScopeJSON:   req.ScopeJSON,
 		Status:      strings.TrimSpace(req.Status),
 	}
@@ -184,7 +194,7 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 		}
 	}
 	if req.Description != nil {
-		p.Description = *req.Description
+		p.Description = clampProjectDescription(*req.Description)
 	}
 	if req.ScopeJSON != nil {
 		p.ScopeJSON = *req.ScopeJSON
