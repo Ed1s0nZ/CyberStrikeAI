@@ -814,7 +814,7 @@ async function loadProjectConversations() {
             const id = conv.id;
             const idEsc = escapeHtml(id);
             const title = escapeHtml(conv.title || tp('projects.untitledConversation'));
-            const updated = formatProjectTime(conv.updatedAt || conv.updated_at, conv.createdAt || conv.created_at);
+            const updated = formatProjectTime(conv.createdAt || conv.created_at, conv.updatedAt || conv.updated_at);
             return `<tr>
             <td class="cell-summary" title="${title}">${title}</td>
             <td>${escapeHtml(updated)}</td>

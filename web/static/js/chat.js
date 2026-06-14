@@ -5978,10 +5978,10 @@ async function loadConversationsWithGroups(searchQuery = '') {
             }
         });
 
-        // 按时间排序
+        // 按创建时间排序，避免继续对话后因 updatedAt 改变而跳动
         const sortByTime = (a, b) => {
-            const timeA = a.updatedAt ? new Date(a.updatedAt) : new Date(0);
-            const timeB = b.updatedAt ? new Date(b.updatedAt) : new Date(0);
+            const timeA = a.createdAt ? new Date(a.createdAt) : new Date(0);
+            const timeB = b.createdAt ? new Date(b.createdAt) : new Date(0);
             return timeB - timeA;
         };
 
@@ -6011,7 +6011,7 @@ async function loadConversationsWithGroups(searchQuery = '') {
         };
 
         normalConvs.forEach(conv => {
-            const dateObj = conv.updatedAt ? new Date(conv.updatedAt) : new Date();
+            const dateObj = conv.createdAt ? new Date(conv.createdAt) : new Date();
             const validDate = isNaN(dateObj.getTime()) ? new Date() : dateObj;
             const groupKey = getConversationGroup(validDate, todayStart, sevenDaysCutoff, yesterdayStart);
             groups[groupKey].push({
@@ -6024,7 +6024,7 @@ async function loadConversationsWithGroups(searchQuery = '') {
 
         if (pinnedConvs.length > 0) {
             pinnedConvs.forEach(conv => {
-                const dateObj = conv.updatedAt ? new Date(conv.updatedAt) : new Date();
+                const dateObj = conv.createdAt ? new Date(conv.createdAt) : new Date();
                 const validDate = isNaN(dateObj.getTime()) ? new Date() : dateObj;
                 fragment.appendChild(createConversationListItemWithMenu({
                     ...conv,
@@ -6135,7 +6135,7 @@ function createConversationListItemWithMenu(conversation, isPinned) {
 
     const time = document.createElement('div');
     time.className = 'conversation-time';
-    const dateObj = conversation.updatedAt ? new Date(conversation.updatedAt) : new Date();
+    const dateObj = conversation.createdAt ? new Date(conversation.createdAt) : new Date();
     time.textContent = conversation._timeText || formatConversationTimestamp(dateObj);
     contentWrapper.appendChild(time);
 
@@ -7298,7 +7298,7 @@ function renderBatchConversations(filtered = null) {
 
         const time = document.createElement('div');
         time.className = 'batch-table-col-time';
-        const dateObj = conv.updatedAt ? new Date(conv.updatedAt) : new Date();
+        const dateObj = conv.createdAt ? new Date(conv.createdAt) : new Date();
         const locale = (typeof i18next !== 'undefined' && i18next.language) ? i18next.language : 'zh-CN';
         time.textContent = dateObj.toLocaleString(locale, {
             year: 'numeric',
@@ -7949,7 +7949,7 @@ async function loadGroupConversations(groupId, searchQuery = '') {
 
                 const timeWrapper = document.createElement('div');
                 timeWrapper.className = 'group-conversation-time';
-                const dateObj = fullConv.updatedAt ? new Date(fullConv.updatedAt) : new Date();
+                const dateObj = fullConv.createdAt ? new Date(fullConv.createdAt) : new Date();
                 const convListLocale = (typeof window.__locale === 'string' && window.__locale.startsWith('zh')) ? 'zh-CN' : 'en-US';
                 timeWrapper.textContent = dateObj.toLocaleString(convListLocale, {
                     year: 'numeric',
