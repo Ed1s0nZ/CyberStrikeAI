@@ -61,37 +61,44 @@ show_progress() {
     printf "\r"
 }
 
-echo ""
-echo "=========================================="
-echo "  CyberStrikeAI Deploy & Start Script"
-echo "  (HTTPS with self-signed cert by default; plain HTTP: $0 --http)"
-echo "=========================================="
-echo ""
+print_start_banner() {
+    echo ""
+    echo "=========================================="
+    echo "  CyberStrikeAI Deploy & Start Script"
+    echo "  (background HTTPS by default; plain HTTP: $0 --http; foreground: $0 --foreground)"
+    echo "=========================================="
+    echo ""
 
-# Show temporary mirror/proxy info
-echo ""
-warning "Note: this script uses temporary mirrors to speed up downloads"
-echo ""
-info "Python pip temporary mirror:"
-echo "  ${PIP_INDEX_URL}"
-info "Go temporary proxy:"
-echo "  ${GOPROXY}"
-echo ""
-note "These settings apply only while this script runs and do not change system config"
-echo ""
-sleep 1
+    # Show temporary mirror/proxy info
+    echo ""
+    warning "Note: this script uses temporary mirrors to speed up downloads"
+    echo ""
+    info "Python pip temporary mirror:"
+    echo "  ${PIP_INDEX_URL}"
+    info "Go temporary proxy:"
+    echo "  ${GOPROXY}"
+    echo ""
+    note "These settings apply only while this script runs and do not change system config"
+    echo ""
+    sleep 1
+}
 
 CONFIG_FILE="$ROOT_DIR/config.yaml"
 VENV_DIR="$ROOT_DIR/venv"
 REQUIREMENTS_FILE="$ROOT_DIR/requirements.txt"
 BINARY_NAME="cyberstrike-ai"
+LOG_DIR="$ROOT_DIR/logs"
+RUN_DIR="$ROOT_DIR/run"
+PID_FILE="$RUN_DIR/$BINARY_NAME.pid"
+SERVER_LOG="$LOG_DIR/$BINARY_NAME.log"
 
-# Check config file
-if [ ! -f "$CONFIG_FILE" ]; then
-    error "Config file config.yaml not found"
-    info "Make sure you run this script from the project root"
-    exit 1
-fi
+check_config_file() {
+    if [ ! -f "$CONFIG_FILE" ]; then
+        error "Config file config.yaml not found"
+        info "Make sure you run this script from the project root"
+        exit 1
+    fi
+}
 
 # Check Python environment
 check_python() {
@@ -353,18 +360,289 @@ need_rebuild() {
     return 1  # no rebuild needed
 }
 
+read_pid() {
+    if [ -f "$PID_FILE" ]; then
+        tr -d '[:space:]' < "$PID_FILE" 2>/dev/null || true
+    fi
+}
+
+is_running() {
+    local pid="${1:-}"
+    if [ -z "$pid" ]; then
+        return 1
+    fi
+    kill -0 "$pid" 2>/dev/null
+}
+
+status_server() {
+    local pid
+    pid="$(read_pid)"
+    if is_running "$pid"; then
+        success "CyberStrikeAI is running in background"
+        info "PID: $pid"
+        info "PID file: $PID_FILE"
+        info "Log file: $SERVER_LOG"
+        return 0
+    fi
+
+    if [ -n "$pid" ]; then
+        warning "PID file exists but process is not running: $pid"
+        info "PID file: $PID_FILE"
+    else
+        warning "CyberStrikeAI is not running (no PID file)"
+    fi
+    return 1
+}
+
+stop_server() {
+    local pid
+    pid="$(read_pid)"
+    if ! is_running "$pid"; then
+        if [ -n "$pid" ]; then
+            warning "Removing stale PID file: $PID_FILE"
+            rm -f "$PID_FILE"
+        else
+            warning "CyberStrikeAI is not running"
+        fi
+        return 0
+    fi
+
+    info "Stopping CyberStrikeAI server (PID: $pid)..."
+    kill -TERM "$pid" 2>/dev/null || true
+    for _ in {1..20}; do
+        if ! is_running "$pid"; then
+            rm -f "$PID_FILE"
+            success "CyberStrikeAI server stopped"
+            return 0
+        fi
+        sleep 0.5
+    done
+
+    warning "Timed out waiting for CyberStrikeAI server to stop"
+    warning "Still running PID: $pid"
+    return 1
+}
+
+build_server_args() {
+    SERVER_ARGS=(-config "$CONFIG_FILE")
+    if [ "$USE_HTTPS" -eq 1 ]; then
+        SERVER_ARGS+=(--https)
+    fi
+    if [ "${#FORWARD_ARGS[@]}" -gt 0 ]; then
+        SERVER_ARGS+=("${FORWARD_ARGS[@]}")
+    fi
+}
+
+read_config_auth_password() {
+    awk '
+        /^[[:space:]]*auth:[[:space:]]*$/ {
+            in_auth = 1
+            next
+        }
+        in_auth && /^[^[:space:]#][^:]*:/ {
+            in_auth = 0
+        }
+        in_auth && /^[[:space:]]*password:[[:space:]]*/ {
+            line = $0
+            sub(/^[[:space:]]*password:[[:space:]]*/, "", line)
+            sub(/[[:space:]]+#.*$/, "", line)
+            gsub(/^"/, "", line)
+            gsub(/"$/, "", line)
+            gsub(/^\047/, "", line)
+            gsub(/\047$/, "", line)
+            print line
+            exit
+        }
+    ' "$CONFIG_FILE" 2>/dev/null || true
+}
+
+print_generated_password_from_log() {
+    local offset="${1:-0}"
+    local pid="${2:-}"
+    local password=""
+    local new_log=""
+    local configured_password=""
+
+    for _ in {1..20}; do
+        if [ -f "$SERVER_LOG" ]; then
+            new_log="$(tail -c +"$((offset + 1))" "$SERVER_LOG" 2>/dev/null || true)"
+            password="$(printf "%s\n" "$new_log" | awk -F': ' '/^Password: / { value=$2 } END { print value }')"
+            if [ -n "$password" ]; then
+                echo ""
+                success "Web login password generated"
+                echo "=========================================="
+                echo "  CyberStrikeAI Auto-Generated Web Password"
+                echo "  Password: $password"
+                echo "=========================================="
+                warning "Anyone with this password can fully control CyberStrikeAI. Store it securely and change auth.password soon."
+                return 0
+            fi
+        fi
+
+        configured_password="$(read_config_auth_password)"
+        if [ -n "$configured_password" ]; then
+            echo ""
+            success "Web login password is configured"
+            echo "=========================================="
+            echo "  CyberStrikeAI Web Login Password"
+            echo "  Password: $configured_password"
+            echo "=========================================="
+            warning "Anyone with this password can fully control CyberStrikeAI. Store it securely."
+            return 0
+        fi
+
+        if [ -n "$pid" ] && ! is_running "$pid"; then
+            break
+        fi
+        sleep 0.5
+    done
+
+    note "No Web login password was found in this startup log or config.yaml."
+    return 1
+}
+
+start_server_background() {
+    mkdir -p "$LOG_DIR" "$RUN_DIR"
+
+    local existing_pid
+    existing_pid="$(read_pid)"
+    if is_running "$existing_pid"; then
+        success "CyberStrikeAI server is already running in background"
+        info "PID: $existing_pid"
+        info "Log file: $SERVER_LOG"
+        info "Stop it with: $0 --stop"
+        return 0
+    fi
+    if [ -n "$existing_pid" ]; then
+        warning "Removing stale PID file: $PID_FILE"
+        rm -f "$PID_FILE"
+    fi
+
+    build_server_args
+
+    if [ "$USE_HTTPS" -eq 1 ]; then
+        info "Starting CyberStrikeAI server in background (HTTPS + HTTP/2, self-signed cert)..."
+        note "For plain HTTP, use: $0 --http"
+    else
+        info "Starting CyberStrikeAI server in background (HTTP)..."
+        note "For HTTPS with a self-signed cert, use: $0 --https"
+    fi
+    info "Log file: $SERVER_LOG"
+    echo "=========================================="
+    echo ""
+
+    local log_offset=0
+    if [ -f "$SERVER_LOG" ]; then
+        log_offset="$(wc -c < "$SERVER_LOG" 2>/dev/null | tr -d '[:space:]' || echo 0)"
+        if [ -z "$log_offset" ]; then
+            log_offset=0
+        fi
+    fi
+
+    local https_env=0
+    if [ "$USE_HTTPS" -eq 1 ]; then
+        https_env=1
+    fi
+
+    CYBERSTRIKE_HTTPS="$https_env" nohup "./$BINARY_NAME" "${SERVER_ARGS[@]}" >>"$SERVER_LOG" 2>&1 </dev/null &
+    local server_pid=$!
+    echo "$server_pid" > "$PID_FILE"
+
+    sleep 1
+    if is_running "$server_pid"; then
+        success "CyberStrikeAI server started in background"
+        info "PID: $server_pid"
+        info "PID file: $PID_FILE"
+        info "Log file: $SERVER_LOG"
+        info "Stop: $0 --stop"
+        info "Status: $0 --status"
+        info "Foreground mode: $0 --foreground"
+        print_generated_password_from_log "$log_offset" "$server_pid" || true
+        return 0
+    fi
+
+    rm -f "$PID_FILE"
+    error "CyberStrikeAI server failed to start"
+    if [ -f "$SERVER_LOG" ]; then
+        info "Last log lines:"
+        tail -n 20 "$SERVER_LOG" | sed 's/^/  /'
+    fi
+    return 1
+}
+
+start_server_foreground() {
+    build_server_args
+
+    if [ "$USE_HTTPS" -eq 1 ]; then
+        info "Starting CyberStrikeAI server in foreground (HTTPS + HTTP/2, self-signed cert)..."
+        note "For plain HTTP, use: $0 --http"
+    else
+        info "Starting CyberStrikeAI server in foreground (HTTP)..."
+        note "For HTTPS with a self-signed cert, use: $0 --https"
+    fi
+    echo "=========================================="
+    echo ""
+
+    local https_env=0
+    if [ "$USE_HTTPS" -eq 1 ]; then
+        https_env=1
+    fi
+
+    CYBERSTRIKE_HTTPS="$https_env" exec "./$BINARY_NAME" "${SERVER_ARGS[@]}"
+}
+
 # Main flow
-# Default: HTTPS (--https passed to binary); --http uses plain HTTP.
+# Default: background HTTPS; --http uses plain HTTP.
 main() {
     USE_HTTPS=1
+    RUN_IN_BACKGROUND=1
+    ACTION="start"
     FORWARD_ARGS=()
     for arg in "$@"; do
-        if [ "$arg" = "--http" ]; then
-            USE_HTTPS=0
-            continue
-        fi
-        FORWARD_ARGS+=("$arg")
+        case "$arg" in
+            --http)
+                USE_HTTPS=0
+                ;;
+            --https)
+                USE_HTTPS=1
+                ;;
+            --foreground)
+                RUN_IN_BACKGROUND=0
+                ;;
+            --background|--daemon)
+                RUN_IN_BACKGROUND=1
+                ;;
+            --stop)
+                ACTION="stop"
+                ;;
+            --status)
+                ACTION="status"
+                ;;
+            --restart)
+                ACTION="restart"
+                ;;
+            *)
+                FORWARD_ARGS+=("$arg")
+                ;;
+        esac
     done
+
+    case "$ACTION" in
+        stop)
+            stop_server
+            return $?
+            ;;
+        status)
+            status_server
+            return $?
+            ;;
+        restart)
+            stop_server || exit 1
+            ;;
+    esac
+
+    check_config_file
+    print_start_banner
 
     # Environment checks
     info "Checking runtime environment..."
@@ -389,30 +667,14 @@ main() {
     # Start server
     success "All setup complete!"
     echo ""
-    if [ "$USE_HTTPS" -eq 1 ]; then
-        info "Starting CyberStrikeAI server (HTTPS + HTTP/2, self-signed cert)..."
-        note "For plain HTTP, use: $0 --http"
-    else
-        info "Starting CyberStrikeAI server (HTTP)..."
-    fi
-    echo "=========================================="
-    echo ""
 
     # Always pass config.yaml from project root so cwd does not matter; extra args still apply (e.g. -config override; last Go flag wins).
-    if [ "$USE_HTTPS" -eq 1 ]; then
-        if [ "${#FORWARD_ARGS[@]}" -gt 0 ]; then
-            exec "./$BINARY_NAME" -config "$CONFIG_FILE" --https "${FORWARD_ARGS[@]}"
-        else
-            exec "./$BINARY_NAME" -config "$CONFIG_FILE" --https
-        fi
+    if [ "$RUN_IN_BACKGROUND" -eq 1 ]; then
+        start_server_background
     else
-        if [ "${#FORWARD_ARGS[@]}" -gt 0 ]; then
-            exec "./$BINARY_NAME" -config "$CONFIG_FILE" "${FORWARD_ARGS[@]}"
-        else
-            exec "./$BINARY_NAME" -config "$CONFIG_FILE"
-        fi
+        start_server_foreground
     fi
 }
 
-# Run main (supports args, e.g. ./run.sh --http)
+# Run main (supports args, e.g. ./run.sh --http, ./run.sh --foreground, ./run.sh --stop)
 main "$@"

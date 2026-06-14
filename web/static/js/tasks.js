@@ -36,6 +36,7 @@ function getBatchQueueStatusPresentation(queue) {
     const map = {
         pending: { text: _t('tasks.statusPending'), class: 'batch-queue-status-pending' },
         running: { text: _t('tasks.statusRunning'), class: 'batch-queue-status-running' },
+        pausing: { text: _t('tasks.statusPausing'), class: 'batch-queue-status-pausing' },
         paused: { text: _t('tasks.statusPaused'), class: 'batch-queue-status-paused' },
         completed: { text: _t('tasks.statusCompleted'), class: 'batch-queue-status-completed' },
         cancelled: { text: _t('tasks.statusCancelled'), class: 'batch-queue-status-cancelled' }
@@ -77,7 +78,7 @@ function getBatchQueueStatusPresentation(queue) {
 /** 队列是否处于「可改子任务列表/文案」的空闲态（与后端 batch_task_manager.queueAllowsTaskListMutationLocked 对齐） */
 function batchQueueAllowsSubtaskMutation(queue) {
     if (!queue) return false;
-    if (queue.status === 'running') return false;
+    if (queue.status === 'running' || queue.status === 'pausing') return false;
     const hasRunningSubtask = Array.isArray(queue.tasks) && queue.tasks.some(t => t && t.status === 'running');
     if (hasRunningSubtask) return false;
     return queue.status === 'pending' || queue.status === 'paused' || queue.status === 'completed' || queue.status === 'cancelled';
@@ -803,7 +804,7 @@ const batchQueuesState = {
     currentQueueId: null,
     refreshInterval: null,
     // 筛选和分页状态
-    filterStatus: 'all', // 'all', 'pending', 'running', 'paused', 'completed', 'cancelled'
+    filterStatus: 'all', // 'all', 'pending', 'running', 'pausing', 'paused', 'completed', 'cancelled'
     searchKeyword: '',
     currentPage: 1,
     pageSize: 10,
@@ -1386,7 +1387,7 @@ async function showBatchQueueDetail(queueId) {
             addTaskBtn.style.display = allowSubtaskMutation ? 'inline-block' : 'none';
         }
         if (startBtn) {
-            // pending状态显示"开始执行"，paused状态显示"继续执行"
+            // pending状态显示"开始执行"，paused状态显示"继续执行"；pausing 等待当前子任务停止
             startBtn.style.display = (queue.status === 'pending' || queue.status === 'paused') ? 'inline-block' : 'none';
             if (startBtn && queue.status === 'paused') {
                 startBtn.textContent = _t('tasks.resumeExecute');
@@ -1403,7 +1404,7 @@ async function showBatchQueueDetail(queueId) {
             rerunBtn.style.display = (queue.status === 'completed' || queue.status === 'cancelled') ? 'inline-block' : 'none';
         }
         if (pauseBtn) {
-            // running状态显示"暂停队列"
+            // running状态显示"暂停队列"；pausing 已在停止中
             pauseBtn.style.display = queue.status === 'running' ? 'inline-block' : 'none';
         }
         if (deleteBtn) {

@@ -50,6 +50,41 @@
         return distanceFromBottom(el) <= thresholdPx;
     }
 
+    function isVerticallyScrollable(el) {
+        if (!el || el.scrollHeight <= el.clientHeight + 1) return false;
+        try {
+            const overflowY = window.getComputedStyle(el).overflowY;
+            return overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay';
+        } catch (e) {
+            return true;
+        }
+    }
+
+    function getScrollableProcessDetailElements() {
+        const root = getChatMessagesEl();
+        if (!root) return [];
+        const targets = [];
+        root.querySelectorAll('.progress-timeline.expanded').forEach(function (timeline) {
+            if (isVerticallyScrollable(timeline)) targets.push(timeline);
+            timeline.querySelectorAll('*').forEach(function (el) {
+                if (isVerticallyScrollable(el)) targets.push(el);
+            });
+        });
+        return Array.from(new Set(targets));
+    }
+
+    function scrollProcessDetailsTo(position, smooth) {
+        const top = position === 'top' ? 0 : null;
+        getScrollableProcessDetailElements().forEach(function (el) {
+            const targetTop = top === null ? el.scrollHeight : top;
+            if (smooth && typeof el.scrollTo === 'function') {
+                el.scrollTo({ top: targetTop, behavior: 'smooth' });
+            } else {
+                el.scrollTop = targetTop;
+            }
+        });
+    }
+
     function isChatMessagesPinnedToBottom() {
         return isNearBottom(CHAT_SCROLL_FAB_HIDE_THRESHOLD_PX);
     }
@@ -72,13 +107,13 @@
         scrollMode = 'following';
         detachLockUntil = 0;
         hasPendingNewBelow = false;
-        updateScrollToBottomFab();
+        updateScrollFabs();
     }
 
     function markPendingNewBelow() {
         if (scrollMode !== 'detached') return;
         hasPendingNewBelow = true;
-        updateScrollToBottomFab();
+        updateScrollFabs();
     }
 
     function setScrollDetached() {
@@ -88,7 +123,7 @@
         if (isStreamActive()) {
             hasPendingNewBelow = true;
         }
-        updateScrollToBottomFab();
+        updateScrollFabs();
     }
 
     function scrollChatToBottomInstant() {
@@ -96,6 +131,7 @@
         const el = getChatMessagesEl();
         if (!el) return;
         programmaticScroll = true;
+        scrollProcessDetailsTo('bottom', false);
         el.scrollTop = el.scrollHeight;
         lastScrollTop = el.scrollTop;
         requestAnimationFrame(function () {
@@ -107,6 +143,7 @@
         const el = getChatMessagesEl();
         if (!el) return;
         programmaticScroll = true;
+        scrollProcessDetailsTo('bottom', true);
         el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
         requestAnimationFrame(function () {
             programmaticScroll = false;
@@ -115,12 +152,26 @@
         });
     }
 
-    function updateScrollToBottomFab() {
-        const fab = document.getElementById('chat-scroll-to-bottom');
-        if (!fab) return;
+    function scrollChatToTopSmooth() {
+        const el = getChatMessagesEl();
+        if (!el) return;
+        scrollMode = 'detached';
+        detachLockUntil = Date.now() + DETACH_LOCK_MS;
+        cancelAnimationFrame(scrollFollowRaf);
+        programmaticScroll = true;
+        scrollProcessDetailsTo('top', true);
+        el.scrollTo({ top: 0, behavior: 'smooth' });
+        requestAnimationFrame(function () {
+            programmaticScroll = false;
+            const node = getChatMessagesEl();
+            if (node) lastScrollTop = node.scrollTop;
+        });
+        updateScrollFabs();
+    }
 
-        const show = scrollMode === 'detached' && !isNearBottom(CHAT_SCROLL_FAB_HIDE_THRESHOLD_PX);
-        fab.classList.toggle('visible', show);
+    function updateScrollFabs() {
+        const bottomFab = document.getElementById('chat-scroll-to-bottom');
+        const topFab = document.getElementById('chat-scroll-to-top');
 
         let label;
         if (hasPendingNewBelow) {
@@ -132,8 +183,22 @@
                 ? window.t('chat.scrollToBottom')
                 : '回到底部';
         }
-        fab.setAttribute('aria-label', label);
-        fab.textContent = label;
+        if (bottomFab) {
+            bottomFab.classList.add('visible');
+            bottomFab.setAttribute('aria-label', label);
+            bottomFab.setAttribute('title', label);
+            bottomFab.textContent = label;
+        }
+
+        const topLabel = typeof window.t === 'function'
+            ? window.t('chat.scrollToTop')
+            : '回到顶部';
+        if (topFab) {
+            topFab.classList.add('visible');
+            topFab.setAttribute('aria-label', topLabel);
+            topFab.setAttribute('title', topLabel);
+            topFab.textContent = topLabel;
+        }
     }
 
     function canAutoScrollNow(wasPinnedBeforeDomUpdate) {
@@ -210,7 +275,7 @@
         try {
             window.__csTaskEventStream = { active: false, conversationId: null, assistantDomId: null, progressId: null };
         } catch (e) { /* ignore */ }
-        updateScrollToBottomFab();
+        updateScrollFabs();
     }
 
     /** 刷新后会话 task-events 补流开始时，与 sendMessage 主流程对齐 */
@@ -225,7 +290,7 @@
         } catch (e) { /* ignore */ }
         markProcessDetailsStreaming(true, assistantDomId);
         resumeFollowingIfAtBottom();
-        updateScrollToBottomFab();
+        updateScrollFabs();
     }
 
     function onTaskEventStreamEnd() {
@@ -267,7 +332,7 @@
         }
 
         lastScrollTop = st;
-        updateScrollToBottomFab();
+        updateScrollFabs();
     }
 
     function bindChatScrollListeners() {
@@ -307,13 +372,19 @@
                 forceScrollChatToBottom(true);
             });
         }
+        const topFab = document.getElementById('chat-scroll-to-top');
+        if (topFab) {
+            topFab.addEventListener('click', function () {
+                scrollChatToTopSmooth();
+            });
+        }
     }
 
     function initChatScroll() {
         bindChatScrollListeners();
         const el = getChatMessagesEl();
         if (el) lastScrollTop = el.scrollTop;
-        updateScrollToBottomFab();
+        updateScrollFabs();
     }
 
     window.CyberStrikeChatScroll = {
@@ -326,6 +397,7 @@
         scheduleScroll: scheduleChatScrollToBottomIfFollowing,
         scrollIfPinned: scrollChatMessagesToBottomIfPinned,
         forceScrollToBottom: forceScrollChatToBottom,
+        forceScrollToTop: scrollChatToTopSmooth,
         applyMessageScroll: applyMessageScrollOption,
         scrollIntoViewIfFollowing: scrollElementIntoViewIfFollowing,
         isPinnedToBottom: isChatMessagesPinnedToBottom,

@@ -96,7 +96,7 @@ func (db *DB) CreateConversationWithWebshell(webshellConnectionID, title string,
 	return conv, nil
 }
 
-// GetConversationByWebshellConnectionID 根据 WebShell 连接 ID 获取该连接下最近一条对话（用于 AI 助手持久化）
+// GetConversationByWebshellConnectionID 根据 WebShell 连接 ID 获取该连接下最新创建的一条对话（用于 AI 助手持久化）
 func (db *DB) GetConversationByWebshellConnectionID(connectionID string) (*Conversation, error) {
 	if connectionID == "" {
 		return nil, fmt.Errorf("connectionID is empty")
@@ -105,7 +105,7 @@ func (db *DB) GetConversationByWebshellConnectionID(connectionID string) (*Conve
 	var createdAt, updatedAt string
 	var pinned int
 	err := db.QueryRow(
-		"SELECT id, title, pinned, created_at, updated_at FROM conversations WHERE webshell_connection_id = ? ORDER BY updated_at DESC LIMIT 1",
+		"SELECT id, title, pinned, created_at, updated_at FROM conversations WHERE webshell_connection_id = ? ORDER BY created_at DESC LIMIT 1",
 		connectionID,
 	).Scan(&conv.ID, &conv.Title, &pinned, &createdAt, &updatedAt)
 	if err != nil {
@@ -173,16 +173,17 @@ func (db *DB) GetConversationByWebshellConnectionID(connectionID string) (*Conve
 type WebShellConversationItem struct {
 	ID        string    `json:"id"`
 	Title     string    `json:"title"`
+	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-// ListConversationsByWebshellConnectionID 列出该 WebShell 连接下的所有对话（按更新时间倒序），供侧边栏展示
+// ListConversationsByWebshellConnectionID 列出该 WebShell 连接下的所有对话（按创建时间倒序），供侧边栏展示
 func (db *DB) ListConversationsByWebshellConnectionID(connectionID string) ([]WebShellConversationItem, error) {
 	if connectionID == "" {
 		return nil, nil
 	}
 	rows, err := db.Query(
-		"SELECT id, title, updated_at FROM conversations WHERE webshell_connection_id = ? ORDER BY updated_at DESC",
+		"SELECT id, title, created_at, updated_at FROM conversations WHERE webshell_connection_id = ? ORDER BY created_at DESC",
 		connectionID,
 	)
 	if err != nil {
@@ -192,9 +193,16 @@ func (db *DB) ListConversationsByWebshellConnectionID(connectionID string) ([]We
 	var list []WebShellConversationItem
 	for rows.Next() {
 		var item WebShellConversationItem
-		var updatedAt string
-		if err := rows.Scan(&item.ID, &item.Title, &updatedAt); err != nil {
+		var createdAt, updatedAt string
+		if err := rows.Scan(&item.ID, &item.Title, &createdAt, &updatedAt); err != nil {
 			continue
+		}
+		if t, e := time.Parse("2006-01-02 15:04:05.999999999-07:00", createdAt); e == nil {
+			item.CreatedAt = t
+		} else if t, e := time.Parse("2006-01-02 15:04:05", createdAt); e == nil {
+			item.CreatedAt = t
+		} else {
+			item.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
 		}
 		if t, e := time.Parse("2006-01-02 15:04:05.999999999-07:00", updatedAt); e == nil {
 			item.UpdatedAt = t
@@ -395,13 +403,13 @@ func (db *DB) ListConversations(limit, offset int, search string) ([]*Conversati
 			 FROM conversations c
 			 WHERE c.title LIKE ?
 			    OR EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.content LIKE ?)
-			 ORDER BY c.updated_at DESC
+			 ORDER BY c.created_at DESC
 			 LIMIT ? OFFSET ?`,
 			searchPattern, searchPattern, limit, offset,
 		)
 	} else {
 		rows, err = db.Query(
-			"SELECT id, title, COALESCE(pinned, 0), created_at, updated_at, project_id FROM conversations ORDER BY updated_at DESC LIMIT ? OFFSET ?",
+			"SELECT id, title, COALESCE(pinned, 0), created_at, updated_at, project_id FROM conversations ORDER BY created_at DESC LIMIT ? OFFSET ?",
 			limit, offset,
 		)
 	}
@@ -471,7 +479,7 @@ func (db *DB) ListUngroupedConversations(limit, offset int) ([]*Conversation, er
 	rows, err := db.Query(
 		`SELECT c.id, c.title, COALESCE(c.pinned, 0), c.created_at, c.updated_at, c.project_id `+
 			ungroupedConversationsSQL+`
-		 ORDER BY c.updated_at DESC
+		 ORDER BY c.created_at DESC
 		 LIMIT ? OFFSET ?`,
 		limit, offset,
 	)
