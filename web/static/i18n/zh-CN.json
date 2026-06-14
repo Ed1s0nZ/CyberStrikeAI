@@ -658,6 +658,7 @@
     "retryTask": "重试",
     "conversationIdLabel": "对话ID",
     "statusPending": "待执行",
+    "statusPausing": "正在停止...",
     "statusPaused": "已暂停",
     "statusCronCycleIdle": "本轮已完成 · 定时循环中",
     "statusCronRunning": "执行中 · 定时队列",
@@ -1846,6 +1847,7 @@
   "tasksPage": {
     "statusFilter": "状态筛选",
     "statusPending": "待执行",
+    "statusPausing": "正在停止",
     "statusPaused": "已暂停",
     "statusCancelled": "已取消",
     "searchQueuePlaceholder": "搜索队列ID、标题或创建时间",

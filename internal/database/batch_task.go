@@ -123,7 +123,7 @@ func (db *DB) RepairInterruptedBatchRuns(reason string) (*BatchStartupRepairSumm
 		summary.TasksFailed, _ = res.RowsAffected()
 	}
 
-	qRows, err := tx.Query(`SELECT id FROM batch_task_queues WHERE status = 'running'`)
+	qRows, err := tx.Query(`SELECT id FROM batch_task_queues WHERE status IN ('running', 'pausing')`)
 	if err != nil {
 		return nil, fmt.Errorf("查询中断批量队列失败: %w", err)
 	}
@@ -158,7 +158,7 @@ func (db *DB) RepairInterruptedBatchRuns(reason string) (*BatchStartupRepairSumm
 				UPDATE batch_task_queues
 				SET status = 'paused',
 				    last_run_error = ?
-				WHERE id = ? AND status = 'running'
+				WHERE id = ? AND status IN ('running', 'pausing')
 			`, reason, queueID)
 		} else {
 			res, err = tx.Exec(`
@@ -169,7 +169,7 @@ func (db *DB) RepairInterruptedBatchRuns(reason string) (*BatchStartupRepairSumm
 				        WHEN ? THEN ?
 				        ELSE last_run_error
 				    END
-				WHERE id = ? AND status = 'running'
+				WHERE id = ? AND status IN ('running', 'pausing')
 			`, now, repairedTaskQueues[queueID], reason, queueID)
 		}
 		if err != nil {

@@ -12179,6 +12179,12 @@ tr.mcp-stats-tool-row[data-tool-name]:focus-visible {
     border: 1px solid rgba(0, 123, 255, 0.3);
 }
 
+.batch-queue-status-pausing {
+    background: rgba(255, 193, 7, 0.12);
+    color: #9a6a00;
+    border: 1px solid rgba(255, 193, 7, 0.45);
+}
+
 .batch-queue-cron-active {
     box-shadow: 0 0 0 1px rgba(0, 123, 255, 0.15);
 }

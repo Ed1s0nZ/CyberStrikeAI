@@ -670,6 +670,7 @@
     "retryTask": "Retry",
     "conversationIdLabel": "Conversation ID",
     "statusPending": "Pending",
+    "statusPausing": "Stopping...",
     "statusPaused": "Paused",
     "statusCronCycleIdle": "Round done · scheduled loop",
     "statusCronRunning": "Running · cron queue",
@@ -1858,6 +1859,7 @@
   "tasksPage": {
     "statusFilter": "Status filter",
     "statusPending": "Pending",
+    "statusPausing": "Stopping",
     "statusPaused": "Paused",
     "statusCancelled": "Cancelled",
     "searchQueuePlaceholder": "Search queue ID, title or created time",
