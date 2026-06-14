@@ -172,9 +172,9 @@ chmod +x run.sh && ./run.sh
 - ✅ 安装 Python 依赖包
 - ✅ 下载 Go 依赖模块
 - ✅ 编译构建项目
-- ✅ 启动服务器
+- ✅ 后台启动服务器
 
-**网络默认：** `run.sh` 会以 **`--https`** 并传入项目根 **`config.yaml`** 启动（本机自签证书，多路流式场景更稳）。只要明文 HTTP 用 **`./run.sh --http`**。生产环境在 **`config.yaml`** 的 **`server.tls_cert_path` / `server.tls_key_path`** 配正式证书（见文件内注释）。手动启动可加 **`--https`** 或环境变量 **`CYBERSTRIKE_HTTPS=1`**；`-config` 写错时程序会在终端提示正确写法。
+**网络默认：** `run.sh` 默认后台常驻并以 **HTTPS** 启动，传入项目根 **`config.yaml`**（本机自签证书，多路流式场景更稳）。PID 写入 **`run/cyberstrike-ai.pid`**，日志写入 **`logs/cyberstrike-ai.log`**；查看状态用 **`./run.sh --status`**，停止用 **`./run.sh --stop`**，需要前台实时日志用 **`./run.sh --foreground`**。只要明文 HTTP 用 **`./run.sh --http`**。生产环境在 **`config.yaml`** 的 **`server.tls_cert_path` / `server.tls_key_path`** 配正式证书（见文件内注释）。手动启动可加 **`--https`** 或环境变量 **`CYBERSTRIKE_HTTPS=1`**；`-config` 写错时程序会在终端提示正确写法。
 
 **首次配置：**
 1. **配置 AI 模型 API**（首次使用前必填）
@@ -187,7 +187,7 @@ chmod +x run.sh && ./run.sh
        model: "gpt-4o"  # 或 deepseek-chat, claude-3-opus 等
      ```
    - 或启动前直接编辑 `config.yaml` 文件
-2. **登录系统** - 使用控制台显示的自动生成密码（或在 `config.yaml` 中设置 `auth.password`）
+2. **登录系统** - 使用启动输出/日志中显示的自动生成密码（或在 `config.yaml` 中设置 `auth.password`）
 3. **安装安全工具（可选）** - 按需安装 `tools/` 目录中的工具；未安装的工具在执行时会自动跳过或改用替代方案。常用示例：
 
    **macOS（Homebrew）：**

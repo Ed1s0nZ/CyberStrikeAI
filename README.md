@@ -173,9 +173,9 @@ The `run.sh` script will automatically:
 - ✅ Install Python dependencies
 - ✅ Download Go dependencies
 - ✅ Build the project
-- ✅ Start the server
+- ✅ Start the server in the background
 
-**Networking defaults:** `run.sh` starts the server with **`--https`** and the repo **`config.yaml`** (local self-signed TLS; better for many concurrent streams). Use **`./run.sh --http`** for plain HTTP. In production, set **`server.tls_cert_path`** / **`server.tls_key_path`** in **`config.yaml`** (see comments there). For manual runs, add **`--https`** or **`CYBERSTRIKE_HTTPS=1`**; if **`-config`** is wrong, the binary prints a short usage hint on stderr.
+**Networking defaults:** `run.sh` now keeps the server running in the background with **HTTPS** and the repo **`config.yaml`** (local self-signed TLS; better for many concurrent streams). The PID is written to **`run/cyberstrike-ai.pid`** and logs go to **`logs/cyberstrike-ai.log`**; use **`./run.sh --status`** to check it, **`./run.sh --stop`** to stop it, and **`./run.sh --foreground`** for live foreground logs. Use **`./run.sh --http`** for plain HTTP. In production, set **`server.tls_cert_path`** / **`server.tls_key_path`** in **`config.yaml`** (see comments there). For manual runs, add **`--https`** or **`CYBERSTRIKE_HTTPS=1`**; if **`-config`** is wrong, the binary prints a short usage hint on stderr.
 
 **First-Time Configuration:**
 1. **Configure OpenAI-compatible API** (required before first use)
@@ -188,7 +188,7 @@ The `run.sh` script will automatically:
        model: "gpt-4o"  # or deepseek-chat, claude-3-opus, etc.
      ```
    - Or edit `config.yaml` directly before launching
-2. **Login** - Use the auto-generated password shown in the console (or set `auth.password` in `config.yaml`)
+2. **Login** - Use the auto-generated password shown in startup output/logs (or set `auth.password` in `config.yaml`)
 3. **Install security tools (optional)** - Install tools from `tools/` as needed; missing tools are skipped or substituted at runtime. Common examples:
 
    **macOS (Homebrew):**
@@ -678,5 +678,4 @@ CyberStrikeAI is a professional security testing platform designed to assist sec
 ---
 
 Need help or want to contribute? Open an issue or PR—community tooling additions are welcome!
-
 
