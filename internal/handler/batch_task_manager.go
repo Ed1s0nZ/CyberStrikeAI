@@ -21,6 +21,7 @@ import (
 const (
 	BatchQueueStatusPending   = "pending"
 	BatchQueueStatusRunning   = "running"
+	BatchQueueStatusPausing   = "pausing"
 	BatchQueueStatusPaused    = "paused"
 	BatchQueueStatusCompleted = "completed"
 	BatchQueueStatusCancelled = "cancelled"
@@ -68,7 +69,7 @@ type BatchTaskQueue struct {
 	LastRunError          string       `json:"lastRunError,omitempty"`
 	ProjectID             string       `json:"projectId,omitempty"`
 	Tasks                 []*BatchTask `json:"tasks"`
-	Status                string       `json:"status"` // pending, running, paused, completed, cancelled
+	Status                string       `json:"status"` // pending, running, pausing, paused, completed, cancelled
 	CreatedAt             time.Time    `json:"createdAt"`
 	StartedAt             *time.Time   `json:"startedAt,omitempty"`
 	CompletedAt           *time.Time   `json:"completedAt,omitempty"`
@@ -443,6 +444,15 @@ func (m *BatchTaskManager) ListQueues(limit, offset int, status, keyword string)
 func (m *BatchTaskManager) LoadFromDB() error {
 	if m.db == nil {
 		return nil
+	}
+
+	const interruptedReason = "服务重启导致批量任务中断，已自动标记当前子任务失败"
+	if summary, err := m.db.RepairInterruptedBatchRuns(interruptedReason); err != nil {
+		m.logger.Warn("repair interrupted batch runs failed", zap.Error(err))
+	} else if summary != nil && (summary.QueuesRepaired > 0 || summary.TasksFailed > 0) {
+		m.logger.Info("repaired interrupted batch runs on startup",
+			zap.Int64("queues", summary.QueuesRepaired),
+			zap.Int64("tasks", summary.TasksFailed))
 	}
 
 	queueRows, err := m.db.GetAllBatchQueues()
@@ -988,7 +998,7 @@ func (m *BatchTaskManager) SetTaskCancel(queueID string, cancel context.CancelFu
 	}
 }
 
-// PauseQueue 暂停队列
+// PauseQueue requests a running queue to stop after cancelling the current task.
 func (m *BatchTaskManager) PauseQueue(queueID string) bool {
 	var cancelFunc context.CancelFunc
 
@@ -1006,7 +1016,7 @@ func (m *BatchTaskManager) PauseQueue(queueID string) bool {
 
 	// DB 优先：先持久化，成功后再更新内存
 	if m.db != nil {
-		if err := m.db.UpdateBatchQueueStatus(queueID, BatchQueueStatusPaused); err != nil {
+		if err := m.db.UpdateBatchQueueStatus(queueID, BatchQueueStatusPausing); err != nil {
 			m.logger.Warn("batch queue DB pause update failed, skipping memory update",
 				zap.String("queueId", queueID), zap.Error(err))
 			m.mu.Unlock()
@@ -1014,7 +1024,7 @@ func (m *BatchTaskManager) PauseQueue(queueID string) bool {
 		}
 	}
 
-	queue.Status = BatchQueueStatusPaused
+	queue.Status = BatchQueueStatusPausing
 
 	// 取消当前正在执行的任务（通过取消context）
 	if cancel, ok := m.taskCancels[queueID]; ok {
@@ -1028,6 +1038,28 @@ func (m *BatchTaskManager) PauseQueue(queueID string) bool {
 		cancelFunc()
 	}
 
+	return true
+}
+
+// CompletePause transitions a queue from pausing to paused after the active task has stopped.
+func (m *BatchTaskManager) CompletePause(queueID string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	queue, exists := m.queues[queueID]
+	if !exists || queue.Status != BatchQueueStatusPausing {
+		return false
+	}
+
+	if m.db != nil {
+		if err := m.db.UpdateBatchQueueStatus(queueID, BatchQueueStatusPaused); err != nil {
+			m.logger.Warn("batch queue DB complete pause update failed, skipping memory update",
+				zap.String("queueId", queueID), zap.Error(err))
+			return false
+		}
+	}
+
+	queue.Status = BatchQueueStatusPaused
 	return true
 }
 

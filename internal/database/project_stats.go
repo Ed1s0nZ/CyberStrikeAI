@@ -85,7 +85,7 @@ func (db *DB) ListConversationsByProjectID(projectID string, limit, offset int) 
 	}
 	rows, err := db.Query(
 		`SELECT id, title, COALESCE(pinned, 0), created_at, updated_at, project_id
-		 FROM conversations WHERE project_id = ? ORDER BY updated_at DESC LIMIT ? OFFSET ?`,
+		 FROM conversations WHERE project_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
 		projectID, limit, offset,
 	)
 	if err != nil {

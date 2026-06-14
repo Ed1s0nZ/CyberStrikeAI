@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -41,6 +42,194 @@ type BatchTaskRow struct {
 	CompletedAt    sql.NullTime
 	Error          sql.NullString
 	Result         sql.NullString
+}
+
+// BatchStartupRepairSummary records orphaned batch state fixed during startup.
+type BatchStartupRepairSummary struct {
+	QueuesRepaired int64
+	TasksFailed    int64
+}
+
+// RepairInterruptedBatchRuns closes batch queue/task states left as running by a previous process.
+//
+// Batch runners and cancellation callbacks are in-memory only. If the process exits while a
+// queue is running, those callbacks disappear but the database still says running. On the next
+// startup, any such task is no longer executing, so mark it failed and move the queue to an
+// actionable state.
+func (db *DB) RepairInterruptedBatchRuns(reason string) (*BatchStartupRepairSummary, error) {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		reason = "服务重启导致批量任务中断"
+	}
+	now := time.Now()
+	summary := &BatchStartupRepairSummary{}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("开始事务失败: %w", err)
+	}
+	defer tx.Rollback()
+
+	type runningTask struct {
+		ID             string
+		QueueID        string
+		ConversationID string
+	}
+	var runningTasks []runningTask
+	rows, err := tx.Query(`
+		SELECT id, queue_id, COALESCE(conversation_id, '')
+		FROM batch_tasks
+		WHERE status = 'running'
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("查询中断批量子任务失败: %w", err)
+	}
+	for rows.Next() {
+		var t runningTask
+		if err := rows.Scan(&t.ID, &t.QueueID, &t.ConversationID); err != nil {
+			rows.Close()
+			return nil, fmt.Errorf("扫描中断批量子任务失败: %w", err)
+		}
+		runningTasks = append(runningTasks, t)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, fmt.Errorf("关闭中断批量子任务游标失败: %w", err)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("遍历中断批量子任务失败: %w", err)
+	}
+
+	repairedTaskQueues := make(map[string]bool)
+	for _, t := range runningTasks {
+		repairedTaskQueues[t.QueueID] = true
+		if t.ConversationID != "" {
+			if err := db.recordInterruptedBatchConversationTx(tx, t.ConversationID, reason, now); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if len(runningTasks) > 0 {
+		res, err := tx.Exec(`
+			UPDATE batch_tasks
+			SET status = 'failed',
+			    completed_at = COALESCE(completed_at, ?),
+			    error = CASE WHEN COALESCE(error, '') = '' THEN ? ELSE error END
+			WHERE status = 'running'
+		`, now, reason)
+		if err != nil {
+			return nil, fmt.Errorf("标记中断批量子任务失败: %w", err)
+		}
+		summary.TasksFailed, _ = res.RowsAffected()
+	}
+
+	qRows, err := tx.Query(`SELECT id FROM batch_task_queues WHERE status IN ('running', 'pausing')`)
+	if err != nil {
+		return nil, fmt.Errorf("查询中断批量队列失败: %w", err)
+	}
+	var runningQueueIDs []string
+	for qRows.Next() {
+		var queueID string
+		if err := qRows.Scan(&queueID); err != nil {
+			qRows.Close()
+			return nil, fmt.Errorf("扫描中断批量队列失败: %w", err)
+		}
+		runningQueueIDs = append(runningQueueIDs, queueID)
+	}
+	if err := qRows.Close(); err != nil {
+		return nil, fmt.Errorf("关闭中断批量队列游标失败: %w", err)
+	}
+	if err := qRows.Err(); err != nil {
+		return nil, fmt.Errorf("遍历中断批量队列失败: %w", err)
+	}
+
+	for _, queueID := range runningQueueIDs {
+		var pendingCount int
+		if err := tx.QueryRow(
+			`SELECT COUNT(1) FROM batch_tasks WHERE queue_id = ? AND status = 'pending'`,
+			queueID,
+		).Scan(&pendingCount); err != nil {
+			return nil, fmt.Errorf("统计批量队列待执行子任务失败: %w", err)
+		}
+
+		var res sql.Result
+		if pendingCount > 0 {
+			res, err = tx.Exec(`
+				UPDATE batch_task_queues
+				SET status = 'paused',
+				    last_run_error = ?
+				WHERE id = ? AND status IN ('running', 'pausing')
+			`, reason, queueID)
+		} else {
+			res, err = tx.Exec(`
+				UPDATE batch_task_queues
+				SET status = 'completed',
+				    completed_at = COALESCE(completed_at, ?),
+				    last_run_error = CASE
+				        WHEN ? THEN ?
+				        ELSE last_run_error
+				    END
+				WHERE id = ? AND status IN ('running', 'pausing')
+			`, now, repairedTaskQueues[queueID], reason, queueID)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("修复中断批量队列状态失败: %w", err)
+		}
+		affected, _ := res.RowsAffected()
+		summary.QueuesRepaired += affected
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("提交中断批量任务修复失败: %w", err)
+	}
+	return summary, nil
+}
+
+func (db *DB) recordInterruptedBatchConversationTx(tx *sql.Tx, conversationID, reason string, now time.Time) error {
+	var messageID, content string
+	err := tx.QueryRow(`
+		SELECT id, content
+		FROM messages
+		WHERE conversation_id = ? AND role = 'assistant'
+		ORDER BY created_at DESC, rowid DESC
+		LIMIT 1
+	`, conversationID).Scan(&messageID, &content)
+	if err == sql.ErrNoRows {
+		messageID = uuid.New().String()
+		if _, err := tx.Exec(`
+			INSERT INTO messages (id, conversation_id, role, content, reasoning_content, mcp_execution_ids, created_at, updated_at)
+			VALUES (?, ?, 'assistant', ?, '', '', ?, ?)
+		`, messageID, conversationID, reason, now, now); err != nil {
+			return fmt.Errorf("写入中断批量任务助手消息失败: %w", err)
+		}
+	} else if err != nil {
+		return fmt.Errorf("查询中断批量任务助手消息失败: %w", err)
+	} else {
+		nextContent := strings.TrimSpace(content)
+		if nextContent == "" || nextContent == "处理中..." {
+			nextContent = reason
+		} else if !strings.Contains(nextContent, reason) {
+			nextContent += "\n\n" + reason
+		}
+		if nextContent != content {
+			if _, err := tx.Exec(
+				`UPDATE messages SET content = ?, updated_at = ? WHERE id = ?`,
+				nextContent, now, messageID,
+			); err != nil {
+				return fmt.Errorf("更新中断批量任务助手消息失败: %w", err)
+			}
+		}
+	}
+
+	detailID := uuid.New().String()
+	if _, err := tx.Exec(`
+		INSERT INTO process_details (id, message_id, conversation_id, event_type, message, data, created_at)
+		VALUES (?, ?, ?, 'error', ?, '', ?)
+	`, detailID, messageID, conversationID, reason, now); err != nil {
+		return fmt.Errorf("写入中断批量任务过程详情失败: %w", err)
+	}
+	_, _ = tx.Exec(`UPDATE conversations SET updated_at = ? WHERE id = ?`, now, conversationID)
+	return nil
 }
 
 // CreateBatchQueue 创建批量任务队列

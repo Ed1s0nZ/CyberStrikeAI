@@ -974,6 +974,7 @@
                             </div>
                             <div id="active-tasks-bar" class="active-tasks-bar"></div>
                             <div id="chat-messages" class="chat-messages"></div>
+                            <button type="button" id="chat-scroll-to-top" class="chat-scroll-fab chat-scroll-to-top" aria-label="回到顶部" title="回到顶部">↑ 回到顶部</button>
                             <button type="button" id="chat-scroll-to-bottom" class="chat-scroll-to-bottom" aria-label="回到底部" title="回到底部">↓ 回到底部</button>
                             <div id="chat-input-container" class="chat-input-container">
                                 <div class="chat-input-primary-row">
@@ -1994,6 +1995,7 @@
                                         <option value="all" data-i18n="knowledgePage.all">全部</option>
                                         <option value="pending" data-i18n="tasksPage.statusPending">待执行</option>
                                         <option value="running" data-i18n="dashboard.executing">执行中</option>
+                                        <option value="pausing" data-i18n="tasksPage.statusPausing">正在停止</option>
                                         <option value="paused" data-i18n="tasksPage.statusPaused">已暂停</option>
                                         <option value="completed" data-i18n="dashboard.completed">已完成</option>
                                         <option value="cancelled" data-i18n="tasksPage.statusCancelled">已取消</option>
@@ -4298,4 +4300,3 @@
     <script src="/static/js/c2.js"></script>
 </body>
 </html>
-

@@ -1,0 +1,13 @@
+/.gitattributes text eol=lf
+/README*.md text eol=lf
+/PR_DESCRIPTION.md text eol=lf
+/progress.md text eol=lf
+/run.sh text eol=lf
+/agents/*.md text eol=lf
+/docs/*.md text eol=lf
+/internal/**/*.go text eol=lf
+/skills/**/*.md text eol=lf
+/web/**/*.css text eol=lf
+/web/**/*.html text eol=lf
+/web/**/*.js text eol=lf
+/web/**/*.json text eol=lf
