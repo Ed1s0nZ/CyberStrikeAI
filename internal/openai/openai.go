@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -534,4 +535,82 @@ func (c *Client) ChatCompletionStreamWithToolCalls(
 	}
 
 	return full.String(), toolCalls, finishReason, nil
+}
+
+// ModelsListResponse 表示 OpenAI 兼容 GET /models 响应。
+type ModelsListResponse struct {
+	Object string `json:"object"`
+	Data   []struct {
+		ID      string `json:"id"`
+		Object  string `json:"object,omitempty"`
+		OwnedBy string `json:"owned_by,omitempty"`
+	} `json:"data"`
+}
+
+// ListModels 调用 GET {baseURL}/models 获取可用模型 id 列表（按字典序）。
+func (c *Client) ListModels(ctx context.Context) ([]string, error) {
+	if c == nil {
+		return nil, fmt.Errorf("openai client is not initialized")
+	}
+	if c.config == nil {
+		return nil, fmt.Errorf("openai config is nil")
+	}
+	if strings.TrimSpace(c.config.APIKey) == "" {
+		return nil, fmt.Errorf("openai api key is empty")
+	}
+	if c.isClaude() {
+		return nil, fmt.Errorf("claude provider does not support models list API")
+	}
+
+	baseURL := strings.TrimSuffix(c.config.BaseURL, "/")
+	if baseURL == "" {
+		baseURL = "https://api.openai.com/v1"
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/models", nil)
+	if err != nil {
+		return nil, fmt.Errorf("build openai models request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.config.APIKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("call openai models api: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read openai models response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, &APIError{
+			StatusCode: resp.StatusCode,
+			Body:       string(respBody),
+		}
+	}
+
+	var list ModelsListResponse
+	if err := json.Unmarshal(respBody, &list); err != nil {
+		return nil, fmt.Errorf("decode openai models response: %w", err)
+	}
+
+	seen := make(map[string]struct{}, len(list.Data))
+	models := make([]string, 0, len(list.Data))
+	for _, item := range list.Data {
+		id := strings.TrimSpace(item.ID)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		models = append(models, id)
+	}
+	sort.Strings(models)
+	if len(models) == 0 {
+		return nil, fmt.Errorf("models list is empty")
+	}
+	return models, nil
 }
