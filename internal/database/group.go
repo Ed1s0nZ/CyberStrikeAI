@@ -237,7 +237,7 @@ func (db *DB) GetConversationsByGroup(groupID string) ([]*Conversation, error) {
 		 FROM conversations c
 		 INNER JOIN conversation_group_mappings cgm ON c.id = cgm.conversation_id
 		 WHERE cgm.group_id = ?
-		 ORDER BY COALESCE(cgm.pinned, 0) DESC, c.updated_at DESC`,
+		 ORDER BY COALESCE(cgm.pinned, 0) DESC, c.created_at DESC`,
 		groupID,
 	)
 	if err != nil {
@@ -309,7 +309,7 @@ func (db *DB) SearchConversationsByGroup(groupID string, searchQuery string) ([]
 		args = append(args, searchPattern, searchPattern)
 	}
 
-	query += " ORDER BY COALESCE(cgm.pinned, 0) DESC, c.updated_at DESC"
+	query += " ORDER BY COALESCE(cgm.pinned, 0) DESC, c.created_at DESC"
 
 	rows, err := db.Query(query, args...)
 	if err != nil {

@@ -35,8 +35,8 @@ func RegisterBatchTaskMCPTools(mcpServer *mcp.Server, h *AgentHandler, logger *z
 			"properties": map[string]interface{}{
 				"status": map[string]interface{}{
 					"type":        "string",
-					"description": "筛选状态：all（默认）、pending、running、paused、completed、cancelled",
-					"enum":        []string{"all", "pending", "running", "paused", "completed", "cancelled"},
+					"description": "筛选状态：all（默认）、pending、running、pausing、paused、completed、cancelled",
+					"enum":        []string{"all", "pending", "running", "pausing", "paused", "completed", "cancelled"},
 				},
 				"keyword": map[string]interface{}{
 					"type":        "string",
@@ -342,7 +342,7 @@ func RegisterBatchTaskMCPTools(mcpServer *mcp.Server, h *AgentHandler, logger *z
 			return batchMCPTextResult("无法暂停：队列不存在或当前非 running 状态", true), nil
 		}
 		logger.Info("MCP batch_task_pause", zap.String("queueId", qid))
-		return batchMCPTextResult("队列已暂停。", false), nil
+		return batchMCPTextResult("队列正在停止当前子任务，停止完成后会进入已暂停状态。", false), nil
 	})
 
 	// --- delete queue ---

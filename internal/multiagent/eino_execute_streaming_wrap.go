@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os/exec"
+	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"cyberstrike-ai/internal/einomcp"
@@ -57,10 +60,10 @@ type einoStreamingShellWrap struct {
 }
 
 func (w *einoStreamingShellWrap) ExecuteStreaming(ctx context.Context, input *filesystem.ExecuteRequest) (*schema.StreamReader[*filesystem.ExecuteResponse], error) {
-	if w.inner == nil {
-		return nil, fmt.Errorf("einoStreamingShellWrap: inner shell is nil")
-	}
 	if input == nil {
+		if w.inner == nil {
+			return nil, fmt.Errorf("einoStreamingShellWrap: inner shell is nil")
+		}
 		return w.inner.ExecuteStreaming(ctx, nil)
 	}
 	req := *input
@@ -78,7 +81,7 @@ func (w *einoStreamingShellWrap) ExecuteStreaming(ctx context.Context, input *fi
 		execCtx, execCancel = context.WithTimeout(ctx, time.Duration(w.toolTimeoutMinutes)*time.Minute)
 	}
 
-	sr, err := w.inner.ExecuteStreaming(execCtx, &req)
+	sr, err := executeManagedStreamingShell(execCtx, &req)
 	if err != nil {
 		if execCancel != nil {
 			execCancel()
@@ -171,4 +174,170 @@ func (w *einoStreamingShellWrap) ExecuteStreaming(ctx context.Context, input *fi
 	}(sr, userCmd, execCancel, execCtx)
 
 	return outR, nil
+}
+
+func executeManagedStreamingShell(ctx context.Context, input *filesystem.ExecuteRequest) (*schema.StreamReader[*filesystem.ExecuteResponse], error) {
+	if input == nil || strings.TrimSpace(input.Command) == "" {
+		return nil, fmt.Errorf("command is required")
+	}
+
+	cmd := managedShellCommand(ctx, input.Command)
+	if err := security.PrepareShellCmdSession(cmd); err != nil {
+		return nil, err
+	}
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		_ = stdout.Close()
+		return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
+	}
+
+	sr, w := schema.Pipe[*filesystem.ExecuteResponse](100)
+	if err := cmd.Start(); err != nil {
+		_ = stdout.Close()
+		_ = stderr.Close()
+		go sendManagedShellError(w, fmt.Errorf("failed to start command: %w", err))
+		return sr, nil
+	}
+
+	if input.RunInBackendGround {
+		runManagedShellInBackground(ctx, cmd, stdout, stderr, w)
+		return sr, nil
+	}
+
+	go streamManagedShellOutput(ctx, cmd, stdout, stderr, w)
+	return sr, nil
+}
+
+func managedShellCommand(ctx context.Context, command string) *exec.Cmd {
+	if runtime.GOOS == "windows" {
+		return exec.CommandContext(ctx, "cmd", "/C", command)
+	}
+	return exec.CommandContext(ctx, "/bin/sh", "-c", command)
+}
+
+func sendManagedShellError(w *schema.StreamWriter[*filesystem.ExecuteResponse], err error) {
+	defer w.Close()
+	w.Send(nil, err)
+}
+
+func runManagedShellInBackground(ctx context.Context, cmd *exec.Cmd, stdout, stderr io.ReadCloser, w *schema.StreamWriter[*filesystem.ExecuteResponse]) {
+	go func() {
+		defer func() {
+			_ = stdout.Close()
+			_ = stderr.Close()
+		}()
+
+		done := make(chan struct{})
+		go func() {
+			drainReaders(stdout, stderr)
+			_ = cmd.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-ctx.Done():
+			security.TerminateCmdTree(cmd)
+		case <-done:
+		}
+	}()
+
+	go func() {
+		defer w.Close()
+		exitCode := 0
+		w.Send(&filesystem.ExecuteResponse{Output: "command started in background\n", ExitCode: &exitCode}, nil)
+	}()
+}
+
+func streamManagedShellOutput(ctx context.Context, cmd *exec.Cmd, stdout, stderr io.ReadCloser, w *schema.StreamWriter[*filesystem.ExecuteResponse]) {
+	defer w.Close()
+	defer func() {
+		_ = stdout.Close()
+		_ = stderr.Close()
+	}()
+
+	stopWatch := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			security.TerminateCmdTree(cmd)
+		case <-stopWatch:
+		}
+	}()
+	defer close(stopWatch)
+
+	chunks := make(chan string, 64)
+	var wg sync.WaitGroup
+	readFn := func(r io.Reader) {
+		defer wg.Done()
+		buf := make([]byte, 8192)
+		for {
+			n, readErr := r.Read(buf)
+			if n > 0 {
+				chunks <- string(buf[:n])
+			}
+			if readErr != nil {
+				return
+			}
+		}
+	}
+	wg.Add(2)
+	go readFn(stdout)
+	go readFn(stderr)
+
+	go func() {
+		wg.Wait()
+		close(chunks)
+	}()
+
+	hasOutput := false
+	for chunk := range chunks {
+		hasOutput = true
+		if w.Send(&filesystem.ExecuteResponse{Output: chunk}, nil) {
+			security.TerminateCmdTree(cmd)
+			return
+		}
+	}
+
+	waitErr := cmd.Wait()
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		w.Send(nil, ctxErr)
+		return
+	}
+	if waitErr != nil {
+		var exitErr *exec.ExitError
+		if errors.As(waitErr, &exitErr) {
+			exitCode := exitErr.ExitCode()
+			w.Send(&filesystem.ExecuteResponse{
+				Output:   fmt.Sprintf("command exited with non-zero code %d", exitCode),
+				ExitCode: &exitCode,
+			}, nil)
+			return
+		}
+		w.Send(nil, fmt.Errorf("command failed: %w", waitErr))
+		return
+	}
+	if !hasOutput {
+		exitCode := 0
+		w.Send(&filesystem.ExecuteResponse{ExitCode: &exitCode}, nil)
+	}
+}
+
+func drainReaders(readers ...io.Reader) {
+	var wg sync.WaitGroup
+	for _, r := range readers {
+		if r == nil {
+			continue
+		}
+		wg.Add(1)
+		go func(reader io.Reader) {
+			defer wg.Done()
+			_, _ = io.Copy(io.Discard, reader)
+		}(r)
+	}
+	wg.Wait()
 }

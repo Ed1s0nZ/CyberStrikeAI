@@ -2029,7 +2029,7 @@ function fetchAndRenderWebshellAiConvList(conn, listEl) {
                 row.className = 'webshell-ai-conv-item';
                 row.dataset.convId = item.id;
                 var title = (item.title || '').trim() || item.id.slice(0, 8);
-                var dateStr = item.updatedAt ? formatWebshellAiConvDate(item.updatedAt) : '';
+                var dateStr = item.createdAt ? formatWebshellAiConvDate(item.createdAt) : (item.updatedAt ? formatWebshellAiConvDate(item.updatedAt) : '');
                 row.innerHTML = '<span class="webshell-ai-conv-item-title">' + escapeHtml(title) + '</span><span class="webshell-ai-conv-item-date">' + escapeHtml(dateStr) + '</span>';
                 if (webshellAiConvMap[conn.id] === item.id) row.classList.add('active');
                 row.addEventListener('click', function () {
