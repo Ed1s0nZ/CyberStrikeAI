@@ -11,6 +11,7 @@ import (
 
 	"cyberstrike-ai/internal/agent"
 	"cyberstrike-ai/internal/config"
+	"cyberstrike-ai/internal/database"
 	"cyberstrike-ai/internal/einomcp"
 	"cyberstrike-ai/internal/openai"
 	"cyberstrike-ai/internal/project"
@@ -32,6 +33,7 @@ func RunEinoSingleChatModelAgent(
 	appCfg *config.Config,
 	ma *config.MultiAgentConfig,
 	ag *agent.Agent,
+	db *database.DB,
 	logger *zap.Logger,
 	conversationID string,
 	projectID string,
@@ -121,7 +123,7 @@ func RunEinoSingleChatModelAgent(
 		return nil, fmt.Errorf("eino single 模型: %w", err)
 	}
 
-	mainSumMw, err := newEinoSummarizationMiddleware(ctx, mainModel, appCfg, &ma.EinoMiddleware, conversationID, logger)
+	mainSumMw, err := newEinoSummarizationMiddleware(ctx, mainModel, appCfg, &ma.EinoMiddleware, conversationID, db, projectID, logger)
 	if err != nil {
 		return nil, fmt.Errorf("eino single summarization: %w", err)
 	}

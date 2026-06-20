@@ -15,6 +15,7 @@ import (
 	"cyberstrike-ai/internal/agent"
 	"cyberstrike-ai/internal/agents"
 	"cyberstrike-ai/internal/config"
+	"cyberstrike-ai/internal/database"
 	"cyberstrike-ai/internal/einomcp"
 	"cyberstrike-ai/internal/openai"
 	"cyberstrike-ai/internal/project"
@@ -56,6 +57,7 @@ func RunDeepAgent(
 	appCfg *config.Config,
 	ma *config.MultiAgentConfig,
 	ag *agent.Agent,
+	db *database.DB,
 	logger *zap.Logger,
 	conversationID string,
 	projectID string,
@@ -210,7 +212,7 @@ func RunDeepAgent(
 
 			subMax := resolveMaxIterations(appCfg, sub.MaxIterations)
 
-			subSumMw, err := newEinoSummarizationMiddleware(ctx, subModel, appCfg, &ma.EinoMiddleware, conversationID, logger)
+			subSumMw, err := newEinoSummarizationMiddleware(ctx, subModel, appCfg, &ma.EinoMiddleware, conversationID, db, projectID, logger)
 			if err != nil {
 				return nil, fmt.Errorf("子代理 %q summarization 中间件: %w", id, err)
 			}
@@ -281,7 +283,7 @@ func RunDeepAgent(
 		return nil, fmt.Errorf("多代理主模型: %w", err)
 	}
 
-	mainSumMw, err := newEinoSummarizationMiddleware(ctx, mainModel, appCfg, &ma.EinoMiddleware, conversationID, logger)
+	mainSumMw, err := newEinoSummarizationMiddleware(ctx, mainModel, appCfg, &ma.EinoMiddleware, conversationID, db, projectID, logger)
 	if err != nil {
 		return nil, fmt.Errorf("多代理主 summarization 中间件: %w", err)
 	}
@@ -441,6 +443,8 @@ func RunDeepAgent(
 			AppCfg:               appCfg,
 			MwCfg:                &ma.EinoMiddleware,
 			ConversationID:       conversationID,
+			DB:                   db,
+			ProjectID:            projectID,
 			Logger:               logger,
 			ModelName:            appCfg.OpenAI.Model,
 			ExecPreMiddlewares:   mainOrchestratorPre,

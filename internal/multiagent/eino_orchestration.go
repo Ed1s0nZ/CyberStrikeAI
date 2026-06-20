@@ -7,6 +7,7 @@ import (
 
 	"cyberstrike-ai/internal/agent"
 	"cyberstrike-ai/internal/config"
+	"cyberstrike-ai/internal/database"
 
 	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/cloudwego/eino/adk"
@@ -29,7 +30,9 @@ type PlanExecuteRootArgs struct {
 	MwCfg  *config.MultiAgentEinoMiddlewareConfig
 	// ConversationID is used for transcript/isolation paths in middleware.
 	ConversationID string
-	Logger *zap.Logger
+	DB             *database.DB
+	ProjectID      string
+	Logger         *zap.Logger
 	// ModelName is used for model input token estimation logs.
 	ModelName string
 	// ExecPreMiddlewares 是由 prependEinoMiddlewares 构建的前置中间件（patchtoolcalls, reduction, toolsearch, plantask），
@@ -93,7 +96,7 @@ func NewPlanExecuteRoot(ctx context.Context, a *PlanExecuteRootArgs) (adk.Resuma
 	}
 	// 4. summarization（最后，与 Deep/Supervisor 一致）
 	if a.AppCfg != nil {
-		sumMw, sumErr := newEinoSummarizationMiddleware(ctx, a.ExecModel, a.AppCfg, a.MwCfg, a.ConversationID, a.Logger)
+		sumMw, sumErr := newEinoSummarizationMiddleware(ctx, a.ExecModel, a.AppCfg, a.MwCfg, a.ConversationID, a.DB, a.ProjectID, a.Logger)
 		if sumErr != nil {
 			return nil, fmt.Errorf("plan_execute executor summarization: %w", sumErr)
 		}

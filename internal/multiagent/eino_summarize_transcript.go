@@ -6,6 +6,8 @@ import (
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/schema"
 
+	"cyberstrike-ai/internal/project"
+
 	"github.com/bytedance/sonic"
 )
 
@@ -19,7 +21,6 @@ const (
 	transcriptToolIndexStartMarker   = "以下是当前会话绑定的工具名称索引"
 	transcriptPersonaStartMarker     = "你是CyberStrikeAI"
 	transcriptSkillsSystemMarker     = "# Skills System"
-	transcriptProjectBlackboardMarker  = "## 项目黑板索引"
 )
 
 // formatSummarizationTranscript renders pre-compaction messages for transcript.txt.
@@ -88,11 +89,17 @@ func stripSkillsSystemBoilerplate(s string) string {
 }
 
 func extractProjectBlackboardSection(s string) string {
-	idx := strings.Index(s, transcriptProjectBlackboardMarker)
-	if idx < 0 {
+	start := strings.Index(s, project.FactIndexSectionStartMarker)
+	if start < 0 {
 		return ""
 	}
-	return strings.TrimSpace(s[idx:])
+	section := s[start:]
+	end := strings.Index(section, project.FactIndexSectionEndMarker)
+	if end < 0 {
+		return ""
+	}
+	section = section[:end+len(project.FactIndexSectionEndMarker)]
+	return strings.TrimSpace(section)
 }
 
 func appendTranscriptSection(sb *strings.Builder, role schema.RoleType, body string) {
