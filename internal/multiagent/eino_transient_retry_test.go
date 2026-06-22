@@ -102,10 +102,3 @@ func TestAppendUserMessageIfNeeded(t *testing.T) {
 		t.Fatalf("should not duplicate user message: len=%d", len(dup))
 	}
 }
-
-func TestErrTransientRetryContinue(t *testing.T) {
-	t.Parallel()
-	if !errors.Is(ErrTransientRetryContinue, ErrTransientRetryContinue) {
-		t.Fatal("sentinel should match")
-	}
-}

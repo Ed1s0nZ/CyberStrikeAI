@@ -416,7 +416,7 @@ func RunDeepAgent(
 		EmitInternalEvents: true,
 	}
 
-	deepOutKey, modelRetry, taskGen := deepExtrasFromConfig(ma)
+	deepOutKey, taskGen := deepExtrasFromConfig(ma)
 
 	var da adk.Agent
 	switch orchMode {
@@ -473,9 +473,6 @@ func RunDeepAgent(
 			Handlers:      supHandlers,
 			Exit:          &adk.ExitTool{},
 		}
-		if modelRetry != nil {
-			supCfg.ModelRetryConfig = modelRetry
-		}
 		if deepOutKey != "" {
 			supCfg.OutputKey = deepOutKey
 		}
@@ -508,9 +505,6 @@ func RunDeepAgent(
 		}
 		if deepOutKey != "" {
 			dcfg.OutputKey = deepOutKey
-		}
-		if modelRetry != nil {
-			dcfg.ModelRetryConfig = modelRetry
 		}
 		if taskGen != nil {
 			dcfg.TaskToolDescriptionGenerator = taskGen

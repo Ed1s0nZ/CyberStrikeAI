@@ -188,12 +188,9 @@ func RunEinoSingleChatModelAgent(
 		MaxIterations: maxIter,
 		Handlers:      handlers,
 	}
-	outKey, modelRetry, _ := deepExtrasFromConfig(ma)
+	outKey, _ := deepExtrasFromConfig(ma)
 	if outKey != "" {
 		chatCfg.OutputKey = outKey
-	}
-	if modelRetry != nil {
-		chatCfg.ModelRetryConfig = modelRetry
 	}
 
 	chatAgent, err := adk.NewChatModelAgent(ctx, chatCfg)

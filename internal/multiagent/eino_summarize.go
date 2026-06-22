@@ -22,8 +22,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const defaultSummarizationRetryMax = 3
-
 // einoSummarizeUserInstruction：压缩历史时保留渗透测试关键信息。
 const einoSummarizeUserInstruction = `在保持所有关键安全测试信息完整的前提下压缩对话历史。
 
@@ -97,10 +95,8 @@ func newEinoSummarizationMiddleware(
 		}
 	}
 
-	retryMax := defaultSummarizationRetryMax
-	if mwCfg != nil && mwCfg.SummarizationRetryMaxAttempts > 0 {
-		retryMax = mwCfg.SummarizationRetryMaxAttempts
-	}
+	retryPolicy := einoTransientRunRetryPolicyFromMW(mwCfg)
+	retryMax := retryPolicy.maxAttempts
 
 	// ModelOptions apply only to summarization Generate (same ChatModel instance as the agent).
 	// Strip thinking/reasoning on this call path; mark requests for empty-choices diagnostics.
@@ -137,13 +133,14 @@ func newEinoSummarizationMiddleware(
 		Retry: &summarization.RetryConfig{
 			MaxRetries: &retryMax,
 			ShouldRetry: func(_ context.Context, _ adk.Message, err error) bool {
-				if err != nil && logger != nil {
-					logger.Warn("eino summarization generate attempt failed, will retry if attempts remain",
+				retry := isEinoTransientRunError(err)
+				if retry && logger != nil {
+					logger.Warn("eino summarization generate transient error, will retry if attempts remain",
 						zap.Error(err),
 						zap.Int("max_retries", retryMax),
 					)
 				}
-				return err != nil
+				return retry
 			},
 		},
 		Finalize: func(ctx context.Context, originalMessages []adk.Message, summary adk.Message) ([]adk.Message, error) {

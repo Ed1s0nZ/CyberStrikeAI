@@ -243,16 +243,13 @@ func prependEinoMiddlewares(
 	return outTools, extraHandlers, toolSearchActive, nil
 }
 
-func deepExtrasFromConfig(ma *config.MultiAgentConfig) (outputKey string, retry *adk.ModelRetryConfig, taskDesc func(context.Context, []adk.Agent) (string, error)) {
+func deepExtrasFromConfig(ma *config.MultiAgentConfig) (outputKey string, taskDesc func(context.Context, []adk.Agent) (string, error)) {
 	if ma == nil {
-		return "", nil, nil
+		return "", nil
 	}
 	mw := ma.EinoMiddleware
 	if k := strings.TrimSpace(mw.DeepOutputKey); k != "" {
 		outputKey = k
-	}
-	if mw.DeepModelRetryMaxRetries > 0 {
-		retry = &adk.ModelRetryConfig{MaxRetries: mw.DeepModelRetryMaxRetries}
 	}
 	prefix := strings.TrimSpace(mw.TaskToolDescriptionPrefix)
 	if prefix != "" {
@@ -274,5 +271,5 @@ func deepExtrasFromConfig(ma *config.MultiAgentConfig) (outputKey string, retry 
 			return prefix + "\n可用子代理（按名称 transfer / task 调用）：" + strings.Join(names, "、"), nil
 		}
 	}
-	return outputKey, retry, taskDesc
+	return outputKey, taskDesc
 }

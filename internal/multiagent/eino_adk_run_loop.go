@@ -383,6 +383,12 @@ func runEinoADKAgentLoop(ctx context.Context, args *einoADKRunLoopArgs, baseMsgs
 		}
 	}
 	runner := adk.NewRunner(ctx, runnerCfg)
+	startRunnerIter := func(runMsgs []adk.Message) *adk.AsyncIterator[*adk.AgentEvent] {
+		if checkPointID != "" {
+			return runner.Run(ctx, runMsgs, adk.WithCheckPointID(checkPointID))
+		}
+		return runner.Run(ctx, runMsgs)
+	}
 	var iter *adk.AsyncIterator[*adk.AgentEvent]
 	if cpStore != nil && checkPointID != "" {
 		if _, existed, getErr := cpStore.Get(ctx, checkPointID); getErr != nil {
@@ -422,12 +428,9 @@ func runEinoADKAgentLoop(ctx context.Context, args *einoADKRunLoopArgs, baseMsgs
 		}
 	}
 	if iter == nil {
-		if checkPointID != "" {
-			iter = runner.Run(ctx, msgs, adk.WithCheckPointID(checkPointID))
-		} else {
-			iter = runner.Run(ctx, msgs)
-		}
+		iter = startRunnerIter(msgs)
 	}
+	transientRetrier := newEinoTransientRunRetrier(einoTransientRunRetryPolicyFromArgs(args))
 	handleRunErr := func(runErr error) error {
 		if runErr == nil {
 			return nil
@@ -480,26 +483,60 @@ func runEinoADKAgentLoop(ctx context.Context, args *einoADKRunLoopArgs, baseMsgs
 		return runErr
 	}
 
-	// maybeRetryTransientRun：不在此层 runner.Run/Resume；由 handler 落库 + loadHistoryFromAgentTrace 分段续跑（同中断并继续）。
-	maybeRetryTransientRun := func(runErr error) (retry bool, fatal error) {
-		if runErr == nil || !isEinoTransientRunError(runErr) {
+	maybeRetryTransientRun := func(runErr error) (restarted bool, fatal error) {
+		if runErr == nil {
+			return false, nil
+		}
+		if !isEinoTransientRunError(runErr) {
 			return false, handleRunErr(runErr)
 		}
+		restarted, restartMsgs, ctxSource, backoff, retErr := transientRetrier.tryRetry(
+			ctx, runErr, args, baseMsgs, runAccumulatedMsgs, baseAccumulatedCount,
+		)
+		if retErr != nil {
+			flushAllPendingAsFailed(runErr)
+			if logger != nil {
+				logger.Warn("eino transient retry exhausted",
+					zap.Error(retErr),
+					zap.String("orchestration", orchMode),
+					zap.Int("maxAttempts", transientRetrier.maxAttempts()))
+			}
+			return false, retErr
+		}
+		if !restarted {
+			return false, nil
+		}
+		attemptNo := transientRetrier.attempt()
+		maxAttempts := transientRetrier.maxAttempts()
 		if logger != nil {
-			logger.Warn("eino transient error, ending run segment for handler resume",
+			logger.Warn("eino transient error, retrying after backoff",
 				zap.Error(runErr),
-				zap.String("orchestration", orchMode))
+				zap.String("orchestration", orchMode),
+				zap.Int("attempt", attemptNo),
+				zap.Int("maxAttempts", maxAttempts),
+				zap.Duration("backoff", backoff))
 		}
 		if progress != nil {
-			progress("eino_run_retry", "遇到临时错误（限流或网络波动），将保存上下文并重试…", map[string]interface{}{
+			progress("eino_run_retry", fmt.Sprintf("遇到临时错误（限流或网络波动），%d 秒后第 %d/%d 次重试…", int(backoff.Seconds()), attemptNo, maxAttempts), map[string]interface{}{
 				"conversationId": conversationID,
 				"source":         "eino",
 				"orchestration":  orchMode,
 				"error":          runErr.Error(),
-				"resumeKind":     "trace_segment",
+				"attempt":        attemptNo,
+				"maxAttempts":    maxAttempts,
+				"backoffSec":     int(backoff.Seconds()),
+			})
+			progress("eino_run_retry", "已恢复上下文，正在重试…", map[string]interface{}{
+				"conversationId": conversationID,
+				"source":         "eino",
+				"orchestration":  orchMode,
+				"attempt":        attemptNo,
+				"contextSource":  string(ctxSource),
 			})
 		}
-		return false, ErrTransientRetryContinue
+		msgs = restartMsgs
+		iter = startRunnerIter(msgs)
+		return true, nil
 	}
 
 	takePartial := func(runErr error) (*RunResult, error) {
@@ -583,8 +620,12 @@ func runEinoADKAgentLoop(ctx context.Context, args *einoADKRunLoopArgs, baseMsgs
 			continue
 		}
 		if ev.Err != nil {
-			if _, retErr := maybeRetryTransientRun(ev.Err); retErr != nil {
+			restarted, retErr := maybeRetryTransientRun(ev.Err)
+			if retErr != nil {
 				return takePartial(retErr)
+			}
+			if restarted {
+				continue
 			}
 		}
 		if ev.AgentName != "" && progress != nil {
@@ -951,8 +992,12 @@ func runEinoADKAgentLoop(ctx context.Context, args *einoADKRunLoopArgs, baseMsgs
 						"einoRole":       einoRoleTag(ev.AgentName),
 					})
 				}
-				if _, retErr := maybeRetryTransientRun(streamRecvErr); retErr != nil {
+				restarted, retErr := maybeRetryTransientRun(streamRecvErr)
+				if retErr != nil {
 					return takePartial(retErr)
+				}
+				if restarted {
+					continue
 				}
 			}
 			continue
@@ -1057,30 +1102,7 @@ func runEinoADKAgentLoop(ctx context.Context, args *einoADKRunLoopArgs, baseMsgs
 		orchMode, runAccumulatedMsgs, persistTraceSource(args, runAccumulatedMsgs),
 		lastAssistant, lastPlanExecuteExecutor, emptyHint, ids, false,
 	)
-	if shouldEinoEmptyResponseContinue(out, emptyHint, len(runAccumulatedMsgs), baseAccumulatedCount) {
-		if logger != nil {
-			logger.Info("eino empty response, ending run segment for handler resume",
-				zap.String("conversationId", conversationID),
-				zap.String("orchestration", orchMode),
-				zap.Int("traceMessages", len(runAccumulatedMsgs)))
-		}
-		if progress != nil {
-			progress("eino_empty_response_continue", "会话已结束但未产生助手正文，正在基于轨迹自动续跑…", map[string]interface{}{
-				"conversationId": conversationID,
-				"source":         "eino",
-				"resumeKind":     "trace_segment",
-			})
-		}
-		return out, ErrEmptyResponseContinue
-	}
 	return out, nil
-}
-
-func shouldEinoEmptyResponseContinue(out *RunResult, emptyHint string, accumulatedLen, baseCount int) bool {
-	if out == nil || accumulatedLen <= baseCount {
-		return false
-	}
-	return strings.TrimSpace(out.Response) == strings.TrimSpace(emptyHint)
 }
 
 func persistTraceSource(args *einoADKRunLoopArgs, fallback []adk.Message) []adk.Message {
