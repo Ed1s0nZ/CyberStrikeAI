@@ -90,7 +90,7 @@ type einoADKRunLoopArgs struct {
 	FilesystemMonitorRecord einomcp.ExecutionRecorder
 	MCPExecutionBinder      *MCPExecutionBinder
 
-	// ToolInvokeNotify 与 einomcp.ToolsFromDefinitions 共享：run loop 在迭代前 Set，MCP 桥 Fire 以补全 tool_result。
+	// ToolInvokeNotify 与 einomcp.ToolsFromDefinitions 共享：run loop 在迭代前 Set，execute/MCP 桥 Fire 时立即推送 tool_result（ADK 晚到经 toolResultSent 去重）。
 	ToolInvokeNotify *einomcp.ToolInvokeNotifyHolder
 
 	DA adk.Agent
@@ -341,8 +341,22 @@ func runEinoADKAgentLoop(ctx context.Context, args *einoADKRunLoopArgs, baseMsgs
 	}
 	if args.ToolInvokeNotify != nil {
 		args.ToolInvokeNotify.Set(func(toolCallID, toolName, einoAgent string, success bool, content string, invokeErr error) {
-			removePendingByID(strings.TrimSpace(toolCallID))
-			// tool_result 仅由下方 ADK schema.Tool 事件推送，正文与送入模型的上下文一致（含 reduction 截断）。
+			// Eino execute / MCP 桥在工具返回时 Fire；若 ADK schema.Tool 事件迟迟不到，此处立即推送
+			// tool_result 解除 UI「执行中」。tryEmitToolResultProgress 经 toolResultSent 去重，ADK 晚到不重复。
+			isErr := !success || invokeErr != nil
+			body := content
+			if strings.HasPrefix(body, einomcp.ToolErrorPrefix) {
+				isErr = true
+				body = strings.TrimPrefix(body, einomcp.ToolErrorPrefix)
+			}
+			if tail := friendlyEinoExecuteInvokeTail(invokeErr); tail != "" {
+				if body == "" {
+					body = tail
+				} else if !strings.Contains(body, tail) {
+					body = strings.TrimSpace(body) + "\n\n" + tail
+				}
+			}
+			tryEmitToolResultProgress(toolName, body, toolCallID, isErr, einoAgent)
 		})
 	}
 
@@ -551,10 +565,10 @@ func runEinoADKAgentLoop(ctx context.Context, args *einoADKRunLoopArgs, baseMsgs
 	}
 
 	for {
-		// 检测 context 取消（用户关闭浏览器、请求超时等），flush pending 工具状态避免 UI 卡在 "执行中"。
-		select {
-		case <-ctx.Done():
-			flushAllPendingAsFailed(ctx.Err())
+		// iter.Next 可能长时间阻塞（工具执行、模型推理）；须与 ctx 联动，否则取消/超时无法及时 flush pending。
+		ev, ok, iterCtxErr := nextAgentEventWithContext(ctx, iter)
+		if iterCtxErr != nil {
+			flushAllPendingAsFailed(iterCtxErr)
 			if progress != nil {
 				if isInterruptContinue(ctx) {
 					progress("progress", "已暂停当前输出，正在合并用户补充并继续…", map[string]interface{}{
@@ -563,17 +577,14 @@ func runEinoADKAgentLoop(ctx context.Context, args *einoADKRunLoopArgs, baseMsgs
 						"kind":           "interrupt_continue",
 					})
 				} else {
-					progress("error", "Request cancelled / 请求已取消", map[string]interface{}{
+					progress("error", iterCtxErr.Error(), map[string]interface{}{
 						"conversationId": conversationID,
 						"source":         "eino",
 					})
 				}
 			}
-			return takePartial(ctx.Err())
-		default:
+			return takePartial(iterCtxErr)
 		}
-
-		ev, ok := iter.Next()
 		if !ok {
 			// iter 结束并不总是“正常完成”：
 			// 当取消/超时发生在 iter.Next() 阻塞期间时，可能直接返回 !ok。
@@ -691,29 +702,7 @@ func runEinoADKAgentLoop(ctx context.Context, args *einoADKRunLoopArgs, baseMsgs
 
 		if mv.IsStreaming && mv.MessageStream != nil && mv.Role == schema.Tool {
 			toolName := strings.TrimSpace(mv.ToolName)
-			var toolBuf strings.Builder
-			streamToolCallID := ""
-			var toolStreamRecvErr error
-			for {
-				chunk, rerr := mv.MessageStream.Recv()
-				if errors.Is(rerr, io.EOF) {
-					break
-				}
-				if rerr != nil {
-					toolStreamRecvErr = rerr
-					break
-				}
-				if chunk == nil {
-					continue
-				}
-				if chunk.Content != "" {
-					toolBuf.WriteString(chunk.Content)
-				}
-				if tid := strings.TrimSpace(chunk.ToolCallID); tid != "" {
-					streamToolCallID = tid
-				}
-			}
-			content := toolBuf.String()
+			content, streamToolCallID, toolStreamRecvErr := recvSchemaMessageStream(ctx, mv.MessageStream)
 			isErr := false
 			if strings.HasPrefix(content, einomcp.ToolErrorPrefix) {
 				isErr = true
@@ -1130,6 +1119,78 @@ func friendlyEinoExecuteInvokeTail(invokeErr error) string {
 		return einoExecuteTimeoutUserHint()
 	}
 	return "[执行未正常结束] " + invokeErr.Error()
+}
+
+// nextAgentEventWithContext 在 ctx 取消时不再无限阻塞于 iter.Next()（工具执行/模型推理期间常见）。
+func nextAgentEventWithContext(ctx context.Context, iter *adk.AsyncIterator[*adk.AgentEvent]) (ev *adk.AgentEvent, ok bool, ctxErr error) {
+	if iter == nil {
+		return nil, false, nil
+	}
+	type nextRes struct {
+		ev *adk.AgentEvent
+		ok bool
+	}
+	ch := make(chan nextRes, 1)
+	go func() {
+		e, o := iter.Next()
+		ch <- nextRes{e, o}
+	}()
+	select {
+	case <-ctx.Done():
+		return nil, false, ctx.Err()
+	case res := <-ch:
+		return res.ev, res.ok, nil
+	}
+}
+
+// recvSchemaMessageStream 消费 ADK Tool 流式结果；ctx 取消时立即返回，避免 amass 等无输出时永久阻塞。
+func recvSchemaMessageStream(ctx context.Context, stream *schema.StreamReader[*schema.Message]) (content, toolCallID string, recvErr error) {
+	if stream == nil {
+		return "", "", nil
+	}
+	type streamMsg struct {
+		chunk *schema.Message
+		err   error
+	}
+	recvCh := make(chan streamMsg, 8)
+	go func() {
+		defer close(recvCh)
+		for {
+			ch, rerr := stream.Recv()
+			recvCh <- streamMsg{chunk: ch, err: rerr}
+			if rerr != nil {
+				return
+			}
+		}
+	}()
+	var buf strings.Builder
+	for {
+		select {
+		case <-ctx.Done():
+			return buf.String(), toolCallID, ctx.Err()
+		case sm, open := <-recvCh:
+			if !open {
+				return buf.String(), toolCallID, nil
+			}
+			rerr := sm.err
+			if errors.Is(rerr, io.EOF) {
+				return buf.String(), toolCallID, nil
+			}
+			if rerr != nil {
+				return buf.String(), toolCallID, rerr
+			}
+			chunk := sm.chunk
+			if chunk == nil {
+				continue
+			}
+			if chunk.Content != "" {
+				buf.WriteString(chunk.Content)
+			}
+			if tid := strings.TrimSpace(chunk.ToolCallID); tid != "" {
+				toolCallID = tid
+			}
+		}
+	}
 }
 
 func buildEinoRunResultFromAccumulated(

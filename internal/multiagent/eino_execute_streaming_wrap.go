@@ -51,7 +51,7 @@ func einoExecuteRecvErrIsToolTimeout(rerr error, tctx context.Context) bool {
 // 对「完全后台」命令自动开启 RunInBackendGround，与 local.runCmdInBackground 行为对齐。
 //
 // 使用 Pipe 将内层流转发给调用方：在 inner EOF 后、关闭 Pipe 前同步调用 ToolInvokeNotify.Fire，
-// 保证 run loop 在模型开始下一轮输出前已记录 execute 结果（用于 UI 与「重复助手复述」去重）。
+// run loop 收到 Fire 后立即推送 tool_result（toolResultSent 去重），避免 ADK Tool 事件迟到时 UI 卡在「执行中」。
 //
 // 若 inner 在校验阶段直接返回 error（未建立 reader），不会进入下方 goroutine，也必须 Fire；
 // 否则 pending tool_call 要等整轮 run 结束才被 force-close，与已展示的助手/工具软错误文案不同步。

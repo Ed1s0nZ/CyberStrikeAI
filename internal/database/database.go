@@ -408,6 +408,8 @@ func (db *DB) initTables() error {
 		last_schedule_trigger_at DATETIME,
 		last_schedule_error TEXT,
 		last_run_error TEXT,
+		project_id TEXT,
+		concurrency INTEGER NOT NULL DEFAULT 1,
 		status TEXT NOT NULL,
 		created_at DATETIME NOT NULL,
 		started_at DATETIME,
@@ -1134,6 +1136,21 @@ func (db *DB) migrateBatchTaskQueuesTable() error {
 	} else if projectIDCount == 0 {
 		if _, err := db.Exec("ALTER TABLE batch_task_queues ADD COLUMN project_id TEXT"); err != nil {
 			db.logger.Warn("添加batch_task_queues.project_id字段失败", zap.Error(err))
+		}
+	}
+
+	var concurrencyCount int
+	err = db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('batch_task_queues') WHERE name='concurrency'").Scan(&concurrencyCount)
+	if err != nil {
+		if _, addErr := db.Exec("ALTER TABLE batch_task_queues ADD COLUMN concurrency INTEGER NOT NULL DEFAULT 1"); addErr != nil {
+			errMsg := strings.ToLower(addErr.Error())
+			if !strings.Contains(errMsg, "duplicate column") && !strings.Contains(errMsg, "already exists") {
+				db.logger.Warn("添加batch_task_queues.concurrency字段失败", zap.Error(addErr))
+			}
+		}
+	} else if concurrencyCount == 0 {
+		if _, err := db.Exec("ALTER TABLE batch_task_queues ADD COLUMN concurrency INTEGER NOT NULL DEFAULT 1"); err != nil {
+			db.logger.Warn("添加batch_task_queues.concurrency字段失败", zap.Error(err))
 		}
 	}
 
