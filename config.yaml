@@ -96,7 +96,7 @@ fofa:
 agent:
   max_iterations: 12000 # 全局最大迭代次数（单代理 / Deep / Supervisor / Plan-Execute 主执行器 / 子代理均沿用；agents/*.md 中 max_iterations>0 可单独覆盖）
   tool_timeout_minutes: 60 # 单次工具执行最大时长（分钟），超时自动终止；0 表示不限制（不推荐，易出现长时间挂起）
-  shell_no_output_timeout_seconds: 300 # execute/exec 连续无新输出则终止（秒）；通用防挂死；0=默认300；-1=关闭
+  shell_no_output_timeout_seconds: 1200 # execute/exec 连续无新输出则终止（秒）；通用防挂死；0=默认300；-1=关闭
   # system_prompt_path: prompts/single-agent.md # 可选：单代理系统提示文件（相对本配置文件所在目录）；非空且可读时替换内置提示
 
   system_prompt_path: ""
