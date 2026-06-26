@@ -8409,9 +8409,16 @@ function refreshChatPanelI18n() {
 document.addEventListener('languagechange', function () {
     refreshSystemReadyMessageBubbles();
     refreshChatPanelI18n();
-    const modal = document.getElementById('batch-manage-modal');
-    if (isAppModalOpen('batch-manage-modal')) {
-        refreshBatchProjectFilter().then(() => applyBatchConversationFilters());
+    if (typeof refreshConversationProjectFilter === 'function') {
+        refreshConversationProjectFilter();
+    }
+    if (typeof refreshBatchProjectFilter === 'function') {
+        refreshBatchProjectFilter().then(() => {
+            const modal = document.getElementById('batch-manage-modal');
+            if (modal && isAppModalOpen('batch-manage-modal') && typeof applyBatchConversationFilters === 'function') {
+                applyBatchConversationFilters();
+            }
+        });
     }
     // 侧边栏最近对话等列表的时间戳会随语言变化（24h/12h 等），重新拉列表以统一格式
     if (typeof loadConversationsWithGroups === 'function') {
@@ -9342,6 +9349,7 @@ function clearGroupSearch() {
 
 // 初始化时加载分组
 document.addEventListener('DOMContentLoaded', async () => {
+    if (window.i18nReady) await window.i18nReady;
     updateConversationSortMenuUI();
     initConversationProjectCustomSelect();
     await refreshConversationProjectFilter();
