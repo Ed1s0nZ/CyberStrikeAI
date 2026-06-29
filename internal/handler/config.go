@@ -798,6 +798,10 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 
 	// 更新机器人配置
 	if req.Robots != nil {
+		if err := config.ValidateWecomConfig(req.Robots.Wecom); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		h.config.Robots = *req.Robots
 		h.logger.Info("更新机器人配置",
 			zap.Bool("wechat_enabled", h.config.Robots.Wechat.Enabled),

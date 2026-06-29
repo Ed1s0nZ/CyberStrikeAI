@@ -503,6 +503,17 @@ type RobotWecomConfig struct {
 	AgentID        int64  `yaml:"agent_id" json:"agent_id"`                 // 应用 AgentId
 }
 
+// ValidateWecomConfig 校验企业微信机器人配置；启用时必须配置 token，否则回调无法防伪造。
+func ValidateWecomConfig(w RobotWecomConfig) error {
+	if !w.Enabled {
+		return nil
+	}
+	if strings.TrimSpace(w.Token) == "" {
+		return fmt.Errorf("robots.wecom.enabled 为 true 时必须配置 robots.wecom.token")
+	}
+	return nil
+}
+
 // RobotDingtalkConfig 钉钉机器人配置
 type RobotDingtalkConfig struct {
 	Enabled                    bool   `yaml:"enabled" json:"enabled"`
@@ -885,6 +896,10 @@ func Load(path string) (*Config, error) {
 		if cfg.Roles == nil {
 			cfg.Roles = make(map[string]RoleConfig)
 		}
+	}
+
+	if err := ValidateWecomConfig(cfg.Robots.Wecom); err != nil {
+		return nil, err
 	}
 
 	return &cfg, nil
