@@ -26,6 +26,35 @@ const (
 	wireOutputConfig
 )
 
+// ApplyPlanExecutePlannerModelConfig configures the plan_execute planner/replanner
+// ChatModel. Those Eino agents call WithToolChoice(Forced); several gateways reject
+// thinking / reasoning fields on the same request (tool_choice required/object).
+// Executor should keep the normal ApplyToEinoChatModelConfig path.
+func ApplyPlanExecutePlannerModelConfig(cfg *einoopenai.ChatModelConfig, oa *config.OpenAIConfig) {
+	if cfg == nil || oa == nil {
+		return
+	}
+	offOA := *oa
+	offReasoning := oa.Reasoning
+	offReasoning.Mode = "off"
+	offOA.Reasoning = offReasoning
+	ApplyToEinoChatModelConfig(cfg, &offOA, nil)
+	clearReasoningFromChatModelConfig(cfg)
+}
+
+func clearReasoningFromChatModelConfig(cfg *einoopenai.ChatModelConfig) {
+	if cfg == nil {
+		return
+	}
+	cfg.ReasoningEffort = ""
+	if cfg.ExtraFields != nil {
+		for _, key := range []string{"thinking", "reasoning_effort", "output_config", "reasoning"} {
+			delete(cfg.ExtraFields, key)
+		}
+	}
+	applyThinkingDisabled(cfg)
+}
+
 // ApplyToEinoChatModelConfig merges reasoning-related options into cfg.
 // Precondition: cfg already has APIKey, BaseURL, Model, HTTPClient set.
 func ApplyToEinoChatModelConfig(cfg *einoopenai.ChatModelConfig, oa *config.OpenAIConfig, client *ClientIntent) {

@@ -432,6 +432,22 @@ func RunDeepAgent(
 	var da adk.Agent
 	switch orchMode {
 	case "plan_execute":
+		plannerModelCfg := &einoopenai.ChatModelConfig{
+			APIKey:     appCfg.OpenAI.APIKey,
+			BaseURL:    strings.TrimSuffix(appCfg.OpenAI.BaseURL, "/"),
+			Model:      appCfg.OpenAI.Model,
+			HTTPClient: httpClient,
+		}
+		reasoning.ApplyPlanExecutePlannerModelConfig(plannerModelCfg, &appCfg.OpenAI)
+		peMainModel, perr := einoopenai.NewChatModel(ctx, plannerModelCfg)
+		if perr != nil {
+			return nil, fmt.Errorf("plan_execute 规划模型: %w", perr)
+		}
+		if logger != nil {
+			logger.Info("plan_execute: planner/replanner 使用无 reasoning 的独立 ChatModel（ToolChoiceForced 兼容）",
+				zap.String("model", appCfg.OpenAI.Model),
+			)
+		}
 		execModel, perr := einoopenai.NewChatModel(ctx, baseModelCfg)
 		if perr != nil {
 			return nil, fmt.Errorf("plan_execute 执行器模型: %w", perr)
@@ -445,7 +461,7 @@ func RunDeepAgent(
 			}
 		}
 		peRoot, perr := NewPlanExecuteRoot(ctx, &PlanExecuteRootArgs{
-			MainToolCallingModel: mainModel,
+			MainToolCallingModel: peMainModel,
 			ExecModel:            execModel,
 			OrchInstruction:      orchInstruction,
 			ToolsCfg:             mainToolsCfg,

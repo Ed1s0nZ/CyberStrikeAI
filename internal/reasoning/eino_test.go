@@ -49,6 +49,30 @@ func TestApplyOpenAICompat_xhighExtraField(t *testing.T) {
 	}
 }
 
+func TestApplyPlanExecutePlannerModelConfig_stripsReasoningWhenGlobalOn(t *testing.T) {
+	cfg := &einoopenai.ChatModelConfig{}
+	oa := &config.OpenAIConfig{
+		BaseURL: "https://antchat.example.com/v1",
+		Model:   "minimax-m3",
+		Reasoning: config.OpenAIReasoningConfig{
+			Profile: "openai_compat",
+			Mode:    "on",
+			Effort:  "high",
+		},
+	}
+	ApplyPlanExecutePlannerModelConfig(cfg, oa)
+	if cfg.ReasoningEffort != "" {
+		t.Fatalf("expected ReasoningEffort cleared, got %q", cfg.ReasoningEffort)
+	}
+	th, ok := cfg.ExtraFields["thinking"].(map[string]any)
+	if !ok || th["type"] != "disabled" {
+		t.Fatalf("expected thinking disabled, got %#v", cfg.ExtraFields)
+	}
+	if _, ok := cfg.ExtraFields["reasoning_effort"]; ok {
+		t.Fatalf("expected reasoning_effort stripped, got %#v", cfg.ExtraFields)
+	}
+}
+
 func TestApplyReasoningOff_disablesThinking(t *testing.T) {
 	cfg := &einoopenai.ChatModelConfig{}
 	oa := &config.OpenAIConfig{
