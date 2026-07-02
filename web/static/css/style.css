@@ -27159,3 +27159,77 @@ body.app-modal-open {
     }
 }
 
+
+
+html[lang="fa-IR"], html[dir="rtl"] {
+    direction: rtl;
+}
+
+html[lang="fa-IR"] body,
+html[dir="rtl"] body {
+    direction: rtl;
+    text-align: right;
+    font-family: Tahoma, Arial, sans-serif;
+}
+
+html[lang="fa-IR"] .main-layout,
+html[dir="rtl"] .main-layout {
+    flex-direction: row-reverse;
+}
+
+html[lang="fa-IR"] .main-sidebar,
+html[dir="rtl"] .main-sidebar {
+    border-right: none;
+    border-left: 1px solid var(--border-color);
+    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.04);
+}
+
+html[lang="fa-IR"] .main-sidebar.collapsed,
+html[dir="rtl"] .main-sidebar.collapsed {
+    border-left: 1px solid var(--border-color);
+}
+
+html[lang="fa-IR"] .sidebar-collapse-btn,
+html[dir="rtl"] .sidebar-collapse-btn {
+    right: auto;
+    left: 8px;
+}
+
+html[lang="fa-IR"] .header-content,
+html[dir="rtl"] .header-content {
+    flex-direction: row-reverse;
+}
+
+html[lang="fa-IR"] .header-actions,
+html[dir="rtl"] .header-actions {
+    flex-direction: row-reverse;
+}
+
+html[lang="fa-IR"] .logo,
+html[dir="rtl"] .logo {
+    flex-direction: row-reverse;
+}
+
+html[lang="fa-IR"] .notification-dropdown,
+html[dir="rtl"] .notification-dropdown,
+html[lang="fa-IR"] .lang-dropdown,
+html[dir="rtl"] .lang-dropdown {
+    left: 0;
+    right: auto;
+}
+
+html[lang="fa-IR"] .notification-dropdown-header,
+html[dir="rtl"] .notification-dropdown-header,
+html[lang="fa-IR"] .lang-switcher-btn,
+html[dir="rtl"] .lang-switcher-btn {
+    direction: rtl;
+}
+
+html[lang="fa-IR"] input,
+html[lang="fa-IR"] textarea,
+html[dir="rtl"] input,
+html[dir="rtl"] textarea {
+    direction: rtl;
+    text-align: right;
+}
+
