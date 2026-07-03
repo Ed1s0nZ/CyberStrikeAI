@@ -367,6 +367,7 @@ func New(cfg *config.Config, log *logger.Logger, configPath string) (*App, error
 	configHandler.SetAudit(auditSvc)
 	agentHandler.SetHitlToolWhitelistSaver(configHandler)
 	agentHandler.SetHitlAuditStrategySaver(configHandler)
+	agentHandler.SetHitlDefaultReviewerSaver(configHandler)
 	externalMCPHandler := handler.NewExternalMCPHandler(externalMCPMgr, cfg, configPath, log.Logger)
 	externalMCPHandler.SetAudit(auditSvc)
 	roleHandler := handler.NewRoleHandler(cfg, configPath, log.Logger)
@@ -826,6 +827,8 @@ func setupRoutes(
 		protected.GET("/hitl/tool-whitelist", agentHandler.GetHITLGlobalToolWhitelist)
 		protected.PUT("/hitl/tool-whitelist", agentHandler.SetHITLGlobalToolWhitelist)
 		protected.POST("/hitl/tool-whitelist", agentHandler.MergeHITLGlobalToolWhitelist)
+		protected.GET("/hitl/default-reviewer", agentHandler.GetHITLDefaultReviewer)
+		protected.PUT("/hitl/default-reviewer", agentHandler.UpdateHITLDefaultReviewer)
 		protected.GET("/hitl/audit-strategy", agentHandler.GetHITLAuditStrategy)
 		protected.PUT("/hitl/audit-strategy", agentHandler.UpdateHITLAuditStrategy)
 		// Agent Loop 取消与任务列表
