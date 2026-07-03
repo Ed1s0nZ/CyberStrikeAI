@@ -133,6 +133,9 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 			"userMessageId":  prep.UserMessageID,
 		})
 	}
+	if h.runRoleWorkflowStreamIfBound(&req, prep, sendEvent) {
+		return
+	}
 
 	var cancelWithCause context.CancelCauseFunc
 	curFinalMessage := prep.FinalMessage
@@ -406,6 +409,9 @@ func (h *AgentHandler) MultiAgentLoop(c *gin.Context) {
 	h.activateHITLForConversation(prep.ConversationID, req.Hitl)
 	if h.hitlManager != nil {
 		defer h.hitlManager.DeactivateConversation(prep.ConversationID)
+	}
+	if h.runRoleWorkflowJSONIfBound(c, &req, prep) {
+		return
 	}
 
 	baseCtx, cancelWithCause := context.WithCancelCause(c.Request.Context())
