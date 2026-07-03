@@ -643,6 +643,18 @@ type HitlConfig struct {
 	AuditAgentPromptReviewEdit string `yaml:"audit_agent_prompt_review_edit,omitempty" json:"audit_agent_prompt_review_edit,omitempty"`
 	// RetentionDays 已决策审计日志（hitl_interrupts 非 pending）保留天数；省略时默认 90；0 表示不自动清理。
 	RetentionDays *int `yaml:"retention_days,omitempty" json:"retention_days,omitempty"`
+	// DefaultReviewer 全局默认审批方（human | audit_agent）；未选会话时切换会写入 config.yaml；新建会话无独立配置时沿用。
+	DefaultReviewer string `yaml:"default_reviewer,omitempty" json:"default_reviewer,omitempty"`
+}
+
+// EffectiveDefaultReviewer returns human or audit_agent; omitted or unknown values default to human.
+func (h HitlConfig) EffectiveDefaultReviewer() string {
+	switch strings.ToLower(strings.TrimSpace(h.DefaultReviewer)) {
+	case "audit_agent", "agent", "ai":
+		return "audit_agent"
+	default:
+		return "human"
+	}
 }
 
 // RetentionDaysEffective returns retention; 0 means keep forever; omitted defaults to 90.
