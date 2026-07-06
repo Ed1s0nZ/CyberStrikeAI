@@ -1105,7 +1105,11 @@ async function sendMessage() {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';
+            let streamSawDone = false;
             const dispatchStreamEvent = function (eventData) {
+                if (eventData && eventData.type === 'done') {
+                    streamSawDone = true;
+                }
                 handleStreamEvent(eventData, progressElement, progressId,
                     () => assistantMessageId, (id) => { assistantMessageId = id; },
                     () => mcpExecutionIds, (ids) => { mcpExecutionIds = ids; });
@@ -1141,6 +1145,23 @@ async function sendMessage() {
             if (buffer.trim()) {
                 const lines = buffer.split('\n');
                 await processSseLines(lines, dispatchStreamEvent);
+            }
+            if (!streamSawDone) {
+                if (typeof loadActiveTasks === 'function') {
+                    loadActiveTasks();
+                }
+                const convId = currentConversationId || (body && body.conversationId) || null;
+                let attached = false;
+                if (convId && typeof window.attachRunningTaskEventStream === 'function') {
+                    window.__csAgentLiveStream = { active: false, conversationId: null, progressId: null };
+                    attached = await window.attachRunningTaskEventStream(convId).catch(() => false);
+                }
+                if (!attached) {
+                    const hint = typeof window.t === 'function'
+                        ? window.t('chat.streamEndedWithoutDone')
+                        : '连接提前结束，未收到任务完成信号。任务可能仍在后端执行，请查看顶部运行中任务或刷新当前对话。';
+                    addMessage('system', hint);
+                }
             }
         } finally {
             window.__csAgentLiveStream = { active: false, conversationId: null, progressId: null };

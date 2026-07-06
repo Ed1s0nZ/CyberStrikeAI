@@ -597,6 +597,7 @@
     "knowledgeRetrievalTag": "Knowledge retrieval",
     "error": "Error",
     "streamNetworkErrorHint": "Connection lost ({{detail}}). A long task may still be running on the server; check running tasks at the top or refresh this conversation later.",
+    "streamEndedWithoutDone": "The connection ended before a completion signal was received. The task may still be running on the server; check running tasks at the top or refresh this conversation.",
     "taskCancelled": "Task cancelled",
     "userInterruptContinueTitle": "⏸️ User interrupt & continue",
     "unknownTool": "Unknown tool",

@@ -805,7 +805,7 @@
             } else if (workflows.length) {
                 fillWorkflowForm(workflows[0]);
             } else {
-                newWorkflowDraft();
+                newWorkflowDraft({ openMeta: false });
                 return;
             }
             renderWorkflowList();
@@ -815,7 +815,8 @@
         }
     };
 
-    window.newWorkflowDraft = function () {
+    window.newWorkflowDraft = function (options) {
+        const shouldOpenMeta = !options || options.openMeta !== false;
         currentWorkflowId = '';
         fillWorkflowForm({
             id: '',
@@ -825,7 +826,9 @@
             graph_json: defaultGraph()
         });
         syncWorkflowMetaIdField(false, '');
-        openWorkflowMetaModal();
+        if (shouldOpenMeta) {
+            openWorkflowMetaModal();
+        }
     };
 
     window.selectWorkflow = function (id) {
@@ -1032,7 +1035,7 @@
         }
         currentWorkflowId = '';
         showNotification(_t('workflows.deleted'), 'success');
-        newWorkflowDraft();
+        newWorkflowDraft({ openMeta: false });
         await refreshWorkflows();
     };
 

@@ -3331,7 +3331,11 @@ async function attachRunningTaskEventStream(conversationId) {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';
+            let replaySawDone = false;
             const dispatchTaskEvent = function (eventData) {
+                if (eventData && eventData.type === 'done') {
+                    replaySawDone = true;
+                }
                 handleStreamEvent(eventData, null, progressId, getAssistantIdFn, setAssistantIdFn, function () { return mcpIds; }, function (ids) { mcpIds = mergeMcpExecutionIDLists(mcpIds, ids || []); });
             };
             while (true) {
@@ -3351,14 +3355,14 @@ async function attachRunningTaskEventStream(conversationId) {
             if (window.csTaskReplay && window.csTaskReplay.progressId === progressId) {
                 clearCsTaskReplay();
             }
-            if (progressTaskState.has(progressId)) {
+            if (replaySawDone && progressTaskState.has(progressId)) {
                 finalizeProgressTask(progressId, typeof window.t === 'function' ? window.t('tasks.statusCompleted') : '已完成');
             }
             if (window.CyberStrikeChatScroll && typeof window.CyberStrikeChatScroll.onTaskEventStreamEnd === 'function') {
                 window.CyberStrikeChatScroll.onTaskEventStreamEnd();
             }
             if (typeof loadActiveTasks === 'function') loadActiveTasks();
-            if (typeof window.loadConversation === 'function' && window.currentConversationId === conversationId) {
+            if (replaySawDone && typeof window.loadConversation === 'function' && window.currentConversationId === conversationId) {
                 await window.loadConversation(conversationId);
             }
             return true;

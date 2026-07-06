@@ -585,6 +585,7 @@
     "knowledgeRetrievalTag": "知识检索",
     "error": "错误",
     "streamNetworkErrorHint": "连接已中断（{{detail}}）。长时间任务可能仍在后端执行，请查看顶部「运行中」任务或稍后刷新本对话。",
+    "streamEndedWithoutDone": "连接提前结束，未收到任务完成信号。任务可能仍在后端执行，请查看顶部「运行中」任务或刷新当前对话。",
     "taskCancelled": "任务已取消",
     "userInterruptContinueTitle": "⏸️ 用户中断并继续",
     "unknownTool": "未知工具",
