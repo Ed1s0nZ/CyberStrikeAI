@@ -83,6 +83,11 @@
         root.setAttribute('data-theme', resolved);
         root.style.colorScheme = resolved;
         updateButton(normalized, resolved);
+        document.dispatchEvent(
+            new CustomEvent('cyberstrike-themechange', {
+                detail: { preference: normalized, resolved: resolved },
+            }),
+        );
     }
 
     function savePreference(preference) {

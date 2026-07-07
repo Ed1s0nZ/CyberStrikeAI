@@ -27049,8 +27049,8 @@ html[data-theme="dark"] .chat-files-toast.chat-toast--error {
     z-index: 20;
     margin: 0;
     padding: 10px 0 12px;
-    background: #fff;
-    border-top: 1px solid #eef2f7;
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border-color);
 }
 .projects-graph-toolbar-row {
     align-items: flex-end;
@@ -31128,8 +31128,9 @@ html[data-theme="dark"] #page-projects .projects-graph-legend-divider {
 }
 
 html[data-theme="dark"] #page-projects .projects-graph-legend-item--node i {
-    background: #111827 !important;
-    box-shadow: none !important;
+    background: linear-gradient(135deg, #1e293b 0%, #172033 100%) !important;
+    border-color: var(--legend-color, #64748b) !important;
+    box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.06) !important;
 }
 
 html[data-theme="dark"] #page-projects .projects-settings-intro,

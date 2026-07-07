@@ -44,31 +44,115 @@
     const CARD_KEY_FONT =
         'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace';
 
+    const NODE_TYPE_STYLES = {
+        target: {
+            typeLabel: '目标',
+            typeEn: 'TARGET',
+            accent: { light: '#4F46E5', dark: '#818cf8' },
+            bgEnd: { light: '#F5F3FF', dark: '#1e1b4b' },
+            icon: 'target',
+        },
+        finding: {
+            typeLabel: '发现',
+            typeEn: 'FINDING',
+            accent: { light: '#E11D48', dark: '#fb7185' },
+            bgEnd: { light: '#FFF1F2', dark: '#3f1219' },
+            icon: 'finding',
+        },
+        exploit: {
+            typeLabel: '利用',
+            typeEn: 'EXPLOIT',
+            accent: { light: '#B45309', dark: '#fbbf24' },
+            bgEnd: { light: '#FFFBEB', dark: '#3b2712' },
+            icon: 'vulnerability',
+        },
+        vulnerability: {
+            typeLabel: '漏洞',
+            typeEn: 'VULN',
+            accent: { light: '#9333EA', dark: '#c084fc' },
+            bgEnd: { light: '#F5F3FF', dark: '#2e1065' },
+            icon: 'vuln',
+        },
+        auth: {
+            typeLabel: '认证',
+            typeEn: 'AUTH',
+            accent: { light: '#0D9488', dark: '#2dd4bf' },
+            bgEnd: { light: '#F0FDFA', dark: '#0f2926' },
+            icon: 'default',
+        },
+        infra: {
+            typeLabel: '基础设施',
+            typeEn: 'INFRA',
+            accent: { light: '#64748B', dark: '#94a3b8' },
+            bgEnd: { light: '#F8FAFC', dark: '#1e293b' },
+            icon: 'default',
+        },
+        chain: {
+            typeLabel: '攻击链',
+            typeEn: 'CHAIN',
+            accent: { light: '#7C3AED', dark: '#a78bfa' },
+            bgEnd: { light: '#F5F3FF', dark: '#2e1065' },
+            icon: 'vulnerability',
+        },
+        poc: {
+            typeLabel: 'POC',
+            typeEn: 'POC',
+            accent: { light: '#C2410C', dark: '#fb923c' },
+            bgEnd: { light: '#FFEDD5', dark: '#3b2010' },
+            icon: 'vulnerability',
+        },
+        business: {
+            typeLabel: '业务',
+            typeEn: 'BUSINESS',
+            accent: { light: '#0369A1', dark: '#38bdf8' },
+            bgEnd: { light: '#F0F9FF', dark: '#0c2540' },
+            icon: 'default',
+        },
+        missing: {
+            typeLabel: '缺失',
+            typeEn: 'MISSING',
+            accent: { light: '#CBD5E1', dark: '#64748b' },
+            bgEnd: { light: '#F1F5F9', dark: '#1e293b' },
+            icon: 'default',
+        },
+        note: {
+            typeLabel: '备注',
+            typeEn: 'NOTE',
+            accent: { light: '#94A3B8', dark: '#94a3b8' },
+            bgEnd: { light: '#F8FAFC', dark: '#1e293b' },
+            icon: 'default',
+        },
+    };
+
+    function isDarkTheme() {
+        return document.documentElement.getAttribute('data-theme') === 'dark';
+    }
+
+    function cardPalette() {
+        const dark = isDarkTheme();
+        return {
+            bgStart: dark ? '#1e293b' : '#FFFFFF',
+            keyColor: dark ? '#94a3b8' : '#64748b',
+            summaryColor: dark ? '#e5e7eb' : '#0f172a',
+            nodeFallbackBg: dark ? '#1e293b' : '#ffffff',
+        };
+    }
+
     function nodeTheme(type) {
-        switch (type) {
-            case 'target':
-                return { typeLabel: '目标', typeEn: 'TARGET', accent: '#4F46E5', bgEnd: '#F5F3FF', icon: 'target' };
-            case 'finding':
-                return { typeLabel: '发现', typeEn: 'FINDING', accent: '#E11D48', bgEnd: '#FFF1F2', icon: 'finding', cardStyle: 'default' };
-            case 'exploit':
-                return { typeLabel: '利用', typeEn: 'EXPLOIT', accent: '#B45309', bgEnd: '#FFFBEB', icon: 'vulnerability', cardStyle: 'default' };
-            case 'vulnerability':
-                return { typeLabel: '漏洞', typeEn: 'VULN', accent: '#9333EA', bgEnd: '#F5F3FF', icon: 'vuln', cardStyle: 'default' };
-            case 'auth':
-                return { typeLabel: '认证', typeEn: 'AUTH', accent: '#0D9488', bgEnd: '#F0FDFA', icon: 'default' };
-            case 'infra':
-                return { typeLabel: '基础设施', typeEn: 'INFRA', accent: '#64748B', bgEnd: '#F8FAFC', icon: 'default' };
-            case 'chain':
-                return { typeLabel: '攻击链', typeEn: 'CHAIN', accent: '#7C3AED', bgEnd: '#F5F3FF', icon: 'vulnerability' };
-            case 'poc':
-                return { typeLabel: 'POC', typeEn: 'POC', accent: '#C2410C', bgEnd: '#FFEDD5', icon: 'vulnerability' };
-            case 'business':
-                return { typeLabel: '业务', typeEn: 'BUSINESS', accent: '#0369A1', bgEnd: '#F0F9FF', icon: 'default' };
-            case 'missing':
-                return { typeLabel: '缺失', typeEn: 'MISSING', accent: '#CBD5E1', bgEnd: '#F1F5F9', icon: 'default' };
-            default:
-                return { typeLabel: '备注', typeEn: 'NOTE', accent: '#94A3B8', bgEnd: '#F8FAFC', icon: 'default' };
-        }
+        const style = NODE_TYPE_STYLES[type] || NODE_TYPE_STYLES.note;
+        const dark = isDarkTheme();
+        const palette = cardPalette();
+        return {
+            typeLabel: style.typeLabel,
+            typeEn: style.typeEn,
+            accent: dark ? style.accent.dark : style.accent.light,
+            bgStart: palette.bgStart,
+            bgEnd: dark ? style.bgEnd.dark : style.bgEnd.light,
+            keyColor: palette.keyColor,
+            summaryColor: palette.summaryColor,
+            icon: style.icon,
+            cardStyle: style.cardStyle || 'default',
+        };
     }
 
     function escapeXml(str) {
@@ -228,7 +312,10 @@
     function buildNodeCardSvgUrl(theme, layout, confidence) {
         const { width, height, headerLines, keyLines, summaryLines } = layout;
         const accent = theme.accent;
+        const bgStart = theme.bgStart;
         const bgEnd = theme.bgEnd;
+        const keyColor = theme.keyColor;
+        const summaryColor = theme.summaryColor;
         const conf = (confidence || '').toLowerCase();
         const isTentative = conf === 'tentative';
         const isDeprecated = conf === 'deprecated';
@@ -258,14 +345,14 @@
         const keySvg = keyLines
             .map(
                 (line, i) =>
-                    `<text x="${CARD_TEXT_X}" y="${keyY + i * CARD_KEY_LH}" font-size="${CARD_KEY_FS}" font-weight="500" fill="#64748b" font-family='${CARD_KEY_FONT}'>${escapeXml(line)}</text>`,
+                    `<text x="${CARD_TEXT_X}" y="${keyY + i * CARD_KEY_LH}" font-size="${CARD_KEY_FS}" font-weight="500" fill="${keyColor}" font-family='${CARD_KEY_FONT}'>${escapeXml(line)}</text>`,
             )
             .join('');
 
         const summarySvg = summaryLines
             .map(
                 (line, i) =>
-                    `<text x="${CARD_TEXT_X}" y="${summaryY + i * CARD_SUMMARY_LH}" font-size="${CARD_SUMMARY_FS}" font-weight="600" fill="#0f172a" font-family='${CARD_FONT}'>${escapeXml(line)}</text>`,
+                    `<text x="${CARD_TEXT_X}" y="${summaryY + i * CARD_SUMMARY_LH}" font-size="${CARD_SUMMARY_FS}" font-weight="600" fill="${summaryColor}" font-family='${CARD_FONT}'>${escapeXml(line)}</text>`,
             )
             .join('');
 
@@ -275,7 +362,7 @@
         const svg =
             `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
             `<defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">` +
-            `<stop offset="0%" stop-color="#FFFFFF"/><stop offset="100%" stop-color="${bgEnd}"/></linearGradient>` +
+            `<stop offset="0%" stop-color="${bgStart}"/><stop offset="100%" stop-color="${bgEnd}"/></linearGradient>` +
             `<clipPath id="textClip"><rect x="${CARD_TEXT_X}" y="${CARD_PAD - 2}" width="${textClipW}" height="${textClipH}"/></clipPath></defs>` +
             `<g${isDeprecated ? ' opacity="0.55"' : ''}>` +
             `<rect x="0.75" y="0.75" width="${width - 1.5}" height="${height - 1.5}" rx="12" fill="url(#bg)" ${stroke}/>` +
@@ -288,6 +375,52 @@
         } catch (e) {
             return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
         }
+    }
+
+    function applyNodePalette() {
+        if (!_cy) return;
+        const palette = cardPalette();
+        _cy.style().selector('node').style('background-color', palette.nodeFallbackBg).update();
+    }
+
+    function rebuildNodeCards() {
+        if (!_cy) return;
+        applyNodePalette();
+        _cy.nodes().forEach((nodeEle) => {
+            const d = nodeEle.data();
+            const visualType = d.type || 'note';
+            const theme = nodeTheme(visualType);
+            const statusBadge = d.statusBadge || buildStatusBadge(d.confidence);
+            const layout = computeNodeLayout(
+                visualType,
+                d.summary || '—',
+                statusBadge,
+                theme,
+                d.factKey,
+            );
+            nodeEle.data({
+                cardSvgUrl: buildNodeCardSvgUrl(theme, layout, d.confidence),
+                accentColor: theme.accent,
+                nodeWidth: layout.width,
+                nodeHeight: layout.height,
+                label: layout.searchLabel,
+            });
+        });
+    }
+
+    function refreshTheme() {
+        rebuildNodeCards();
+        if (!_cy) return;
+        const accent = isDarkTheme() ? '#60a5fa' : '#4F46E5';
+        _cy.style()
+            .selector('edge:selected')
+            .style({
+                'line-color': accent,
+                'target-arrow-color': accent,
+            })
+            .selector('node:selected')
+            .style('border-color', accent)
+            .update();
     }
 
     function destroy() {
@@ -487,6 +620,7 @@
                     accentColor: theme.accent,
                     statusBadge: statusBadge,
                     confidence: node.confidence || '',
+                    summary: summary,
                     nodeWidth: layout.width,
                     nodeHeight: layout.height,
                     cardSvgUrl: buildNodeCardSvgUrl(theme, layout, node.confidence),
@@ -510,6 +644,7 @@
             });
         });
 
+        const palette = cardPalette();
         _cy = cytoscape({
             container,
             elements,
@@ -521,7 +656,7 @@
                         width: (ele) => ele.data('nodeWidth') || CARD_MIN_W,
                         height: (ele) => ele.data('nodeHeight') || CARD_MIN_H,
                         shape: 'round-rectangle',
-                        'background-color': '#ffffff',
+                        'background-color': palette.nodeFallbackBg,
                         'background-image': (ele) => ele.data('cardSvgUrl') || 'none',
                         'background-width': (ele) => (ele.data('nodeWidth') || CARD_MIN_W) + 'px',
                         'background-height': (ele) => (ele.data('nodeHeight') || CARD_MIN_H) + 'px',
@@ -549,15 +684,15 @@
                     style: {
                         width: 3.5,
                         opacity: 1,
-                        'line-color': '#4F46E5',
-                        'target-arrow-color': '#4F46E5',
+                        'line-color': isDarkTheme() ? '#60a5fa' : '#4F46E5',
+                        'target-arrow-color': isDarkTheme() ? '#60a5fa' : '#4F46E5',
                     },
                 },
                 {
                     selector: 'node:selected',
                     style: {
                         'border-width': 3,
-                        'border-color': '#4F46E5',
+                        'border-color': isDarkTheme() ? '#60a5fa' : '#4F46E5',
                         'border-opacity': 1,
                     },
                 },
@@ -674,7 +809,10 @@
         setConnectMode,
         selectEdge,
         clearEdgeSelection,
+        refreshTheme,
         nodeTheme,
         resolveGraphNodeType,
     };
+
+    document.addEventListener('cyberstrike-themechange', refreshTheme);
 })(typeof window !== 'undefined' ? window : globalThis);
