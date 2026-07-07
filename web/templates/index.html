@@ -2818,6 +2818,9 @@
                                 <div class="settings-nav-item active" data-section="basic" onclick="switchSettingsSection('basic')">
                                     <span data-i18n="settings.nav.basic">基本设置</span>
                                 </div>
+                                <div class="settings-nav-item" data-section="hitl" onclick="switchSettingsSection('hitl')">
+                                    <span data-i18n="settings.nav.hitl">人机协同</span>
+                                </div>
                                 <div class="settings-nav-item" data-section="infocollect" onclick="switchSettingsSection('infocollect')">
                                     <span data-i18n="settings.nav.infocollect">信息收集</span>
                                 </div>
@@ -3049,6 +3052,93 @@
 
                                 <div class="settings-actions">
                                     <button class="btn-primary" onclick="applySettings()" data-i18n="settings.apply.button">应用配置</button>
+                                </div>
+                            </div>
+
+                            <!-- 人机协同 -->
+                            <div id="settings-section-hitl" class="settings-section-content">
+                                <div class="settings-section-header">
+                                    <h3 data-i18n="settings.hitl.title">人机协同</h3>
+                                </div>
+
+                                <div class="settings-subsection">
+                                    <h4 data-i18n="settings.hitl.approvalTitle">审批配置</h4>
+                                    <div class="settings-form">
+                                        <div class="form-group">
+                                            <label for="hitl-default-reviewer" data-i18n="settings.hitl.defaultReviewer">全局默认审批方</label>
+                                            <select id="hitl-default-reviewer" class="form-select">
+                                                <option value="human" data-i18n="chat.hitlReviewerHuman">人工审批</option>
+                                                <option value="audit_agent" data-i18n="chat.hitlReviewerAgent">审计 Agent</option>
+                                            </select>
+                                            <small class="form-hint" data-i18n="settings.hitl.defaultReviewerHint">未选会话和新建会话默认使用该审批方；会话侧栏仍可临时覆盖。</small>
+                                        </div>
+                                        <div class="settings-subsection-header">
+                                            <h5 data-i18n="settings.hitl.auditModelTitle">审计 Agent 模型</h5>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="hitl-audit-model-provider" data-i18n="settingsBasic.apiProvider">API 提供商</label>
+                                            <select id="hitl-audit-model-provider" class="form-select">
+                                                <option value="" data-i18n="settings.hitl.auditModelReuseMain">跟随主模型配置</option>
+                                                <option value="openai" data-i18n="settingsBasic.providerOpenAI">OpenAI / 兼容 OpenAI 协议</option>
+                                                <option value="claude" data-i18n="settingsBasic.providerClaude">Claude (Anthropic Messages API)</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="hitl-audit-model-base-url">Base URL</label>
+                                            <input type="text" id="hitl-audit-model-base-url" data-i18n="settings.hitl.auditModelBaseUrlPlaceholder" data-i18n-attr="placeholder" placeholder="留空则复用主模型 Base URL" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="hitl-audit-model-api-key">API Key</label>
+                                            <input type="password" id="hitl-audit-model-api-key" data-i18n="settings.hitl.auditModelApiKeyPlaceholder" data-i18n-attr="placeholder" placeholder="留空则复用主模型 API Key" autocomplete="off" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="hitl-audit-model-name" data-i18n="settings.hitl.auditModelName">审批模型</label>
+                                            <div class="model-pick-row">
+                                                <input type="text" id="hitl-audit-model-name" class="model-pick-input" data-i18n="settings.hitl.auditModelNamePlaceholder" data-i18n-attr="placeholder" placeholder="留空则复用主模型；建议填写小模型" />
+                                                <select id="hitl-audit-model-select" class="model-pick-native" style="display: none;" aria-hidden="true" tabindex="-1">
+                                                    <option value="" disabled data-i18n="settingsBasic.modelsListSelectPlaceholder">请选择模型</option>
+                                                </select>
+                                                <a href="javascript:void(0)" id="fetch-hitl-audit-models-btn" class="model-pick-fetch-link" onclick="fetchModelList('hitlAudit')" data-i18n="settingsBasic.fetchModels">获取列表</a>
+                                            </div>
+                                            <small id="fetch-hitl-audit-models-hint" class="form-hint" style="display: none; font-size: 0.75rem; margin-top: 4px;"></small>
+                                            <span id="fetch-hitl-audit-models-result" style="font-size: 0.75rem; margin-top: 2px; display: block;"></span>
+                                            <small class="form-hint" data-i18n="settings.hitl.auditModelHint">仅审计 Agent 审批时使用；人工审批不消耗模型。</small>
+                                        </div>
+                                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 2px;">
+                                            <a href="javascript:void(0)" id="test-hitl-audit-model-btn" onclick="testHitlAuditModelConnection()" style="font-size: 0.8125rem; color: var(--accent-color, #3182ce); text-decoration: none; cursor: pointer; user-select: none;" data-i18n="settings.hitl.testAuditModel">测试审计模型</a>
+                                            <span id="test-hitl-audit-model-result" style="font-size: 0.8125rem;"></span>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="hitl-retention-days" data-i18n="settings.hitl.retentionDays">已决策审计日志保留天数</label>
+                                            <input type="number" id="hitl-retention-days" min="0" step="1" placeholder="90" />
+                                            <small class="form-hint" data-i18n="settings.hitl.retentionDaysHint">0 表示不自动清理；留空使用默认 90 天。</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="hitl-tool-whitelist" data-i18n="settings.hitl.toolWhitelist">免审批工具白名单</label>
+                                            <textarea id="hitl-tool-whitelist" rows="4" spellcheck="false" autocomplete="off" data-i18n="settings.hitl.toolWhitelistPlaceholder" data-i18n-attr="placeholder" placeholder="read_file, list_dir, glob"></textarea>
+                                            <small class="form-hint" data-i18n="settings.hitl.toolWhitelistHint">每行一个或逗号分隔；白名单工具不会触发人机协同审批。</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="settings-subsection">
+                                    <h4 data-i18n="settings.hitl.auditAgentTitle">审计 Agent 策略</h4>
+                                    <div class="settings-form">
+                                        <div class="form-group">
+                                            <label for="hitl-audit-agent-prompt-settings" data-i18n="settings.hitl.auditPromptApproval">审批模式提示词</label>
+                                            <textarea id="hitl-audit-agent-prompt-settings" rows="10" spellcheck="false" autocomplete="off"></textarea>
+                                            <small class="form-hint" data-i18n="settings.hitl.auditPromptHint">留空时使用后端内置默认策略。</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="hitl-audit-agent-prompt-review-edit-settings" data-i18n="settings.hitl.auditPromptReviewEdit">审查编辑模式提示词</label>
+                                            <textarea id="hitl-audit-agent-prompt-review-edit-settings" rows="10" spellcheck="false" autocomplete="off"></textarea>
+                                            <small class="form-hint" data-i18n="settings.hitl.auditPromptReviewEditHint">审查编辑模式可通过 editedArguments 收窄参数后放行。</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="settings-actions">
+                                    <button type="button" class="btn-primary" onclick="applySettings()" data-i18n="settings.apply.button">应用配置</button>
                                 </div>
                             </div>
 

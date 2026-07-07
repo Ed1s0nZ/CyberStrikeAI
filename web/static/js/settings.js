@@ -16,6 +16,190 @@ function settingsT(key, fallback) {
     return fallback;
 }
 
+const settingsCustomSelects = new Map();
+let settingsCustomSelectsDocBound = false;
+
+function shouldEnhanceSettingsSelect(select) {
+    if (!select || select.dataset.settingsCustomSelect === '1') return false;
+    if (select.classList.contains('model-pick-native')) return false;
+    if (select.id && select.id.indexOf('audit-filter-') === 0) return false;
+    if (select.getAttribute('aria-hidden') === 'true') return false;
+    if (select.style && select.style.display === 'none') return false;
+    return true;
+}
+
+function closeSettingsCustomSelect(select) {
+    const reg = settingsCustomSelects.get(select);
+    if (reg) {
+        reg.wrapper.classList.remove('open');
+        reg.trigger.setAttribute('aria-expanded', 'false');
+    }
+}
+
+function closeAllSettingsCustomSelects() {
+    settingsCustomSelects.forEach((reg) => {
+        reg.wrapper.classList.remove('open');
+        reg.trigger.setAttribute('aria-expanded', 'false');
+    });
+}
+
+function syncSettingsCustomSelect(select) {
+    const reg = settingsCustomSelects.get(select);
+    if (!reg) return;
+    const selected = select.options[select.selectedIndex];
+    reg.value.textContent = selected ? selected.textContent : '';
+    reg.trigger.disabled = !!select.disabled;
+    reg.wrapper.classList.toggle('is-disabled', !!select.disabled);
+    reg.menu.innerHTML = '';
+
+    Array.prototype.forEach.call(select.options, (option, index) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'settings-custom-select-option';
+        item.setAttribute('role', 'option');
+        item.setAttribute('data-index', String(index));
+        item.setAttribute('aria-selected', option.selected ? 'true' : 'false');
+        item.disabled = !!option.disabled;
+        item.classList.toggle('is-selected', option.selected);
+        item.classList.toggle('is-disabled', !!option.disabled);
+
+        const check = document.createElement('span');
+        check.className = 'settings-custom-select-check';
+        check.setAttribute('aria-hidden', 'true');
+        check.textContent = '✓';
+
+        const label = document.createElement('span');
+        label.className = 'settings-custom-select-label';
+        label.textContent = option.textContent;
+
+        item.appendChild(check);
+        item.appendChild(label);
+        reg.menu.appendChild(item);
+    });
+}
+
+function refreshSettingsCustomSelects() {
+    settingsCustomSelects.forEach((_reg, select) => syncSettingsCustomSelect(select));
+}
+
+function enhanceSettingsSelect(select) {
+    if (!shouldEnhanceSettingsSelect(select)) {
+        if (select && select.dataset.settingsCustomSelect === '1') {
+            syncSettingsCustomSelect(select);
+        }
+        return;
+    }
+
+    select.dataset.settingsCustomSelect = '1';
+    select.classList.add('settings-native-select');
+    select.tabIndex = -1;
+    select.setAttribute('aria-hidden', 'true');
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'settings-custom-select';
+    if (select.id && select.id.indexOf('openai-reasoning-') === 0) {
+        wrapper.classList.add('settings-custom-select--compact');
+    }
+    if (select.style.width) wrapper.style.width = select.style.width;
+    if (select.style.minWidth) wrapper.style.minWidth = select.style.minWidth;
+
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'settings-custom-select-trigger';
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+
+    const value = document.createElement('span');
+    value.className = 'settings-custom-select-value';
+    const caret = document.createElement('span');
+    caret.className = 'settings-custom-select-caret';
+    caret.setAttribute('aria-hidden', 'true');
+    caret.textContent = '▾';
+    trigger.appendChild(value);
+    trigger.appendChild(caret);
+
+    const menu = document.createElement('div');
+    menu.className = 'settings-custom-select-menu';
+    menu.setAttribute('role', 'listbox');
+
+    const parent = select.parentNode;
+    parent.insertBefore(wrapper, select);
+    wrapper.appendChild(trigger);
+    wrapper.appendChild(menu);
+    wrapper.appendChild(select);
+
+    settingsCustomSelects.set(select, { wrapper, trigger, value, menu });
+
+    trigger.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (select.disabled) return;
+        const willOpen = !wrapper.classList.contains('open');
+        closeAllSettingsCustomSelects();
+        wrapper.classList.toggle('open', willOpen);
+        trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    });
+
+    trigger.addEventListener('keydown', (event) => {
+        if (select.disabled) return;
+        const enabledOptions = Array.prototype.filter.call(select.options, (option) => !option.disabled);
+        if (!enabledOptions.length) return;
+        const current = Math.max(0, enabledOptions.indexOf(select.options[select.selectedIndex]));
+        let next = current;
+        if (event.key === 'ArrowDown') next = Math.min(enabledOptions.length - 1, current + 1);
+        else if (event.key === 'ArrowUp') next = Math.max(0, current - 1);
+        else if (event.key === 'Home') next = 0;
+        else if (event.key === 'End') next = enabledOptions.length - 1;
+        else if (event.key === 'Escape') {
+            closeSettingsCustomSelect(select);
+            return;
+        } else if (event.key === 'Enter' || event.key === ' ') {
+            wrapper.classList.add('open');
+            trigger.setAttribute('aria-expanded', 'true');
+            event.preventDefault();
+            return;
+        } else {
+            return;
+        }
+        event.preventDefault();
+        const nextOption = enabledOptions[next];
+        if (nextOption && select.value !== nextOption.value) {
+            select.value = nextOption.value;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        syncSettingsCustomSelect(select);
+    });
+
+    menu.addEventListener('click', (event) => {
+        const item = event.target.closest('.settings-custom-select-option');
+        if (!item || item.disabled) return;
+        event.stopPropagation();
+        const option = select.options[Number(item.dataset.index)];
+        if (option && !option.disabled && select.value !== option.value) {
+            select.value = option.value;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        syncSettingsCustomSelect(select);
+        closeSettingsCustomSelect(select);
+    });
+
+    select.addEventListener('change', () => syncSettingsCustomSelect(select));
+    syncSettingsCustomSelect(select);
+}
+
+function initSettingsCustomSelects(root) {
+    const scope = root || document.getElementById('page-settings');
+    if (!scope) return;
+    scope.querySelectorAll('select').forEach(enhanceSettingsSelect);
+    if (!settingsCustomSelectsDocBound) {
+        document.addEventListener('click', closeAllSettingsCustomSelects);
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') closeAllSettingsCustomSelects();
+        });
+        settingsCustomSelectsDocBound = true;
+    }
+    refreshSettingsCustomSelects();
+}
+
 function getRobotStatus(type) {
     const value = (id) => document.getElementById(id)?.value?.trim() || '';
     const checked = (id) => document.getElementById(id)?.checked === true;
@@ -282,6 +466,7 @@ function syncRobotAgentModeSelectOptions(multiEnabled) {
     if (!multiEnabled && ['deep', 'plan_execute', 'supervisor'].indexOf(sel.value) >= 0) {
         sel.value = 'eino_single';
     }
+    syncSettingsCustomSelect(sel);
 }
 
 /** 首次进入仪表盘等页面前拉一次配置，隐藏侧栏 C2（避免禁用后仍显示） */
@@ -340,6 +525,7 @@ function switchSettingsSection(section) {
     const activeContent = document.getElementById(`settings-section-${section}`);
     if (activeContent) {
         activeContent.classList.add('active');
+        initSettingsCustomSelects(activeContent);
     }
     if (section === 'terminal' && typeof initTerminal === 'function') {
         setTimeout(initTerminal, 0);
@@ -361,6 +547,7 @@ async function openSettings() {
     
     // 每次打开时重新加载最新配置（系统设置页面不需要加载工具列表）
     await loadConfig(false);
+    initSettingsCustomSelects();
     
     // 清除之前的验证错误状态
     document.querySelectorAll('.form-group input').forEach(input => {
@@ -459,6 +646,42 @@ async function loadConfig(loadTools = true) {
         if (fofaEmailEl) fofaEmailEl.value = fofa.email || '';
         if (fofaKeyEl) fofaKeyEl.value = fofa.api_key || '';
         if (fofaBaseUrlEl) fofaBaseUrlEl.value = fofa.base_url || '';
+
+        // 填充人机协同配置
+        const hitl = currentConfig.hitl || {};
+        const hitlReviewerEl = document.getElementById('hitl-default-reviewer');
+        if (hitlReviewerEl) {
+            const reviewer = String(hitl.default_reviewer || 'human').trim().toLowerCase();
+            hitlReviewerEl.value = reviewer === 'audit_agent' ? 'audit_agent' : 'human';
+        }
+        const hitlAuditModel = hitl.audit_model || {};
+        const hitlAuditProviderEl = document.getElementById('hitl-audit-model-provider');
+        if (hitlAuditProviderEl) {
+            const provider = String(hitlAuditModel.provider || '').trim().toLowerCase();
+            hitlAuditProviderEl.value = ['openai', 'claude'].includes(provider) ? provider : '';
+        }
+        const hitlAuditBaseUrlEl = document.getElementById('hitl-audit-model-base-url');
+        if (hitlAuditBaseUrlEl) hitlAuditBaseUrlEl.value = hitlAuditModel.base_url || '';
+        const hitlAuditApiKeyEl = document.getElementById('hitl-audit-model-api-key');
+        if (hitlAuditApiKeyEl) hitlAuditApiKeyEl.value = hitlAuditModel.api_key || '';
+        const hitlAuditModelNameEl = document.getElementById('hitl-audit-model-name');
+        if (hitlAuditModelNameEl) hitlAuditModelNameEl.value = hitlAuditModel.model || '';
+        const hitlRetentionEl = document.getElementById('hitl-retention-days');
+        if (hitlRetentionEl) {
+            hitlRetentionEl.value = (hitl.retention_days === undefined || hitl.retention_days === null) ? '90' : String(hitl.retention_days);
+        }
+        const hitlWhitelistEl = document.getElementById('hitl-tool-whitelist');
+        if (hitlWhitelistEl) {
+            hitlWhitelistEl.value = Array.isArray(hitl.tool_whitelist) ? hitl.tool_whitelist.join('\n') : '';
+        }
+        const hitlApprovalPromptEl = document.getElementById('hitl-audit-agent-prompt-settings');
+        if (hitlApprovalPromptEl) {
+            hitlApprovalPromptEl.value = hitl.audit_agent_prompt || '';
+        }
+        const hitlReviewEditPromptEl = document.getElementById('hitl-audit-agent-prompt-review-edit-settings');
+        if (hitlReviewEditPromptEl) {
+            hitlReviewEditPromptEl.value = hitl.audit_agent_prompt_review_edit || '';
+        }
         
         // 填充Agent配置
         document.getElementById('agent-max-iterations').value = currentConfig.agent.max_iterations || 30;
@@ -723,6 +946,8 @@ async function loadConfig(loadTools = true) {
         if (qqSandbox) qqSandbox.checked = qq.sandbox === true;
         bindRobotManagerEvents();
         refreshRobotManager();
+        initSettingsCustomSelects();
+        refreshSettingsCustomSelects();
         
         // 只有在需要时才加载工具列表（MCP管理页面需要，系统设置页面不需要）
         if (loadTools) {
@@ -1530,6 +1755,15 @@ async function applySettings() {
         const wecomAgentIdVal = document.getElementById('robot-wecom-agent-id')?.value.trim();
         const prevOpenai = (currentConfig && currentConfig.openai) ? currentConfig.openai : {};
         const prevRobots = (currentConfig && currentConfig.robots) ? currentConfig.robots : {};
+        const prevHitl = (currentConfig && currentConfig.hitl) ? currentConfig.hitl : {};
+        const hitlRetentionRaw = document.getElementById('hitl-retention-days')?.value;
+        const hitlRetention = parseInt(hitlRetentionRaw, 10);
+        const hitlWhitelistRaw = document.getElementById('hitl-tool-whitelist')?.value || '';
+        const hitlToolsSplit = (typeof window.hitlToolsSplitToArray === 'function')
+            ? window.hitlToolsSplitToArray
+            : function (s) {
+                return String(s || '').split(/[\n,，]/).map(v => v.trim()).filter(Boolean);
+            };
         const config = {
             openai: {
                 ...prevOpenai,
@@ -1551,6 +1785,21 @@ async function applySettings() {
                 email: document.getElementById('fofa-email')?.value.trim() || '',
                 api_key: document.getElementById('fofa-api-key')?.value.trim() || '',
                 base_url: document.getElementById('fofa-base-url')?.value.trim() || ''
+            },
+            hitl: {
+                ...prevHitl,
+                audit_model: {
+                    ...(prevHitl.audit_model || {}),
+                    provider: document.getElementById('hitl-audit-model-provider')?.value || '',
+                    base_url: document.getElementById('hitl-audit-model-base-url')?.value.trim() || '',
+                    api_key: document.getElementById('hitl-audit-model-api-key')?.value.trim() || '',
+                    model: document.getElementById('hitl-audit-model-name')?.value.trim() || ''
+                },
+                default_reviewer: document.getElementById('hitl-default-reviewer')?.value === 'audit_agent' ? 'audit_agent' : 'human',
+                retention_days: Number.isNaN(hitlRetention) ? 90 : Math.max(0, hitlRetention),
+                tool_whitelist: hitlToolsSplit(hitlWhitelistRaw),
+                audit_agent_prompt: document.getElementById('hitl-audit-agent-prompt-settings')?.value.trim() || '',
+                audit_agent_prompt_review_edit: document.getElementById('hitl-audit-agent-prompt-review-edit-settings')?.value.trim() || ''
             },
             agent: {
                 max_iterations: parseInt(document.getElementById('agent-max-iterations').value) || 30
@@ -2012,14 +2261,23 @@ function initModelListControls() {
         visionProv.dataset.modelListBound = '1';
         visionProv.addEventListener('change', syncModelListFetchButtons);
     }
+    const hitlAuditProv = document.getElementById('hitl-audit-model-provider');
+    if (hitlAuditProv && !hitlAuditProv.dataset.modelListBound) {
+        hitlAuditProv.dataset.modelListBound = '1';
+        hitlAuditProv.addEventListener('change', syncModelListFetchButtons);
+    }
     bindModelSelect('openai');
     bindModelSelect('vision');
+    bindModelSelect('hitlAudit');
     syncModelListFetchButtons();
 }
 
 function modelSelectIds(scope) {
     if (scope === 'vision') {
         return { selectId: 'vision-model-select', inputId: 'vision-model' };
+    }
+    if (scope === 'hitlAudit') {
+        return { selectId: 'hitl-audit-model-select', inputId: 'hitl-audit-model-name' };
     }
     return { selectId: 'openai-model-select', inputId: 'openai-model' };
 }
@@ -2044,6 +2302,15 @@ function resolveModelListCredentials(scope) {
         const baseUrl = (document.getElementById('vision-base-url')?.value || '').trim()
             || (document.getElementById('openai-base-url')?.value || '').trim();
         const apiKey = (document.getElementById('vision-api-key')?.value || '').trim()
+            || (document.getElementById('openai-api-key')?.value || '').trim();
+        return { provider, base_url: baseUrl, api_key: apiKey };
+    }
+    if (scope === 'hitlAudit') {
+        const hp = (document.getElementById('hitl-audit-model-provider')?.value || '').trim();
+        const provider = hp || document.getElementById('openai-provider')?.value || 'openai';
+        const baseUrl = (document.getElementById('hitl-audit-model-base-url')?.value || '').trim()
+            || (document.getElementById('openai-base-url')?.value || '').trim();
+        const apiKey = (document.getElementById('hitl-audit-model-api-key')?.value || '').trim()
             || (document.getElementById('openai-api-key')?.value || '').trim();
         return { provider, base_url: baseUrl, api_key: apiKey };
     }
@@ -2106,6 +2373,32 @@ function syncModelListFetchButtons() {
             visionHint.style.display = 'none';
         }
     }
+
+    const hp = (document.getElementById('hitl-audit-model-provider')?.value || '').trim();
+    const hitlAuditEffectiveProv = hp || openaiProv;
+    const hitlAuditBtn = document.getElementById('fetch-hitl-audit-models-btn');
+    const hitlAuditHint = document.getElementById('fetch-hitl-audit-models-hint');
+    const hitlAuditSelect = document.getElementById('hitl-audit-model-select');
+    const isClaudeHitlAudit = hitlAuditEffectiveProv === 'claude';
+    if (hitlAuditBtn) {
+        hitlAuditBtn.style.display = isClaudeHitlAudit ? 'none' : '';
+    }
+    if (hitlAuditSelect && isClaudeHitlAudit) {
+        hitlAuditSelect.style.display = 'none';
+        const hitlAuditWrap = modelPickSelectMap['hitl-audit-model-select'];
+        if (hitlAuditWrap) hitlAuditWrap.wrapper.style.display = 'none';
+    } else if (hitlAuditSelect && !isClaudeHitlAudit) {
+        syncModelPickDropdown('hitl-audit-model-select');
+    }
+    if (hitlAuditHint) {
+        if (isClaudeHitlAudit) {
+            hitlAuditHint.textContent = tFn('settingsBasic.modelsListClaudeHint');
+            hitlAuditHint.style.display = '';
+        } else {
+            hitlAuditHint.textContent = '';
+            hitlAuditHint.style.display = 'none';
+        }
+    }
 }
 
 function populateModelSelect(scope, models, currentValue) {
@@ -2145,9 +2438,13 @@ function populateModelSelect(scope, models, currentValue) {
 async function fetchModelList(scope) {
     const tFn = typeof window.t === 'function' ? window.t : (k) => k;
     const creds = resolveModelListCredentials(scope);
-    const btnId = scope === 'vision' ? 'fetch-vision-models-btn' : 'fetch-openai-models-btn';
-    const resultId = scope === 'vision' ? 'fetch-vision-models-result' : 'fetch-openai-models-result';
-    const inputId = scope === 'vision' ? 'vision-model' : 'openai-model';
+    const btnId = scope === 'vision'
+        ? 'fetch-vision-models-btn'
+        : (scope === 'hitlAudit' ? 'fetch-hitl-audit-models-btn' : 'fetch-openai-models-btn');
+    const resultId = scope === 'vision'
+        ? 'fetch-vision-models-result'
+        : (scope === 'hitlAudit' ? 'fetch-hitl-audit-models-result' : 'fetch-openai-models-result');
+    const inputId = modelSelectIds(scope).inputId;
     const btn = document.getElementById(btnId);
     const resultEl = document.getElementById(resultId);
     const inputEl = document.getElementById(inputId);
@@ -2255,6 +2552,75 @@ async function testVisionConnection() {
     } catch (error) {
         resultEl.textContent = (typeof window.t === 'function' ? window.t('settingsBasic.testError') : '测试出错') + ': ' + error.message;
         resultEl.style.color = 'var(--error-color, #e53e3e)';
+    }
+}
+
+function collectHitlAuditModelEffectiveConfig() {
+    const main = {
+        provider: document.getElementById('openai-provider')?.value || 'openai',
+        api_key: document.getElementById('openai-api-key')?.value.trim() || '',
+        base_url: document.getElementById('openai-base-url')?.value.trim() || '',
+        model: document.getElementById('openai-model')?.value.trim() || ''
+    };
+    return {
+        provider: document.getElementById('hitl-audit-model-provider')?.value || main.provider,
+        base_url: document.getElementById('hitl-audit-model-base-url')?.value.trim() || main.base_url,
+        api_key: document.getElementById('hitl-audit-model-api-key')?.value.trim() || main.api_key,
+        model: document.getElementById('hitl-audit-model-name')?.value.trim() || main.model
+    };
+}
+
+async function testHitlAuditModelConnection() {
+    const btn = document.getElementById('test-hitl-audit-model-btn');
+    const resultEl = document.getElementById('test-hitl-audit-model-result');
+    const cfg = collectHitlAuditModelEffectiveConfig();
+
+    if (!cfg.api_key || !cfg.model) {
+        if (resultEl) {
+            resultEl.style.color = 'var(--danger-color, #e53e3e)';
+            resultEl.textContent = typeof window.t === 'function' ? window.t('settingsBasic.testFillRequired') : '请先填写 API Key 和模型';
+        }
+        return;
+    }
+
+    if (btn) {
+        btn.style.pointerEvents = 'none';
+        btn.style.opacity = '0.5';
+    }
+    if (resultEl) {
+        resultEl.style.color = 'var(--text-muted, #888)';
+        resultEl.textContent = typeof window.t === 'function' ? window.t('settingsBasic.testing') : '测试中...';
+    }
+
+    try {
+        const response = await apiFetch('/api/config/test-openai', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(cfg)
+        });
+        const result = await response.json();
+
+        if (result.success) {
+            if (resultEl) {
+                resultEl.style.color = 'var(--success-color, #38a169)';
+                const latency = result.latency_ms ? ` (${result.latency_ms}ms)` : '';
+                const modelInfo = result.model ? ` [${result.model}]` : '';
+                resultEl.textContent = (typeof window.t === 'function' ? window.t('settingsBasic.testSuccess') : '连接成功') + modelInfo + latency;
+            }
+        } else if (resultEl) {
+            resultEl.style.color = 'var(--danger-color, #e53e3e)';
+            resultEl.textContent = (typeof window.t === 'function' ? window.t('settingsBasic.testFailed') : '连接失败') + ': ' + (result.error || '未知错误');
+        }
+    } catch (error) {
+        if (resultEl) {
+            resultEl.style.color = 'var(--danger-color, #e53e3e)';
+            resultEl.textContent = (typeof window.t === 'function' ? window.t('settingsBasic.testError') : '测试出错') + ': ' + error.message;
+        }
+    } finally {
+        if (btn) {
+            btn.style.pointerEvents = '';
+            btn.style.opacity = '';
+        }
     }
 }
 
@@ -3172,6 +3538,11 @@ openSettings = async function() {
 // 语言切换后重新渲染 MCP 管理页中由 JS 写入的区块（innerHTML 不会随 data-i18n 自动更新）
 document.addEventListener('languagechange', function () {
     try {
+        const settingsPage = document.getElementById('page-settings');
+        if (settingsPage) {
+            initSettingsCustomSelects(settingsPage);
+            refreshSettingsCustomSelects();
+        }
         const mcpPage = document.getElementById('page-mcp-management');
         if (mcpPage && mcpPage.classList.contains('active')) {
             if (typeof loadExternalMCPs === 'function') {

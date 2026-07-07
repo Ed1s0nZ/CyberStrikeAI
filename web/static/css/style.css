@@ -7116,6 +7116,170 @@ html[data-theme="dark"] .openapi-doc-btn:hover {
     padding-right: 36px;
 }
 
+.settings-native-select {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+.settings-custom-select {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+}
+
+.settings-custom-select--compact {
+    width: auto;
+    flex: 0 0 auto;
+}
+
+.settings-custom-select-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    min-height: 42px;
+    box-sizing: border-box;
+    padding: 9px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 0.9375rem;
+    line-height: 1.25;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.settings-custom-select--compact .settings-custom-select-trigger {
+    min-height: 34px;
+    padding: 6px 10px;
+    font-size: 0.875rem;
+}
+
+.settings-custom-select-value {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.settings-custom-select-caret {
+    flex: 0 0 auto;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    line-height: 1;
+    transition: transform 0.15s ease;
+}
+
+.settings-custom-select.open .settings-custom-select-caret {
+    transform: rotate(180deg);
+}
+
+.settings-custom-select-trigger:hover:not(:disabled) {
+    border-color: var(--accent-color);
+}
+
+.settings-custom-select.open .settings-custom-select-trigger {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+}
+
+.settings-custom-select.is-disabled .settings-custom-select-trigger {
+    cursor: not-allowed;
+    opacity: 0.56;
+    background: var(--bg-secondary, #f5f6f8);
+}
+
+.settings-custom-select-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 2600;
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 6px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    box-shadow: var(--shadow-lg);
+}
+
+.settings-custom-select.open .settings-custom-select-menu {
+    display: block;
+}
+
+.settings-custom-select-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 0.875rem;
+    line-height: 1.25;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.settings-custom-select-option:hover:not(:disabled) {
+    background: var(--bg-secondary);
+}
+
+.settings-custom-select-option.is-selected {
+    color: var(--accent-color);
+    font-weight: 600;
+    background: rgba(0, 102, 255, 0.08);
+}
+
+.settings-custom-select-option.is-disabled,
+.settings-custom-select-option:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.settings-custom-select-check {
+    flex: 0 0 14px;
+    width: 14px;
+    color: var(--accent-color);
+    font-size: 0.75rem;
+    line-height: 1;
+    opacity: 0;
+    text-align: center;
+}
+
+.settings-custom-select-option.is-selected .settings-custom-select-check {
+    opacity: 1;
+}
+
+.settings-custom-select-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .form-group input:not([type="checkbox"]):not([type="radio"]):focus,
 .form-group select:focus {
     outline: none;
@@ -30312,6 +30476,49 @@ html[data-theme="dark"] #page-settings .model-pick-input:focus {
 html[data-theme="dark"] #page-settings select option {
     background: #0f172a;
     color: var(--text-primary);
+}
+
+html[data-theme="dark"] #page-settings .settings-custom-select-trigger,
+html[data-theme="dark"] #page-settings .audit-custom-select-trigger {
+    background: #0f172a !important;
+    color: var(--text-primary) !important;
+    border-color: #2b374b !important;
+    box-shadow: none !important;
+}
+
+html[data-theme="dark"] #page-settings .settings-custom-select-trigger:hover:not(:disabled),
+html[data-theme="dark"] #page-settings .audit-custom-select-trigger:hover:not(:disabled) {
+    border-color: rgba(96, 165, 250, 0.75) !important;
+}
+
+html[data-theme="dark"] #page-settings .settings-custom-select.open .settings-custom-select-trigger,
+html[data-theme="dark"] #page-settings .audit-custom-select.open .audit-custom-select-trigger {
+    background: #111827 !important;
+    border-color: var(--accent-color) !important;
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.16) !important;
+}
+
+html[data-theme="dark"] #page-settings .settings-custom-select-menu,
+html[data-theme="dark"] #page-settings .audit-custom-select-dropdown {
+    background: #0f172a !important;
+    border-color: #2b374b !important;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.42) !important;
+}
+
+html[data-theme="dark"] #page-settings .settings-custom-select-option,
+html[data-theme="dark"] #page-settings .audit-custom-select-option {
+    color: var(--text-primary) !important;
+}
+
+html[data-theme="dark"] #page-settings .settings-custom-select-option:hover:not(:disabled),
+html[data-theme="dark"] #page-settings .audit-custom-select-option:hover {
+    background: rgba(96, 165, 250, 0.12) !important;
+}
+
+html[data-theme="dark"] #page-settings .settings-custom-select-option.is-selected,
+html[data-theme="dark"] #page-settings .audit-custom-select-option.is-selected {
+    background: rgba(96, 165, 250, 0.16) !important;
+    color: #60a5fa !important;
 }
 
 /* Chat @ tool mention panel dark theme. */

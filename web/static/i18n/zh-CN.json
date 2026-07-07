@@ -1209,6 +1209,7 @@
     "title": "系统设置",
     "nav": {
       "basic": "基本设置",
+      "hitl": "人机协同",
       "knowledge": "知识库",
       "c2": "C2",
       "robots": "机器人设置",
@@ -1219,6 +1220,30 @@
     },
     "infocollect": {
       "title": "信息收集"
+    },
+    "hitl": {
+      "title": "人机协同",
+      "approvalTitle": "审批配置",
+      "defaultReviewer": "全局默认审批方",
+      "defaultReviewerHint": "未选会话和新建会话默认使用该审批方；会话侧栏仍可临时覆盖。",
+      "auditModelTitle": "审计 Agent 模型",
+      "auditModelReuseMain": "跟随主模型配置",
+      "auditModelBaseUrlPlaceholder": "留空则复用主模型 Base URL",
+      "auditModelApiKeyPlaceholder": "留空则复用主模型 API Key",
+      "auditModelName": "审批模型",
+      "auditModelNamePlaceholder": "留空则复用主模型；建议填写小模型",
+      "auditModelHint": "仅审计 Agent 审批时使用；人工审批不消耗模型。",
+      "testAuditModel": "测试审计模型",
+      "retentionDays": "已决策审计日志保留天数",
+      "retentionDaysHint": "0 表示不自动清理；留空使用默认 90 天。",
+      "toolWhitelist": "免审批工具白名单",
+      "toolWhitelistPlaceholder": "read_file, list_dir, glob",
+      "toolWhitelistHint": "每行一个或逗号分隔；白名单工具不会触发人机协同审批。",
+      "auditAgentTitle": "审计 Agent 策略",
+      "auditPromptApproval": "审批模式提示词",
+      "auditPromptHint": "留空时使用后端内置默认策略。",
+      "auditPromptReviewEdit": "审查编辑模式提示词",
+      "auditPromptReviewEditHint": "审查编辑模式可通过 editedArguments 收窄参数后放行。"
     },
     "knowledge": {
       "title": "知识库设置"

@@ -1221,6 +1221,7 @@
     "title": "System settings",
     "nav": {
       "basic": "Basic",
+      "hitl": "Human-in-the-loop",
       "knowledge": "Knowledge base",
       "c2": "C2",
       "robots": "Bots",
@@ -1231,6 +1232,30 @@
     },
     "infocollect": {
       "title": "Reconnaissance"
+    },
+    "hitl": {
+      "title": "Human-in-the-loop",
+      "approvalTitle": "Approval",
+      "defaultReviewer": "Global default reviewer",
+      "defaultReviewerHint": "Used when no conversation is selected and for new conversations; the chat sidebar can still override it.",
+      "auditModelTitle": "Audit Agent model",
+      "auditModelReuseMain": "Follow main model config",
+      "auditModelBaseUrlPlaceholder": "Leave blank to reuse the main Base URL",
+      "auditModelApiKeyPlaceholder": "Leave blank to reuse the main API Key",
+      "auditModelName": "Approval model",
+      "auditModelNamePlaceholder": "Leave blank to reuse the main model; a small model is recommended",
+      "auditModelHint": "Used only for Audit Agent approvals; manual approval does not call a model.",
+      "testAuditModel": "Test audit model",
+      "retentionDays": "Resolved audit log retention days",
+      "retentionDaysHint": "0 keeps logs forever; blank uses the 90-day default.",
+      "toolWhitelist": "No-approval tool whitelist",
+      "toolWhitelistPlaceholder": "read_file, list_dir, glob",
+      "toolWhitelistHint": "One per line or comma-separated; whitelisted tools skip human-in-the-loop approval.",
+      "auditAgentTitle": "Audit Agent strategy",
+      "auditPromptApproval": "Approval-mode prompt",
+      "auditPromptHint": "Leave blank to use the backend default strategy.",
+      "auditPromptReviewEdit": "Review-edit-mode prompt",
+      "auditPromptReviewEditHint": "Review-edit mode can approve with narrowed editedArguments."
     },
     "knowledge": {
       "title": "Knowledge base"
