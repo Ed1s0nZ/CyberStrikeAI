@@ -108,6 +108,12 @@ agent:
 hitl:
   # 全局默认审批方：human=人工审批，audit_agent=审计 Agent；未选会话时切换会写入本项，重启后仍生效
   default_reviewer: human
+  # 审计 Agent 专用模型；字段留空则复用上方 openai 配置。建议 model 填小模型，用于降低审批成本。
+  audit_model:
+    provider: "" # openai / claude；留空跟随 openai.provider
+    base_url: "" # 留空跟随 openai.base_url
+    api_key: "" # 留空跟随 openai.api_key
+    model: "" # 留空跟随 openai.model，例如可填 gpt-4o-mini / qwen-turbo / deepseek-chat
   # 已决策审计日志保留天数（与 MCP 监控一致；省略默认 90；0 表示不自动清理）
   retention_days: 90
   # 按你环境里的真实工具名增删（与侧栏一致、小写不敏感）；不需要全局免审批可改为 []
@@ -396,7 +402,6 @@ agents_dir: agents
 # 系统会从该目录加载所有 .yaml 格式的角色配置文件
 # 每个角色应创建独立的配置文件，例如：roles/CTF.yaml, roles/默认.yaml 等
 roles_dir: roles # 角色配置文件目录（相对于配置文件所在目录）
-
 # ============================================
 # 项目管理与事实黑板
 # ============================================
@@ -405,7 +410,6 @@ project:
   # default_project_id: "" # 可选：机器人/批量任务创建对话时的默认项目 ID
   fact_index_max_runes: 65000
   # 事实关系速览段预算（从索引总预算中预留）
-  fact_index_path_max_runes: 10000 
+  fact_index_path_max_runes: 10000
   fact_summary_max_runes: 24000
   default_inject_deprecated: false
-
