@@ -213,9 +213,13 @@ func (idx *Indexer) HasIndex() (bool, error) {
 	return count > 0, nil
 }
 
-// RebuildIndex 重建所有索引
-func (idx *Indexer) RebuildIndex(ctx context.Context) error {
+func (idx *Indexer) beginIndexRun() error {
 	idx.rebuildMu.Lock()
+	defer idx.rebuildMu.Unlock()
+
+	if idx.isRebuilding {
+		return fmt.Errorf("索引任务已在进行中")
+	}
 	idx.isRebuilding = true
 	idx.rebuildTotalItems = 0
 	idx.rebuildCurrent = 0
@@ -223,19 +227,39 @@ func (idx *Indexer) RebuildIndex(ctx context.Context) error {
 	idx.rebuildStartTime = time.Now()
 	idx.rebuildLastItemID = ""
 	idx.rebuildLastChunks = 0
-	idx.rebuildMu.Unlock()
+	return nil
+}
 
+func (idx *Indexer) finishIndexRun() {
+	idx.rebuildMu.Lock()
+	idx.isRebuilding = false
+	idx.rebuildMu.Unlock()
+}
+
+func (idx *Indexer) resetLastError() {
 	idx.mu.Lock()
 	idx.lastError = ""
 	idx.lastErrorTime = time.Time{}
 	idx.errorCount = 0
 	idx.mu.Unlock()
+}
 
-	rows, err := idx.db.Query("SELECT id FROM knowledge_base_items")
+func (idx *Indexer) setIndexRunTotal(total int) {
+	idx.rebuildMu.Lock()
+	idx.rebuildTotalItems = total
+	idx.rebuildMu.Unlock()
+}
+
+// RebuildIndex 重建所有索引
+func (idx *Indexer) RebuildIndex(ctx context.Context) error {
+	if err := idx.beginIndexRun(); err != nil {
+		return err
+	}
+	defer idx.finishIndexRun()
+	idx.resetLastError()
+
+	rows, err := idx.db.QueryContext(ctx, "SELECT id FROM knowledge_base_items ORDER BY updated_at ASC, id ASC")
 	if err != nil {
-		idx.rebuildMu.Lock()
-		idx.isRebuilding = false
-		idx.rebuildMu.Unlock()
 		return fmt.Errorf("查询知识项失败：%w", err)
 	}
 	defer rows.Close()
@@ -244,20 +268,61 @@ func (idx *Indexer) RebuildIndex(ctx context.Context) error {
 	for rows.Next() {
 		var id string
 		if err := rows.Scan(&id); err != nil {
-			idx.rebuildMu.Lock()
-			idx.isRebuilding = false
-			idx.rebuildMu.Unlock()
 			return fmt.Errorf("扫描知识项 ID 失败：%w", err)
 		}
 		itemIDs = append(itemIDs, id)
 	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("扫描知识项 ID 失败：%w", err)
+	}
 
-	idx.rebuildMu.Lock()
-	idx.rebuildTotalItems = len(itemIDs)
-	idx.rebuildMu.Unlock()
+	idx.setIndexRunTotal(len(itemIDs))
 
 	idx.logger.Info("开始重建索引", zap.Int("totalItems", len(itemIDs)))
 
+	return idx.indexItemIDs(ctx, itemIDs, "索引重建完成")
+}
+
+// IndexMissing 只为还没有向量的知识项补齐索引，适合中断后续跑。
+func (idx *Indexer) IndexMissing(ctx context.Context) error {
+	if err := idx.beginIndexRun(); err != nil {
+		return err
+	}
+	defer idx.finishIndexRun()
+	idx.resetLastError()
+
+	rows, err := idx.db.QueryContext(ctx, `
+		SELECT i.id
+		FROM knowledge_base_items i
+		LEFT JOIN knowledge_embeddings e ON e.item_id = i.id
+		WHERE e.item_id IS NULL
+		ORDER BY i.updated_at ASC, i.id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("查询未索引知识项失败：%w", err)
+	}
+	defer rows.Close()
+
+	var itemIDs []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return fmt.Errorf("扫描未索引知识项 ID 失败：%w", err)
+		}
+		itemIDs = append(itemIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("扫描未索引知识项 ID 失败：%w", err)
+	}
+
+	idx.setIndexRunTotal(len(itemIDs))
+
+	idx.logger.Info("开始补齐缺失索引", zap.Int("totalItems", len(itemIDs)))
+
+	return idx.indexItemIDs(ctx, itemIDs, "缺失索引补齐完成")
+}
+
+func (idx *Indexer) indexItemIDs(ctx context.Context, itemIDs []string, doneMessage string) error {
 	failedCount := 0
 	consecutiveFailures := 0
 	maxConsecutiveFailures := 5
@@ -329,11 +394,7 @@ func (idx *Indexer) RebuildIndex(ctx context.Context) error {
 		}
 	}
 
-	idx.rebuildMu.Lock()
-	idx.isRebuilding = false
-	idx.rebuildMu.Unlock()
-
-	idx.logger.Info("索引重建完成", zap.Int("totalItems", len(itemIDs)), zap.Int("failedCount", failedCount))
+	idx.logger.Info(doneMessage, zap.Int("totalItems", len(itemIDs)), zap.Int("failedCount", failedCount))
 	return nil
 }
 

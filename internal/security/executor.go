@@ -407,6 +407,18 @@ func (e *Executor) buildCommandArgs(toolName string, toolConfig *config.ToolConf
 				}
 			}
 
+			formattedValue := e.formatParamValue(param, value)
+			if strings.TrimSpace(formattedValue) == "" {
+				if param.Required {
+					e.logger.Warn("必需参数为空",
+						zap.String("tool", toolName),
+						zap.String("param", param.Name),
+					)
+					return []string{}
+				}
+				continue
+			}
+
 			format := param.Format
 			if format == "" {
 				format = "flag" // 默认格式
@@ -418,23 +430,20 @@ func (e *Executor) buildCommandArgs(toolName string, toolConfig *config.ToolConf
 				if param.Flag != "" {
 					cmdArgs = append(cmdArgs, param.Flag)
 				}
-				formattedValue := e.formatParamValue(param, value)
-				if formattedValue != "" {
-					cmdArgs = append(cmdArgs, formattedValue)
-				}
+				cmdArgs = append(cmdArgs, formattedValue)
 			case "combined":
 				// --flag=value 或 -f=value
 				if param.Flag != "" {
-					cmdArgs = append(cmdArgs, fmt.Sprintf("%s=%s", param.Flag, e.formatParamValue(param, value)))
+					cmdArgs = append(cmdArgs, fmt.Sprintf("%s=%s", param.Flag, formattedValue))
 				} else {
-					cmdArgs = append(cmdArgs, e.formatParamValue(param, value))
+					cmdArgs = append(cmdArgs, formattedValue)
 				}
 			case "template":
 				// 使用模板字符串
 				if param.Template != "" {
 					template := param.Template
 					template = strings.ReplaceAll(template, "{flag}", param.Flag)
-					template = strings.ReplaceAll(template, "{value}", e.formatParamValue(param, value))
+					template = strings.ReplaceAll(template, "{value}", formattedValue)
 					template = strings.ReplaceAll(template, "{name}", param.Name)
 					cmdArgs = append(cmdArgs, strings.Fields(template)...)
 				} else {
@@ -442,14 +451,14 @@ func (e *Executor) buildCommandArgs(toolName string, toolConfig *config.ToolConf
 					if param.Flag != "" {
 						cmdArgs = append(cmdArgs, param.Flag)
 					}
-					cmdArgs = append(cmdArgs, e.formatParamValue(param, value))
+					cmdArgs = append(cmdArgs, formattedValue)
 				}
 			case "positional":
 				// 位置参数（已在上面处理）
-				cmdArgs = append(cmdArgs, e.formatParamValue(param, value))
+				cmdArgs = append(cmdArgs, formattedValue)
 			default:
 				// 默认：直接添加值
-				cmdArgs = append(cmdArgs, e.formatParamValue(param, value))
+				cmdArgs = append(cmdArgs, formattedValue)
 			}
 		}
 
