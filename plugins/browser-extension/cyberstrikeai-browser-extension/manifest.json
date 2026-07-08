@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "CyberStrikeAI",
+  "version": "0.3.5",
+  "description": "Capture browser HTTP traffic and send to CyberStrikeAI for AI-assisted security testing.",
+  "devtools_page": "devtools.html",
+  "permissions": ["storage"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "CyberStrikeAI"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

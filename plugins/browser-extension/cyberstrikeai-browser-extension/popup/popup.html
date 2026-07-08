@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="popup-header">
+    <img src="../icons/icon48.png" alt="CyberStrikeAI" width="40" height="40">
+    <div>
+      <h1>CyberStrikeAI</h1>
+      <p class="version" id="version"></p>
+    </div>
+  </header>
+
+  <div id="conn-status" class="conn-status conn-status--idle">加载中…</div>
+
+  <p class="hint">主工作区在 DevTools 面板：按 <strong>F12</strong> → <strong>CyberStrikeAI</strong></p>
+
+  <ul class="tips">
+    <li>连接配置与 Validate 请在 DevTools 面板完成</li>
+    <li>默认只捕获 XHR/Fetch</li>
+    <li>Test History 可回看多次发送</li>
+    <li><strong>Latest XHR</strong> 快速发送最近 API 请求</li>
+  </ul>
+
+  <script src="../lib/constants.js"></script>
+  <script src="../lib/storage.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

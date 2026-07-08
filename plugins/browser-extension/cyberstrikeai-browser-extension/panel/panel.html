@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CyberStrikeAI</title>
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <div id="ctx-banner" class="ctx-banner hidden" role="alert">
+    扩展已更新或上下文失效，请关闭 DevTools 后重新打开（F12 → CyberStrikeAI 面板）。
+  </div>
+  <header class="toolbar" id="toolbar">
+    <div class="toolbar-row toolbar-row--conn">
+      <div class="brand">
+        <img src="../icons/icon48.png" alt="" width="24" height="24" class="brand-logo">
+        <span class="brand-name">CyberStrikeAI</span>
+      </div>
+      <span id="conn-summary" class="conn-summary"></span>
+      <button id="btn-conn-toggle" type="button" class="btn btn--ghost" aria-expanded="false">连接设置</button>
+      <span id="status" class="status">Not validated</span>
+    </div>
+    <div id="conn-details" class="conn-details">
+      <div class="conn-group">
+        <label class="field">
+          <span class="field-label">Host</span>
+          <input id="host" type="text" size="12" spellcheck="false">
+        </label>
+        <label class="field field--sm">
+          <span class="field-label">Port</span>
+          <input id="port" type="text" size="5" spellcheck="false">
+        </label>
+        <label class="toggle-pill">
+          <input id="https" type="checkbox">
+          <span>HTTPS</span>
+        </label>
+        <label class="field">
+          <span class="field-label">Password</span>
+          <input id="password" type="password" size="10" autocomplete="off">
+        </label>
+        <button id="btn-validate" type="button" class="btn btn--ghost">Validate</button>
+      </div>
+    </div>
+    <div class="toolbar-row toolbar-row--bottom">
+      <div class="action-group">
+        <button id="btn-send" type="button" class="btn btn--primary" disabled>Send</button>
+        <button id="btn-latest-xhr" type="button" class="btn btn--secondary" disabled>Latest XHR</button>
+        <button id="btn-stop" type="button" class="btn btn--danger">Stop</button>
+        <span class="action-divider"></span>
+        <button id="btn-copy" type="button" class="btn btn--ghost">Copy</button>
+        <button id="btn-clear" type="button" class="btn btn--ghost">Clear Output</button>
+        <span class="action-divider"></span>
+        <button id="btn-capture-toggle" type="button" class="btn btn--capture-on" aria-pressed="true">● 捕获中</button>
+      </div>
+      <div class="option-group">
+        <label class="toggle-pill"><input id="filter-api" type="checkbox" checked><span>XHR/Fetch only</span></label>
+        <label class="toggle-pill"><input id="debug-events" type="checkbox"><span>Debug events</span></label>
+        <label class="toggle-pill"><input id="render-md" type="checkbox" checked><span>Markdown</span></label>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-head">
+          <strong>Test History</strong>
+          <button id="btn-clear-runs" type="button" class="link-btn">Clear All</button>
+        </div>
+        <ul id="run-list" class="run-list"></ul>
+      </div>
+      <div class="sidebar-section grow">
+        <div class="sidebar-head">
+          <strong>Captured Requests</strong>
+          <span id="capture-paused-hint" class="capture-paused-hint hidden">已暂停</span>
+          <button id="btn-clear-captures" type="button" class="link-btn">Clear</button>
+        </div>
+        <div class="search-wrap">
+          <input id="search" type="search" placeholder="Search URL…">
+        </div>
+        <ul id="request-list" class="request-list"></ul>
+      </div>
+    </aside>
+
+    <section class="main">
+      <div class="tabs">
+        <button class="tab active" data-tab="output">Output</button>
+        <button class="tab" data-tab="request">Request</button>
+        <button class="tab" data-tab="response">Response</button>
+      </div>
+      <div id="tab-output" class="tab-panel active">
+        <div class="split">
+          <div class="pane">
+            <div class="pane-title">Progress</div>
+            <pre id="progress" class="log"></pre>
+          </div>
+          <div class="pane grow">
+            <div class="pane-title">Final Response</div>
+            <pre id="final-raw" class="log"></pre>
+            <iframe id="final-md" class="log md-frame hidden" sandbox=""></iframe>
+          </div>
+        </div>
+      </div>
+      <div id="tab-request" class="tab-panel hidden">
+        <pre id="view-request" class="log full"></pre>
+      </div>
+      <div id="tab-response" class="tab-panel hidden">
+        <pre id="view-response" class="log full"></pre>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="send-dialog">
+    <form method="dialog" id="send-form">
+      <div class="dialog-header">
+        <img src="../icons/icon48.png" alt="" width="32" height="32" class="dialog-logo">
+        <h3>发送到 CyberStrikeAI</h3>
+      </div>
+      <div class="send-row">
+        <label class="field block">项目 <select id="dlg-project"></select></label>
+        <label class="field block">角色 <select id="dlg-role"></select></label>
+        <label class="field block">对话 <select id="dlg-agent"></select></label>
+      </div>
+      <label class="field block">测试指令（可针对当前流量修改）
+        <textarea id="dlg-instruction" rows="6"></textarea>
+      </label>
+      <div class="dialog-actions">
+        <button type="button" id="dlg-cancel" class="btn btn--ghost">取消</button>
+        <button type="submit" value="ok" class="btn btn--primary">确定</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="../lib/constants.js"></script>
+  <script src="../lib/storage.js"></script>
+  <script src="../lib/http-normalize.js"></script>
+  <script src="../lib/formatter.js"></script>
+  <script src="../lib/markdown.js"></script>
+  <script src="../lib/api.js"></script>
+  <script src="../lib/catalog-cache.js"></script>
+  <script src="panel.js"></script>
+</body>
+</html>
