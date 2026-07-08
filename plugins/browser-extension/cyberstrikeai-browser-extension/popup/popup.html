@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <link rel="stylesheet" href="popup.css">
@@ -13,19 +13,21 @@
     </div>
   </header>
 
-  <div id="conn-status" class="conn-status conn-status--idle">加载中…</div>
+  <div id="conn-status" class="conn-status conn-status--idle">Loading…</div>
 
-  <p class="hint">主工作区在 DevTools 面板：按 <strong>F12</strong> → <strong>CyberStrikeAI</strong></p>
+  <p class="hint">Main workspace is in DevTools: press <strong>F12</strong> → <strong>CyberStrikeAI</strong></p>
 
   <ul class="tips">
-    <li>连接配置与 Validate 请在 DevTools 面板完成</li>
-    <li>默认只捕获 XHR/Fetch</li>
-    <li>Test History 可回看多次发送</li>
-    <li><strong>Latest XHR</strong> 快速发送最近 API 请求</li>
+    <li>Connection and Validate are in the DevTools panel</li>
+    <li>Captures XHR/Fetch by default</li>
+    <li>Test History stores recent sends</li>
+    <li><strong>Latest XHR</strong> sends the most recent API request</li>
   </ul>
 
   <script src="../lib/constants.js"></script>
+  <script src="../lib/auth-session.js"></script>
   <script src="../lib/storage.js"></script>
+  <script src="../lib/api.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

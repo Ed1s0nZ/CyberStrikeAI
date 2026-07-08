@@ -12,17 +12,37 @@ async function renderPopup() {
   try {
     const cfg = await loadConfig();
     const endpoint = baseUrlFrom(cfg);
-    if (cfg.token) {
-      statusEl.className = 'conn-status conn-status--ok';
-      statusEl.textContent = `已连接 ${endpoint}`;
-    } else {
+    if (!cfg.token) {
       statusEl.className = 'conn-status conn-status--idle';
-      statusEl.textContent = `未验证 · 目标 ${endpoint}`;
+      statusEl.textContent = `Not validated · ${endpoint}`;
+      return;
+    }
+    if (isTokenExpiredByTime(cfg.tokenExpiresAt)) {
+      statusEl.className = 'conn-status conn-status--idle';
+      statusEl.textContent = `Session expired · ${endpoint}`;
+      return;
+    }
+
+    try {
+      await validateTokenSession(endpoint, cfg.token);
+      statusEl.className = 'conn-status conn-status--ok';
+      statusEl.textContent = `${formatTokenExpiryHint(cfg.tokenExpiresAt)} · ${endpoint}`;
+    } catch (err) {
+      if (isAuthHttpStatus(err.status)) {
+        statusEl.className = 'conn-status conn-status--idle';
+        statusEl.textContent = `Server restarted or token invalid · ${endpoint}`;
+      } else if (isNetworkFetchError(err)) {
+        statusEl.className = 'conn-status conn-status--idle';
+        statusEl.textContent = `Cannot reach server · ${endpoint}`;
+      } else {
+        statusEl.className = 'conn-status conn-status--idle';
+        statusEl.textContent = `Validation failed · ${endpoint}`;
+      }
     }
   } catch (_) {
     statusEl.className = 'conn-status conn-status--idle';
-    statusEl.textContent = '无法读取配置';
+    statusEl.textContent = 'Cannot read config';
   }
 }
 
-renderPopup();
+renderPopup().catch(() => {});

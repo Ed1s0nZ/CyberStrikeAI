@@ -27,42 +27,118 @@ const DEFAULTS = {
   showDebugEvents: false,
 };
 
+function extensionContextAlive() {
+  try {
+    return !!(typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id);
+  } catch (_) {
+    return false;
+  }
+}
+
+function extensionContextError() {
+  const err = new Error('Extension context invalidated');
+  err.name = 'ExtensionContextError';
+  err.contextInvalidated = true;
+  return err;
+}
+
+function isExtensionContextError(err) {
+  if (!err) return false;
+  if (err.contextInvalidated || err.name === 'ExtensionContextError') return true;
+  return /extension context invalidated/i.test(String(err.message || err));
+}
+
+function normalizeStorageError(err) {
+  if (isExtensionContextError(err)) return extensionContextError();
+  return err instanceof Error ? err : new Error(String(err));
+}
+
+function rejectLastError(reject) {
+  const msg = chrome.runtime.lastError && chrome.runtime.lastError.message;
+  if (!msg) return false;
+  reject(/invalidated/i.test(msg) ? extensionContextError() : new Error(msg));
+  return true;
+}
+
 function localGet(keys) {
-  return new Promise((resolve) => chrome.storage.local.get(keys, resolve));
+  return new Promise((resolve, reject) => {
+    try {
+      if (!extensionContextAlive()) {
+        reject(extensionContextError());
+        return;
+      }
+      chrome.storage.local.get(keys, (data) => {
+        if (rejectLastError(reject)) return;
+        resolve(data);
+      });
+    } catch (err) {
+      reject(normalizeStorageError(err));
+    }
+  });
 }
 
 function localSet(obj) {
-  return new Promise((resolve) => chrome.storage.local.set(obj, resolve));
+  return new Promise((resolve, reject) => {
+    try {
+      if (!extensionContextAlive()) {
+        reject(extensionContextError());
+        return;
+      }
+      chrome.storage.local.set(obj, () => {
+        if (rejectLastError(reject)) return;
+        resolve();
+      });
+    } catch (err) {
+      reject(normalizeStorageError(err));
+    }
+  });
 }
 
 function sessionGet(keys) {
-  return new Promise((resolve) => {
-    if (!chrome.storage.session) {
-      chrome.storage.local.get(keys, resolve);
-      return;
+  return new Promise((resolve, reject) => {
+    try {
+      if (!extensionContextAlive()) {
+        reject(extensionContextError());
+        return;
+      }
+      const store = chrome.storage.session || chrome.storage.local;
+      store.get(keys, (data) => {
+        if (rejectLastError(reject)) return;
+        resolve(data);
+      });
+    } catch (err) {
+      reject(normalizeStorageError(err));
     }
-    chrome.storage.session.get(keys, resolve);
   });
 }
 
 function sessionSet(obj) {
-  return new Promise((resolve) => {
-    if (!chrome.storage.session) {
-      chrome.storage.local.set(obj, resolve);
-      return;
+  return new Promise((resolve, reject) => {
+    try {
+      if (!extensionContextAlive()) {
+        reject(extensionContextError());
+        return;
+      }
+      const store = chrome.storage.session || chrome.storage.local;
+      store.set(obj, () => {
+        if (rejectLastError(reject)) return;
+        resolve();
+      });
+    } catch (err) {
+      reject(normalizeStorageError(err));
     }
-    chrome.storage.session.set(obj, resolve);
   });
 }
 
 async function loadConfig() {
   const data = await localGet(Object.values(STORAGE_KEYS));
-  const sess = await sessionGet([SESSION_TOKEN_KEY]);
+  const sess = await sessionGet([SESSION_TOKEN_KEY, SESSION_TOKEN_EXPIRY_KEY]);
   return {
     host: data[STORAGE_KEYS.host] || DEFAULTS.host,
     port: data[STORAGE_KEYS.port] || DEFAULTS.port,
     https: data[STORAGE_KEYS.https] !== false,
     token: sess[SESSION_TOKEN_KEY] || '',
+    tokenExpiresAt: sess[SESSION_TOKEN_EXPIRY_KEY] || '',
     lastProjectId: data[STORAGE_KEYS.lastProjectId] || '',
     lastRole: data[STORAGE_KEYS.lastRole] || '',
     lastAgentMode: data[STORAGE_KEYS.lastAgentMode] || 'eino_single',
@@ -88,7 +164,10 @@ async function saveConfig(partial) {
   if (partial.renderMarkdown != null) localMap[STORAGE_KEYS.renderMarkdown] = partial.renderMarkdown;
   if (partial.showDebugEvents != null) localMap[STORAGE_KEYS.showDebugEvents] = partial.showDebugEvents;
   if (Object.keys(localMap).length) await localSet(localMap);
-  if (partial.token != null) await sessionSet({ [SESSION_TOKEN_KEY]: partial.token });
+  const sessionMap = {};
+  if (partial.token != null) sessionMap[SESSION_TOKEN_KEY] = partial.token;
+  if (partial.tokenExpiresAt != null) sessionMap[SESSION_TOKEN_EXPIRY_KEY] = partial.tokenExpiresAt;
+  if (Object.keys(sessionMap).length) await sessionSet(sessionMap);
 }
 
 function baseUrlFrom(cfg) {
@@ -98,6 +177,7 @@ function baseUrlFrom(cfg) {
 
 /** Request optional host permission for the configured CyberStrikeAI origin. */
 async function ensureHostPermission(baseUrl) {
+  if (!extensionContextAlive()) throw extensionContextError();
   if (!chrome.permissions || !chrome.permissions.request) return;
   let origin;
   try {
@@ -109,6 +189,6 @@ async function ensureHostPermission(baseUrl) {
   if (has) return;
   const granted = await chrome.permissions.request({ origins: [origin] });
   if (!granted) {
-    throw new Error('需要授权访问 CyberStrikeAI 服务器地址');
+    throw new Error('Permission required to access the CyberStrikeAI server');
   }
 }

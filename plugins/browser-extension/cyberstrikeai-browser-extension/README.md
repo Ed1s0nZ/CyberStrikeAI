@@ -1,6 +1,6 @@
 ## CyberStrikeAI Browser Extension
 
-**Version 0.3.5** — Full docs: **README.zh-CN.md**
+**Version 0.3.8** — Full docs: **README.zh-CN.md**
 
 Chromium DevTools extension: capture Network traffic and send it to CyberStrikeAI for AI-assisted security testing. Aligned with the Burp Suite plugin.
 
@@ -28,7 +28,7 @@ Chromium DevTools extension: capture Network traffic and send it to CyberStrikeA
 - **Deferred Markdown** — plain text while streaming; render after done; skip above 100KB
 - **Stop** — abort local stream + server cancel via `conversationId`
 - **Latest XHR**, **Copy**, project/role/agent send dialog
-- Session token + optional host permissions
+- Session token with **expires_at** tracking, 30s server probe, restart/unreachable detection
 
 ### Data limits (no unbounded growth)
 

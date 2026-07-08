@@ -11,7 +11,7 @@ Optional integrations that connect CyberStrikeAI with other tools.
 ### Browser (Chrome / Edge)
 
 - **Path**: `plugins/browser-extension/cyberstrikeai-browser-extension/`
-- **Version**: **0.3.5**
+- **Version**: **0.3.8**
 - **Install**: `chrome://extensions/` → Load unpacked → F12 → **CyberStrikeAI** tab
 - **Package**: `bash package.sh` → `dist/cyberstrikeai-browser-extension.zip`
 - **Docs**: `README.zh-CN.md` (full) / `README.md` (summary)
@@ -20,6 +20,7 @@ Optional integrations that connect CyberStrikeAI with other tools.
 
 | Feature | Description |
 |---------|-------------|
+| Token expiry | Remaining time + 30s validate probe; detects server restart / unreachable |
 | Capture pause | **● Capturing** / **○ Paused** — stop recording without closing DevTools |
 | HTTP/1.1 display | Raw HAR in memory; UI + AI prompt normalized (no `:method` pseudo-headers) |
 | Collapsible conn bar | Host/Port/Validate collapses after success |

@@ -1,6 +1,6 @@
 ## CyberStrikeAI 浏览器扩展
 
-**当前版本：0.3.5**
+**当前版本：0.3.8**（UI 为英文；中文说明见下文）
 
 Chrome / Edge（Chromium）DevTools 扩展：在开发者工具中捕获 **Network** 流量，发送到 CyberStrikeAI 进行 AI 辅助安全测试。能力与 Burp Suite 插件对齐，并按生产场景做了性能与体验优化。
 
@@ -81,8 +81,13 @@ Cookie: ...
 #### 安全与权限
 
 - Token 存 **chrome.storage.session**（关浏览器失效）
-- **optional_host_permissions**：Validate 时按需授权 CyberStrikeAI 地址
-- Markdown iframe 使用 `sandbox`
+- 登录后保存 **`expires_at`**，状态栏显示 **剩余时间**（如 `OK · 剩余 11h 30m`）
+- **不会自动续期**：过期后需重新 Validate（需 Password）
+- 本地过期检测（30s）+ 服务端 `/api/auth/validate` 探测（同周期；切回面板时立即探测）
+- 服务不可达时显示 **无法连接服务**；重启后 Token 失效显示 **服务已重启或 Token 已失效**
+- **401/403** 时自动清空 Token 并展开连接栏
+- Send 前主动校验 Token 有效性
+- **optional_host_permissions**：Validate 时按需授权
 
 ---
 
@@ -140,6 +145,12 @@ Cookie: ...
 
 **扩展更新后报错 `chrome.runtime.connect` undefined？**  
 扩展重载后旧 DevTools 面板上下文失效。请：**关闭 DevTools → 重新加载扩展 → 再开 F12**。
+
+**Token 过期会自动刷新吗？**  
+**不会自动续期**（无 refresh token）。插件会保存 `expires_at`、显示剩余时间；每 30s 向服务端校验，切回 DevTools 时立即校验。服务重启后 session 清空，会提示重新 Validate。
+
+**重启服务后状态还显示 OK？**  
+v0.3.7 起每 30s 探测 `/api/auth/validate`；不可达显示黄色警告，Token 失效则清空并展开连接栏。重载扩展后请关闭 DevTools 再开 F12。
 
 **Request 里为什么曾经有 `:authority`、`:method`？**  
 HTTP/2 伪首部。展示与 AI Prompt 已归一化为 HTTP/1.1；原始 HAR 仍保存在内存 entry 中。
@@ -205,8 +216,9 @@ panel/
 popup/
   popup.html / popup.js / popup.css   # 只读状态
 lib/
+  auth-session.js     # Token 过期检测与剩余时间提示
   api.js              # 登录、SSE、项目/角色 API
-  storage.js          # 配置与 session token
+  storage.js          # 配置 + session token + expires_at
   capture.js          # HAR 摘要、静态过滤
   http-normalize.js   # HTTP/2 → HTTP/1.1 展示/Prompt
   formatter.js        # toPrompt 组装

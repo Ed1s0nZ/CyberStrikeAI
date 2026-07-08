@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,7 +8,7 @@
 </head>
 <body>
   <div id="ctx-banner" class="ctx-banner hidden" role="alert">
-    扩展已更新或上下文失效，请关闭 DevTools 后重新打开（F12 → CyberStrikeAI 面板）。
+    Extension updated or context invalidated. Close DevTools and reopen (F12 → CyberStrikeAI panel).
   </div>
   <header class="toolbar" id="toolbar">
     <div class="toolbar-row toolbar-row--conn">
@@ -17,7 +17,7 @@
         <span class="brand-name">CyberStrikeAI</span>
       </div>
       <span id="conn-summary" class="conn-summary"></span>
-      <button id="btn-conn-toggle" type="button" class="btn btn--ghost" aria-expanded="false">连接设置</button>
+      <button id="btn-conn-toggle" type="button" class="btn btn--ghost" aria-expanded="false">Connection</button>
       <span id="status" class="status">Not validated</span>
     </div>
     <div id="conn-details" class="conn-details">
@@ -50,7 +50,7 @@
         <button id="btn-copy" type="button" class="btn btn--ghost">Copy</button>
         <button id="btn-clear" type="button" class="btn btn--ghost">Clear Output</button>
         <span class="action-divider"></span>
-        <button id="btn-capture-toggle" type="button" class="btn btn--capture-on" aria-pressed="true">● 捕获中</button>
+        <button id="btn-capture-toggle" type="button" class="btn btn--capture-on" aria-pressed="true">● Capturing</button>
       </div>
       <div class="option-group">
         <label class="toggle-pill"><input id="filter-api" type="checkbox" checked><span>XHR/Fetch only</span></label>
@@ -72,7 +72,7 @@
       <div class="sidebar-section grow">
         <div class="sidebar-head">
           <strong>Captured Requests</strong>
-          <span id="capture-paused-hint" class="capture-paused-hint hidden">已暂停</span>
+          <span id="capture-paused-hint" class="capture-paused-hint hidden">Paused</span>
           <button id="btn-clear-captures" type="button" class="link-btn">Clear</button>
         </div>
         <div class="search-wrap">
@@ -114,24 +114,25 @@
     <form method="dialog" id="send-form">
       <div class="dialog-header">
         <img src="../icons/icon48.png" alt="" width="32" height="32" class="dialog-logo">
-        <h3>发送到 CyberStrikeAI</h3>
+        <h3>Send to CyberStrikeAI</h3>
       </div>
       <div class="send-row">
-        <label class="field block">项目 <select id="dlg-project"></select></label>
-        <label class="field block">角色 <select id="dlg-role"></select></label>
-        <label class="field block">对话 <select id="dlg-agent"></select></label>
+        <label class="field block">Project <select id="dlg-project"></select></label>
+        <label class="field block">Role <select id="dlg-role"></select></label>
+        <label class="field block">Agent <select id="dlg-agent"></select></label>
       </div>
-      <label class="field block">测试指令（可针对当前流量修改）
+      <label class="field block">Test instruction (editable for this request)
         <textarea id="dlg-instruction" rows="6"></textarea>
       </label>
       <div class="dialog-actions">
-        <button type="button" id="dlg-cancel" class="btn btn--ghost">取消</button>
-        <button type="submit" value="ok" class="btn btn--primary">确定</button>
+        <button type="button" id="dlg-cancel" class="btn btn--ghost">Cancel</button>
+        <button type="submit" value="ok" class="btn btn--primary">OK</button>
       </div>
     </form>
   </dialog>
 
   <script src="../lib/constants.js"></script>
+  <script src="../lib/auth-session.js"></script>
   <script src="../lib/storage.js"></script>
   <script src="../lib/http-normalize.js"></script>
   <script src="../lib/formatter.js"></script>

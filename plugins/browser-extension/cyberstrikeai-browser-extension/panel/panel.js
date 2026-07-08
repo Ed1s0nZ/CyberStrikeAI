@@ -1,7 +1,7 @@
 /* global chrome, loadConfig, saveConfig, baseUrlFrom, ensureHostPermission,
-   loginAndValidate, fetchCatalogCached, invalidateCatalogCache, streamTest,
+   loginAndValidate, validateTokenSession, fetchCatalogCached, invalidateCatalogCache, streamTest,
    cancelByConversationId, extractConversationId, AGENT_MODES, toPrompt,
-   defaultInstruction, markdownToHtml, CSAI_LIMITS */
+   defaultInstruction, markdownToHtml, CSAI_LIMITS, isExtensionContextError */
 
 let config = {};
 let entries = [];
@@ -10,6 +10,7 @@ let selectedEntryId = null;
 let selectedRunId = null;
 let inspectedTabId = null;
 let token = '';
+let tokenExpiresAt = '';
 let bgPort = null;
 let activeAbort = null;
 let activeRunId = null;
@@ -18,6 +19,12 @@ let validating = false;
 let captureEnabled = true;
 let searchDebounceTimer = null;
 let connectRetryTimer = null;
+let tokenCheckTimer = null;
+let probeInFlight = null;
+let lastProbeAt = 0;
+
+const TOKEN_TICK_INTERVAL_MS = 30 * 1000;
+const PROBE_MIN_GAP_MS = 5000;
 let outputFlushScheduled = false;
 let pendingProgressRunId = null;
 let pendingFinalRunId = null;
@@ -32,6 +39,25 @@ function extensionAlive() {
   } catch (_) {
     return false;
   }
+}
+
+function stopOnContextLoss() {
+  if (tokenCheckTimer) {
+    clearInterval(tokenCheckTimer);
+    tokenCheckTimer = null;
+  }
+  if (connectRetryTimer) {
+    clearTimeout(connectRetryTimer);
+    connectRetryTimer = null;
+  }
+  bgPort = null;
+  showContextBanner(true);
+}
+
+function onContextLoss(err) {
+  if (!isExtensionContextError(err)) return false;
+  stopOnContextLoss();
+  return true;
 }
 
 function showContextBanner(show) {
@@ -56,7 +82,7 @@ function setStatus(text, kind) {
   const el = $('status');
   el.textContent = text;
   el.className = 'status' + (kind ? ' status-' + kind : '');
-  updateConnSummary();
+  if (kind !== 'error') updateConnSummary();
 }
 
 function connectionEndpointLabel() {
@@ -73,7 +99,7 @@ function setConnExpanded(expanded) {
   const btn = $('btn-conn-toggle');
   if (btn) {
     btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-    btn.textContent = expanded ? '收起' : '连接设置';
+    btn.textContent = expanded ? 'Collapse' : 'Connection';
   }
 }
 
@@ -81,7 +107,129 @@ function updateConnSummary() {
   const summary = $('conn-summary');
   if (!summary) return;
   summary.textContent = connectionEndpointLabel();
-  summary.classList.toggle('conn-summary--ok', !!token);
+  summary.classList.toggle('conn-summary--ok', !!token && !isTokenExpiredByTime(tokenExpiresAt));
+}
+
+function refreshAuthStatus() {
+  if (!token) {
+    setStatus('Not validated', '');
+    updateConnSummary();
+    return;
+  }
+  if (isTokenExpiredByTime(tokenExpiresAt)) {
+    setStatus('Session expired — please Validate again', 'error');
+    updateConnSummary();
+    return;
+  }
+  const hint = formatTokenExpiryHint(tokenExpiresAt);
+  const kind = tokenExpiresWithin(tokenExpiresAt, TOKEN_WARN_BEFORE_MS) ? 'warn' : 'ok';
+  setStatus(hint, kind);
+}
+
+async function clearAuthSession(message) {
+  token = '';
+  tokenExpiresAt = '';
+  try {
+    await saveConfig({ token: '', tokenExpiresAt: '' });
+  } catch (err) {
+    if (onContextLoss(err)) return;
+    throw err;
+  }
+  invalidateCatalogCache();
+  setStatus(message || 'Not validated', message ? 'error' : '');
+  setConnExpanded(true);
+  updateConnSummary();
+  updateSendButtons();
+}
+
+async function handleAuthFailure(err, fallbackMessage) {
+  if (err && isAuthHttpStatus(err.status)) {
+    await clearAuthSession(fallbackMessage || 'Token invalid or expired — please Validate again');
+    return true;
+  }
+  return false;
+}
+
+async function ensureAuthReady() {
+  if (!token) {
+    setStatus('Validate first', 'warn');
+    setConnExpanded(true);
+    return false;
+  }
+  if (isTokenExpiredByTime(tokenExpiresAt)) {
+    await clearAuthSession('Session expired — please Validate again');
+    return false;
+  }
+  try {
+    await probeTokenOnServer(true);
+    return !!token;
+  } catch (_) {
+    return false;
+  }
+}
+
+function startTokenWatch() {
+  if (tokenCheckTimer) clearInterval(tokenCheckTimer);
+  tokenCheckTimer = setInterval(async () => {
+    if (!extensionAlive()) {
+      stopOnContextLoss();
+      return;
+    }
+    if (!token) return;
+    if (isTokenExpiredByTime(tokenExpiresAt)) {
+      await clearAuthSession('Session expired — please Validate again');
+      return;
+    }
+    await probeTokenOnServer();
+  }, TOKEN_TICK_INTERVAL_MS);
+}
+
+async function probeTokenOnServer(force) {
+  if (!extensionAlive()) {
+    stopOnContextLoss();
+    return;
+  }
+  if (!token || isTokenExpiredByTime(tokenExpiresAt)) return;
+  const now = Date.now();
+  if (!force && now - lastProbeAt < PROBE_MIN_GAP_MS) return;
+  if (probeInFlight) return probeInFlight;
+
+  probeInFlight = (async () => {
+    try {
+      const baseUrl = baseUrlFrom(await loadConfig());
+      await validateTokenSession(baseUrl, token);
+      lastProbeAt = Date.now();
+      refreshAuthStatus();
+    } catch (err) {
+      if (onContextLoss(err)) return;
+      lastProbeAt = Date.now();
+      if (await handleAuthFailure(err, 'Server restarted or token invalid — please Validate again')) {
+        return;
+      }
+      if (isNetworkFetchError(err)) {
+        setStatus('Cannot reach server — confirm CyberStrikeAI is running', 'warn');
+        updateConnSummary();
+        return;
+      }
+      setStatus('Validation failed: ' + err.message, 'warn');
+      updateConnSummary();
+    } finally {
+      probeInFlight = null;
+    }
+  })();
+
+  return probeInFlight;
+}
+
+function setupAuthProbeHooks() {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && token) {
+      probeTokenOnServer(true).catch(() => {});
+    }
+  });
+  window.addEventListener('focus', () => {
+    if (token) probeTokenOnServer(true).catch(() => {});
+  });
 }
 
 function onConnToggle() {
@@ -96,7 +244,7 @@ function updateCaptureToggleUi() {
     btn.classList.toggle('btn--capture-on', captureEnabled);
     btn.classList.toggle('btn--capture-off', !captureEnabled);
     btn.setAttribute('aria-pressed', captureEnabled ? 'true' : 'false');
-    btn.textContent = captureEnabled ? '● 捕获中' : '○ 已暂停';
+    btn.textContent = captureEnabled ? '● Capturing' : '○ Paused';
   }
   const sidebar = $('sidebar');
   if (sidebar) sidebar.classList.toggle('capture-paused', !captureEnabled);
@@ -105,7 +253,12 @@ function updateCaptureToggleUi() {
 }
 
 async function syncCaptureEnabled() {
-  await saveConfig({ captureEnabled });
+  try {
+    await saveConfig({ captureEnabled });
+  } catch (err) {
+    if (onContextLoss(err)) return;
+    throw err;
+  }
   try {
     await runtimeSendMessage({ type: 'set-capture-enabled', enabled: captureEnabled });
   } catch (_) {}
@@ -491,8 +644,14 @@ function setRunConversationId(runId, cid) {
 }
 
 async function initConfig() {
-  config = await loadConfig();
+  try {
+    config = await loadConfig();
+  } catch (err) {
+    if (onContextLoss(err)) return;
+    throw err;
+  }
   token = config.token || '';
+  tokenExpiresAt = config.tokenExpiresAt || '';
   $('host').value = config.host;
   $('port').value = config.port;
   $('https').checked = config.https;
@@ -500,23 +659,36 @@ async function initConfig() {
   captureEnabled = config.captureEnabled !== false;
   $('render-md').checked = config.renderMarkdown;
   $('debug-events').checked = config.showDebugEvents;
-  setStatus(token ? 'OK (token saved, session)' : 'Not validated', token ? 'ok' : '');
+
+  if (token && isTokenExpiredByTime(tokenExpiresAt)) {
+    await clearAuthSession('Session expired — please Validate again');
+  } else {
+    refreshAuthStatus();
+    if (token) {
+      startTokenWatch();
+      probeTokenOnServer().catch(() => {});
+    }
+  }
+
   setConnExpanded(!token);
-  updateConnSummary();
   updateCaptureToggleUi();
   syncCaptureEnabled().catch(() => {});
   updateSendButtons();
 }
 
 async function persistConnection() {
-  await saveConfig({
-    host: $('host').value.trim(),
-    port: $('port').value.trim(),
-    https: $('https').checked,
-    filterApiOnly: $('filter-api').checked,
-    renderMarkdown: $('render-md').checked,
-    showDebugEvents: $('debug-events').checked,
-  });
+  try {
+    await saveConfig({
+      host: $('host').value.trim(),
+      port: $('port').value.trim(),
+      https: $('https').checked,
+      filterApiOnly: $('filter-api').checked,
+      renderMarkdown: $('render-md').checked,
+      showDebugEvents: $('debug-events').checked,
+    });
+  } catch (err) {
+    onContextLoss(err);
+  }
 }
 
 async function onValidate() {
@@ -532,23 +704,37 @@ async function onValidate() {
   $('btn-validate').textContent = 'Cancel';
   setStatus('Validating...', 'pending');
   await persistConnection();
-  config = await loadConfig();
+  try {
+    config = await loadConfig();
+  } catch (err) {
+    if (onContextLoss(err)) return;
+    throw err;
+  }
   const baseUrl = baseUrlFrom(config);
   const password = $('password').value;
   try {
     await ensureHostPermission(baseUrl);
-    token = await loginAndValidate(baseUrl, password, validateAbort.signal);
-    await saveConfig({ token });
+    const auth = await loginAndValidate(baseUrl, password, validateAbort.signal);
+    token = auth.token;
+    tokenExpiresAt = auth.expiresAt || '';
+    await saveConfig({ token, tokenExpiresAt });
     invalidateCatalogCache();
-    setStatus('OK (token saved, session)', 'ok');
+    refreshAuthStatus();
+    startTokenWatch();
     setConnExpanded(false);
     updateSendButtons();
   } catch (err) {
+    if (onContextLoss(err)) return;
     if (err.name === 'AbortError') {
       setStatus('Cancelled', 'warn');
     } else {
       token = '';
-      await saveConfig({ token: '' });
+      tokenExpiresAt = '';
+      try {
+        await saveConfig({ token: '', tokenExpiresAt: '' });
+      } catch (saveErr) {
+        onContextLoss(saveErr);
+      }
       setStatus('Failed: ' + err.message, 'error');
       setConnExpanded(true);
     }
@@ -585,15 +771,16 @@ function fillSelect(sel, items, value) {
 
 async function openSendDialog(entryOverride) {
   const e = entryOverride || selectedEntry();
-  if (!e || !token) return;
+  if (!e) return;
+  if (!(await ensureAuthReady())) return;
   const dlg = $('send-dialog');
   config = await loadConfig();
   const baseUrl = baseUrlFrom(config);
 
   $('dlg-instruction').value = config.lastInstruction || defaultInstruction();
   fillAgentSelect($('dlg-agent'), config.lastAgentMode);
-  $('dlg-project').innerHTML = '<option>加载中...</option>';
-  $('dlg-role').innerHTML = '<option>加载中...</option>';
+  $('dlg-project').innerHTML = '<option>Loading…</option>';
+  $('dlg-role').innerHTML = '<option>Loading…</option>';
   dlg.showModal();
 
   try {
@@ -601,8 +788,12 @@ async function openSendDialog(entryOverride) {
     fillSelect($('dlg-project'), projects, config.lastProjectId);
     fillSelect($('dlg-role'), roles, config.lastRole);
   } catch (err) {
-    fillSelect($('dlg-project'), [{ id: '', label: '(加载失败)' }], '');
-    fillSelect($('dlg-role'), [{ id: '', label: '默认' }], '');
+    if (await handleAuthFailure(err, 'Token invalid or expired — please Validate again')) {
+      dlg.close();
+      return;
+    }
+    fillSelect($('dlg-project'), [{ id: '', label: '(load failed)' }], '');
+    fillSelect($('dlg-role'), [{ id: '', label: 'Default' }], '');
   }
 
   dlg.dataset.entryId = e.id;
@@ -611,22 +802,27 @@ async function openSendDialog(entryOverride) {
 async function onSendConfirmed() {
   const entryId = $('send-dialog').dataset.entryId;
   const e = entries.find((x) => x.id === entryId) || selectedEntry();
-  if (!e || !token) return;
+  if (!e || !(await ensureAuthReady())) return;
 
   const instruction = $('dlg-instruction').value.trim() || defaultInstruction();
   const projectId = $('dlg-project').value || '';
   const role = $('dlg-role').value || '';
   const agentMode = $('dlg-agent').value || 'eino_single';
 
-  await saveConfig({
-    lastInstruction: instruction,
-    lastProjectId: projectId,
-    lastRole: role,
-    lastAgentMode: agentMode,
-  });
+  try {
+    await saveConfig({
+      lastInstruction: instruction,
+      lastProjectId: projectId,
+      lastRole: role,
+      lastAgentMode: agentMode,
+    });
+  } catch (err) {
+    if (onContextLoss(err)) return;
+    throw err;
+  }
 
   const modeLabel = (AGENT_MODES.find((m) => m.id === agentMode) || {}).label || agentMode;
-  const roleLabel = role || '默认';
+  const roleLabel = role || 'Default';
   const run = createRun(e, modeLabel + ' · ' + roleLabel);
   activeRunId = run.id;
   prependRunItem(run);
@@ -665,6 +861,7 @@ async function onSendConfirmed() {
       appendToRun(run.id, 'progress', '\n[info] Local stream stopped.\n');
       setRunStatus(run.id, 'cancelled');
     } else {
+      await handleAuthFailure(err, 'Token invalid or expired — please Validate again');
       appendToRun(run.id, 'progress', '\n[error] ' + err.message + '\n');
       setRunStatus(run.id, 'error');
     }
@@ -677,7 +874,7 @@ function handleStreamEvent(runId, type, message, ev) {
   const debug = $('debug-events').checked;
   switch (type) {
     case 'response_start':
-      appendToRun(runId, 'progress', '\n\n[主回复]\n');
+      appendToRun(runId, 'progress', '\n\n[Main reply]\n');
       break;
     case 'response_delta':
       if (message) appendToRun(runId, 'final', message);
@@ -686,7 +883,7 @@ function handleStreamEvent(runId, type, message, ev) {
       if (message) appendToRun(runId, 'final', message);
       break;
     case 'eino_agent_reply_stream_start':
-      appendToRun(runId, 'progress', '\n\n[子代理回复]\n');
+      appendToRun(runId, 'progress', '\n\n[Sub-agent reply]\n');
       break;
     case 'eino_agent_reply_stream_delta':
       if (message) appendToRun(runId, 'progress', message);
@@ -869,7 +1066,8 @@ async function clearCaptures() {
 }
 
 async function sendLatestXhr() {
-  if (inspectedTabId == null || !token) return;
+  if (inspectedTabId == null) return;
+  if (!(await ensureAuthReady())) return;
   const resp = await runtimeSendMessage({
     type: 'get-latest-api',
     tabId: inspectedTabId,
@@ -941,6 +1139,7 @@ $('send-form').addEventListener('submit', (ev) => {
 $('dlg-cancel').addEventListener('click', () => $('send-dialog').close());
 
 setupTabs();
+setupAuthProbeHooks();
 initConfig().then(() => {
   if (extensionAlive()) connectBackground();
   else showContextBanner(true);

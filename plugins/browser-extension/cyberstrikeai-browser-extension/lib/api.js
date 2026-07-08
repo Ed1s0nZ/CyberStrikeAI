@@ -10,7 +10,14 @@ function agentModeById(id) {
 }
 
 async function apiFetch(baseUrl, path, options = {}) {
-  const res = await fetch(baseUrl + path, options);
+  let res;
+  try {
+    res = await fetch(baseUrl + path, options);
+  } catch (err) {
+    const e = err instanceof Error ? err : new Error(String(err));
+    e.network = true;
+    throw e;
+  }
   const text = await res.text();
   let json = null;
   try {
@@ -19,8 +26,9 @@ async function apiFetch(baseUrl, path, options = {}) {
     json = null;
   }
   if (!res.ok) {
-    const err = (json && json.error) || text || `HTTP ${res.status}`;
-    throw new Error(err);
+    const err = new Error((json && json.error) || text || `HTTP ${res.status}`);
+    err.status = res.status;
+    throw err;
   }
   return json;
 }
@@ -34,12 +42,19 @@ async function loginAndValidate(baseUrl, password, signal) {
   });
   const token = login && login.token;
   if (!token) throw new Error('Login response missing token');
+  await validateTokenSession(baseUrl, token, signal);
+  return {
+    token,
+    expiresAt: (login && login.expires_at) || '',
+  };
+}
+
+async function validateTokenSession(baseUrl, token, signal) {
   await apiFetch(baseUrl, '/api/auth/validate', {
     method: 'GET',
     headers: { Authorization: `Bearer ${token}` },
     signal,
   });
-  return token;
 }
 
 async function fetchProjects(baseUrl, token, signal) {
@@ -48,11 +63,11 @@ async function fetchProjects(baseUrl, token, signal) {
     signal,
   });
   const list = (data && data.projects) || [];
-  const out = [{ id: '', label: '(无)' }];
+  const out = [{ id: '', label: '(none)' }];
   for (const p of list) {
     if (!p.id) continue;
     let label = p.name || p.id;
-    if (p.status === 'archived') label += ' [已归档]';
+    if (p.status === 'archived') label += ' [archived]';
     out.push({ id: p.id, label });
   }
   return out;
@@ -64,7 +79,7 @@ async function fetchRoles(baseUrl, token, signal) {
     signal,
   });
   const list = (data && data.roles) || [];
-  const out = [{ id: '', label: '默认' }];
+  const out = [{ id: '', label: 'Default' }];
   for (const r of list) {
     if (r.enabled === false) continue;
     if (!r.name) continue;
@@ -106,7 +121,9 @@ async function streamTest(baseUrl, token, options, handlers) {
 
   if (!res.ok) {
     const t = await res.text();
-    throw new Error(t || `HTTP ${res.status}`);
+    const err = new Error(t || `HTTP ${res.status}`);
+    err.status = res.status;
+    throw err;
   }
 
   const reader = res.body.getReader();

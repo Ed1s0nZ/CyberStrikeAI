@@ -14,4 +14,4 @@ const CSAI_LIMITS = {
 };
 
 const CSAI_DEFAULT_INSTRUCTION =
-  '针对该流量做web渗透测试，并输出测试结果，要求：只针对该接口流量做测试，切勿拓展其他接口';
+  'Perform web penetration testing on this traffic and output results. Test only this endpoint; do not expand to other APIs.';
