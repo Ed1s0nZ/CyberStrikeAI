@@ -318,18 +318,35 @@ func (h *KnowledgeHandler) DeleteItem(c *gin.Context) {
 
 // RebuildIndex 重建索引
 func (h *KnowledgeHandler) RebuildIndex(c *gin.Context) {
-	// 异步重建索引
+	if isRebuilding, _, _, _, _, _, _ := h.indexer.GetRebuildStatus(); isRebuilding {
+		c.JSON(http.StatusConflict, gin.H{"error": "已有索引任务正在进行，请等待完成"})
+		return
+	}
+
+	mode := c.Query("mode")
+	fullRebuild := mode == "full" || c.Query("full") == "true"
+
+	message := "缺失索引补齐已开始，将在后台进行"
 	go func() {
 		ctx := context.Background()
-		if err := h.indexer.RebuildIndex(ctx); err != nil {
-			h.logger.Error("重建索引失败", zap.Error(err))
+		if fullRebuild {
+			if err := h.indexer.RebuildIndex(ctx); err != nil {
+				h.logger.Error("重建索引失败", zap.Error(err))
+			}
+			return
+		}
+		if err := h.indexer.IndexMissing(ctx); err != nil {
+			h.logger.Error("补齐缺失索引失败", zap.Error(err))
 		}
 	}()
+	if fullRebuild {
+		message = "全量索引重建已开始，将在后台进行"
+	}
 
 	if h.audit != nil {
 		h.audit.RecordOK(c, "knowledge", "index_rebuild", "重建知识库索引", "knowledge", "", nil)
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "索引重建已开始，将在后台进行"})
+	c.JSON(http.StatusOK, gin.H{"message": message, "mode": mode})
 }
 
 // ScanKnowledgeBase 扫描知识库
