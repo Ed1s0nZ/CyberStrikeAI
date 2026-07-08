@@ -149,6 +149,11 @@ CyberStrikeAI includes optional integrations under `plugins/`.
 - **Burp Suite extension**: `plugins/burp-suite/cyberstrikeai-burp-extension/`  
   Build output: `plugins/burp-suite/cyberstrikeai-burp-extension/dist/cyberstrikeai-burp-extension.jar`  
   Docs: `plugins/burp-suite/cyberstrikeai-burp-extension/README.md`
+- **Browser extension (Chrome / Edge)**: `plugins/browser-extension/cyberstrikeai-browser-extension/`  
+  Capture Network traffic in DevTools and send it to CyberStrikeAI for AI-assisted security testing—aligned with the Burp plugin.  
+  Install: `chrome://extensions/` → Load unpacked → F12 → **CyberStrikeAI** tab  
+  Package output: `plugins/browser-extension/cyberstrikeai-browser-extension/dist/cyberstrikeai-browser-extension.zip`  
+  Docs: `plugins/browser-extension/cyberstrikeai-browser-extension/README.md` / `README.zh-CN.md`
 
 ## Tool Overview
 

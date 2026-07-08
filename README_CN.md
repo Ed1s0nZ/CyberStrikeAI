@@ -148,6 +148,11 @@ CyberStrikeAI 基于 Go 构建，为 AI 原生安全运营提供完整底座：1
 - **Burp Suite 插件**：`plugins/burp-suite/cyberstrikeai-burp-extension/`  
   构建产物：`plugins/burp-suite/cyberstrikeai-burp-extension/dist/cyberstrikeai-burp-extension.jar`  
   说明文档：`plugins/burp-suite/cyberstrikeai-burp-extension/README.zh-CN.md`
+- **浏览器扩展（Chrome / Edge）**：`plugins/browser-extension/cyberstrikeai-browser-extension/`  
+  在 DevTools 中捕获 Network 流量并发送到 CyberStrikeAI 进行 AI 辅助安全测试，能力与 Burp 插件对齐。  
+  安装：`chrome://extensions/` → 加载已解压 → F12 → **CyberStrikeAI** 标签页  
+  打包产物：`plugins/browser-extension/cyberstrikeai-browser-extension/dist/cyberstrikeai-browser-extension.zip`  
+  说明文档：`plugins/browser-extension/cyberstrikeai-browser-extension/README.zh-CN.md`
 
 ## 工具概览
 
