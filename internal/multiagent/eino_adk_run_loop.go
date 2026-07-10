@@ -200,6 +200,7 @@ func runEinoADKAgentLoop(ctx context.Context, args *einoADKRunLoopArgs, baseMsgs
 	markPendingWithMonitor := func(tc toolCallPendingInfo) {
 		markPending(tc)
 		beginEinoADKFilesystemToolMonitor(
+			ctx,
 			args.FilesystemMonitorAgent,
 			args.FilesystemMonitorRecord,
 			args.MCPExecutionBinder,
@@ -342,7 +343,7 @@ func runEinoADKAgentLoop(ctx context.Context, args *einoADKRunLoopArgs, baseMsgs
 			toolCallID = tid
 		}
 		recordPendingExecuteStdoutDup(toolName, content, isErr)
-		recordEinoADKFilesystemToolMonitor(args.FilesystemMonitorAgent, args.FilesystemMonitorRecord, args.MCPExecutionBinder, toolName, toolCallID, runAccumulatedMsgs, content, isErr)
+		recordEinoADKFilesystemToolMonitor(ctx, args.FilesystemMonitorAgent, args.FilesystemMonitorRecord, args.MCPExecutionBinder, toolName, toolCallID, runAccumulatedMsgs, content, isErr)
 		if args.FilesystemMonitorAgent != nil && args.MCPExecutionBinder != nil {
 			if execID := args.MCPExecutionBinder.ExecutionID(toolCallID); execID != "" {
 				args.FilesystemMonitorAgent.UpdateMCPExecutionDisplayResult(execID, content)

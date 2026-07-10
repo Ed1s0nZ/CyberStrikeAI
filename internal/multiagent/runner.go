@@ -135,7 +135,7 @@ func RunDeepAgent(
 		mcpIDs = append(mcpIDs, id)
 		mcpIDsMu.Unlock()
 	}
-	einoExecBegin, einoExecFinish := newEinoExecuteMonitorCallbacks(ag, recorder)
+	einoExecBegin, einoExecFinish := newEinoExecuteMonitorCallbacks(ctx, ag, recorder)
 
 	// 与单代理流式一致：在 response_start / response_delta 的 data 中带当前 mcpExecutionIds，供主聊天绑定复制与展示。
 	snapshotMCPIDs := func() []string {
@@ -279,6 +279,7 @@ func RunDeepAgent(
 						Tools:               subToolsForCfg,
 						UnknownToolsHandler: einomcp.UnknownToolReminderHandler(),
 						ToolCallMiddlewares: []compose.ToolMiddleware{
+							localToolRBACMiddleware(),
 							hitlToolCallMiddleware(),
 							softRecoveryToolMiddleware(),
 						},
@@ -438,6 +439,7 @@ func RunDeepAgent(
 			Tools:               mainToolsForCfg,
 			UnknownToolsHandler: einomcp.UnknownToolReminderHandler(),
 			ToolCallMiddlewares: []compose.ToolMiddleware{
+				localToolRBACMiddleware(),
 				hitlToolCallMiddleware(),
 				softRecoveryToolMiddleware(),
 			},

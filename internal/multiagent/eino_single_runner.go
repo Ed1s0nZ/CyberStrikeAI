@@ -82,7 +82,7 @@ func RunEinoSingleChatModelAgent(
 	}
 
 	toolInvokeNotify := einomcp.NewToolInvokeNotifyHolder()
-	einoExecBegin, einoExecFinish := newEinoExecuteMonitorCallbacks(ag, recorder)
+	einoExecBegin, einoExecFinish := newEinoExecuteMonitorCallbacks(ctx, ag, recorder)
 	mainDefs := ag.ToolsForRole(roleTools)
 	mainTools, err := einomcp.ToolsFromDefinitions(ag, holder, mainDefs, recorder, nil, toolInvokeNotify, einoSingleAgentName)
 	if err != nil {
@@ -162,6 +162,7 @@ func RunEinoSingleChatModelAgent(
 			Tools:               mainToolsForCfg,
 			UnknownToolsHandler: einomcp.UnknownToolReminderHandler(),
 			ToolCallMiddlewares: []compose.ToolMiddleware{
+				localToolRBACMiddleware(),
 				hitlToolCallMiddleware(),
 				softRecoveryToolMiddleware(),
 			},

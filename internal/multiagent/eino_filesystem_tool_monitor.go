@@ -1,6 +1,7 @@
 package multiagent
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -65,6 +66,7 @@ func toolCallArgsFromAccumulated(msgs []adk.Message, toolCallID, expectToolName 
 
 // beginEinoADKFilesystemToolMonitor 在 Eino ADK filesystem 工具开始调用时写入 running 状态。
 func beginEinoADKFilesystemToolMonitor(
+	ctx context.Context,
 	ag *agent.Agent,
 	rec einomcp.ExecutionRecorder,
 	binder *MCPExecutionBinder,
@@ -85,7 +87,7 @@ func beginEinoADKFilesystemToolMonitor(
 		return
 	}
 	storedName := "eino_fs::" + strings.ToLower(name)
-	id := ag.BeginLocalToolExecution(storedName, map[string]interface{}{})
+	id := ag.BeginLocalToolExecution(ctx, storedName, map[string]interface{}{})
 	if id == "" {
 		return
 	}
@@ -97,6 +99,7 @@ func beginEinoADKFilesystemToolMonitor(
 
 // recordEinoADKFilesystemToolMonitor 将 Eino ADK filesystem 中间件工具结果写入 MCP 监控（与 execute / MCP 桥芯片一致）。
 func recordEinoADKFilesystemToolMonitor(
+	ctx context.Context,
 	ag *agent.Agent,
 	rec einomcp.ExecutionRecorder,
 	binder *MCPExecutionBinder,
@@ -131,7 +134,7 @@ func recordEinoADKFilesystemToolMonitor(
 	if binder != nil {
 		execID = binder.ExecutionID(toolCallID)
 	}
-	id := ag.FinishLocalToolExecution(execID, storedName, args, resultText, invErr)
+	id := ag.FinishLocalToolExecution(ctx, execID, storedName, args, resultText, invErr)
 	if id != "" && execID == "" {
 		rec(id, toolCallID)
 	}
