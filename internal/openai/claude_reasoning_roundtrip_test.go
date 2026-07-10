@@ -106,6 +106,65 @@ func TestConvertOpenAIToClaude_OutputConfigEffort(t *testing.T) {
 	}
 }
 
+func TestConvertOpenAIToClaudeAcceptsCompleteMultiToolBatch(t *testing.T) {
+	payload := map[string]interface{}{
+		"model": "claude-test",
+		"messages": []interface{}{
+			map[string]interface{}{
+				"role": "assistant",
+				"tool_calls": []interface{}{
+					map[string]interface{}{"id": "c1", "function": map[string]interface{}{"name": "one", "arguments": "{}"}},
+					map[string]interface{}{"id": "c2", "function": map[string]interface{}{"name": "two", "arguments": "{}"}},
+				},
+			},
+			map[string]interface{}{"role": "tool", "tool_call_id": "c1", "content": "r1"},
+			map[string]interface{}{"role": "tool", "tool_call_id": "c2", "content": "r2"},
+			map[string]interface{}{"role": "assistant", "content": "done"},
+		},
+	}
+	req, err := convertOpenAIToClaude(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(req.Messages) != 3 || len(req.Messages[1].Content.Blocks) != 2 {
+		t.Fatalf("unexpected converted messages: %+v", req.Messages)
+	}
+}
+
+func TestConvertOpenAIToClaudeRejectsMissingToolResult(t *testing.T) {
+	payload := map[string]interface{}{
+		"model": "claude-test",
+		"messages": []interface{}{
+			map[string]interface{}{
+				"role": "assistant",
+				"tool_calls": []interface{}{
+					map[string]interface{}{"id": "c1", "function": map[string]interface{}{"name": "one", "arguments": "{}"}},
+					map[string]interface{}{"id": "c2", "function": map[string]interface{}{"name": "two", "arguments": "{}"}},
+				},
+			},
+			map[string]interface{}{"role": "tool", "tool_call_id": "c1", "content": "r1"},
+		},
+	}
+	_, err := convertOpenAIToClaude(payload)
+	if err == nil || !strings.Contains(err.Error(), "missing tool_result") {
+		t.Fatalf("expected missing tool_result error, got %v", err)
+	}
+}
+
+func TestConvertOpenAIToClaudeRejectsOrphanToolResult(t *testing.T) {
+	payload := map[string]interface{}{
+		"model": "claude-test",
+		"messages": []interface{}{
+			map[string]interface{}{"role": "user", "content": "start"},
+			map[string]interface{}{"role": "tool", "tool_call_id": "orphan", "content": "result"},
+		},
+	}
+	_, err := convertOpenAIToClaude(payload)
+	if err == nil || !strings.Contains(err.Error(), "orphan tool_result") {
+		t.Fatalf("expected orphan tool_result error, got %v", err)
+	}
+}
+
 func TestClaudeToOpenAIResponseJSON_Thinking(t *testing.T) {
 	claudeBody := []byte(`{
 		"id":"msg_1","type":"message","role":"assistant","model":"x","stop_reason":"end_turn",

@@ -35,11 +35,11 @@ import (
 
 // claudeRequest 表示 Anthropic Messages API 的请求体。
 type claudeRequest struct {
-	Model     string          `json:"model"`
-	MaxTokens int             `json:"max_tokens"`
-	System    string          `json:"system,omitempty"`
-	Messages  []claudeMessage `json:"messages"`
-	Tools     []claudeTool    `json:"tools,omitempty"`
+	Model        string          `json:"model"`
+	MaxTokens    int             `json:"max_tokens"`
+	System       string          `json:"system,omitempty"`
+	Messages     []claudeMessage `json:"messages"`
+	Tools        []claudeTool    `json:"tools,omitempty"`
 	Stream       bool            `json:"stream,omitempty"`
 	Thinking     json.RawMessage `json:"thinking,omitempty"`
 	OutputConfig json.RawMessage `json:"output_config,omitempty"`
@@ -316,8 +316,71 @@ func convertOpenAIToClaude(payload interface{}) (*claudeRequest, error) {
 			req.OutputConfig = json.RawMessage(raw)
 		}
 	}
+	if err := validateClaudeToolPairs(req.Messages); err != nil {
+		return nil, err
+	}
 
 	return req, nil
+}
+
+// validateClaudeToolPairs prevents malformed OpenAI history from reaching
+// Anthropic/Bedrock. Every tool_use batch must be answered by the immediately
+// following user message, with exactly one tool_result for every ID.
+func validateClaudeToolPairs(messages []claudeMessage) error {
+	validatedResultMessages := make(map[int]struct{})
+	for i, msg := range messages {
+		expected := make(map[string]struct{})
+		for _, block := range msg.Content.Blocks {
+			if block.Type != "tool_use" {
+				continue
+			}
+			id := strings.TrimSpace(block.ID)
+			if id == "" {
+				return fmt.Errorf("claude bridge: assistant message %d has tool_use without id", i)
+			}
+			if _, duplicate := expected[id]; duplicate {
+				return fmt.Errorf("claude bridge: assistant message %d has duplicate tool_use id %q", i, id)
+			}
+			expected[id] = struct{}{}
+		}
+		if len(expected) == 0 {
+			continue
+		}
+		if i+1 >= len(messages) || messages[i+1].Role != "user" {
+			return fmt.Errorf("claude bridge: assistant message %d tool_use is not immediately followed by user tool_result", i)
+		}
+		seen := make(map[string]struct{}, len(expected))
+		for _, block := range messages[i+1].Content.Blocks {
+			if block.Type != "tool_result" {
+				continue
+			}
+			id := strings.TrimSpace(block.ToolUseID)
+			if _, ok := expected[id]; !ok {
+				return fmt.Errorf("claude bridge: user message %d has unexpected tool_result id %q", i+1, id)
+			}
+			if _, duplicate := seen[id]; duplicate {
+				return fmt.Errorf("claude bridge: user message %d has duplicate tool_result id %q", i+1, id)
+			}
+			seen[id] = struct{}{}
+		}
+		for id := range expected {
+			if _, ok := seen[id]; !ok {
+				return fmt.Errorf("claude bridge: user message %d is missing tool_result for id %q", i+1, id)
+			}
+		}
+		validatedResultMessages[i+1] = struct{}{}
+	}
+	for i, msg := range messages {
+		if _, ok := validatedResultMessages[i]; ok {
+			continue
+		}
+		for _, block := range msg.Content.Blocks {
+			if block.Type == "tool_result" {
+				return fmt.Errorf("claude bridge: user message %d has orphan tool_result id %q", i, block.ToolUseID)
+			}
+		}
+	}
+	return nil
 }
 
 // ============================================================
