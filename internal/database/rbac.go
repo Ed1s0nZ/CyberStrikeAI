@@ -76,10 +76,14 @@ type RBACResourceOption struct {
 
 // RBACAccess is the resolved authorization profile for one user.
 type RBACAccess struct {
-	User        RBACUser        `json:"user"`
-	Roles       []RBACRole      `json:"roles"`
-	Permissions map[string]bool `json:"permissions"`
-	Scope       string          `json:"scope"`
+	User             RBACUser          `json:"user"`
+	Roles            []RBACRole        `json:"roles"`
+	Permissions      map[string]bool   `json:"permissions"`
+	PermissionScopes map[string]string `json:"permissionScopes,omitempty"`
+	// Scope is retained as the broadest effective scope for UI compatibility.
+	// Authorization decisions must use PermissionScopes so a global read role
+	// cannot widen an unrelated write permission from another role.
+	Scope string `json:"scope"`
 }
 
 func (db *DB) initRBACTables() error {
@@ -133,10 +137,27 @@ func (db *DB) initRBACTables() error {
 			FOREIGN KEY (user_id) REFERENCES rbac_users(id) ON DELETE CASCADE,
 			UNIQUE(user_id, resource_type, resource_id)
 		);`,
+		`CREATE TABLE IF NOT EXISTS chat_upload_artifacts (
+			relative_path TEXT PRIMARY KEY,
+			conversation_id TEXT NOT NULL,
+			owner_user_id TEXT NOT NULL,
+			created_at DATETIME NOT NULL,
+			FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+		);`,
+		`CREATE TABLE IF NOT EXISTS c2_payload_artifacts (
+			filename TEXT PRIMARY KEY,
+			payload_id TEXT NOT NULL,
+			listener_id TEXT NOT NULL,
+			owner_user_id TEXT NOT NULL,
+			created_at DATETIME NOT NULL
+		);`,
 		`CREATE INDEX IF NOT EXISTS idx_rbac_user_roles_user ON rbac_user_roles(user_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_rbac_role_permissions_role ON rbac_role_permissions(role_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_rbac_assignments_user_resource ON rbac_resource_assignments(user_id, resource_type, resource_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_rbac_assignments_resource ON rbac_resource_assignments(resource_type, resource_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_chat_upload_artifacts_conversation ON chat_upload_artifacts(conversation_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_chat_upload_artifacts_owner ON chat_upload_artifacts(owner_user_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_c2_payload_artifacts_listener ON c2_payload_artifacts(listener_id);`,
 	}
 	for _, stmt := range stmts {
 		if _, err := db.Exec(stmt); err != nil {
@@ -158,11 +179,16 @@ func (db *DB) migrateRBACOwnershipColumns() error {
 		{"webshell_connections", "owner_user_id", "ALTER TABLE webshell_connections ADD COLUMN owner_user_id TEXT"},
 		{"batch_task_queues", "owner_user_id", "ALTER TABLE batch_task_queues ADD COLUMN owner_user_id TEXT"},
 		{"c2_listeners", "owner_user_id", "ALTER TABLE c2_listeners ADD COLUMN owner_user_id TEXT"},
+		{"conversation_groups", "owner_user_id", "ALTER TABLE conversation_groups ADD COLUMN owner_user_id TEXT"},
+		{"tool_executions", "owner_user_id", "ALTER TABLE tool_executions ADD COLUMN owner_user_id TEXT"},
+		{"tool_executions", "conversation_id", "ALTER TABLE tool_executions ADD COLUMN conversation_id TEXT"},
 	} {
 		if err := db.addColumnIfMissing(col.table, col.name, col.stmt); err != nil {
 			return err
 		}
 	}
+	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_tool_executions_owner ON tool_executions(owner_user_id)`)
+	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_tool_executions_conversation ON tool_executions(conversation_id)`)
 	return nil
 }
 
@@ -201,6 +227,35 @@ func (db *DB) BootstrapRBAC(adminPasswordHash string, permissions map[string]str
 			return err
 		}
 		if _, err := tx.Exec(`UPDATE rbac_permissions SET description = ? WHERE key = ?`, desc, key); err != nil {
+			return err
+		}
+	}
+	// Remove stale/unknown keys so a permission invented by an older build or
+	// manual database edit cannot become active automatically if a future route
+	// happens to reuse the same name.
+	permissionRows, err := tx.Query(`SELECT key FROM rbac_permissions`)
+	if err != nil {
+		return err
+	}
+	var stalePermissionKeys []string
+	for permissionRows.Next() {
+		var key string
+		if err := permissionRows.Scan(&key); err != nil {
+			_ = permissionRows.Close()
+			return err
+		}
+		if _, known := permissions[key]; !known {
+			stalePermissionKeys = append(stalePermissionKeys, key)
+		}
+	}
+	if err := permissionRows.Close(); err != nil {
+		return err
+	}
+	for _, key := range stalePermissionKeys {
+		if _, err := tx.Exec(`DELETE FROM rbac_role_permissions WHERE permission_key = ?`, key); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`DELETE FROM rbac_permissions WHERE key = ?`, key); err != nil {
 			return err
 		}
 	}
@@ -250,19 +305,43 @@ func (db *DB) BootstrapRBAC(adminPasswordHash string, permissions map[string]str
 
 func grantSystemRolePermissions(tx *sql.Tx, permissions map[string]string) error {
 	now := time.Now()
+	// System roles are immutable and owned by the application. Rebuild their
+	// grants deterministically so policy tightening also removes permissions
+	// seeded by older versions instead of leaving stale INSERT OR IGNORE rows.
+	if _, err := tx.Exec(`DELETE FROM rbac_role_permissions WHERE role_id IN (?, ?, ?, ?)`, RBACSystemRoleAdmin, RBACSystemRoleOperator, RBACSystemRoleAuditor, RBACSystemRoleViewer); err != nil {
+		return err
+	}
 	for key := range permissions {
 		if _, err := tx.Exec(`INSERT OR IGNORE INTO rbac_role_permissions (role_id, permission_key, created_at) VALUES (?, ?, ?)`, RBACSystemRoleAdmin, key, now); err != nil {
 			return err
 		}
 		switch {
-		case strings.HasSuffix(key, ":read"), key == "auth:self":
+		case key == "auth:self":
 			for _, roleID := range []string{RBACSystemRoleOperator, RBACSystemRoleAuditor, RBACSystemRoleViewer} {
 				if _, err := tx.Exec(`INSERT OR IGNORE INTO rbac_role_permissions (role_id, permission_key, created_at) VALUES (?, ?, ?)`, roleID, key, now); err != nil {
 					return err
 				}
 			}
+		case key == "audit:read":
+			if _, err := tx.Exec(`INSERT OR IGNORE INTO rbac_role_permissions (role_id, permission_key, created_at) VALUES (?, ?, ?)`, RBACSystemRoleAuditor, key, now); err != nil {
+				return err
+			}
 		case strings.HasPrefix(key, "rbac:"), strings.HasPrefix(key, "config:"), strings.HasPrefix(key, "terminal:"), strings.HasPrefix(key, "audit:"):
 			continue
+		case key == "mcp:write" || key == "mcp:external:execute":
+			continue
+		case key == "roles:write" || key == "roles:delete" ||
+			key == "skills:write" || key == "skills:delete" ||
+			key == "agents:write" || key == "agents:delete" ||
+			key == "knowledge:write" || key == "knowledge:delete" ||
+			key == "workflow:write" || key == "workflow:delete" || key == "robot:write":
+			continue
+		case strings.HasSuffix(key, ":read"):
+			for _, roleID := range []string{RBACSystemRoleOperator, RBACSystemRoleAuditor, RBACSystemRoleViewer} {
+				if _, err := tx.Exec(`INSERT OR IGNORE INTO rbac_role_permissions (role_id, permission_key, created_at) VALUES (?, ?, ?)`, roleID, key, now); err != nil {
+					return err
+				}
+			}
 		default:
 			if _, err := tx.Exec(`INSERT OR IGNORE INTO rbac_role_permissions (role_id, permission_key, created_at) VALUES (?, ?, ?)`, RBACSystemRoleOperator, key, now); err != nil {
 				return err
@@ -325,7 +404,9 @@ func (db *DB) ResolveRBACAccess(userID string) (*RBACAccess, error) {
 	}
 	defer rows.Close()
 
-	access := &RBACAccess{User: *u, Permissions: map[string]bool{}, Scope: RBACScopeOwn}
+	access := &RBACAccess{
+		User: *u, Permissions: map[string]bool{}, PermissionScopes: map[string]string{}, Scope: RBACScopeOwn,
+	}
 	for rows.Next() {
 		var role RBACRole
 		var isSystem int
@@ -344,9 +425,10 @@ func (db *DB) ResolveRBACAccess(userID string) (*RBACAccess, error) {
 	}
 
 	prows, err := db.Query(`
-		SELECT DISTINCT rp.permission_key
+		SELECT rp.permission_key, r.scope
 		FROM rbac_role_permissions rp
 		JOIN rbac_user_roles ur ON ur.role_id = rp.role_id
+		JOIN rbac_roles r ON r.id = rp.role_id
 		WHERE ur.user_id = ?
 	`, userID)
 	if err != nil {
@@ -354,11 +436,16 @@ func (db *DB) ResolveRBACAccess(userID string) (*RBACAccess, error) {
 	}
 	defer prows.Close()
 	for prows.Next() {
-		var key string
-		if err := prows.Scan(&key); err != nil {
+		var key, scope string
+		if err := prows.Scan(&key, &scope); err != nil {
 			return nil, err
 		}
 		access.Permissions[key] = true
+		if existing, ok := access.PermissionScopes[key]; ok {
+			access.PermissionScopes[key] = mergeRBACScope(existing, scope)
+		} else {
+			access.PermissionScopes[key] = scope
+		}
 	}
 	return access, prows.Err()
 }
@@ -529,6 +616,31 @@ func (db *DB) SetResourceOwner(resourceType, resourceID, userID string) error {
 	}
 	_, err := db.Exec(`UPDATE `+table+` SET owner_user_id = COALESCE(NULLIF(owner_user_id, ''), ?) WHERE id = ?`, userID, resourceID)
 	return err
+}
+
+func (db *DB) GetResourceOwner(resourceType, resourceID string) string {
+	table := ""
+	switch strings.TrimSpace(resourceType) {
+	case "project":
+		table = "projects"
+	case "conversation":
+		table = "conversations"
+	case "vulnerability":
+		table = "vulnerabilities"
+	case "webshell":
+		table = "webshell_connections"
+	case "batch_task":
+		table = "batch_task_queues"
+	case "c2_listener":
+		table = "c2_listeners"
+	default:
+		return ""
+	}
+	var owner sql.NullString
+	if err := db.QueryRow(`SELECT owner_user_id FROM `+table+` WHERE id = ?`, strings.TrimSpace(resourceID)).Scan(&owner); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(owner.String)
 }
 
 func (db *DB) AssignResourceToUser(userID, resourceType, resourceID string) error {
@@ -915,8 +1027,12 @@ func (db *DB) UpsertRBACRole(id, name, description, scope string, permissionKeys
 		if key == "" {
 			continue
 		}
-		if _, err := tx.Exec(`INSERT OR IGNORE INTO rbac_permissions (key, description, created_at) VALUES (?, '', ?)`, key, now); err != nil {
+		var permissionExists int
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM rbac_permissions WHERE key = ?`, key).Scan(&permissionExists); err != nil {
 			return nil, err
+		}
+		if permissionExists == 0 {
+			return nil, fmt.Errorf("unknown permission: %s", key)
 		}
 		if _, err := tx.Exec(`INSERT OR IGNORE INTO rbac_role_permissions (role_id, permission_key, created_at) VALUES (?, ?, ?)`, id, key, now); err != nil {
 			return nil, err

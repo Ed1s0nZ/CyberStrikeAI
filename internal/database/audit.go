@@ -9,25 +9,26 @@ import (
 
 // AuditLog platform operation audit record.
 type AuditLog struct {
-	ID           string                 `json:"id"`
-	CreatedAt    time.Time              `json:"createdAt"`
-	Level        string                 `json:"level"`
-	Category     string                 `json:"category"`
-	Action       string                 `json:"action"`
-	Result       string                 `json:"result"`
-	Actor        string                 `json:"actor"`
-	SessionHint  string                 `json:"sessionHint,omitempty"`
-	ClientIP     string                 `json:"clientIp,omitempty"`
-	UserAgent    string                 `json:"userAgent,omitempty"`
-	ResourceType string                 `json:"resourceType,omitempty"`
-	ResourceID   string                 `json:"resourceId,omitempty"`
-	ResourceAvailable *bool             `json:"resourceAvailable,omitempty"` // API-only: whether linked resource still exists
-	Message      string                 `json:"message"`
-	Detail       map[string]interface{} `json:"detail,omitempty"`
+	ID                string                 `json:"id"`
+	CreatedAt         time.Time              `json:"createdAt"`
+	Level             string                 `json:"level"`
+	Category          string                 `json:"category"`
+	Action            string                 `json:"action"`
+	Result            string                 `json:"result"`
+	Actor             string                 `json:"actor"`
+	SessionHint       string                 `json:"sessionHint,omitempty"`
+	ClientIP          string                 `json:"clientIp,omitempty"`
+	UserAgent         string                 `json:"userAgent,omitempty"`
+	ResourceType      string                 `json:"resourceType,omitempty"`
+	ResourceID        string                 `json:"resourceId,omitempty"`
+	ResourceAvailable *bool                  `json:"resourceAvailable,omitempty"` // API-only: whether linked resource still exists
+	Message           string                 `json:"message"`
+	Detail            map[string]interface{} `json:"detail,omitempty"`
 }
 
 // ListAuditLogsFilter query parameters.
 type ListAuditLogsFilter struct {
+	Actor        string
 	Level        string
 	Category     string
 	Action       string
@@ -44,6 +45,10 @@ type ListAuditLogsFilter struct {
 func buildAuditLogsWhere(filter ListAuditLogsFilter) (string, []interface{}) {
 	conditions := []string{"1=1"}
 	args := []interface{}{}
+	if filter.Actor != "" {
+		conditions = append(conditions, "actor = ?")
+		args = append(args, filter.Actor)
+	}
 	if filter.Level != "" {
 		conditions = append(conditions, "level = ?")
 		args = append(args, filter.Level)

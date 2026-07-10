@@ -10,20 +10,28 @@ import (
 
 // ConversationGroup 对话分组
 type ConversationGroup struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Icon      string    `json:"icon"`
-	Pinned    bool      `json:"pinned"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Icon        string    `json:"icon"`
+	Pinned      bool      `json:"pinned"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+	OwnerUserID string    `json:"-"`
 }
 
 // GroupExistsByName 检查分组名称是否已存在
 func (db *DB) GroupExistsByName(name string, excludeID string) (bool, error) {
+	return db.groupExistsByNameForOwner(name, excludeID, "")
+}
+
+func (db *DB) groupExistsByNameForOwner(name, excludeID, ownerUserID string) (bool, error) {
 	var count int
 	var err error
-
-	if excludeID != "" {
+	if ownerUserID != "" && excludeID != "" {
+		err = db.QueryRow("SELECT COUNT(*) FROM conversation_groups WHERE name = ? AND owner_user_id = ? AND id != ?", name, ownerUserID, excludeID).Scan(&count)
+	} else if ownerUserID != "" {
+		err = db.QueryRow("SELECT COUNT(*) FROM conversation_groups WHERE name = ? AND owner_user_id = ?", name, ownerUserID).Scan(&count)
+	} else if excludeID != "" {
 		err = db.QueryRow(
 			"SELECT COUNT(*) FROM conversation_groups WHERE name = ? AND id != ?",
 			name, excludeID,
@@ -43,9 +51,13 @@ func (db *DB) GroupExistsByName(name string, excludeID string) (bool, error) {
 }
 
 // CreateGroup 创建分组
-func (db *DB) CreateGroup(name, icon string) (*ConversationGroup, error) {
+func (db *DB) CreateGroup(name, icon string, owners ...string) (*ConversationGroup, error) {
+	ownerUserID := ""
+	if len(owners) > 0 {
+		ownerUserID = owners[0]
+	}
 	// 检查名称是否已存在
-	exists, err := db.GroupExistsByName(name, "")
+	exists, err := db.groupExistsByNameForOwner(name, "", ownerUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -61,27 +73,39 @@ func (db *DB) CreateGroup(name, icon string) (*ConversationGroup, error) {
 	}
 
 	_, err = db.Exec(
-		"INSERT INTO conversation_groups (id, name, icon, pinned, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-		id, name, icon, 0, now, now,
+		"INSERT INTO conversation_groups (id, name, icon, pinned, owner_user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		id, name, icon, 0, ownerUserID, now, now,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("创建分组失败: %w", err)
 	}
 
 	return &ConversationGroup{
-		ID:        id,
-		Name:      name,
-		Icon:      icon,
-		Pinned:    false,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:          id,
+		Name:        name,
+		Icon:        icon,
+		Pinned:      false,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+		OwnerUserID: ownerUserID,
 	}, nil
 }
 
 // ListGroups 列出所有分组
 func (db *DB) ListGroups() ([]*ConversationGroup, error) {
+	return db.ListGroupsForAccess("", RBACScopeAll)
+}
+
+func (db *DB) ListGroupsForAccess(userID, scope string) ([]*ConversationGroup, error) {
+	query := "SELECT id, name, icon, COALESCE(pinned, 0), COALESCE(owner_user_id, ''), created_at, updated_at FROM conversation_groups"
+	args := []interface{}{}
+	if scope != RBACScopeAll {
+		query += " WHERE owner_user_id = ?"
+		args = append(args, userID)
+	}
+	query += " ORDER BY COALESCE(pinned, 0) DESC, created_at ASC"
 	rows, err := db.Query(
-		"SELECT id, name, icon, COALESCE(pinned, 0), created_at, updated_at FROM conversation_groups ORDER BY COALESCE(pinned, 0) DESC, created_at ASC",
+		query, args...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("查询分组列表失败: %w", err)
@@ -94,7 +118,7 @@ func (db *DB) ListGroups() ([]*ConversationGroup, error) {
 		var createdAt, updatedAt string
 		var pinned int
 
-		if err := rows.Scan(&group.ID, &group.Name, &group.Icon, &pinned, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&group.ID, &group.Name, &group.Icon, &pinned, &group.OwnerUserID, &createdAt, &updatedAt); err != nil {
 			return nil, fmt.Errorf("扫描分组失败: %w", err)
 		}
 
@@ -131,9 +155,9 @@ func (db *DB) GetGroup(id string) (*ConversationGroup, error) {
 	var pinned int
 
 	err := db.QueryRow(
-		"SELECT id, name, icon, COALESCE(pinned, 0), created_at, updated_at FROM conversation_groups WHERE id = ?",
+		"SELECT id, name, icon, COALESCE(pinned, 0), COALESCE(owner_user_id, ''), created_at, updated_at FROM conversation_groups WHERE id = ?",
 		id,
-	).Scan(&group.ID, &group.Name, &group.Icon, &pinned, &createdAt, &updatedAt)
+	).Scan(&group.ID, &group.Name, &group.Icon, &pinned, &group.OwnerUserID, &createdAt, &updatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("分组不存在")
@@ -164,10 +188,23 @@ func (db *DB) GetGroup(id string) (*ConversationGroup, error) {
 	return &group, nil
 }
 
+func (db *DB) UserCanAccessGroup(userID, scope, groupID string) bool {
+	if scope == RBACScopeAll {
+		return true
+	}
+	var count int
+	err := db.QueryRow(`SELECT COUNT(*) FROM conversation_groups WHERE id = ? AND owner_user_id = ?`, groupID, userID).Scan(&count)
+	return err == nil && count > 0
+}
+
 // UpdateGroup 更新分组
 func (db *DB) UpdateGroup(id, name, icon string) error {
+	existing, err := db.GetGroup(id)
+	if err != nil {
+		return err
+	}
 	// 检查名称是否已存在（排除当前分组）
-	exists, err := db.GroupExistsByName(name, id)
+	exists, err := db.groupExistsByNameForOwner(name, id, existing.OwnerUserID)
 	if err != nil {
 		return err
 	}

@@ -225,6 +225,8 @@ func (db *DB) initTables() error {
 		start_time DATETIME NOT NULL,
 		end_time DATETIME,
 		duration_ms INTEGER,
+		owner_user_id TEXT,
+		conversation_id TEXT,
 		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);`
 
@@ -300,6 +302,7 @@ func (db *DB) initTables() error {
 		id TEXT PRIMARY KEY,
 		name TEXT NOT NULL,
 		icon TEXT,
+		owner_user_id TEXT,
 		created_at DATETIME NOT NULL,
 		updated_at DATETIME NOT NULL
 	);`
