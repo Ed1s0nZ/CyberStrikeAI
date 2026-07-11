@@ -76,7 +76,7 @@ func RegisterKnowledgeTool(
 	}
 
 	mcpServer.RegisterTool(listRiskTypesTool, listRiskTypesHandler)
-	logger.Info("风险类型列表工具已注册", zap.String("toolName", listRiskTypesTool.Name))
+	logger.Debug("风险类型列表工具已注册", zap.String("toolName", listRiskTypesTool.Name))
 
 	// 注册第二个工具：搜索知识库（保持原有功能）
 	searchTool := mcp.Tool{
@@ -271,7 +271,7 @@ func RegisterKnowledgeTool(
 	}
 
 	mcpServer.RegisterTool(searchTool, searchHandler)
-	logger.Info("知识检索工具已注册", zap.String("toolName", searchTool.Name))
+	logger.Debug("知识检索工具已注册", zap.String("toolName", searchTool.Name))
 }
 
 // contains 检查切片是否包含元素
