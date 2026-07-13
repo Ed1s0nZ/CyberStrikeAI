@@ -2115,21 +2115,17 @@
 
     window.openWorkflowPackageImportModal = async function () {
         if (typeof requirePermission === 'function' && !requirePermission('workflow:write')) return;
+        resetWorkflowPackageImport();
+        renderWorkflowPackageInspection();
+        renderWorkflowPackageResolution();
+        workflowPackageSetStep('inspection');
         if (typeof openAppModal === 'function') openAppModal('workflow-package-import-modal', { focusEl: document.getElementById('workflow-package-inspect-btn') });
         if (typeof window.applyTranslations === 'function') window.applyTranslations(document.getElementById('workflow-package-import-modal'));
-        if (!workflowPackageState.inspection && !workflowPackageState.importRecord) {
-            renderWorkflowPackageResolution();
-            await restoreWorkflowPackageState();
-        } else if (workflowPackageState.importRecord) {
-            renderWorkflowPackageImportResult(workflowPackageState.importRecord);
-        } else {
-            renderWorkflowPackageInspection();
-            renderWorkflowPackageResolution();
-        }
     };
 
     window.closeWorkflowPackageImportModal = function () {
         if (typeof closeAppModal === 'function') closeAppModal('workflow-package-import-modal');
+        resetWorkflowPackageImport();
     };
 
     window.onWorkflowPackageFileSelected = function () {

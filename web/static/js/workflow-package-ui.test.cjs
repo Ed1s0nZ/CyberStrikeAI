@@ -59,3 +59,12 @@ test('语言切换会刷新工作流包弹窗及其动态状态', () => {
     const workflows = fs.readFileSync('web/static/js/workflows.js', 'utf8');
     assert.match(workflows, /function refreshWorkflowsI18n\(\)[\s\S]*?workflow-package-import-modal[\s\S]*?workflow-package-overwrite-modal[\s\S]*?renderWorkflowPackageInspection\(\)[\s\S]*?renderWorkflowPackageResolution\(\)/);
 });
+
+test('每次打开导入弹窗都会开始新的导入会话', () => {
+    const workflows = fs.readFileSync('web/static/js/workflows.js', 'utf8');
+    const start = workflows.indexOf('window.openWorkflowPackageImportModal = async function ()');
+    const end = workflows.indexOf('window.closeWorkflowPackageImportModal = function ()', start);
+    const openHandler = workflows.slice(start, end);
+    assert.match(openHandler, /resetWorkflowPackageImport\(\);/);
+    assert.doesNotMatch(openHandler, /restoreWorkflowPackageState\(\)/);
+});
