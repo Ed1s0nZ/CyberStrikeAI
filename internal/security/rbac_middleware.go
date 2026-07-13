@@ -161,6 +161,10 @@ func permissionForRequest(method, fullPath string) string {
 		return crudPermission(method, "files")
 	case strings.HasPrefix(path, "/roles"):
 		return crudPermission(method, "roles")
+	case path == "/workflows/:id/package":
+		return "workflow:read"
+	case strings.HasPrefix(path, "/workflow-package-inspections"), strings.HasPrefix(path, "/workflow-package-imports"):
+		return "workflow:write"
 	case strings.HasPrefix(path, "/workflows"):
 		if path == "/workflows/validate" || path == "/workflows/dry-run" || strings.HasSuffix(path, "/resume") {
 			return "workflow:execute"
@@ -253,6 +257,9 @@ func isProcessGlobalMutationPath(path string) bool {
 	if strings.HasPrefix(path, "/workflows") {
 		// Workflow runs inherit conversation access; definitions are global.
 		return !strings.HasPrefix(path, "/workflows/runs/") && path != "/workflows/validate" && path != "/workflows/dry-run"
+	}
+	if strings.HasPrefix(path, "/workflow-package-inspections") || strings.HasPrefix(path, "/workflow-package-imports") {
+		return true
 	}
 	if strings.HasPrefix(path, "/knowledge") {
 		return path != "/knowledge/search"

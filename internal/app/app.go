@@ -119,6 +119,18 @@ func New(cfg *config.Config, log *logger.Logger, configPath string) (*App, error
 	audit.RegisterConversationCreateHook(auditSvc)
 	auditSvc.PurgeExpired()
 	audit.StartRetentionLoop(auditSvc, log.Logger)
+	if err := db.PurgeWorkflowPackageLifecycle(time.Now().UTC()); err != nil {
+		log.Logger.Warn("清理过期工作流包记录失败", zap.Error(err))
+	}
+	go func() {
+		ticker := time.NewTicker(time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			if err := db.PurgeWorkflowPackageLifecycle(time.Now().UTC()); err != nil {
+				log.Logger.Warn("清理过期工作流包记录失败", zap.Error(err))
+			}
+		}
+	}()
 
 	monitorRetention := monitor.NewService(db, cfg, log.Logger)
 	monitorRetention.PurgeExpired()
@@ -1303,6 +1315,11 @@ func setupRoutes(
 		protected.POST("/workflows/runs/:runId/resume", workflowHandler.ResumeRun)
 		protected.POST("/workflows/validate", workflowHandler.Validate)
 		protected.POST("/workflows/dry-run", workflowHandler.DryRun)
+		protected.GET("/workflows/:id/package", workflowHandler.ExportPackage)
+		protected.POST("/workflow-package-inspections", workflowHandler.CreatePackageInspection)
+		protected.GET("/workflow-package-inspections/:inspectionId", workflowHandler.GetPackageInspection)
+		protected.POST("/workflow-package-imports", workflowHandler.ApplyPackageImport)
+		protected.GET("/workflow-package-imports/:importId", workflowHandler.GetPackageImport)
 		protected.GET("/workflows", workflowHandler.List)
 		protected.GET("/workflows/:id", workflowHandler.Get)
 		protected.POST("/workflows", workflowHandler.Create)
