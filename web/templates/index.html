@@ -2620,6 +2620,7 @@
                         <h2 data-i18n="workflows.title">图编排</h2>
                         <div class="page-header-actions">
                             <button class="btn-secondary" onclick="refreshWorkflows()" data-i18n="common.refresh">刷新</button>
+                            <button class="btn-secondary" data-require-permission="workflow:write" type="button" onclick="openWorkflowPackageImportModal()" data-i18n="workflows.package.importLocal">导入本地包</button>
                             <button class="btn-primary" onclick="newWorkflowDraft()" data-i18n="workflows.newGraph">新建图</button>
                         </div>
                     </div>
@@ -2661,6 +2662,7 @@
                                     <button class="btn-secondary btn-small" data-require-permission="workflow:delete" type="button" onclick="deleteWorkflowSelection()" data-i18n="workflows.deleteSelected">删除选中</button>
                                     <button class="btn-secondary btn-small" type="button" onclick="layoutWorkflowGraph()" data-i18n="workflows.autoLayout">自动布局</button>
                                     <button class="btn-secondary btn-small" data-require-permission="workflow:execute" type="button" onclick="dryRunWorkflowDraft()" data-i18n="workflows.dryRun">试运行</button>
+                                    <button class="btn-secondary btn-small" data-require-permission="workflow:read" type="button" id="workflow-package-export-btn" onclick="exportCurrentWorkflowPackage()" data-i18n="workflows.package.export">导出</button>
                                     <button class="btn-secondary btn-small" data-require-permission="workflow:delete" onclick="deleteCurrentWorkflow()" data-i18n="common.delete">删除</button>
                                     <button class="btn-primary btn-small" data-require-permission="workflow:write" onclick="saveWorkflowDraft()" data-i18n="common.save">保存</button>
                                 </div>
@@ -4854,6 +4856,57 @@
             <div class="modal-footer workflow-meta-modal-footer">
                 <button type="button" class="btn-secondary btn-small" onclick="closeWorkflowMetaModal()" data-i18n="common.cancel">取消</button>
                 <button type="button" class="btn-primary btn-small" onclick="applyWorkflowMetaModal()" data-i18n="common.confirm">确认</button>
+            </div>
+        </div>
+    </div>
+    <div id="workflow-package-import-modal" class="modal workflow-package-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="workflow-package-import-title">
+        <div class="modal-content workflow-package-modal-content">
+            <div class="modal-header workflow-package-modal-header">
+                <div>
+                    <h2 id="workflow-package-import-title" data-i18n="workflows.package.title">导入本地包</h2>
+                    <p class="workflow-package-subtitle" data-i18n="workflows.package.preflightHint">预检不会修改本地工作流</p>
+                </div>
+                <span class="modal-close" onclick="closeWorkflowPackageImportModal()" aria-label="关闭" data-i18n="common.close" data-i18n-attr="aria-label">&times;</span>
+            </div>
+            <div class="workflow-package-steps" aria-label="导入步骤">
+                <span class="is-active" id="workflow-package-step-inspection"><b>1</b><span data-i18n="workflows.package.stepInspection">上传与预检</span></span>
+                <span id="workflow-package-step-import"><b>2</b><span data-i18n="workflows.package.stepImport">处理冲突与导入</span></span>
+            </div>
+            <div class="modal-body workflow-package-modal-body">
+                <section class="workflow-package-pane workflow-package-pane--inspection">
+                    <div class="workflow-package-file-row">
+                        <input id="workflow-package-file-input" type="file" accept=".csapkg.zip,application/zip" hidden onchange="onWorkflowPackageFileSelected()">
+                        <button type="button" class="btn-secondary" onclick="document.getElementById('workflow-package-file-input').click()" data-i18n="workflows.package.selectFile">选择本地包</button>
+                        <span id="workflow-package-file-name" class="workflow-package-file-name" data-i18n="workflows.package.noFile">未选择文件</span>
+                    </div>
+                    <p class="workflow-package-file-hint" data-i18n="workflows.package.fileHint">仅支持单个 .csapkg.zip，文件不得超过 10 MiB。</p>
+                    <button id="workflow-package-inspect-btn" type="button" class="btn-primary" onclick="inspectWorkflowPackage()" data-i18n="workflows.package.inspect">上传并预检</button>
+                    <div id="workflow-package-inspection" class="workflow-package-summary" aria-live="polite"></div>
+                </section>
+                <section class="workflow-package-pane workflow-package-pane--resolution">
+                    <h3 data-i18n="workflows.package.resolutionTitle">处理方式</h3>
+                    <div id="workflow-package-resolution" class="workflow-package-resolution" aria-live="polite"></div>
+                </section>
+            </div>
+            <div class="modal-footer workflow-package-modal-footer">
+                <button type="button" class="btn-secondary" onclick="closeWorkflowPackageImportModal()" data-i18n="common.cancel">取消</button>
+                <button id="workflow-package-submit-btn" type="button" class="btn-primary" onclick="submitWorkflowPackageImport()" disabled data-i18n="workflows.package.confirmImport">确认导入</button>
+            </div>
+        </div>
+    </div>
+    <div id="workflow-package-overwrite-modal" class="modal workflow-package-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="workflow-package-overwrite-title">
+        <div class="modal-content workflow-package-overwrite-content">
+            <div class="modal-header">
+                <h2 id="workflow-package-overwrite-title" data-i18n="workflows.package.overwriteTitle">确认覆盖本地工作流？</h2>
+                <span class="modal-close" onclick="closeWorkflowPackageOverwriteModal()" aria-label="关闭" data-i18n="common.close" data-i18n-attr="aria-label">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p data-i18n="workflows.package.overwriteWarning">覆盖将替换名称、描述、图定义和启用状态。本期不提供回滚。</p>
+                <label class="workflow-package-confirm-check"><input id="workflow-package-overwrite-confirm" type="checkbox" onchange="updateWorkflowPackageOverwriteConfirmation()"> <span data-i18n="workflows.package.overwriteCheck">我已确认覆盖当前本地工作流</span></label>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="closeWorkflowPackageOverwriteModal()" data-i18n="common.cancel">取消</button>
+                <button id="workflow-package-overwrite-submit-btn" type="button" class="btn-primary" onclick="confirmWorkflowPackageOverwrite()" disabled data-i18n="workflows.package.overwriteConfirm">确认覆盖并导入</button>
             </div>
         </div>
     </div>
