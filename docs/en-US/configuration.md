@@ -11,6 +11,9 @@ server:
   host: 0.0.0.0
   port: 8080
   tls_enabled: true
+  # Optional: other trusted Web integrations; Chromium extensions need no entry.
+  # cors_allowed_origins:
+  #   - https://trusted-integration.example
 auth:
   session_duration_hours: 12
 openai:
@@ -24,6 +27,8 @@ agent:
 ```
 
 Change the initial `admin` password from the Web UI after first login. Use HTTPS or a trusted reverse proxy in any shared environment.
+
+Valid Chromium `chrome-extension://<32-character-extension-id>` origins are recognized automatically. The extension must still obtain host permission and authenticate with a password and Bearer token. `server.cors_allowed_origins` remains available as an exact allowlist for other trusted Web integrations; wildcards are not accepted, and changing it requires a restart.
 
 ## Hot-Apply Boundaries
 

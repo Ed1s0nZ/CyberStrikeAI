@@ -11,6 +11,9 @@ server:
   port: 8080
   tls_enabled: true
   tls_auto_self_sign: true
+  # 可选：其他可信 Web 集成；Chromium 浏览器插件无需配置
+  # cors_allowed_origins:
+  #   - https://trusted-integration.example
 auth:
   session_duration_hours: 12
 log:
@@ -21,6 +24,8 @@ log:
 - `version`：前端展示版本。
 - `server.host/port`：Web 服务监听地址和端口。
 - `server.tls_*`：HTTPS 配置。生产环境建议使用 `tls_cert_path` 和 `tls_key_path`。
+- Chromium 浏览器插件的合法 `chrome-extension://<32位插件ID>` Origin 会被自动识别，无需配置。插件仍需按域授权，并使用密码登录与 Bearer Token 调用 API。
+- `server.cors_allowed_origins`：仅供其他可信 Web 集成使用的额外 Origin 精确白名单；不支持 `*`，修改后需重启服务。
 - `auth.session_duration_hours`：登录会话有效期（小时）。登录密码由 RBAC 用户管理，首次启动时在控制台输出 `admin` 初始密码。
 - `log.output`：可以是 `stdout`、`stderr` 或文件路径。
 
