@@ -4437,6 +4437,12 @@ const monitorState = {
     lastFetchedAt: null,
     retentionDays: 0,
     selectedExecutions: new Set(),
+    renderKeys: {
+        stats: '',
+        executions: '',
+        pagination: '',
+        timeline: ''
+    },
     pagination: {
         page: 1,
         pageSize: (() => {
@@ -4450,28 +4456,43 @@ const monitorState = {
 };
 
 let monitorPollTimer = null;
+let monitorPollGeneration = 0;
 const MONITOR_POLL_INTERVAL_MS = 3000;
 
 function startMonitorPoll() {
     stopMonitorPoll();
-    monitorPollTimer = setInterval(function () {
+    scheduleMonitorPoll(monitorPollGeneration);
+}
+
+function scheduleMonitorPoll(generation) {
+    monitorPollTimer = setTimeout(async function pollMonitor() {
+        monitorPollTimer = null;
+        if (generation !== monitorPollGeneration) return;
         const page = document.getElementById('page-mcp-monitor');
         if (!page || !page.classList.contains('active')) {
-            stopMonitorPoll();
             return;
         }
-        if (document.hidden) {
-            return;
-        }
-        if (typeof refreshMonitorPanel === 'function') {
-            refreshMonitorPanel().catch(function () { /* ignore */ });
+
+        try {
+            if (!document.hidden && typeof refreshMonitorPanel === 'function') {
+                // 等待本轮完成后再安排下一轮，避免 WSL 或慢网络下请求重叠。
+                await refreshMonitorPanel();
+            }
+        } catch (error) {
+            // refreshMonitorPanel 已负责展示错误；轮询仍应继续。
+        } finally {
+            const activePage = document.getElementById('page-mcp-monitor');
+            if (generation === monitorPollGeneration && activePage && activePage.classList.contains('active')) {
+                scheduleMonitorPoll(generation);
+            }
         }
     }, MONITOR_POLL_INTERVAL_MS);
 }
 
 function stopMonitorPoll() {
+    monitorPollGeneration++;
     if (monitorPollTimer) {
-        clearInterval(monitorPollTimer);
+        clearTimeout(monitorPollTimer);
         monitorPollTimer = null;
     }
 }
@@ -4547,7 +4568,8 @@ async function refreshMonitorPanel(page = null) {
         }
 
         const range = getMcpMonitorTimelineRange();
-        monitorState.timelineLoading = true;
+        // 后台轮询时保留当前趋势图，避免每 3 秒重新进入加载态并触发闪烁。
+        monitorState.timelineLoading = monitorState.timeline == null && !monitorState.timelineError;
         const timelinePromise = fetchMonitorTimeline(range);
 
         const monitorResp = await apiFetch(url, { method: 'GET' });
@@ -4565,10 +4587,7 @@ async function refreshMonitorPanel(page = null) {
         if (mySeq !== monitorPanelFetchSeq) {
             return;
         }
-        monitorState.timeline = timeline;
-        monitorState.timelineError = timelineError;
-        monitorState.timelineLoading = false;
-        updateMonitorTimelineSection();
+        applyMonitorTimelinePayload(timeline, timelineError, range);
         initializeMonitorPageSize();
     } catch (error) {
         console.error('刷新监控面板失败:', error);
@@ -4783,7 +4802,7 @@ async function refreshMonitorPanelWithFilter(statusFilter = 'all', toolFilter = 
         }
 
         const range = getMcpMonitorTimelineRange();
-        monitorState.timelineLoading = true;
+        monitorState.timelineLoading = monitorState.timeline == null && !monitorState.timelineError;
         const timelinePromise = fetchMonitorTimeline(range);
 
         const monitorResp = await apiFetch(url, { method: 'GET' });
@@ -4801,10 +4820,7 @@ async function refreshMonitorPanelWithFilter(statusFilter = 'all', toolFilter = 
         if (mySeq !== monitorPanelFetchSeq) {
             return;
         }
-        monitorState.timeline = timeline;
-        monitorState.timelineError = timelineError;
-        monitorState.timelineLoading = false;
-        updateMonitorTimelineSection();
+        applyMonitorTimelinePayload(timeline, timelineError, range);
         initializeMonitorPageSize();
     } catch (error) {
         console.error('刷新监控面板失败:', error);
@@ -4837,9 +4853,68 @@ function applyMonitorPayload(result, statusFilter) {
         };
     }
 
-    renderMonitorStats(monitorState.summary, monitorState.topTools, monitorState.lastFetchedAt);
-    renderMonitorExecutions(monitorState.executions, statusFilter);
-    renderMonitorPagination();
+    const locale = typeof window.__locale === 'string' ? window.__locale : '';
+    const toolFilterEl = document.getElementById('monitor-tool-filter');
+    const currentToolFilter = toolFilterEl ? toolFilterEl.value.trim() : '';
+    const statsKey = monitorRenderKey([
+        monitorState.summary,
+        monitorState.topTools,
+        monitorState.retentionDays,
+        currentToolFilter,
+        locale
+    ]);
+    const executionsKey = monitorRenderKey([
+        monitorState.executions,
+        statusFilter || 'all',
+        currentToolFilter,
+        locale
+    ]);
+    const paginationKey = monitorRenderKey(monitorState.pagination);
+
+    if (statsKey !== monitorState.renderKeys.stats) {
+        monitorState.renderKeys.stats = statsKey;
+        renderMonitorStats(monitorState.summary, monitorState.topTools, monitorState.lastFetchedAt);
+    } else if (document.querySelector('#monitor-stats .mcp-exec-stats')) {
+        const toolCount = monitorState.summary && typeof monitorState.summary.toolCount === 'number'
+            ? monitorState.summary.toolCount
+            : monitorState.topTools.length;
+        updateMonitorStatsSubtitle(monitorState.lastFetchedAt, toolCount, monitorState.retentionDays);
+    }
+
+    const executionsChanged = executionsKey !== monitorState.renderKeys.executions;
+    if (executionsChanged) {
+        monitorState.renderKeys.executions = executionsKey;
+        renderMonitorExecutions(monitorState.executions, statusFilter);
+    } else {
+        updateMonitorExecutionDurations(monitorState.executions);
+    }
+
+    // 空列表渲染会清空执行区，因此这种情况下也需要恢复分页控件。
+    if (executionsChanged || paginationKey !== monitorState.renderKeys.pagination) {
+        monitorState.renderKeys.pagination = paginationKey;
+        renderMonitorPagination();
+    }
+}
+
+function monitorRenderKey(value) {
+    try {
+        return JSON.stringify(value);
+    } catch (error) {
+        return String(Date.now());
+    }
+}
+
+function applyMonitorTimelinePayload(timeline, timelineError, range) {
+    const wasLoading = monitorState.timelineLoading;
+    const timelineKey = monitorRenderKey([timeline, timelineError || null, range || '']);
+    const timelineChanged = timelineKey !== monitorState.renderKeys.timeline;
+    monitorState.timeline = timeline;
+    monitorState.timelineError = timelineError;
+    monitorState.timelineLoading = false;
+    if (wasLoading || timelineChanged) {
+        monitorState.renderKeys.timeline = timelineKey;
+        updateMonitorTimelineSection();
+    }
 }
 
 async function fetchMonitorTimeline(range) {
@@ -5178,14 +5253,9 @@ async function setMcpMonitorTimelineRange(range) {
     updateMonitorTimelineSection();
     try {
         const { timeline, timelineError } = await fetchMonitorTimeline(range);
-        monitorState.timeline = timeline;
-        monitorState.timelineError = timelineError;
-        monitorState.timelineLoading = false;
-        updateMonitorTimelineSection();
+        applyMonitorTimelinePayload(timeline, timelineError, range);
     } catch (err) {
-        monitorState.timelineError = err.message || 'error';
-        monitorState.timelineLoading = false;
-        updateMonitorTimelineSection();
+        applyMonitorTimelinePayload(null, err.message || 'error', range);
     }
 }
 window.setMcpMonitorTimelineRange = setMcpMonitorTimelineRange;
@@ -6143,7 +6213,7 @@ function renderMonitorExecutions(executions = [], statusFilter = 'all') {
     const terminateLabel = typeof window.t === 'function' ? window.t('mcpMonitor.terminateExecution') : '终止';
     const statusKeyMap = { pending: 'statusPending', running: 'statusRunning', completed: 'statusCompleted', failed: 'statusFailed', cancelled: 'statusCancelled' };
     const locale = (typeof window.__locale === 'string' && window.__locale.startsWith('zh')) ? 'zh-CN' : undefined;
-    const rows = executions
+    const rowEntries = executions
         .map(exec => {
             const status = (exec.status || 'unknown').toLowerCase();
             const statusClass = `monitor-status-chip ${status}`;
@@ -6159,15 +6229,19 @@ function renderMonitorExecutions(executions = [], statusFilter = 'all') {
                 : '';
             const jsExecId = rawExecId.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
             const isSelected = monitorState.selectedExecutions.has(rawExecId);
-            return `
-                <tr>
+            const rowKey = monitorRenderKey([exec, isSelected, locale || 'en-US']);
+            return {
+                id: rawExecId,
+                key: rowKey,
+                html: `
+                <tr data-execution-id="${executionId}">
                     <td>
                         <input type="checkbox" class="monitor-execution-checkbox" value="${executionId}" ${isSelected ? 'checked' : ''} onchange="toggleExecutionSelection('${jsExecId}', this.checked)" />
                     </td>
                     <td>${toolName}</td>
                     <td><span class="${statusClass}">${escapeHtml(statusLabel)}</span></td>
                     <td>${escapeHtml(startTime)}</td>
-                    <td>${escapeHtml(duration)}</td>
+                    <td class="monitor-execution-duration">${escapeHtml(duration)}</td>
                     <td>
                         <div class="monitor-execution-actions">
                             <button class="btn-secondary" onclick="showMCPDetail('${executionId}')">${escapeHtml(viewDetailLabel)}</button>
@@ -6176,58 +6250,134 @@ function renderMonitorExecutions(executions = [], statusFilter = 'all') {
                         </div>
                     </td>
                 </tr>
-            `;
-        })
-        .join('');
+            `
+            };
+        });
 
-    // 先移除旧的表格容器和加载提示（保留分页控件）
-    const oldTableContainer = container.querySelector('.monitor-table-container');
-    if (oldTableContainer) {
-        oldTableContainer.remove();
-    }
     // 清除"加载中..."等提示信息
     const oldEmpty = container.querySelector('.monitor-empty');
     if (oldEmpty) {
         oldEmpty.remove();
     }
     
-    // 创建表格容器
-    const tableContainer = document.createElement('div');
-    tableContainer.className = 'monitor-table-container';
     const colTool = typeof window.t === 'function' ? window.t('mcpMonitor.columnTool') : '工具';
     const colStatus = typeof window.t === 'function' ? window.t('mcpMonitor.columnStatus') : '状态';
     const colStartTime = typeof window.t === 'function' ? window.t('mcpMonitor.columnStartTime') : '开始时间';
     const colDuration = typeof window.t === 'function' ? window.t('mcpMonitor.columnDuration') : '耗时';
     const colActions = typeof window.t === 'function' ? window.t('mcpMonitor.columnActions') : '操作';
-    tableContainer.innerHTML = `
-        <table class="monitor-table">
-            <thead>
-                <tr>
-                    <th style="width: 40px;">
-                        <input type="checkbox" id="monitor-select-all" onchange="toggleSelectAll(this)" />
-                    </th>
-                    <th>${escapeHtml(colTool)}</th>
-                    <th>${escapeHtml(colStatus)}</th>
-                    <th>${escapeHtml(colStartTime)}</th>
-                    <th>${escapeHtml(colDuration)}</th>
-                    <th>${escapeHtml(colActions)}</th>
-                </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-        </table>
-    `;
-    
-    // 在分页控件之前插入表格（如果存在分页控件）
-    const existingPagination = container.querySelector('.monitor-pagination');
-    if (existingPagination) {
-        container.insertBefore(tableContainer, existingPagination);
-    } else {
-        container.appendChild(tableContainer);
+    const headerKey = monitorRenderKey([colTool, colStatus, colStartTime, colDuration, colActions, locale || 'en-US']);
+    const headerHtml = `
+        <tr>
+            <th style="width: 40px;">
+                <input type="checkbox" id="monitor-select-all" onchange="toggleSelectAll(this)" />
+            </th>
+            <th>${escapeHtml(colTool)}</th>
+            <th>${escapeHtml(colStatus)}</th>
+            <th>${escapeHtml(colStartTime)}</th>
+            <th>${escapeHtml(colDuration)}</th>
+            <th>${escapeHtml(colActions)}</th>
+        </tr>`;
+
+    let tableContainer = container.querySelector('.monitor-table-container');
+    let tableCreated = false;
+    if (!tableContainer) {
+        tableContainer = document.createElement('div');
+        tableContainer.className = 'monitor-table-container';
+        tableContainer.innerHTML = '<table class="monitor-table"><thead></thead><tbody></tbody></table>';
+        const existingPagination = container.querySelector('.monitor-pagination');
+        if (existingPagination) {
+            container.insertBefore(tableContainer, existingPagination);
+        } else {
+            container.appendChild(tableContainer);
+        }
+        tableCreated = true;
     }
+
+    const table = tableContainer.querySelector('.monitor-table');
+    const thead = table && table.querySelector('thead');
+    if (thead && table.__monitorHeaderKey !== headerKey) {
+        thead.innerHTML = headerHtml;
+        table.__monitorHeaderKey = headerKey;
+    }
+    const changedRows = table
+        ? reconcileMonitorExecutionRows(table.querySelector('tbody'), rowEntries)
+        : [];
     
     // 更新批量操作状态
     updateBatchActionsState();
-    if (typeof rbacAfterDynamicRender === 'function') rbacAfterDynamicRender(tableContainer);
+    if (typeof rbacAfterDynamicRender === 'function') {
+        if (tableCreated) {
+            rbacAfterDynamicRender(tableContainer);
+        } else {
+            changedRows.forEach(function (row) { rbacAfterDynamicRender(row); });
+        }
+    }
+}
+
+function createMonitorExecutionRow(entry) {
+    const template = document.createElement('template');
+    template.innerHTML = entry.html.trim();
+    const row = template.content.firstElementChild;
+    if (row) row.__monitorRenderKey = entry.key;
+    return row;
+}
+
+// 以 execution ID 为 key 对账，只操作新增、删除、换序或内容变化的行。
+function reconcileMonitorExecutionRows(tbody, rowEntries) {
+    if (!tbody) return [];
+
+    const existingById = new Map();
+    Array.from(tbody.children).forEach(function (row) {
+        existingById.set(row.dataset.executionId || '', row);
+    });
+
+    const desiredIds = new Set(rowEntries.map(function (entry) { return entry.id; }));
+    existingById.forEach(function (row, id) {
+        if (!desiredIds.has(id)) row.remove();
+    });
+
+    const changedRows = [];
+    let cursor = tbody.firstElementChild;
+    rowEntries.forEach(function (entry) {
+        let row = existingById.get(entry.id);
+        if (!row || row.__monitorRenderKey !== entry.key) {
+            const nextRow = createMonitorExecutionRow(entry);
+            if (!nextRow) return;
+            if (row && row.parentNode === tbody) {
+                row.replaceWith(nextRow);
+            }
+            row = nextRow;
+            existingById.set(entry.id, row);
+            changedRows.push(row);
+        }
+
+        if (row !== cursor) {
+            tbody.insertBefore(row, cursor);
+        }
+        cursor = row.nextElementSibling;
+    });
+
+    return changedRows;
+}
+
+// 轮询结果未变化时只原位刷新运行中记录的耗时，避免重建整张表格。
+function updateMonitorExecutionDurations(executions = []) {
+    const container = document.getElementById('monitor-executions');
+    if (!container || !Array.isArray(executions)) return;
+
+    const executionMap = new Map();
+    executions.forEach(function (execution) {
+        if (execution && execution.id) executionMap.set(String(execution.id), execution);
+    });
+
+    container.querySelectorAll('tr[data-execution-id]').forEach(function (row) {
+        const execution = executionMap.get(row.dataset.executionId || '');
+        if (!execution || String(execution.status || '').toLowerCase() !== 'running') return;
+        const durationCell = row.querySelector('.monitor-execution-duration');
+        if (durationCell) {
+            durationCell.textContent = formatExecutionDuration(execution.startTime, execution.endTime);
+        }
+    });
 }
 
 // 渲染监控面板分页控件
