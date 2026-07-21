@@ -21,6 +21,7 @@ CyberStrikeAI documentation is organized by user journey. Start with deployment,
 - [Skills 指南](zh-CN/skills-guide.md)
 - [Eino 多代理](zh-CN/MULTI_AGENT_EINO.md)
 - [工作流](zh-CN/workflow-graph.md)
+- [工具执行治理](zh-CN/tool-execution-governance.md)
 - [人机协同最佳实践](zh-CN/hitl-best-practices.md)
 
 ### 功能指南
@@ -58,6 +59,7 @@ CyberStrikeAI documentation is organized by user journey. Start with deployment,
 - [Skills](en-US/skills-guide.md)
 - [Eino Multi-Agent](en-US/MULTI_AGENT_EINO.md)
 - [Workflows](en-US/workflow-graph.md)
+- [Tool Execution Governance](en-US/tool-execution-governance.md)
 - [HITL Best Practices](en-US/hitl-best-practices.md)
 
 ### Feature guides

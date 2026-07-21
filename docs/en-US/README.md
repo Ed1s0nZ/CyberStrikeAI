@@ -13,7 +13,7 @@
 
 - [Architecture](architecture.md) · [Security Model](security-model.md) · [RBAC](rbac.md)
 - [Agents and Roles](agent-and-role-guide.md) · [Skills](skills-guide.md) · [Eino Multi-Agent](MULTI_AGENT_EINO.md)
-- [Workflows](workflow-graph.md) · [HITL Best Practices](hitl-best-practices.md)
+- [Workflows](workflow-graph.md) · [Tool Execution Governance](tool-execution-governance.md) · [HITL Best Practices](hitl-best-practices.md)
 
 ## Feature guides
 

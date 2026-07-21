@@ -118,6 +118,7 @@ CyberStrikeAI connects planning, execution, human oversight, evidence, and repla
 
 - 🧰 **Security tools** include 100+ curated YAML recipes with custom extensions and role-scoped access.
 - 🔌 **MCP integration** supports HTTP, stdio, SSE, external federation, and dynamic tool discovery.
+- ⏱️ **Resilient tool execution** runs blocking MCP/tool calls in workers with bounded agent waits, resumable `execution_id` polling, cancellation, per-server circuit breakers, concurrency limits, and unified output caps.
 - 🎯 **Agent Skills** follow the standard Skill layout and support progressive, on-demand loading.
 - 📚 **Knowledge base** combines query rewriting, vector retrieval, reranking, and result post-processing.
 - 🖼️ **Vision analysis** uses a separate vision model for screenshots, captchas, and UI while retaining text summaries only.
@@ -127,7 +128,7 @@ CyberStrikeAI connects planning, execution, human oversight, evidence, and repla
 - 🧑‍⚖️ **Human in the loop** provides approval modes, tool allowlists, audit-agent review, and traceable decisions.
 - 🔐 **Platform RBAC** supports multiple users, system and custom roles, scoped permissions, ownership, and explicit assignments.
 - 🔒 **Security and audit** provide authenticated access, audit logs, SQLite persistence, and operational evidence retention.
-- 📄 **Result governance** supports pagination, compression, archival, and search for large tool outputs.
+- 📄 **Result governance** stores the same capped tool result seen by the agent, protects resume paths from oversized historical output, and adds UI safeguards for large detail views. See [Tool Execution Governance](docs/en-US/tool-execution-governance.md).
 
 ### Security operations
 
