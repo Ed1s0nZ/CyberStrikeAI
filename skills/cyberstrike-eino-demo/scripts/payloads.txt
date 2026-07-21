@@ -1,4 +1,0 @@
-# Placeholder payloads for authorized testing labs only.
-sqli-probe: '
-xss-probe: <svg/onload=alert(1)>
-ssrf-probe: http://127.0.0.1:80 (only if scope explicitly allows loopback)

@@ -1,8 +1,0 @@
-{
-  "title": "Example finding",
-  "severity": "medium",
-  "affected": "https://example.com/api/v1/search",
-  "summary": "Parameterized query reflects error message; verify with authorized DAST only.",
-  "remediation": "Use prepared statements; generic error pages in production.",
-  "references": ["OWASP SQL Injection"]
-}
