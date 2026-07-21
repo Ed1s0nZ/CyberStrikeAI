@@ -222,10 +222,10 @@ multi_agent:
     tool_search_always_visible_tools: [read_file, glob, grep, analyze_image, write_file, edit_file, execute, task, transfer_to_agent, exit, write_todos, skill, tool_search, TaskCreate, TaskGet, TaskUpdate, TaskList, record_vulnerability, list_vulnerabilities, get_vulnerability, get_tool_execution, wait_tool_execution, cancel_tool_execution, list_knowledge_risk_types, search_knowledge_base, webshell_exec, webshell_file_list, webshell_file_read, webshell_file_write, manage_webshell_list, manage_webshell_add, manage_webshell_update, manage_webshell_delete, manage_webshell_test, batch_task_list, batch_task_get, batch_task_start, batch_task_rerun, batch_task_pause, batch_task_update_metadata, batch_task_update_schedule, batch_task_schedule_enabled, batch_task_update_task, batch_task_remove_task, batch_task_delete, batch_task_create, batch_task_add_task, http-framework-test, exec] # 后端内置常驻工具白名单（优先于 always_visible 数量策略）
     plantask_enable: true # P0：主代理挂载 TaskCreate/Get/Update/List 结构化任务板；需 eino_skills 可用且 skills_dir 存在
     plantask_rel_dir: .eino/plantask # 任务文件相对 skills_dir，按会话分子目录：skills/.eino/plantask/<conversationId>/
-    reduction_enable: true # true：大工具输出截断/落盘以控上下文；后端会独立创建，不依赖 eino_skills 是否启用
-    reduction_max_length_for_trunc: 50000 # 单条工具结果超过该字符数（bytes）时截断并落盘（由 reduction 中间件处理）
+    reduction_enable: true # true：大工具输出截断并落盘到本地文件（tmp/reduction/.../trunc/<id>），上下文只留 <persisted-output> 预览；不依赖 eino_skills
+    reduction_max_length_for_trunc: 100000 # 单条工具结果超过该字节数时：全文写入本地 trunc 文件，返回带路径的截断预览（MCP/exec 与 reduction 共用此阈值）
     reduction_max_tokens_for_clear: 60000 # 历史工具结果清理阈值（tokens），应低于 max_total_tokens * summarization_trigger_ratio
-    reduction_root_dir: "" # 非空：截断/清理内容落盘根路径；空：使用系统临时目录下按会话隔离的默认路径
+    reduction_root_dir: "" # 非空：截断/清理内容落盘根路径；空：项目目录下 tmp/reduction（按会话/项目隔离）
     reduction_clear_exclude: [] # 不参与「清理阶段」的工具名额外列表（会与 task/transfer/exit 等内置排除项合并）；需要时用 YAML 列表填写
     reduction_sub_agents: true # true：子代理也挂 reduction；false：仅编排主代理使用 reduction
     summarization_trigger_ratio: 0.8 # summarization 触发比例（max_total_tokens * ratio），建议 0.75~0.85
