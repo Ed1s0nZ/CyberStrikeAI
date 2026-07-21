@@ -9,6 +9,7 @@ import (
 
 	"cyberstrike-ai/internal/authctx"
 	"cyberstrike-ai/internal/database"
+	"cyberstrike-ai/internal/mcp"
 	"cyberstrike-ai/internal/mcp/builtin"
 	"cyberstrike-ai/internal/security"
 
@@ -62,13 +63,52 @@ func TestEveryBuiltinMCPToolHasExplicitAuthorizationPolicy(t *testing.T) {
 	authorize := mcpToolAuthorizer(db)
 	args := map[string]interface{}{
 		"action": "get", "connection_id": "x", "queue_id": "x", "listener_id": "x",
-		"session_id": "x", "task_id": "x", "id": "x", "conversation_id": "x",
+		"session_id": "x", "task_id": "x", "id": "x", "conversation_id": "x", "execution_id": "x",
 	}
 	for _, toolName := range builtin.GetAllBuiltinTools() {
 		err := authorize(ctx, toolName, args)
 		if err != nil && strings.Contains(err.Error(), "no authorization policy registered") {
 			t.Errorf("builtin tool %s has no explicit policy", toolName)
 		}
+	}
+}
+
+func TestMCPExecutionControlAuthorizationUsesExecutionScope(t *testing.T) {
+	db, err := database.NewDB(filepath.Join(t.TempDir(), "mcp-exec-authz.db"), zap.NewNop())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	user, err := db.CreateRBACUser("exec-user", "Exec User", "hash", true, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SaveToolExecution(&mcp.ToolExecution{
+		ID:          "exec-owned",
+		ToolName:    "lab::slow",
+		Status:      "running",
+		StartTime:   time.Now(),
+		OwnerUserID: user.ID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SaveToolExecution(&mcp.ToolExecution{
+		ID:        "exec-hidden",
+		ToolName:  "lab::slow",
+		Status:    "running",
+		StartTime: time.Now(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	principal := authctx.NewPrincipal(user.ID, user.Username, database.RBACScopeAssigned, map[string]bool{"monitor:read": true, "monitor:write": true})
+	ctx := authctx.WithPrincipal(context.Background(), principal)
+	authorize := mcpToolAuthorizer(db)
+	if err := authorize(ctx, builtin.ToolWaitToolExecution, map[string]interface{}{"execution_id": "exec-owned"}); err != nil {
+		t.Fatalf("owned execution denied: %v", err)
+	}
+	if err := authorize(ctx, builtin.ToolCancelToolExecution, map[string]interface{}{"execution_id": "exec-hidden"}); err == nil {
+		t.Fatal("foreign execution was allowed")
 	}
 }
 

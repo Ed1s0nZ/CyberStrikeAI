@@ -359,7 +359,7 @@ func (db *DB) LoadToolStatsSummaryForAccess(topN int, access RBACListAccess) (*T
 	var lastCall sql.NullString
 	err := db.QueryRow(`SELECT COUNT(*),
 		COALESCE(SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END), 0),
-		COALESCE(SUM(CASE WHEN status IN ('failed', 'cancelled') THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN status IN ('failed', 'cancelled', 'hard_timeout', 'orphaned') THEN 1 ELSE 0 END), 0),
 		MAX(start_time), COUNT(DISTINCT tool_name)`+fromSQL, args...).Scan(
 		&result.Summary.TotalCalls, &result.Summary.SuccessCalls, &result.Summary.FailedCalls,
 		&lastCall, &result.Summary.ToolCount,
@@ -373,7 +373,7 @@ func (db *DB) LoadToolStatsSummaryForAccess(topN int, access RBACListAccess) (*T
 	}
 	rows, err := db.Query(`SELECT tool_name, COUNT(*),
 		SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END),
-		SUM(CASE WHEN status IN ('failed', 'cancelled') THEN 1 ELSE 0 END), MAX(start_time)`+
+		SUM(CASE WHEN status IN ('failed', 'cancelled', 'hard_timeout', 'orphaned') THEN 1 ELSE 0 END), MAX(start_time)`+
 		fromSQL+` GROUP BY tool_name ORDER BY COUNT(*) DESC, tool_name ASC LIMIT ?`, append(args, topN)...)
 	if err != nil {
 		return nil, err
@@ -565,7 +565,7 @@ func (db *DB) UserCanAccessToolExecution(userID, scope, executionID string) bool
 	return conversation != "" && db.UserCanAccessResource(userID, scope, "conversation", conversation)
 }
 
-// CancelOrphanedRunningToolExecutions 将仍为 running 的记录批量标记为 cancelled（如进程重启后无对应执行协程）。
+// CancelOrphanedRunningToolExecutions 将仍为 running 的记录批量标记为 orphaned（如进程重启后无对应执行协程）。
 func (db *DB) CancelOrphanedRunningToolExecutions(endTime time.Time, errMsg string) (int64, error) {
 	errMsg = strings.TrimSpace(errMsg)
 	if errMsg == "" {
@@ -573,7 +573,7 @@ func (db *DB) CancelOrphanedRunningToolExecutions(endTime time.Time, errMsg stri
 	}
 	query := `
 		UPDATE tool_executions
-		SET status = 'cancelled',
+		SET status = 'orphaned',
 		    error = ?,
 		    end_time = ?,
 		    duration_ms = MAX(0, CAST((julianday(?) - julianday(start_time)) * 86400000 AS INTEGER))
@@ -586,7 +586,7 @@ func (db *DB) CancelOrphanedRunningToolExecutions(endTime time.Time, errMsg stri
 	return res.RowsAffected()
 }
 
-// FinalizeStaleRunningToolExecutions 将「非活跃且超过 minAge」的 running 记录标记为 cancelled。
+// FinalizeStaleRunningToolExecutions 将「非活跃且超过 minAge」的 running 记录标记为 orphaned。
 // activeIDs 为当前进程内仍登记 cancel 的 executionId；不在集合内且已超时的视为孤儿记录。
 func (db *DB) FinalizeStaleRunningToolExecutions(endTime time.Time, minAge time.Duration, activeIDs map[string]struct{}, errMsg string) (int64, error) {
 	errMsg = strings.TrimSpace(errMsg)
@@ -639,7 +639,7 @@ func (db *DB) FinalizeStaleRunningToolExecutions(endTime time.Time, minAge time.
 		}
 		res, err := db.Exec(`
 			UPDATE tool_executions
-			SET status = 'cancelled', error = ?, end_time = ?, duration_ms = ?
+			SET status = 'orphaned', error = ?, end_time = ?, duration_ms = ?
 			WHERE id = ? AND status = 'running'
 		`, errMsg, endTime, durationMs, row.id)
 		if err != nil {
@@ -815,7 +815,7 @@ func (db *DB) PurgeToolExecutionsBefore(cutoff time.Time) (int64, error) {
 		}
 		delta.totalCalls += count
 		switch status {
-		case "failed", "cancelled":
+		case "failed", "cancelled", "hard_timeout", "orphaned":
 			delta.failedCalls += count
 		case "completed":
 			delta.successCalls += count
@@ -971,7 +971,7 @@ func (db *DB) LoadCallsTimeline(since time.Time, dailyBuckets bool) ([]CallsTime
 		query = `
 			SELECT date(start_time, 'localtime') AS bucket,
 				COUNT(*) AS total,
-				SUM(CASE WHEN status IN ('failed', 'cancelled') THEN 1 ELSE 0 END) AS failed
+				SUM(CASE WHEN status IN ('failed', 'cancelled', 'hard_timeout', 'orphaned') THEN 1 ELSE 0 END) AS failed
 			FROM tool_executions
 			WHERE start_time >= ?
 			GROUP BY bucket
@@ -981,7 +981,7 @@ func (db *DB) LoadCallsTimeline(since time.Time, dailyBuckets bool) ([]CallsTime
 		query = `
 			SELECT strftime('%Y-%m-%d %H:00:00', start_time, 'localtime') AS bucket,
 				COUNT(*) AS total,
-				SUM(CASE WHEN status IN ('failed', 'cancelled') THEN 1 ELSE 0 END) AS failed
+				SUM(CASE WHEN status IN ('failed', 'cancelled', 'hard_timeout', 'orphaned') THEN 1 ELSE 0 END) AS failed
 			FROM tool_executions
 			WHERE start_time >= ?
 			GROUP BY bucket

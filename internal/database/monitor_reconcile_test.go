@@ -43,8 +43,8 @@ func TestCancelOrphanedRunningToolExecutions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetToolExecution: %v", err)
 	}
-	if got.Status != "cancelled" {
-		t.Fatalf("expected cancelled, got %s", got.Status)
+	if got.Status != "orphaned" {
+		t.Fatalf("expected orphaned, got %s", got.Status)
 	}
 	if got.EndTime == nil {
 		t.Fatal("expected end_time to be set")
@@ -88,8 +88,8 @@ func TestFinalizeStaleRunningToolExecutions_skipsActive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetToolExecution stale: %v", err)
 	}
-	if stale.Status != "cancelled" {
-		t.Fatalf("stale expected cancelled, got %s", stale.Status)
+	if stale.Status != "orphaned" {
+		t.Fatalf("stale expected orphaned, got %s", stale.Status)
 	}
 
 	activeExec, err := db.GetToolExecution("active")

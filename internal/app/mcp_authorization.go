@@ -34,6 +34,16 @@ func mcpToolAuthorizer(db *database.DB) func(context.Context, string, map[string
 			}
 			return nil
 		}
+		toolExecutionResource := func(permission string) error {
+			if err := require(permission); err != nil {
+				return err
+			}
+			id := mcpAuthorizationString(args, "execution_id")
+			if id == "" || db == nil || !db.UserCanAccessToolExecution(principal.UserID, principal.ScopeFor(permission), id) {
+				return fmt.Errorf("no access to tool execution %s", id)
+			}
+			return nil
+		}
 
 		switch toolName {
 		case builtin.ToolWebshellExec, builtin.ToolWebshellFileWrite:
@@ -108,6 +118,10 @@ func mcpToolAuthorizer(db *database.DB) func(context.Context, string, map[string
 			return require("knowledge:read")
 		case builtin.ToolAnalyzeImage:
 			return require("agent:execute")
+		case builtin.ToolGetToolExecution, builtin.ToolWaitToolExecution:
+			return toolExecutionResource("monitor:read")
+		case builtin.ToolCancelToolExecution:
+			return toolExecutionResource("monitor:write")
 		case builtin.ToolBatchTaskList:
 			return require("tasks:read")
 		case builtin.ToolBatchTaskGet:
