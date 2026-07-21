@@ -3039,6 +3039,7 @@
     "responseResult": "Response",
     "copyContent": "Copy content",
     "correctInfo": "Correct info",
+    "rawResponse": "Raw response",
     "errorInfo": "Error info",
     "copyError": "Copy error",
     "contentTruncated": "… (display truncated; use read_file on the path in persisted-output for the full file)"

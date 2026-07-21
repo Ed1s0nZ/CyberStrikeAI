@@ -2212,16 +2212,9 @@
                                 </nav>
                                 <div id="project-panel-facts" class="projects-panel" role="tabpanel">
                                     <div class="projects-fact-toolbar">
-                                        <p class="projects-fact-toolbar-hint" role="note">
-                                            <svg class="projects-fact-toolbar-hint-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-                                                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
-                                                <path d="M12 10v6M12 8h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                            </svg>
-                                            <span data-i18n="projects.factToolbarHint">索引仅含 key 与摘要（须含「什么 + 在哪 + 如何验证」）；攻击链 / POC 写在 body，Agent 通过 get_project_fact 复现</span>
-                                        </p>
                                         <div class="projects-fact-toolbar-filters" role="search">
                                             <label class="projects-fact-filter-field projects-fact-filter-field--search">
-                                                <span class="sr-only" data-i18n="projects.searchFactsSr">搜索事实</span>
+                                                <span class="projects-fact-filter-label" data-i18n="common.search">搜索</span>
                                                 <svg class="projects-fact-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
                                                     <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
                                                     <path d="M20 20L16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -2273,13 +2266,6 @@
                                 </div>
                                 <div id="project-panel-graph" class="projects-panel projects-panel--graph" role="tabpanel" hidden>
                                     <div class="projects-fact-toolbar projects-graph-toolbar">
-                                        <p class="projects-fact-toolbar-hint" role="note">
-                                            <svg class="projects-fact-toolbar-hint-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-                                                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
-                                                <path d="M12 10v6M12 8h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                            </svg>
-                                            <span data-i18n="projects.graphToolbarHint">攻击路径图箭头与事实存储方向一致（source → target）；节点按 target→infra→finding→exploit 分层排布。虚线边为待确认。</span>
-                                        </p>
                                         <div class="projects-fact-toolbar-filters projects-graph-toolbar-row">
                                             <label class="projects-fact-filter-field">
                                                 <span class="projects-fact-filter-label" data-i18n="projects.graphView">视图</span>
@@ -2289,7 +2275,7 @@
                                                 </select>
                                             </label>
                                             <label class="projects-fact-filter-field projects-fact-filter-field--search projects-graph-search-field">
-                                                <span class="sr-only" data-i18n="projects.graphSearchSr">搜索节点</span>
+                                                <span class="projects-fact-filter-label" data-i18n="common.search">搜索</span>
                                                 <svg class="projects-fact-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
                                                     <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
                                                     <path d="M20 20L16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -2357,15 +2343,6 @@
                                     </div>
                                 </div>
                                 <div id="project-panel-assets" class="projects-panel" role="tabpanel" hidden>
-                                    <div class="projects-panel-toolbar projects-panel-toolbar--hint">
-                                        <p class="projects-fact-toolbar-hint" role="note">
-                                            <svg class="projects-fact-toolbar-hint-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-                                                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 10v6M12 8h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                            </svg>
-                                            <span data-i18n="projects.boundAssetsHint">仅展示绑定到当前项目的资产；点击目标可查看完整详情</span>
-                                        </p>
-                                        <span id="project-assets-count" class="projects-panel-count">0</span>
-                                    </div>
                                     <div class="projects-table-wrap projects-table-wrap--with-pagination">
                                         <table class="data-table data-table--projects">
                                             <thead><tr><th data-i18n="assets.target">目标</th><th data-i18n="assets.service">服务</th><th data-i18n="assets.title">标题/指纹</th><th data-i18n="assets.source">来源</th><th data-i18n="assets.lastSeen">最近发现</th><th data-i18n="assets.status">状态</th><th class="col-actions" data-i18n="common.actions">操作</th></tr></thead>
@@ -2375,15 +2352,6 @@
                                     <div id="project-assets-pagination" class="pagination-container pagination-fixed projects-panel-pagination"></div>
                                 </div>
                                 <div id="project-panel-conversations" class="projects-panel" role="tabpanel" hidden>
-                                    <div class="projects-panel-toolbar projects-panel-toolbar--hint">
-                                        <p class="projects-fact-toolbar-hint" role="note">
-                                            <svg class="projects-fact-toolbar-hint-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-                                                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
-                                                <path d="M12 10v6M12 8h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                            </svg>
-                                            <span data-i18n="projects.boundConversationsHint">绑定到本项目的对话；点击可打开会话</span>
-                                        </p>
-                                    </div>
                                     <div class="projects-table-wrap">
                                         <table class="data-table data-table--projects">
                                             <thead><tr><th data-i18n="projects.titleLabel">标题</th><th data-i18n="projects.updated">更新</th><th class="col-actions" data-i18n="common.actions">操作</th></tr></thead>
@@ -2393,19 +2361,9 @@
                                 </div>
                                 <div id="project-panel-vulns" class="projects-panel" role="tabpanel" hidden>
                                     <div class="projects-fact-toolbar">
-                                        <div class="projects-vuln-toolbar-top">
-                                            <p class="projects-fact-toolbar-hint" role="note">
-                                                <svg class="projects-fact-toolbar-hint-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-                                                    <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
-                                                    <path d="M12 10v6M12 8h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                                </svg>
-                                                <span data-i18n="projects.projectVulnSummaryHint">本项目下记录的漏洞汇总</span>
-                                            </p>
-                                            <button type="button" class="btn-secondary btn-small" onclick="openVulnerabilitiesForProject()" data-i18n="projects.viewInVulnerabilityManagement">在漏洞管理中查看</button>
-                                        </div>
-                                        <div class="projects-fact-toolbar-filters" role="search">
+                                        <div class="projects-fact-toolbar-filters projects-vuln-toolbar-filters" role="search">
                                             <label class="projects-fact-filter-field projects-fact-filter-field--search">
-                                                <span class="sr-only" data-i18n="projects.searchVulnsSr">搜索漏洞</span>
+                                                <span class="projects-fact-filter-label" data-i18n="common.search">搜索</span>
                                                 <svg class="projects-fact-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
                                                     <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
                                                     <path d="M20 20L16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -2434,6 +2392,7 @@
                                                     <option value="false_positive" data-i18n="vulnerabilityPage.statusFalsePositive">误报</option>
                                                 </select>
                                             </label>
+                                            <button type="button" class="btn-secondary btn-small projects-vuln-toolbar-action" onclick="openVulnerabilitiesForProject()" data-i18n="projects.viewInVulnerabilityManagement">在漏洞管理中查看</button>
                                         </div>
                                     </div>
                                     <div class="projects-table-wrap">
@@ -4947,7 +4906,7 @@
 
     <!-- MCP调用详情模态框 -->
     <div id="mcp-detail-modal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content mcp-detail-content">
             <div class="modal-header">
                 <h2 data-i18n="mcpDetailModal.title">工具调用详情</h2>
                 <span class="modal-close" onclick="closeMCPDetail()">&times;</span>
@@ -4995,19 +4954,25 @@
                 <div class="detail-section">
                     <div class="detail-section-header">
                         <h3 data-i18n="mcpDetailModal.responseResult">响应结果</h3>
-                        <button class="btn-ghost" type="button" onclick="copyDetailBlock('detail-response', this)" data-i18n="mcpDetailModal.copyContent">复制内容</button>
+                        <button class="btn-ghost" type="button" onclick="copyActiveMCPResultDetail(this)" data-i18n="mcpDetailModal.copyContent">复制内容</button>
                     </div>
-                    <div class="detail-code-card">
-                        <pre id="detail-response" class="code-block"></pre>
+                    <div class="detail-result-tabs" role="tablist" aria-label="响应结果视图">
+                        <button id="detail-result-tab-success" class="detail-result-tab active" type="button" role="tab" aria-selected="true" aria-controls="detail-result-panel-success" onclick="switchMCPResultDetailTab('success')">
+                            <span data-i18n="mcpDetailModal.correctInfo">正确信息</span>
+                        </button>
+                        <button id="detail-result-tab-raw" class="detail-result-tab" type="button" role="tab" aria-selected="false" aria-controls="detail-result-panel-raw" onclick="switchMCPResultDetailTab('raw')">
+                            <span data-i18n="mcpDetailModal.rawResponse">原始响应</span>
+                        </button>
                     </div>
-                </div>
-                <div class="detail-section detail-success-wrapper" id="detail-success-section" style="display: none;">
-                    <div class="detail-section-header">
-                        <h3 data-i18n="mcpDetailModal.correctInfo">正确信息</h3>
-                        <button class="btn-ghost" type="button" onclick="copyDetailBlock('detail-success', this)" data-i18n="mcpDetailModal.copyContent">复制内容</button>
+                    <div id="detail-result-panel-success" class="detail-result-panel active" role="tabpanel" aria-labelledby="detail-result-tab-success">
+                        <div class="detail-code-card detail-success-code-card">
+                            <pre id="detail-success" class="code-block"></pre>
+                        </div>
                     </div>
-                    <div class="detail-code-card">
-                        <pre id="detail-success" class="code-block"></pre>
+                    <div id="detail-result-panel-raw" class="detail-result-panel" role="tabpanel" aria-labelledby="detail-result-tab-raw" hidden>
+                        <div class="detail-code-card">
+                            <pre id="detail-response" class="code-block"></pre>
+                        </div>
                     </div>
                 </div>
                 <div class="detail-section detail-error-wrapper" id="detail-error-section" style="display: none;">

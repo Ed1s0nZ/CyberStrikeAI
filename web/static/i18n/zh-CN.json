@@ -3027,6 +3027,7 @@
     "responseResult": "响应结果",
     "copyContent": "复制内容",
     "correctInfo": "正确信息",
+    "rawResponse": "原始响应",
     "errorInfo": "错误信息",
     "copyError": "复制错误",
     "contentTruncated": "…（展示已截断；完整内容见 persisted-output 中的文件路径，用 read_file 读取）"

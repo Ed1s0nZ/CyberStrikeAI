@@ -3741,6 +3741,44 @@ function formatMCPResultJsonForDisplay(result, maxChars) {
     return json;
 }
 
+function switchMCPResultDetailTab(tabName) {
+    const normalized = tabName === 'raw' ? 'raw' : 'success';
+    const tabs = {
+        success: document.getElementById('detail-result-tab-success'),
+        raw: document.getElementById('detail-result-tab-raw')
+    };
+    const panels = {
+        success: document.getElementById('detail-result-panel-success'),
+        raw: document.getElementById('detail-result-panel-raw')
+    };
+    Object.keys(tabs).forEach(function (key) {
+        const isActive = key === normalized;
+        if (tabs[key]) {
+            tabs[key].classList.toggle('active', isActive);
+            tabs[key].setAttribute('aria-selected', isActive ? 'true' : 'false');
+        }
+        if (panels[key]) {
+            panels[key].classList.toggle('active', isActive);
+            panels[key].hidden = !isActive;
+        }
+    });
+}
+
+function setMCPResultDetailTabs(defaultTab, hasSuccessContent) {
+    const successTab = document.getElementById('detail-result-tab-success');
+    if (successTab) {
+        successTab.disabled = !hasSuccessContent;
+        successTab.classList.toggle('disabled', !hasSuccessContent);
+    }
+    switchMCPResultDetailTab(hasSuccessContent && defaultTab !== 'raw' ? 'success' : 'raw');
+}
+
+function copyActiveMCPResultDetail(triggerBtn = null) {
+    const activePanel = document.querySelector('#mcp-detail-modal .detail-result-panel.active');
+    const activeBlock = activePanel ? activePanel.querySelector('.code-block') : null;
+    copyDetailBlock(activeBlock ? activeBlock.id : 'detail-response', triggerBtn);
+}
+
 async function showMCPDetail(executionId) {
     try {
         openAppModal('mcp-detail-modal', { focus: false });
@@ -3784,7 +3822,6 @@ async function showMCPDetail(executionId) {
             
             // 响应结果 + 正确信息 / 错误信息
             const responseElement = document.getElementById('detail-response');
-            const successSection = document.getElementById('detail-success-section');
             const successElement = document.getElementById('detail-success');
             const errorSection = document.getElementById('detail-error-section');
             const errorElement = document.getElementById('detail-error');
@@ -3792,14 +3829,15 @@ async function showMCPDetail(executionId) {
             // 重置状态
             responseElement.className = 'code-block';
             responseElement.textContent = '';
-            if (successSection && successElement) {
-                successSection.style.display = 'none';
+            if (successElement) {
+                successElement.className = 'code-block';
                 successElement.textContent = '';
             }
             if (errorSection && errorElement) {
                 errorSection.style.display = 'none';
                 errorElement.textContent = '';
             }
+            setMCPResultDetailTabs('raw', false);
 
             if (exec.result) {
                 const agentVisibleText = truncateMCPDetailText(extractMCPResultText(exec.result), MCP_DETAIL_MAX_CHARS);
@@ -3808,6 +3846,10 @@ async function showMCPDetail(executionId) {
                 if (exec.result.isError) {
                     responseElement.className = 'code-block error';
                     responseElement.textContent = formatMCPResultJsonForDisplay(exec.result, MCP_DETAIL_MAX_CHARS);
+                    if (successElement) {
+                        successElement.textContent = '';
+                    }
+                    setMCPResultDetailTabs('raw', false);
                     if (exec.error && errorSection && errorElement) {
                         errorSection.style.display = 'block';
                         errorElement.textContent = exec.error;
@@ -3815,10 +3857,10 @@ async function showMCPDetail(executionId) {
                 } else {
                     responseElement.className = 'code-block';
                     responseElement.textContent = formatMCPResultJsonForDisplay(exec.result, MCP_DETAIL_MAX_CHARS);
-                    if (successSection && successElement) {
-                        successSection.style.display = 'block';
+                    if (successElement) {
                         successElement.textContent = agentVisibleText || emptyText;
                     }
+                    setMCPResultDetailTabs('success', true);
                 }
             } else {
                 if (normalizedStatus === 'running') {
@@ -3826,6 +3868,7 @@ async function showMCPDetail(executionId) {
                 } else {
                     responseElement.textContent = typeof window.t === 'function' ? window.t('chat.noResponseData') : '暂无响应数据';
                 }
+                setMCPResultDetailTabs('raw', false);
             }
 
             const abortSection = document.getElementById('detail-abort-section');
