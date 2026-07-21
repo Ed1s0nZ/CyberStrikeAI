@@ -837,6 +837,46 @@ func (a *Agent) CancelMCPToolExecutionWithNote(executionID, note string) bool {
 	return false
 }
 
+// CancelRunningMCPToolsForConversation cancels all currently running internal/external MCP executions
+// owned by the conversation. It is used when a session ends or the user stops a task.
+func (a *Agent) CancelRunningMCPToolsForConversation(conversationID, note string) int {
+	conversationID = strings.TrimSpace(conversationID)
+	if a == nil || conversationID == "" {
+		return 0
+	}
+	note = strings.TrimSpace(note)
+	seen := make(map[string]struct{})
+	cancelled := 0
+	cancelIfConversationMatches := func(execID string, get func(string) (*mcp.ToolExecution, bool), cancel func(string, string) bool) {
+		execID = strings.TrimSpace(execID)
+		if execID == "" {
+			return
+		}
+		if _, ok := seen[execID]; ok {
+			return
+		}
+		seen[execID] = struct{}{}
+		exec, ok := get(execID)
+		if !ok || exec == nil || strings.TrimSpace(exec.ConversationID) != conversationID {
+			return
+		}
+		if cancel(execID, note) {
+			cancelled++
+		}
+	}
+	if a.mcpServer != nil {
+		for execID := range a.mcpServer.ActiveRunningExecutionIDs() {
+			cancelIfConversationMatches(execID, a.mcpServer.GetExecution, a.mcpServer.CancelToolExecutionWithNote)
+		}
+	}
+	if a.externalMCPMgr != nil {
+		for execID := range a.externalMCPMgr.ActiveRunningExecutionIDs() {
+			cancelIfConversationMatches(execID, a.externalMCPMgr.GetExecution, a.externalMCPMgr.CancelToolExecutionWithNote)
+		}
+	}
+	return cancelled
+}
+
 // extractQuotedToolName 尝试从错误信息中提取被引用的工具名称
 func extractQuotedToolName(errMsg string) string {
 	start := strings.Index(errMsg, "\"")
