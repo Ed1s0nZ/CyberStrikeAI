@@ -51,6 +51,13 @@ Agent 调用工具
 | `wait_tool_execution` | 等待指定 execution 一段时间 |
 | `cancel_tool_execution` | 主动取消指定 execution |
 
+`get_tool_execution` 与 `wait_tool_execution` 支持返回运行中输出预览：
+
+- `include_partial_output`：是否返回 partial output，默认 `true`。
+- `partial_output_max_bytes`：本次返回的尾部预览上限，默认 `4096`，最大 `65536`。
+
+partial output 是“已产生输出的有界预览”，不等同于最终 `result`。最终 `result` 仍只在工具结束时写入 canonical execution 记录；不支持流式输出的工具不会返回 partial 字段。
+
 典型流程：
 
 ```text
@@ -59,6 +66,8 @@ Agent 调用工具
 3. Agent 可继续推理、改用其他工具，或调用 wait_tool_execution
 4. 仍未完成时可继续等待，或调用 cancel_tool_execution
 ```
+
+`tool_wait_timeout_seconds` 适用于内部 MCP、外部 MCP，以及 Eino filesystem 的流式 `execute`。Eino 的 `ls/read_file/write_file/edit_file/glob/grep` 等非流式 filesystem 工具会写入 execution 监控记录，但不作为后台 worker 做软等待续跑。
 
 ## 取消和会话清理
 

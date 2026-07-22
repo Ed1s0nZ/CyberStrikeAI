@@ -51,6 +51,13 @@ Important: when `wait_tool_execution` reaches `timeout_seconds` and the target e
 | `wait_tool_execution` | Wait for a selected execution for a bounded interval |
 | `cancel_tool_execution` | Cancel a selected execution |
 
+`get_tool_execution` and `wait_tool_execution` can include a live output preview:
+
+- `include_partial_output`: whether to return partial output, default `true`.
+- `partial_output_max_bytes`: tail preview limit for this call, default `4096`, maximum `65536`.
+
+Partial output is a bounded preview of output produced so far, not the final `result`. The canonical `result` is still written only when the tool finishes. Tools that do not support streaming output simply omit partial fields.
+
 Typical flow:
 
 ```text
@@ -59,6 +66,8 @@ Typical flow:
 3. Agent can continue reasoning, use other tools, or call wait_tool_execution
 4. If still incomplete, continue waiting or call cancel_tool_execution
 ```
+
+`tool_wait_timeout_seconds` applies to internal MCP tools, external MCP tools, and Eino filesystem's streaming `execute`. Eino's non-streaming filesystem tools such as `ls/read_file/write_file/edit_file/glob/grep` are recorded in execution monitoring, but they are not converted into resumable background workers.
 
 ## Cancellation and Session Cleanup
 
