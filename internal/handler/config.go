@@ -1517,6 +1517,7 @@ func (h *ConfigHandler) ApplyConfig(c *gin.Context) {
 	h.executor.SetToolOutputMaxBytes(h.config.MultiAgent.EinoMiddleware.ReductionMaxLengthForTruncEffective())
 	h.executor.SetToolOutputSpillRoot(h.config.MultiAgent.EinoMiddleware.ReductionRootDir)
 	h.executor.RegisterTools(h.mcpServer)
+	mcp.RegisterExecutionControlTools(h.mcpServer, h.externalMCPMgr)
 
 	// 重新注册漏洞记录工具（内置工具，必须注册）
 	if h.vulnerabilityToolRegistrar != nil {
