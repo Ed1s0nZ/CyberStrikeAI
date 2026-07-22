@@ -34,6 +34,7 @@ func main() {
 
 	// 注册工具
 	executor.RegisterTools(mcpServer)
+	mcp.RegisterExecutionControlTools(mcpServer, nil)
 
 	log.Logger.Info("MCP服务器（stdio模式）已启动，等待消息...")
 
