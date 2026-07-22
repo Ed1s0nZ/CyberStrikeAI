@@ -15,6 +15,8 @@ import (
 const (
 	defaultExecutionWaitTimeout = 60 * time.Second
 	maxExecutionWaitTimeout     = 10 * time.Minute
+	defaultPartialPreviewBytes  = 4096
+	maxPartialPreviewBytes      = 64 * 1024
 )
 
 // RegisterExecutionControlTools exposes execution handle operations to Eino as
@@ -32,7 +34,9 @@ func RegisterExecutionControlTools(server *Server, external *ExternalMCPManager)
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"execution_id": map[string]interface{}{"type": "string", "description": "工具执行 ID"},
+				"execution_id":             map[string]interface{}{"type": "string", "description": "工具执行 ID"},
+				"include_partial_output":   map[string]interface{}{"type": "boolean", "description": "是否返回运行中已产生输出的尾部预览，默认 true"},
+				"partial_output_max_bytes": map[string]interface{}{"type": "number", "description": "partial_output 最多返回字节数，默认 4096，最大 65536"},
 			},
 			"required": []string{"execution_id"},
 		},
@@ -45,7 +49,7 @@ func RegisterExecutionControlTools(server *Server, external *ExternalMCPManager)
 		if exec == nil {
 			return textToolResult("未找到该 execution_id: "+id, true), nil
 		}
-		return textToolResult(formatExecutionForModel(exec), false), nil
+		return textToolResult(formatExecutionForModel(exec, executionFormatOptionsFromArgs(args)), false), nil
 	})
 
 	server.RegisterTool(Tool{
@@ -55,8 +59,10 @@ func RegisterExecutionControlTools(server *Server, external *ExternalMCPManager)
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				"execution_id":    map[string]interface{}{"type": "string", "description": "工具执行 ID"},
-				"timeout_seconds": map[string]interface{}{"type": "number", "description": "本次最多等待秒数，默认 60，最大 600"},
+				"execution_id":             map[string]interface{}{"type": "string", "description": "工具执行 ID"},
+				"timeout_seconds":          map[string]interface{}{"type": "number", "description": "本次最多等待秒数，默认 60，最大 600"},
+				"include_partial_output":   map[string]interface{}{"type": "boolean", "description": "是否返回运行中已产生输出的尾部预览，默认 true"},
+				"partial_output_max_bytes": map[string]interface{}{"type": "number", "description": "partial_output 最多返回字节数，默认 4096，最大 65536"},
 			},
 			"required": []string{"execution_id"},
 		},
@@ -73,7 +79,7 @@ func RegisterExecutionControlTools(server *Server, external *ExternalMCPManager)
 		if snap == nil || snap.Execution == nil {
 			return textToolResult("未找到该 execution_id: "+id, true), nil
 		}
-		body := formatExecutionForModel(snap.Execution)
+		body := formatExecutionForModel(snap.Execution, executionFormatOptionsFromArgs(args))
 		if errors.Is(err, ErrExecutionWaitTimeout) {
 			body += "\n\n本次等待已到达 timeout_seconds，上述 execution 仍未完成。可继续等待、取消，或采用其他步骤。"
 		}
@@ -144,7 +150,25 @@ func lookupToolExecution(server *Server, external *ExternalMCPManager, id string
 	return nil
 }
 
-func formatExecutionForModel(exec *ToolExecution) string {
+type executionFormatOptions struct {
+	includePartialOutput bool
+	partialMaxBytes      int
+}
+
+func executionFormatOptionsFromArgs(args map[string]interface{}) executionFormatOptions {
+	includePartial := true
+	if raw, ok := args["include_partial_output"]; ok {
+		if b, ok := raw.(bool); ok {
+			includePartial = b
+		} else if s := strings.TrimSpace(fmt.Sprint(raw)); s != "" {
+			includePartial = strings.EqualFold(s, "true") || s == "1" || strings.EqualFold(s, "yes")
+		}
+	}
+	maxBytes := intArg(args, "partial_output_max_bytes", defaultPartialPreviewBytes, maxPartialPreviewBytes)
+	return executionFormatOptions{includePartialOutput: includePartial, partialMaxBytes: maxBytes}
+}
+
+func formatExecutionForModel(exec *ToolExecution, opts executionFormatOptions) string {
 	if exec == nil {
 		return "execution: null"
 	}
@@ -167,11 +191,31 @@ func formatExecutionForModel(exec *ToolExecution) string {
 		payload["result"] = ToolResultPlainText(exec.Result)
 		payload["is_error"] = exec.Result.IsError
 	}
+	if opts.includePartialOutput && exec.PartialOutput != "" {
+		partial := tailStringBytes(exec.PartialOutput, opts.partialMaxBytes)
+		payload["partial_output"] = partial
+		payload["partial_output_bytes"] = exec.PartialOutputBytes
+		payload["partial_output_truncated"] = exec.PartialOutputTruncated || len([]byte(partial)) < len([]byte(exec.PartialOutput))
+		if exec.PartialOutputUpdatedAt != nil {
+			payload["partial_output_updated_at"] = exec.PartialOutputUpdatedAt.Format(time.RFC3339)
+		}
+	}
 	b, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
 		return fmt.Sprintf("execution_id: %s\nstatus: %s\nerror: %s", exec.ID, exec.Status, exec.Error)
 	}
 	return string(b)
+}
+
+func tailStringBytes(s string, maxBytes int) string {
+	if maxBytes <= 0 {
+		maxBytes = defaultPartialPreviewBytes
+	}
+	b := []byte(s)
+	if len(b) <= maxBytes {
+		return s
+	}
+	return string(b[len(b)-maxBytes:])
 }
 
 func textToolResult(text string, isErr bool) *ToolResult {
@@ -221,4 +265,32 @@ func durationSecondsArg(args map[string]interface{}, key string, def, max time.D
 		return max
 	}
 	return d
+}
+
+func intArg(args map[string]interface{}, key string, def, max int) int {
+	if args == nil {
+		return def
+	}
+	var n int
+	switch v := args[key].(type) {
+	case int:
+		n = v
+	case int64:
+		n = int(v)
+	case float64:
+		n = int(v)
+	case json.Number:
+		i, _ := v.Int64()
+		n = int(i)
+	case string:
+		i, _ := strconv.Atoi(strings.TrimSpace(v))
+		n = i
+	}
+	if n <= 0 {
+		return def
+	}
+	if max > 0 && n > max {
+		return max
+	}
+	return n
 }

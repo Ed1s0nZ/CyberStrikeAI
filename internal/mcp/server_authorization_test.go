@@ -180,3 +180,41 @@ func TestWaitToolExecutionTimeoutIsObservationNotFailure(t *testing.T) {
 	}
 	close(release)
 }
+
+func TestGetToolExecutionIncludesBoundedPartialOutput(t *testing.T) {
+	server := NewServer(zap.NewNop())
+	RegisterExecutionControlTools(server, nil)
+
+	executionID := server.BeginToolExecution(context.Background(), "execute", map[string]interface{}{"command": "demo"})
+	if executionID == "" {
+		t.Fatal("missing execution id")
+	}
+	server.AppendToolExecutionPartialOutput(executionID, "first\n")
+	server.AppendToolExecutionPartialOutput(executionID, strings.Repeat("x", 32))
+
+	result, _, err := server.CallTool(context.Background(), "get_tool_execution", map[string]interface{}{
+		"execution_id":             executionID,
+		"partial_output_max_bytes": 8,
+	})
+	if err != nil {
+		t.Fatalf("get_tool_execution: %v", err)
+	}
+	body := ToolResultPlainText(result)
+	if !strings.Contains(body, `"partial_output": "xxxxxxxx"`) {
+		t.Fatalf("missing bounded partial output: %s", body)
+	}
+	if !strings.Contains(body, `"partial_output_bytes": 38`) {
+		t.Fatalf("missing partial byte count: %s", body)
+	}
+
+	result, _, err = server.CallTool(context.Background(), "get_tool_execution", map[string]interface{}{
+		"execution_id":           executionID,
+		"include_partial_output": false,
+	})
+	if err != nil {
+		t.Fatalf("get_tool_execution without partial: %v", err)
+	}
+	if body := ToolResultPlainText(result); strings.Contains(body, "partial_output") {
+		t.Fatalf("partial output should be omitted: %s", body)
+	}
+}

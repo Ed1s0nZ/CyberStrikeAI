@@ -59,6 +59,8 @@ type Server struct {
 	spillRootDir           string
 }
 
+const defaultPartialOutputMaxBytes = 64 * 1024
+
 // SetToolAuthorizer installs the common policy decision point for every
 // user-attributed tool call, whether it originates from HTTP or an Agent.
 func (s *Server) SetToolAuthorizer(authorizer func(context.Context, string, map[string]interface{}) error) {
@@ -1123,6 +1125,25 @@ func (s *Server) FinishToolExecution(ctx context.Context, executionID, toolName 
 	return id
 }
 
+// AppendToolExecutionPartialOutput records a bounded tail preview for a running local execution.
+// The final Result remains authoritative and is written only when the tool finishes.
+func (s *Server) AppendToolExecutionPartialOutput(executionID, chunk string) {
+	if s == nil || strings.TrimSpace(executionID) == "" || chunk == "" {
+		return
+	}
+	id := strings.TrimSpace(executionID)
+	if s.executionService != nil && s.executionService.AppendPartialOutput(id, chunk) {
+		return
+	}
+	now := time.Now()
+	s.mu.Lock()
+	exec := s.executions[id]
+	if exec != nil {
+		appendPartialOutput(exec, chunk, defaultPartialOutputMaxBytes, now)
+	}
+	s.mu.Unlock()
+}
+
 // RecordCompletedToolInvocation 将已在其它路径完成的工具调用写入监控存储（格式与 CallTool 结束后一致），
 // 用于 Eino ADK filesystem execute 等未经过 CallTool 的场景；返回 executionId 供助手消息 mcpExecutionIds 关联。
 func (s *Server) RecordCompletedToolInvocation(ctx context.Context, toolName string, args map[string]interface{}, resultText string, invokeErr error) string {
@@ -1204,6 +1225,24 @@ func (s *Server) unregisterRunningCancel(id string) {
 	s.runningCancelsMu.Lock()
 	delete(s.runningCancels, id)
 	s.runningCancelsMu.Unlock()
+}
+
+// RegisterToolExecutionCancel lets non-ExecutionService tool paths, such as Eino
+// filesystem execute, participate in cancel_tool_execution by execution_id.
+func (s *Server) RegisterToolExecutionCancel(id string, cancel context.CancelFunc) {
+	id = strings.TrimSpace(id)
+	if s == nil || id == "" || cancel == nil {
+		return
+	}
+	s.registerRunningCancel(id, cancel)
+}
+
+func (s *Server) UnregisterToolExecutionCancel(id string) {
+	id = strings.TrimSpace(id)
+	if s == nil || id == "" {
+		return
+	}
+	s.unregisterRunningCancel(id)
 }
 
 func (s *Server) readAbortUserNote(id string) string {

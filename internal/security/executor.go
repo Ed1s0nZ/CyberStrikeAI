@@ -74,6 +74,21 @@ func (e *Executor) SetToolOutputSpillRoot(rootDir string) {
 	e.spillRootDir = strings.TrimSpace(rootDir)
 }
 
+func (e *Executor) wrapToolOutputCallback(ctx context.Context, cb ToolOutputCallback) ToolOutputCallback {
+	executionID := mcp.MCPExecutionIDFromContext(ctx)
+	if e == nil || e.mcpServer == nil || strings.TrimSpace(executionID) == "" {
+		return cb
+	}
+	return func(chunk string) {
+		if chunk != "" {
+			e.mcpServer.AppendToolExecutionPartialOutput(executionID, chunk)
+		}
+		if cb != nil {
+			cb(chunk)
+		}
+	}
+}
+
 func (e *Executor) spillOptsFromContext(ctx context.Context) tooloutput.SpillOpts {
 	root := ""
 	if e != nil {
@@ -184,8 +199,9 @@ func (e *Executor) ExecuteTool(ctx context.Context, toolName string, args map[st
 	var output string
 	var err error
 	spill := e.spillOptsFromContext(ctx)
-	// 如果上层提供了 stdout/stderr 增量回调，则边执行边读取并回调。
-	if cb, ok := ctx.Value(ToolOutputCallbackCtxKey).(ToolOutputCallback); ok && cb != nil {
+	// 如果上层提供了 stdout/stderr 增量回调，或当前处于 MCP execution 中，则边执行边读取并回调。
+	if cb, ok := ctx.Value(ToolOutputCallbackCtxKey).(ToolOutputCallback); (ok && cb != nil) || mcp.MCPExecutionIDFromContext(ctx) != "" {
+		cb = e.wrapToolOutputCallback(ctx, cb)
 		output, err = streamCommandOutput(ctx, cmd, cb, ResolveShellNoOutputTimeoutSeconds(e.shellNoOutputTimeoutSec), e.toolOutputMaxBytes, spill)
 		if err != nil && shouldRetryWithPTY(output) {
 			e.logger.Info("检测到工具需要 TTY，使用 PTY 重试",
@@ -948,8 +964,9 @@ func (e *Executor) executeSystemCommand(ctx context.Context, args map[string]int
 	var output string
 	var err error
 	spill := e.spillOptsFromContext(ctx)
-	// 若上层提供工具输出增量回调，则边执行边流式读取。
-	if cb, ok := ctx.Value(ToolOutputCallbackCtxKey).(ToolOutputCallback); ok && cb != nil {
+	// 若上层提供工具输出增量回调，或当前处于 MCP execution 中，则边执行边流式读取。
+	if cb, ok := ctx.Value(ToolOutputCallbackCtxKey).(ToolOutputCallback); (ok && cb != nil) || mcp.MCPExecutionIDFromContext(ctx) != "" {
+		cb = e.wrapToolOutputCallback(ctx, cb)
 		output, err = streamCommandOutput(ctx, cmd, cb, ResolveShellNoOutputTimeoutSeconds(e.shellNoOutputTimeoutSec), e.toolOutputMaxBytes, spill)
 		if err != nil && shouldRetryWithPTY(output) {
 			e.logger.Info("检测到系统命令需要 TTY，使用 PTY 重试")

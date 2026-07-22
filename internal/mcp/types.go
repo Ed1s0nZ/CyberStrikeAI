@@ -199,6 +199,12 @@ type ToolExecution struct {
 	StartTime time.Time              `json:"startTime"`
 	EndTime   *time.Time             `json:"endTime,omitempty"`
 	Duration  time.Duration          `json:"duration,omitempty"`
+	// PartialOutput is a bounded tail preview of output produced by a running tool.
+	// It is intentionally separate from Result, which remains the final canonical tool result.
+	PartialOutput          string     `json:"partialOutput,omitempty"`
+	PartialOutputBytes     int64      `json:"partialOutputBytes,omitempty"`
+	PartialOutputTruncated bool       `json:"partialOutputTruncated,omitempty"`
+	PartialOutputUpdatedAt *time.Time `json:"partialOutputUpdatedAt,omitempty"`
 	// ConversationID 仅 API 展示用（进行中的 Agent 任务），不写入 tool_executions 表。
 	ConversationID string `json:"conversationId,omitempty"`
 	OwnerUserID    string `json:"-"`

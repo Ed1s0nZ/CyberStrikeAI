@@ -348,6 +348,22 @@ func (s *ExecutionService) Get(executionID string) (*ExecutionSnapshot, error) {
 	return s.getPersistedSnapshot(executionID)
 }
 
+func (s *ExecutionService) AppendPartialOutput(executionID, chunk string) bool {
+	id := strings.TrimSpace(executionID)
+	if s == nil || id == "" || chunk == "" {
+		return false
+	}
+	now := time.Now()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	entry := s.entries[id]
+	if entry == nil || entry.exec == nil {
+		return false
+	}
+	appendPartialOutput(entry.exec, chunk, defaultPartialOutputMaxBytes, now)
+	return true
+}
+
 func (s *ExecutionService) Cancel(executionID, note string) bool {
 	id := strings.TrimSpace(executionID)
 	if id == "" || s == nil {
@@ -582,5 +598,28 @@ func cloneToolExecution(in *ToolExecution) *ToolExecution {
 		t := *in.EndTime
 		out.EndTime = &t
 	}
+	if in.PartialOutputUpdatedAt != nil {
+		t := *in.PartialOutputUpdatedAt
+		out.PartialOutputUpdatedAt = &t
+	}
 	return &out
+}
+
+func appendPartialOutput(exec *ToolExecution, chunk string, maxBytes int, updatedAt time.Time) {
+	if exec == nil || chunk == "" {
+		return
+	}
+	if maxBytes <= 0 {
+		maxBytes = defaultPartialOutputMaxBytes
+	}
+	exec.PartialOutputBytes += int64(len([]byte(chunk)))
+	combined := exec.PartialOutput + chunk
+	if len([]byte(combined)) > maxBytes {
+		b := []byte(combined)
+		combined = string(b[len(b)-maxBytes:])
+		exec.PartialOutputTruncated = true
+	}
+	exec.PartialOutput = combined
+	t := updatedAt
+	exec.PartialOutputUpdatedAt = &t
 }

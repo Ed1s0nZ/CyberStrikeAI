@@ -73,6 +73,43 @@ func TestExecuteSystemCommand_BackgroundDoesNotBlockOnChildStdout(t *testing.T) 
 	}
 }
 
+func TestExecToolSoftWaitExposesPartialOutput(t *testing.T) {
+	executor, server := setupTestExecutor(t)
+	server.ConfigureToolWaitTimeoutSeconds(1)
+	mcp.RegisterExecutionControlTools(server, nil)
+	server.RegisterTool(mcp.Tool{Name: "exec", InputSchema: map[string]interface{}{"type": "object"}}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		return executor.ExecuteTool(ctx, "exec", args)
+	})
+
+	result, executionID, err := server.CallTool(context.Background(), "exec", map[string]interface{}{
+		"command": "for i in 1 2 3 4; do echo partial-$i; sleep 0.3; done; sleep 5",
+		"shell":   "sh",
+	})
+	if err != nil {
+		t.Fatalf("CallTool exec: %v", err)
+	}
+	if executionID == "" || result == nil || !result.IsError {
+		t.Fatalf("expected soft wait timeout, id=%q result=%#v", executionID, result)
+	}
+
+	status, _, err := server.CallTool(context.Background(), "get_tool_execution", map[string]interface{}{
+		"execution_id":             executionID,
+		"include_partial_output":   true,
+		"partial_output_max_bytes": 4096,
+	})
+	if err != nil {
+		t.Fatalf("get_tool_execution: %v", err)
+	}
+	body := mcp.ToolResultPlainText(status)
+	if !strings.Contains(body, `"status": "running"`) {
+		t.Fatalf("expected running execution, got: %s", body)
+	}
+	if !strings.Contains(body, "partial-") || !strings.Contains(body, "partial_output") {
+		t.Fatalf("expected partial output in execution status, got: %s", body)
+	}
+	server.CancelToolExecution(executionID)
+}
+
 func TestExecuteSystemCommand_FailureFormat(t *testing.T) {
 	executor, _ := setupTestExecutor(t)
 	res, err := executor.executeSystemCommand(context.Background(), map[string]interface{}{
