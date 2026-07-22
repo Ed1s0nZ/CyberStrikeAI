@@ -861,6 +861,19 @@ func (db *DB) einoReductionBaseDir() string {
 	return filepath.Join("tmp", "reduction")
 }
 
+// EinoReductionBaseDir returns the configured reduction cache root.
+func (db *DB) EinoReductionBaseDir() string {
+	return db.einoReductionBaseDir()
+}
+
+// ConversationArtifactsBaseDir returns the conversation-scoped artifacts root.
+func (db *DB) ConversationArtifactsBaseDir() string {
+	if db == nil {
+		return ""
+	}
+	return strings.TrimSpace(db.conversationArtifactsDir)
+}
+
 func (db *DB) einoWorkspaceBaseDir() string {
 	if db == nil {
 		return ""
