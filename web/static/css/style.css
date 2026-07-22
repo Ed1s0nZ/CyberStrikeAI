@@ -10767,6 +10767,11 @@ html[data-theme="dark"] .robot-binding-service-hint-icon {
     background: rgba(239, 68, 68, 0.1);
 }
 
+.mcp-stats-kpi__chip.is-neutral {
+    color: #475569;
+    background: rgba(100, 116, 139, 0.12);
+}
+
 .mcp-stats-kpi__status {
     font-size: 0.75rem;
     font-weight: 500;

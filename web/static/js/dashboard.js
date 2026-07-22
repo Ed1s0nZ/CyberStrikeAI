@@ -295,14 +295,18 @@ async function refreshDashboard() {
             toolsTotalCalls = s.totalCalls || 0;
             toolsFailedCount = s.failedCalls || 0;
             const totalSuccess = s.successCalls || 0;
+            const effectiveToolCalls = totalSuccess + toolsFailedCount;
             setEl('dashboard-kpi-tools-calls', formatNumber(toolsTotalCalls));
             setKpiSubText('dashboard-kpi-tools-sub-text',
                 dt('dashboard.toolsCountLabel', { count: toolsCount }, toolsCount + ' 个工具'));
-            if (toolsTotalCalls > 0) {
-                toolsSuccessRate = (totalSuccess / toolsTotalCalls) * 100;
+            if (effectiveToolCalls > 0) {
+                toolsSuccessRate = (totalSuccess / effectiveToolCalls) * 100;
                 const rateStr = toolsSuccessRate.toFixed(1) + '%';
                 setEl('dashboard-kpi-success-rate', rateStr);
                 setKpiRateBadge('dashboard-kpi-rate-sub-text', toolsSuccessRate, toolsFailedCount);
+            } else if (toolsTotalCalls > 0) {
+                setEl('dashboard-kpi-success-rate', '-');
+                setKpiSubText('dashboard-kpi-rate-sub-text', dt('dashboard.noCompletedYet', null, '暂无有效完成'));
             } else {
                 setEl('dashboard-kpi-success-rate', '-');
                 setKpiSubText('dashboard-kpi-rate-sub-text', dt('dashboard.noCallYet', null, '暂无调用'));
@@ -1500,19 +1504,19 @@ function renderVulnStatusPanel(byStatus, total) {
     setEl('dashboard-status-fp', formatNumber(fp));
     setEl('dashboard-status-ignored', formatNumber(ignored));
 
-    // 修复率：fixed / total（不计入 false_positive 时也可，按 total 维持一致）
-    var t = Number(total || 0);
-    var rate = t > 0 ? (fixed / t) * 100 : 0;
-    var rateStr = t > 0 ? rate.toFixed(rate >= 100 ? 0 : 1) + '%' : '-';
+    // 修复率只按需要处置的有效漏洞计算；误报/已忽略属于中性闭环，不拉低修复率。
+    var actionableTotal = open + confirmed + fixed;
+    var rate = actionableTotal > 0 ? (fixed / actionableTotal) * 100 : 0;
+    var rateStr = actionableTotal > 0 ? rate.toFixed(rate >= 100 ? 0 : 1) + '%' : '-';
     setEl('dashboard-fix-rate', rateStr);
 
     var detailEl = document.getElementById('dashboard-fix-detail');
     if (detailEl) {
-        detailEl.textContent = '(' + formatNumber(fixed) + ' / ' + formatNumber(t) + ')';
+        detailEl.textContent = '(' + formatNumber(fixed) + ' / ' + formatNumber(actionableTotal) + ')';
     }
 
-    var fixedPct = t > 0 ? (fixed / t) * 100 : 0;
-    var confirmedPct = t > 0 ? (confirmed / t) * 100 : 0;
+    var fixedPct = actionableTotal > 0 ? (fixed / actionableTotal) * 100 : 0;
+    var confirmedPct = actionableTotal > 0 ? (confirmed / actionableTotal) * 100 : 0;
     var fixedBar = document.getElementById('dashboard-fix-progress-fixed');
     var confirmedBar = document.getElementById('dashboard-fix-progress-confirmed');
     if (fixedBar) fixedBar.style.width = fixedPct.toFixed(2) + '%';

@@ -5293,10 +5293,14 @@ function getMcpMonitorTimelineRange() {
 
 function buildMonitorTotals(summary) {
     const s = summary && typeof summary === 'object' ? summary : {};
+    const total = s.totalCalls || 0;
+    const success = s.successCalls || 0;
+    const failed = s.failedCalls || 0;
     return {
-        total: s.totalCalls || 0,
-        success: s.successCalls || 0,
-        failed: s.failedCalls || 0,
+        total,
+        success,
+        failed,
+        neutral: Math.max(0, total - success - failed),
         lastCallTime: s.lastCallTime ? new Date(s.lastCallTime) : null,
     };
 }
@@ -6193,7 +6197,11 @@ function renderMcpStatsMetricsBar(totals, successRate, rateTone, rateSubText, la
     const lastCallLabel = mcpMonitorT('lastCall') || monitorFallback('最近一次调用', 'Last call');
     const successPill = mcpMonitorT('successCount', { n: totals.success }) || monitorFallback(`成功 ${totals.success}`, `Success ${totals.success}`);
     const failedPill = mcpMonitorT('failedCount', { n: totals.failed }) || monitorFallback(`失败 ${totals.failed}`, `Failed ${totals.failed}`);
+    const neutralPill = mcpMonitorT('neutralCount', { n: totals.neutral }) || monitorFallback(`终止 ${totals.neutral}`, `Stopped ${totals.neutral}`);
     const rateValue = hasCalls ? `${successRate}%` : successRate;
+    const neutralChip = totals.neutral > 0
+        ? `<span class="mcp-stats-kpi__chip is-neutral">${escapeHtml(neutralPill)}</span>`
+        : '';
 
     return `
         <div class="mcp-stats-kpi" role="group" aria-label="${escapeHtml(totalCallsLabel)}">
@@ -6205,6 +6213,7 @@ function renderMcpStatsMetricsBar(totals, successRate, rateTone, rateSubText, la
                     <div class="mcp-stats-kpi__meta">
                         <span class="mcp-stats-kpi__chip is-ok">${escapeHtml(successPill)}</span>
                         <span class="mcp-stats-kpi__chip is-fail">${escapeHtml(failedPill)}</span>
+                        ${neutralChip}
                     </div>
                 </div>
             </article>
@@ -6240,7 +6249,8 @@ function renderMcpStatsToolTable(topTools, totals, activeToolFilter = '') {
         const total = tool.totalCalls || 0;
         const success = tool.successCalls || 0;
         const failed = tool.failedCalls || 0;
-        const toolRateNum = total > 0 ? (success / total) * 100 : 0;
+        const effectiveTotal = success + failed;
+        const toolRateNum = effectiveTotal > 0 ? (success / effectiveTotal) * 100 : 0;
         const toolRate = toolRateNum.toFixed(1);
         const sharePct = totals.total > 0 ? ((total / totals.total) * 100).toFixed(1) : '0.0';
         const dotColor = MCP_STATS_DIST_COLORS[index % MCP_STATS_DIST_COLORS.length];
@@ -6318,7 +6328,8 @@ function renderMcpStatsToolsPanel(topTools, totals, activeToolFilter = '') {
         const total = tool.totalCalls || 0;
         const success = tool.successCalls || 0;
         const failed = tool.failedCalls || 0;
-        const toolRateNum = total > 0 ? (success / total) * 100 : 0;
+        const effectiveTotal = success + failed;
+        const toolRateNum = effectiveTotal > 0 ? (success / effectiveTotal) * 100 : 0;
         const toolRate = toolRateNum.toFixed(1);
         const sharePct = totals.total > 0 ? ((total / totals.total) * 100).toFixed(1) : '0.0';
         const color = MCP_STATS_DIST_COLORS[index % MCP_STATS_DIST_COLORS.length];
@@ -6453,17 +6464,19 @@ function renderMonitorStats(summary = null, topTools = [], lastFetchedAt = null)
         return;
     }
 
-    const hasCalls = totals.total > 0;
-    const successRateNum = hasCalls ? (totals.success / totals.total) * 100 : 0;
+    const effectiveTotal = totals.success + totals.failed;
+    const hasCalls = effectiveTotal > 0;
+    const successRateNum = hasCalls ? (totals.success / effectiveTotal) * 100 : 0;
     const successRate = hasCalls ? successRateNum.toFixed(1) : '-';
     const locale = (typeof window.__locale === 'string' && window.__locale.startsWith('zh')) ? 'zh-CN' : 'en-US';
     const noCallsYet = mcpMonitorT('noCallsYet') || monitorFallback('暂无调用', 'No calls yet');
+    const noCompletedYet = mcpMonitorT('noCompletedYet') || monitorFallback('暂无有效完成', 'No completed outcomes yet');
     const lastCallText = totals.lastCallTime
         ? (totals.lastCallTime.toLocaleString ? totals.lastCallTime.toLocaleString(locale) : String(totals.lastCallTime))
         : noCallsYet;
 
     const rateTone = hasCalls ? getMcpStatsRateTone(successRateNum) : 'is-muted';
-    let rateSubText = noCallsYet;
+    let rateSubText = totals.total > 0 ? noCompletedYet : noCallsYet;
     if (hasCalls) {
         rateSubText = mcpMonitorT('rateHealthy') || monitorFallback('运行平稳', 'Running smoothly');
         if (successRateNum < 80) rateSubText = mcpMonitorT('rateCritical') || monitorFallback('失败率偏高', 'High failure rate');
