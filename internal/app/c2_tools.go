@@ -75,6 +75,7 @@ tcp_reverse 默认仅接受 CSB1 加密 Beacon（AES-GCM + ImplantToken）才登
 				"bind_host":     map[string]interface{}{"type": "string", "description": "绑定地址，默认 127.0.0.1；外网监听常用 0.0.0.0"},
 				"callback_host": map[string]interface{}{"type": "string", "description": "可选：植入端/Payload 回连主机名（公网 IP 或域名）。写入 config_json；生成 oneliner/beacon 时优先于 bind_host。update 时传入空字符串可清除"},
 				"bind_port":     map[string]interface{}{"type": "integer", "description": fmt.Sprintf("绑定端口（create 必填）。须 ≠ %d（当前本服务 Web/API 端口，配置 server.port）", webListenPort), "minimum": 1, "maximum": 65535},
+				"project_id":    map[string]interface{}{"type": "string", "description": "所属项目 ID。create 省略时默认使用当前对话绑定项目；未绑定项目的对话则创建未绑定监听器"},
 				"profile_id":    map[string]interface{}{"type": "string", "description": "Malleable Profile ID"},
 				"remark":        map[string]interface{}{"type": "string", "description": "备注"},
 				"config":        map[string]interface{}{"type": "object", "description": "高级配置（beacon 路径/TLS/OPSEC 等），create/update 可用。tcp_reverse 可选 allow_legacy_shell:true 允许未加密经典 shell（默认 false）"},
@@ -116,6 +117,13 @@ tcp_reverse 默认仅接受 CSB1 加密 Beacon（AES-GCM + ImplantToken）才登
 				cfg = &c2.ListenerConfig{}
 				_ = json.Unmarshal(cfgBytes, cfg)
 			}
+			projectID := strings.TrimSpace(getString(params, "project_id"))
+			if projectID == "" {
+				projectID = mcpEffectiveProjectFilter(ctx, m.DB())
+				if projectID == database.ProjectFilterUnbound {
+					projectID = ""
+				}
+			}
 			input := c2.CreateListenerInput{
 				Name:         getString(params, "name"),
 				Type:         getString(params, "type"),
@@ -123,7 +131,7 @@ tcp_reverse 默认仅接受 CSB1 加密 Beacon（AES-GCM + ImplantToken）才登
 				BindPort:     int(getFloat64(params, "bind_port")),
 				ProfileID:    getString(params, "profile_id"),
 				Remark:       getString(params, "remark"),
-				ProjectID:    strings.TrimSpace(mcp.MCPProjectIDFromContext(ctx)),
+				ProjectID:    projectID,
 				Config:       cfg,
 				CallbackHost: getString(params, "callback_host"),
 			}

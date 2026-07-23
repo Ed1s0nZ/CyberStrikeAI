@@ -244,7 +244,20 @@ func authorizeC2Action(ctx context.Context, principal authctx.Principal, db *dat
 		return nil
 	}
 	if id == "" {
-		if action == "create" || action == "list" {
+		if action == "create" {
+			projectID := mcpAuthorizationString(args, "project_id")
+			if projectID == "" {
+				projectID = mcpEffectiveProjectFilter(ctx, db)
+				if projectID == database.ProjectFilterUnbound {
+					projectID = ""
+				}
+			}
+			if projectID != "" && (db == nil || !db.UserCanAccessResource(principal.UserID, principal.ScopeFor(permission), "project", projectID)) {
+				return fmt.Errorf("no access to project %s", projectID)
+			}
+			return nil
+		}
+		if action == "list" {
 			return nil
 		}
 		return fmt.Errorf("missing resource identifier %s", argument)
