@@ -3,6 +3,7 @@ package multiagent
 import (
 	"context"
 	"errors"
+	"io"
 	"strings"
 
 	"github.com/cloudwego/eino/adk"
@@ -65,11 +66,51 @@ func hitlClearReturnDirectlyIfTransfer(ctx context.Context, toolName string) {
 	})
 }
 
+func hitlEditedArgumentsNotice(original, edited string) string {
+	original = strings.TrimSpace(original)
+	edited = strings.TrimSpace(edited)
+	if edited == "" || edited == original {
+		return ""
+	}
+	return "[HITL] Human reviewer approved this tool call with edited arguments.\n" +
+		"Original arguments: " + original + "\n" +
+		"Executed arguments: " + edited + "\n\n"
+}
+
+func hitlPrependEditedArgumentsNotice(result, original, edited string) string {
+	notice := hitlEditedArgumentsNotice(original, edited)
+	if notice == "" {
+		return result
+	}
+	return notice + result
+}
+
+func hitlCollectStringStream(sr *schema.StreamReader[string]) (string, error) {
+	if sr == nil {
+		return "", nil
+	}
+	defer sr.Close()
+	var b strings.Builder
+	for {
+		chunk, err := sr.Recv()
+		if errors.Is(err, io.EOF) {
+			return b.String(), nil
+		}
+		if err != nil {
+			return b.String(), err
+		}
+		b.WriteString(chunk)
+	}
+}
+
 func hitlInvokableToolCallMiddleware() compose.InvokableToolMiddleware {
 	return func(next compose.InvokableToolEndpoint) compose.InvokableToolEndpoint {
 		return func(ctx context.Context, input *compose.ToolInput) (*compose.ToolOutput, error) {
+			originalArgs := ""
+			editedArgs := ""
 			if input != nil {
 				if fn, ok := ctx.Value(hitlInterceptorKey{}).(HITLToolInterceptor); ok && fn != nil {
+					originalArgs = input.Arguments
 					edited, err := fn(ctx, input.Name, input.Arguments)
 					if err != nil {
 						if IsHumanRejectError(err) {
@@ -85,11 +126,17 @@ func hitlInvokableToolCallMiddleware() compose.InvokableToolMiddleware {
 						return nil, err
 					}
 					if edited != "" {
+						editedArgs = edited
 						input.Arguments = edited
 					}
 				}
 			}
-			return next(ctx, input)
+			out, err := next(ctx, input)
+			if err != nil || out == nil {
+				return out, err
+			}
+			out.Result = hitlPrependEditedArgumentsNotice(out.Result, originalArgs, editedArgs)
+			return out, nil
 		}
 	}
 }
@@ -97,8 +144,11 @@ func hitlInvokableToolCallMiddleware() compose.InvokableToolMiddleware {
 func hitlStreamableToolCallMiddleware() compose.StreamableToolMiddleware {
 	return func(next compose.StreamableToolEndpoint) compose.StreamableToolEndpoint {
 		return func(ctx context.Context, input *compose.ToolInput) (*compose.StreamToolOutput, error) {
+			originalArgs := ""
+			editedArgs := ""
 			if input != nil {
 				if fn, ok := ctx.Value(hitlInterceptorKey{}).(HITLToolInterceptor); ok && fn != nil {
+					originalArgs = input.Arguments
 					edited, err := fn(ctx, input.Name, input.Arguments)
 					if err != nil {
 						if IsHumanRejectError(err) {
@@ -111,11 +161,26 @@ func hitlStreamableToolCallMiddleware() compose.StreamableToolMiddleware {
 						return nil, err
 					}
 					if edited != "" {
+						editedArgs = edited
 						input.Arguments = edited
 					}
 				}
 			}
-			return next(ctx, input)
+			out, err := next(ctx, input)
+			if err != nil || out == nil {
+				return out, err
+			}
+			if hitlEditedArgumentsNotice(originalArgs, editedArgs) == "" {
+				return out, nil
+			}
+			result, collectErr := hitlCollectStringStream(out.Result)
+			if collectErr != nil {
+				return nil, collectErr
+			}
+			out.Result = schema.StreamReaderFromArray([]string{
+				hitlPrependEditedArgumentsNotice(result, originalArgs, editedArgs),
+			})
+			return out, nil
 		}
 	}
 }
