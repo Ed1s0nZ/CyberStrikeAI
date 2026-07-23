@@ -67,6 +67,25 @@ Streaming endpoints are long-lived. Clients should:
 - disable proxy buffering;
 - pass `conversationId` when continuing a conversation.
 
+## File Management Sources
+
+The file management page and `GET /api/chat-uploads` group conversation-related files by source. Directory names still use project IDs or conversation IDs for stability, while the UI prefers project names or conversation titles and keeps the full ID available in tooltips or copied paths.
+
+| Source | `source` | Typical directory | Meaning | Mutability |
+| --- | --- | --- | --- | --- |
+| Workspace files | `workspace` | `tmp/workspace/projects/<projectId>/...`, `tmp/workspace/conversations/<conversationId>/...` | The Agent workspace for downloaded files, analysis scripts, intermediate results, and generated CSV/XLSX/Markdown files. If an AI-generated file is missing from the UI, check this source first. | Read-only listing; supports copy path, download, and export. |
+| Conversation artifacts | `conversation_artifact` | `data/conversation_artifacts/<conversationId>/...` | Conversation-scoped deliverables or archived artifacts such as summaries, reports, or middleware-generated artifacts. | Read-only listing; supports copy path, download, and export. |
+| Tool outputs | `reduction` | `tmp/reduction/projects/<projectId>/...`, `tmp/reduction/conversations/<conversationId>/...` | Persisted full tool outputs, scan raw data, or outputs saved before truncation. Useful for reviewing long command or scan results. | Read-only listing; supports copy path, download, and export. |
+| Chat uploads | `upload` | `chat_uploads/<date>/<conversationId>/...` | Files manually uploaded in chat or from the file management page. Copy the server absolute path into chat when the AI should reference a file. | Supports upload, mkdir, text edit, rename, delete, copy path, download, and export. |
+
+Related endpoints:
+
+- `GET /api/chat-uploads`: list files filtered by source, project, conversation, or filename.
+- `GET /api/chat-uploads/path`: resolve a file-management relative path or internal virtual path to a server absolute path for copy actions.
+- `GET /api/chat-uploads/download`: download a file.
+- `GET /api/chat-uploads/export`: export the current filtered result as a ZIP.
+- `POST /api/chat-uploads`: upload into the chat uploads directory.
+
 ## Asset Management and Bulk Import
 
 Asset endpoints:

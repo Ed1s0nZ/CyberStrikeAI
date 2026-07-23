@@ -74,6 +74,25 @@ Content-Type: application/json
 - `POST /api/conversations/:id/delete-turn`
 - `GET /api/messages/:id/process-details`
 
+## 文件管理来源
+
+文件管理页面和 `/api/chat-uploads` 列表接口会把对话相关文件按来源归类。底层目录仍使用项目 ID 或会话 ID 保持稳定，界面会优先显示项目名或对话标题，完整 ID 可在提示或路径中查看。
+
+| 来源 | `source` | 典型目录 | 说明 | 可变更性 |
+| --- | --- | --- | --- | --- |
+| 工作目录 | `workspace` | `tmp/workspace/projects/<projectId>/...`、`tmp/workspace/conversations/<conversationId>/...` | Agent 执行任务时保存下载文件、分析脚本、中间结果和生成的 CSV/XLSX/Markdown 等。用户反馈“AI 生成的文件找不到”时，通常先看这里。 | 只读展示；支持复制路径、下载、导出。 |
+| 会话产物 | `conversation_artifact` | `data/conversation_artifacts/<conversationId>/...` | 系统按会话归档的交付物或会话级产物，例如总结、报告、模型中间件生成的归档内容。 | 只读展示；支持复制路径、下载、导出。 |
+| 工具输出 | `reduction` | `tmp/reduction/projects/<projectId>/...`、`tmp/reduction/conversations/<conversationId>/...` | 超长工具输出、扫描原文或被截断前落盘的结果缓存。适合回看完整工具输出。 | 只读展示；支持复制路径、下载、导出。 |
+| 对话附件 | `upload` | `chat_uploads/<date>/<conversationId>/...` | 用户在对话或文件管理页手动上传的附件。需要让 AI 引用某文件时，可复制服务器绝对路径粘贴到对话中。 | 可上传、新建目录、编辑文本文件、重命名、删除、复制路径、下载、导出。 |
+
+相关接口：
+
+- `GET /api/chat-uploads`：按来源、项目、会话、文件名筛选文件。
+- `GET /api/chat-uploads/path`：把文件管理中的相对路径或内部虚拟路径解析为服务器绝对路径，用于复制文件或目录路径。
+- `GET /api/chat-uploads/download`：下载指定文件。
+- `GET /api/chat-uploads/export`：导出当前筛选结果为 ZIP。
+- `POST /api/chat-uploads`：上传到对话附件目录。
+
 ## 项目、漏洞、攻击链
 
 项目：
