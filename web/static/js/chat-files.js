@@ -3,6 +3,8 @@
 let chatFilesCache = [];
 /** 后端 GET /api/chat-uploads 返回的目录相对路径（含空文件夹），与 files 合并成树 */
 let chatFilesFoldersCache = [];
+const chatFilesProjectNameById = {};
+const chatFilesConversationTitleById = {};
 let chatFilesDisplayed = [];
 let chatFilesEditRelativePath = '';
 let chatFilesRenameRelativePath = '';
@@ -16,6 +18,7 @@ const CHAT_FILES_BROWSE_PATH_KEY = 'csai_chat_files_browse_path';
 const CHAT_FILES_PAGE_SIZE_STORAGE_KEY = 'csai_chat_files_page_size';
 const CHAT_FILES_TREE_UPLOAD_ROOT = 'uploads';
 const CHAT_FILES_TREE_REDUCTION_ROOT = 'tool_outputs';
+const CHAT_FILES_TREE_WORKSPACE_ROOT = 'workspace';
 const CHAT_FILES_TREE_ARTIFACT_ROOT = 'conversation_artifacts';
 
 /** 按文件夹浏览模式下的当前路径（虚拟根段数组），如 ['uploads','2024-03-21','uuid'] */
@@ -36,6 +39,19 @@ function closeAllChatFilesFilterSelects() {
         if (!reg || !reg.wrapper) return;
         reg.wrapper.classList.remove('open');
         if (reg.trigger) reg.trigger.setAttribute('aria-expanded', 'false');
+    });
+}
+
+function chatFilesRememberDisplayNames(files) {
+    Object.keys(chatFilesProjectNameById).forEach(function (k) { delete chatFilesProjectNameById[k]; });
+    Object.keys(chatFilesConversationTitleById).forEach(function (k) { delete chatFilesConversationTitleById[k]; });
+    (Array.isArray(files) ? files : []).forEach(function (f) {
+        const pid = String((f && f.projectId) || '').trim();
+        const pname = String((f && f.projectName) || '').trim();
+        if (pid && pname) chatFilesProjectNameById[pid] = pname;
+        const cid = String((f && f.conversationId) || '').trim();
+        const ctitle = String((f && f.conversationTitle) || '').trim();
+        if (cid && ctitle) chatFilesConversationTitleById[cid] = ctitle;
     });
 }
 
@@ -389,6 +405,7 @@ async function loadChatFilesPage() {
         }
         const data = await res.json();
         chatFilesCache = Array.isArray(data.files) ? data.files : [];
+        chatFilesRememberDisplayNames(chatFilesCache);
         chatFilesFoldersCache = Array.isArray(data.folders) ? data.folders : [];
         chatFilesTotal = Number.isFinite(Number(data.total)) ? Number(data.total) : chatFilesCache.length;
         chatFilesPage = Number.isFinite(Number(data.page)) ? Math.max(1, Number(data.page)) : chatFilesPage;
@@ -708,6 +725,10 @@ function chatFilesTreePathForFile(f) {
         rp = rp.replace(/^__reduction__\//, '');
         return CHAT_FILES_TREE_REDUCTION_ROOT + '/' + rp;
     }
+    if (source === 'workspace') {
+        rp = rp.replace(/^__workspace__\//, '');
+        return CHAT_FILES_TREE_WORKSPACE_ROOT + '/' + rp;
+    }
     if (source === 'conversation_artifact') {
         rp = rp.replace(/^__conversation_artifact__\//, '');
         return CHAT_FILES_TREE_ARTIFACT_ROOT + '/' + rp;
@@ -768,6 +789,7 @@ function chatFilesEnsureSourceRoots(root) {
     const roots = [];
     if (source === 'all' || source === 'upload') roots.push(CHAT_FILES_TREE_UPLOAD_ROOT);
     if (source === 'all' || source === 'reduction') roots.push(CHAT_FILES_TREE_REDUCTION_ROOT);
+    if (source === 'all' || source === 'workspace') roots.push(CHAT_FILES_TREE_WORKSPACE_ROOT);
     if (source === 'all' || source === 'conversation_artifact') roots.push(CHAT_FILES_TREE_ARTIFACT_ROOT);
     roots.forEach(function (name) {
         if (!root.dirs[name]) root.dirs[name] = chatFilesTreeMakeNode();
@@ -776,12 +798,15 @@ function chatFilesEnsureSourceRoots(root) {
 
 function chatFilesIsInternalSource(f) {
     const source = f && f.source;
-    return source === 'reduction' || source === 'conversation_artifact';
+    return source === 'reduction' || source === 'workspace' || source === 'conversation_artifact';
 }
 
 function chatFilesSourceLabel(source) {
     if (source === 'reduction') {
         return (typeof window.t === 'function') ? window.t('chatFilesPage.sourceReduction') : '工具输出';
+    }
+    if (source === 'workspace') {
+        return (typeof window.t === 'function') ? window.t('chatFilesPage.sourceWorkspace') : '工作目录';
     }
     if (source === 'conversation_artifact') {
         return (typeof window.t === 'function') ? window.t('chatFilesPage.sourceConversationArtifact') : '会话产物';
@@ -808,10 +833,64 @@ function chatFilesTreeDisplayName(name) {
     if (name === CHAT_FILES_TREE_REDUCTION_ROOT) {
         return (typeof window.t === 'function') ? window.t('chatFilesPage.treeReductionRoot') : '工具输出';
     }
+    if (name === CHAT_FILES_TREE_WORKSPACE_ROOT) {
+        return (typeof window.t === 'function') ? window.t('chatFilesPage.treeWorkspaceRoot') : '工作目录';
+    }
     if (name === CHAT_FILES_TREE_ARTIFACT_ROOT) {
         return (typeof window.t === 'function') ? window.t('chatFilesPage.treeArtifactsRoot') : '会话产物';
     }
     return name;
+}
+
+function chatFilesIDDisplay(id, labelMap, emptyLabel) {
+    const raw = id == null ? '' : String(id);
+    if (!raw || raw === '—') {
+        return { text: emptyLabel || '—', title: '' };
+    }
+    const label = String((labelMap && labelMap[raw]) || '').trim();
+    if (label) {
+        return { text: label, title: label + ' (' + raw + ')' };
+    }
+    if (raw.length > 36) {
+        return { text: raw.slice(0, 8) + '…' + raw.slice(-6), title: raw };
+    }
+    return { text: raw, title: raw };
+}
+
+function chatFilesConversationDisplay(id) {
+    const c = id == null ? '' : String(id);
+    if (typeof window.t === 'function') {
+        if (c === '_manual') {
+            return { text: window.t('chatFilesPage.convManual'), title: '_manual' };
+        }
+        if (c === '_new') {
+            return { text: window.t('chatFilesPage.convNew'), title: '_new' };
+        }
+    }
+    return chatFilesIDDisplay(c, chatFilesConversationTitleById);
+}
+
+function chatFilesProjectDisplay(id) {
+    const empty = (typeof window.t === 'function') ? window.t('chatFilesPage.projectUnbound') : '未绑定项目';
+    return chatFilesIDDisplay(id, chatFilesProjectNameById, empty);
+}
+
+function chatFilesTreePathDisplayName(pathParts) {
+    const parts = Array.isArray(pathParts) ? pathParts : [];
+    const name = parts.length ? parts[parts.length - 1] : '';
+    const root = parts[0] || '';
+    if ((root === CHAT_FILES_TREE_WORKSPACE_ROOT || root === CHAT_FILES_TREE_REDUCTION_ROOT) && parts.length === 3) {
+        if (parts[1] === 'projects') return chatFilesProjectDisplay(name);
+        if (parts[1] === 'conversations') return chatFilesConversationDisplay(name);
+    }
+    if (root === CHAT_FILES_TREE_ARTIFACT_ROOT && parts.length === 2) {
+        return chatFilesConversationDisplay(name);
+    }
+    if (root === CHAT_FILES_TREE_UPLOAD_ROOT && parts.length === 3) {
+        return chatFilesConversationDisplay(name);
+    }
+    const text = chatFilesTreeDisplayName(name);
+    return { text: text, title: String(name || '') };
 }
 
 function chatFilesUploadRelativeDirFromBrowsePath(path) {
@@ -893,32 +972,15 @@ function chatFilesBuildGroups(files, mode) {
 
 /** 分组标题：长 ID 缩短展示，完整值放在 title */
 function chatFilesGroupHeadingID(key, emptyLabel) {
-    const c = key == null ? '' : String(key);
-    if (c === '' || c === '—') {
-        return { text: emptyLabel || '—', title: '' };
-    }
-    if (c.length > 36) {
-        return { text: c.slice(0, 8) + '…' + c.slice(-6), title: c };
-    }
-    return { text: c, title: c };
+    return chatFilesIDDisplay(key, null, emptyLabel);
 }
 
 function chatFilesGroupHeadingConversation(key) {
-    const c = key == null ? '' : String(key);
-    if (typeof window.t === 'function') {
-        if (c === '_manual') {
-            return { text: window.t('chatFilesPage.convManual'), title: '_manual' };
-        }
-        if (c === '_new') {
-            return { text: window.t('chatFilesPage.convNew'), title: '_new' };
-        }
-    }
-    return chatFilesGroupHeadingID(key);
+    return chatFilesConversationDisplay(key);
 }
 
 function chatFilesGroupHeadingProject(key) {
-    const empty = (typeof window.t === 'function') ? window.t('chatFilesPage.projectUnbound') : '未绑定项目';
-    return chatFilesGroupHeadingID(key, empty);
+    return chatFilesProjectDisplay(key);
 }
 
 function renderChatFilesTable() {
@@ -965,7 +1027,9 @@ function renderChatFilesTable() {
         const isInternal = chatFilesIsInternalSource(f);
         const sourceBadge = isInternal ? '<span class="chat-files-source-badge">' + escapeHtml(chatFilesSourceLabel(f.source)) + '</span>' : '';
         const conv = f.conversationId || '';
-        const convEsc = escapeHtml(conv);
+        const convDisplay = chatFilesConversationDisplay(conv);
+        const convEsc = escapeHtml(convDisplay.text || conv);
+        const convTitleEsc = escapeHtml(convDisplay.title || conv);
         const dt = f.modifiedUnix ? new Date(f.modifiedUnix * 1000).toLocaleString() : '—';
         const canOpenChat = conv && conv !== '_manual' && conv !== '_new';
 
@@ -1011,7 +1075,7 @@ function renderChatFilesTable() {
 
         return `<tr>
             <td>${escapeHtml(f.date || '—')}</td>
-            <td class="chat-files-cell-conv"><code title="${convEsc}">${convEsc}</code></td>
+            <td class="chat-files-cell-conv"><code title="${convTitleEsc}">${convEsc}</code></td>
             <td class="chat-files-cell-subpath" title="${escapeHtml(subRaw || '')}">${subCellInner}</td>
             <td class="chat-files-cell-name" title="${escapeHtml(pathForTitle)}">${nameEsc}${sourceBadge}</td>
             <td>${formatChatFileBytes(f.size || 0)}</td>
@@ -1072,11 +1136,14 @@ function renderChatFilesTable() {
         for (bi = 0; bi < chatFilesBrowsePath.length; bi++) {
             const seg = chatFilesBrowsePath[bi];
             const isLast = bi === chatFilesBrowsePath.length - 1;
+            const display = chatFilesTreePathDisplayName(chatFilesBrowsePath.slice(0, bi + 1));
+            const displayText = escapeHtml(display.text);
+            const displayTitle = display.title ? ' title="' + escapeHtml(display.title) + '"' : '';
             breadcrumbHtml += '<span class="chat-files-breadcrumb-sep">/</span>';
             if (isLast) {
-                breadcrumbHtml += '<span class="chat-files-breadcrumb-current">' + escapeHtml(chatFilesTreeDisplayName(seg)) + '</span>';
+                breadcrumbHtml += '<span class="chat-files-breadcrumb-current"' + displayTitle + '>' + displayText + '</span>';
             } else {
-                breadcrumbHtml += '<button type="button" class="chat-files-breadcrumb-link" onclick="chatFilesNavigateBreadcrumb(' + bi + ')">' + escapeHtml(chatFilesTreeDisplayName(seg)) + '</button>';
+                breadcrumbHtml += '<button type="button" class="chat-files-breadcrumb-link" onclick="chatFilesNavigateBreadcrumb(' + bi + ')"' + displayTitle + '>' + displayText + '</button>';
             }
         }
         breadcrumbHtml += '</nav>';
@@ -1098,6 +1165,8 @@ function renderChatFilesTable() {
         function rowHtmlBrowseFolder(name) {
             const nameAttr = encodeURIComponent(String(name));
             const folderPath = chatFilesBrowsePath.concat([name]);
+            const folderDisplay = chatFilesTreePathDisplayName(folderPath);
+            const folderTitle = folderDisplay.title || tEnter;
             const relToFolder = folderPath.join('/');
             const uploadDirAttr = encodeURIComponent(relToFolder);
             const canUploadFolder = chatFilesBrowseCanUploadToPath(folderPath);
@@ -1109,8 +1178,8 @@ function renderChatFilesTable() {
                 ? `<button type="button" class="btn-icon btn-danger" title="${tDeleteFolder}" data-chat-folder-name="${nameAttr}" onclick="chatFilesDeleteFolderFromBtn(event, this)">${svgTrash}</button>`
                 : '';
             return `<tr class="chat-files-tr-folder chat-files-tr-folder--nav" role="button" tabindex="0" data-chat-folder-name="${nameAttr}" onclick="chatFilesOnFolderRowClick(event)" onkeydown="chatFilesOnFolderRowKeydown(event)">
-                <td class="chat-files-tree-name-cell chat-files-tree-name-cell--folder" title="${tEnter}">
-                    <span class="chat-files-tree-name-inner">${svgFolder}<span class="chat-files-tree-name-text">${escapeHtml(chatFilesTreeDisplayName(name))}</span></span>
+                <td class="chat-files-tree-name-cell chat-files-tree-name-cell--folder" title="${escapeHtml(folderTitle)}">
+                    <span class="chat-files-tree-name-inner">${svgFolder}<span class="chat-files-tree-name-text">${escapeHtml(folderDisplay.text)}</span></span>
                 </td>
                 <td class="chat-files-tree-muted">—</td>
                 <td class="chat-files-tree-muted">—</td>
@@ -1351,7 +1420,25 @@ function chatFilesDeleteFolderFromBtn(ev, btn) {
 
 async function copyChatFolderPathFromBrowse(folderName) {
     const segs = chatFilesBrowsePath.concat([folderName]);
-    const text = chatFilesClipboardFolderPath(segs);
+    const relativePath = chatFilesRelativePathFromTreeSegments(segs);
+    let text = '';
+    if (relativePath) {
+        try {
+            const res = await apiFetch('/api/chat-uploads/path?kind=directory&path=' + encodeURIComponent(relativePath));
+            if (!res.ok) {
+                const raw = await res.text();
+                throw new Error(raw || String(res.status));
+            }
+            const data = await res.json();
+            text = String((data && data.absolutePath) || '').trim();
+        } catch (e) {
+            alert((e && e.message) ? e.message : String(e));
+            return;
+        }
+    }
+    if (!text) {
+        text = chatFilesClipboardFolderPath(segs);
+    }
     const ok = await chatFilesCopyText(text);
     if (ok) {
         const msg = (typeof window.t === 'function') ? window.t('chatFilesPage.folderPathCopied') : '目录路径已复制';
@@ -1360,6 +1447,25 @@ async function copyChatFolderPathFromBrowse(folderName) {
         const fail = (typeof window.t === 'function') ? window.t('common.copyFailed') : '复制失败';
         alert(fail);
     }
+}
+
+function chatFilesRelativePathFromTreeSegments(segs) {
+    const parts = Array.isArray(segs) ? segs.slice() : [];
+    if (!parts.length) return '';
+    const root = parts.shift();
+    if (root === CHAT_FILES_TREE_UPLOAD_ROOT) {
+        return parts.length ? parts.join('/') : '.';
+    }
+    if (root === CHAT_FILES_TREE_REDUCTION_ROOT) {
+        return '__reduction__/' + parts.join('/');
+    }
+    if (root === CHAT_FILES_TREE_WORKSPACE_ROOT) {
+        return '__workspace__/' + parts.join('/');
+    }
+    if (root === CHAT_FILES_TREE_ARTIFACT_ROOT) {
+        return '__conversation_artifact__/' + parts.join('/');
+    }
+    return [root].concat(parts).join('/');
 }
 
 function chatFilesClipboardFolderPath(segs) {
