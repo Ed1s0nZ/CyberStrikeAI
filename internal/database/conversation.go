@@ -835,6 +835,11 @@ func (db *DB) ConversationArtifactsBaseDir() string {
 	return strings.TrimSpace(db.conversationArtifactsDir)
 }
 
+// EinoWorkspaceBaseDir returns the configured agent workspace root.
+func (db *DB) EinoWorkspaceBaseDir() string {
+	return db.einoWorkspaceBaseDir()
+}
+
 func (db *DB) einoWorkspaceBaseDir() string {
 	if db == nil {
 		return ""
