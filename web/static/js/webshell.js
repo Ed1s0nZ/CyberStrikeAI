@@ -4831,11 +4831,7 @@ function showAddWebshellModal() {
     if (osSelEl) osSelEl.value = 'auto';
     var encSelEl = document.getElementById('webshell-encoding');
     if (encSelEl) encSelEl.value = 'auto';
-    var defaultProjectId = '';
-    try {
-        defaultProjectId = typeof getActiveProjectId === 'function' ? (getActiveProjectId() || '') : '';
-    } catch (e) {}
-    populateWebshellProjectSelect(defaultProjectId);
+    populateWebshellProjectSelect('');
     document.getElementById('webshell-remark').value = '';
     var titleEl = document.getElementById('webshell-modal-title');
     if (titleEl) titleEl.textContent = wsT('webshell.addConnection');
