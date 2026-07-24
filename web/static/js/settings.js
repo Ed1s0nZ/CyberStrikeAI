@@ -2519,7 +2519,7 @@ function ensureAIConfigShape(cfg) {
 
 function readAIChannelFromMainForm(id) {
     const prev = currentConfig?.ai?.channels?.[id] || {};
-    const maxCompletionTokens = parseInt(document.getElementById('openai-max-completion-tokens')?.value, 10) || 16384;
+    const maxCompletionTokens = parseInt(document.getElementById('openai-max-completion-tokens')?.value, 10) || 32768;
     return {
         ...prev,
         name: (document.getElementById('ai-channel-name')?.value || '').trim() || prev.name || id,
@@ -2559,7 +2559,7 @@ function writeAIChannelToMainForm(id) {
     const maxTokensEl = document.getElementById('openai-max-total-tokens');
     if (maxTokensEl) maxTokensEl.value = ch.max_total_tokens || 120000;
     const maxCompletionTokensEl = document.getElementById('openai-max-completion-tokens');
-    if (maxCompletionTokensEl) maxCompletionTokensEl.value = ch.max_completion_tokens || 16384;
+    if (maxCompletionTokensEl) maxCompletionTokensEl.value = ch.max_completion_tokens || 32768;
     const r = ch.reasoning || {};
     const modeEl = document.getElementById('openai-reasoning-mode');
     if (modeEl) modeEl.value = ['auto', 'on', 'off'].includes(String(r.mode || '').toLowerCase()) ? String(r.mode).toLowerCase() : 'auto';
@@ -2973,7 +2973,7 @@ function createAIChannelFromForm() {
         base_url: '',
         model: '',
         max_total_tokens: 120000,
-        max_completion_tokens: 16384,
+        max_completion_tokens: 32768,
         reasoning: { mode: 'auto', effort: '', profile: 'auto', allow_client_reasoning: true }
     };
     selectedAIChannelId = id;
