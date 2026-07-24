@@ -7,7 +7,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func TestProcessDetailsSummaryPairsMixedIdentifiedAndIDLessResults(t *testing.T) {
+func TestProcessDetailsSummaryDoesNotGuessIDLessResultsByOrder(t *testing.T) {
 	db, conversationID, messageID := setupProcessDetailsSummaryTest(t)
 	for _, id := range []string{"call-1", "call-2", "call-3", "call-4"} {
 		if err := db.AddProcessDetail(messageID, conversationID, "tool_call", "call", map[string]interface{}{
@@ -32,12 +32,22 @@ func TestProcessDetailsSummaryPairsMixedIdentifiedAndIDLessResults(t *testing.T)
 	if err != nil {
 		t.Fatalf("GetProcessDetailsSummary: %v", err)
 	}
-	if len(summary.ToolExecutions) != 4 {
-		t.Fatalf("tool executions = %d, want 4", len(summary.ToolExecutions))
+	if len(summary.ToolExecutions) != 6 {
+		t.Fatalf("tool executions = %d, want 6", len(summary.ToolExecutions))
 	}
-	for i, execution := range summary.ToolExecutions {
+	for i, execution := range summary.ToolExecutions[:2] {
 		if execution.Status != "completed" {
 			t.Fatalf("execution %d status = %q, want completed", i, execution.Status)
+		}
+	}
+	for i, execution := range summary.ToolExecutions[2:4] {
+		if execution.Status != "result_missing" {
+			t.Fatalf("unmatched call %d status = %q, want result_missing", i, execution.Status)
+		}
+	}
+	for i, execution := range summary.ToolExecutions[4:] {
+		if execution.Status != "completed" || execution.ToolCallID != "" {
+			t.Fatalf("idless result %d = %#v, want separate completed result without toolCallId", i, execution)
 		}
 	}
 }

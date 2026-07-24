@@ -674,48 +674,6 @@ func (m *ExternalMCPManager) updateToolCache(name string, tools []Tool) {
 
 // CallTool 调用外部MCP工具（返回执行ID）
 func (m *ExternalMCPManager) CallTool(ctx context.Context, toolName string, args map[string]interface{}) (*ToolResult, string, error) {
-	_, authenticated := authctx.PrincipalFromContext(ctx)
-	m.mu.RLock()
-	authorizer := m.toolAuthorizer
-	m.mu.RUnlock()
-	if authorizer != nil {
-		if err := authorizer(ctx, toolName, args); err != nil {
-			return nil, "", fmt.Errorf("external tool authorization denied: %w", err)
-		}
-	} else if authenticated {
-		return nil, "", fmt.Errorf("external tool authorization policy is not configured")
-	}
-	// 解析工具名称：name::toolName
-	var mcpName, actualToolName string
-	if idx := findSubstring(toolName, "::"); idx > 0 {
-		mcpName = toolName[:idx]
-		actualToolName = toolName[idx+2:]
-	} else {
-		return nil, "", fmt.Errorf("无效的工具名称格式: %s", toolName)
-	}
-
-	client, exists := m.GetClient(mcpName)
-	if !exists {
-		return nil, "", fmt.Errorf("外部MCP客户端不存在: %s", mcpName)
-	}
-	if err := m.checkExternalMCPCircuit(mcpName); err != nil {
-		return nil, "", err
-	}
-
-	// 检查连接状态，如果未连接或状态为error，不允许调用
-	if !client.IsConnected() {
-		status := client.GetStatus()
-		if status == "error" {
-			// 获取错误信息（如果有）
-			errorMsg := m.GetError(mcpName)
-			if errorMsg != "" {
-				return nil, "", fmt.Errorf("外部MCP连接失败: %s (错误: %s)", mcpName, errorMsg)
-			}
-			return nil, "", fmt.Errorf("外部MCP连接失败: %s", mcpName)
-		}
-		return nil, "", fmt.Errorf("外部MCP客户端未连接: %s (状态: %s)", mcpName, status)
-	}
-
 	if m.executionService == nil {
 		m.executionService = NewExecutionService(m.storage, m.logger)
 		m.executionService.ConfigureToolResultMaxBytes(m.toolResultMaxBytes)
@@ -725,12 +683,57 @@ func (m *ExternalMCPManager) CallTool(ctx context.Context, toolName string, args
 	if principal, ok := authctx.PrincipalFromContext(ctx); ok {
 		ownerUserID = principal.UserID
 	}
+	var mcpName, actualToolName string
+	var client ExternalMCPClient
 	handle, err := m.executionService.Submit(ctx, ExecutionRequest{
 		ToolName:       toolName,
 		Arguments:      args,
 		ConversationID: MCPConversationIDFromContext(ctx),
 		OwnerUserID:    ownerUserID,
 		PreRun: func(runCtx context.Context, exec *ToolExecution) (func(), error) {
+			_, authenticated := authctx.PrincipalFromContext(runCtx)
+			m.mu.RLock()
+			authorizer := m.toolAuthorizer
+			m.mu.RUnlock()
+			if authorizer != nil {
+				if err := authorizer(runCtx, toolName, args); err != nil {
+					return nil, fmt.Errorf("external tool authorization denied: %w", err)
+				}
+			} else if authenticated {
+				return nil, fmt.Errorf("external tool authorization policy is not configured")
+			}
+
+			// 解析工具名称：name::toolName
+			if idx := findSubstring(toolName, "::"); idx > 0 {
+				mcpName = toolName[:idx]
+				actualToolName = toolName[idx+2:]
+			} else {
+				return nil, fmt.Errorf("无效的工具名称格式: %s", toolName)
+			}
+
+			var exists bool
+			client, exists = m.GetClient(mcpName)
+			if !exists {
+				return nil, fmt.Errorf("外部MCP客户端不存在: %s", mcpName)
+			}
+			if err := m.checkExternalMCPCircuit(mcpName); err != nil {
+				return nil, err
+			}
+
+			// 检查连接状态，如果未连接或状态为error，不允许调用
+			if !client.IsConnected() {
+				status := client.GetStatus()
+				if status == "error" {
+					// 获取错误信息（如果有）
+					errorMsg := m.GetError(mcpName)
+					if errorMsg != "" {
+						return nil, fmt.Errorf("外部MCP连接失败: %s (错误: %s)", mcpName, errorMsg)
+					}
+					return nil, fmt.Errorf("外部MCP连接失败: %s", mcpName)
+				}
+				return nil, fmt.Errorf("外部MCP客户端未连接: %s (状态: %s)", mcpName, status)
+			}
+
 			release, acquireErr := m.acquireExternalMCPCallSlot(runCtx, mcpName)
 			if acquireErr != nil {
 				return nil, acquireErr
@@ -746,7 +749,9 @@ func (m *ExternalMCPManager) CallTool(ctx context.Context, toolName string, args
 		},
 		OnDone: func(exec *ToolExecution) {
 			failed := exec != nil && exec.Status != ToolExecutionStatusCompleted && exec.Status != ToolExecutionStatusCancelled
-			m.recordExternalMCPResult(mcpName, failed)
+			if mcpName != "" {
+				m.recordExternalMCPResult(mcpName, failed)
+			}
 			m.updateStats(toolName, failed)
 		},
 	})

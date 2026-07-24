@@ -1424,7 +1424,8 @@ func (db *DB) GetProcessDetailsSummary(messageID string) (*ProcessDetailsSummary
 	seenExecIDs := make(map[string]bool)
 	// A provider may reuse a fallback toolCallId across streaming rounds. Keep a
 	// FIFO per ID instead of a single index so every persisted call gets at most
-	// one result. Results without an ID fall back to the oldest unmatched call.
+	// one result. Results without a stable ID are kept separate instead of being
+	// guessed by order; showing no link is safer than linking to the wrong tool.
 	toolIndexesByCallID := make(map[string][]int)
 	lastMatchedToolIndexByCallID := make(map[string]int)
 	matchedToolIndexes := make([]bool, 0)
@@ -1499,7 +1500,7 @@ func (db *DB) GetProcessDetailsSummary(messageID string) (*ProcessDetailsSummary
 					}
 				}
 			}
-			if idx < 0 {
+			if idx < 0 && toolCallID != "" {
 				for nextUnmatchedToolIdx < len(matchedToolIndexes) && matchedToolIndexes[nextUnmatchedToolIdx] {
 					nextUnmatchedToolIdx++
 				}

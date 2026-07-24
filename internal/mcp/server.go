@@ -895,25 +895,6 @@ func (s *Server) GetAllTools() []Tool {
 
 // CallTool 直接调用工具（用于内部调用）
 func (s *Server) CallTool(ctx context.Context, toolName string, args map[string]interface{}) (*ToolResult, string, error) {
-	_, authenticated := authctx.PrincipalFromContext(ctx)
-	s.mu.RLock()
-	authorizer := s.toolAuthorizer
-	s.mu.RUnlock()
-	if authorizer != nil {
-		if err := authorizer(ctx, toolName, args); err != nil {
-			return nil, "", fmt.Errorf("tool authorization denied: %w", err)
-		}
-	} else if authenticated {
-		return nil, "", errors.New("tool authorization policy is not configured")
-	}
-	s.mu.RLock()
-	handler, exists := s.tools[toolName]
-	s.mu.RUnlock()
-
-	if !exists {
-		return nil, "", fmt.Errorf("工具 %s 未找到", toolName)
-	}
-
 	if s.executionService == nil {
 		s.executionService = NewExecutionService(s.storage, s.logger)
 		s.executionService.ConfigureToolResultMaxBytes(s.toolResultMaxBytes)
@@ -929,6 +910,21 @@ func (s *Server) CallTool(ctx context.Context, toolName string, args map[string]
 		ConversationID: MCPConversationIDFromContext(ctx),
 		OwnerUserID:    ownerUserID,
 		Run: func(runCtx context.Context) (*ToolResult, error) {
+			_, authenticated := authctx.PrincipalFromContext(runCtx)
+			s.mu.RLock()
+			authorizer := s.toolAuthorizer
+			handler, exists := s.tools[toolName]
+			s.mu.RUnlock()
+			if authorizer != nil {
+				if err := authorizer(runCtx, toolName, args); err != nil {
+					return nil, fmt.Errorf("tool authorization denied: %w", err)
+				}
+			} else if authenticated {
+				return nil, errors.New("tool authorization policy is not configured")
+			}
+			if !exists {
+				return nil, fmt.Errorf("工具 %s 未找到", toolName)
+			}
 			return handler(runCtx, args)
 		},
 		OnDone: func(exec *ToolExecution) {

@@ -23,8 +23,19 @@ func TestToolAuthorizerIsUniversalAndExecutionKeepsOwner(t *testing.T) {
 		}
 		return nil
 	})
-	if _, _, err := server.CallTool(context.Background(), "echo", nil); err == nil {
+	_, deniedExecutionID, err := server.CallTool(context.Background(), "echo", nil)
+	if err == nil {
 		t.Fatal("tool call without principal was allowed")
+	}
+	if deniedExecutionID == "" {
+		t.Fatal("denied tool call should still return an execution id")
+	}
+	deniedExecution, ok := server.GetExecution(deniedExecutionID)
+	if !ok || deniedExecution == nil {
+		t.Fatalf("missing denied execution %q", deniedExecutionID)
+	}
+	if deniedExecution.Status != ToolExecutionStatusFailed || !strings.Contains(deniedExecution.Error, "principal required") {
+		t.Fatalf("denied execution = %#v, want failed with authorization error", deniedExecution)
 	}
 	ctx := authctx.WithPrincipal(context.Background(), authctx.NewPrincipal("u1", "user", "assigned", map[string]bool{"mcp:execute": true}))
 	_, executionID, err := server.CallTool(ctx, "echo", nil)
