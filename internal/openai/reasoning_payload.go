@@ -1,6 +1,8 @@
 package openai
 
 import (
+	"strings"
+
 	"github.com/bytedance/sonic"
 )
 
@@ -52,6 +54,28 @@ func StripReasoningIfForcedToolChoice(rawBody []byte) ([]byte, error) {
 	return out, nil
 }
 
+// StripToolChoiceForThinkingMode removes tool_choice while preserving tools and
+// thinking fields. DeepSeek thinking mode can use tools, but rejects the
+// tool_choice parameter itself on some agent requests.
+func StripToolChoiceForThinkingMode(rawBody []byte) ([]byte, error) {
+	var payload map[string]any
+	if err := sonic.Unmarshal(rawBody, &payload); err != nil {
+		return rawBody, nil
+	}
+	if !thinkingModeEnabledByPayload(payload) {
+		return rawBody, nil
+	}
+	if _, ok := payload["tool_choice"]; !ok {
+		return rawBody, nil
+	}
+	delete(payload, "tool_choice")
+	out, err := sonic.Marshal(payload)
+	if err != nil {
+		return rawBody, err
+	}
+	return out, nil
+}
+
 func stripReasoningFields(payload map[string]any) bool {
 	changed := false
 	for _, key := range reasoningPayloadKeys {
@@ -76,4 +100,18 @@ func forcedToolChoiceIncompatibleWithThinking(payload map[string]any) bool {
 	default:
 		return false
 	}
+}
+
+func thinkingModeEnabledByPayload(payload map[string]any) bool {
+	thinking, ok := payload["thinking"]
+	if !ok || thinking == nil {
+		// DeepSeek enables thinking by default unless explicitly disabled.
+		return true
+	}
+	if m, ok := thinking.(map[string]any); ok {
+		if typ, ok := m["type"].(string); ok && strings.EqualFold(strings.TrimSpace(typ), "disabled") {
+			return false
+		}
+	}
+	return true
 }

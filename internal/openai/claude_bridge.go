@@ -893,7 +893,7 @@ func NewEinoHTTPClient(cfg *config.OpenAIConfig, base *http.Client) *http.Client
 	if transport == nil {
 		transport = http.DefaultTransport
 	}
-	transport = &reasoningToolChoiceCompatRoundTripper{base: transport}
+	transport = &reasoningToolChoiceCompatRoundTripper{base: transport, cfg: cfg}
 	if isClaudeProvider(cfg) {
 		transport = &claudeRoundTripper{
 			base:   transport,

@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"cyberstrike-ai/internal/config"
 )
 
 // reasoningToolChoiceCompatRoundTripper strips thinking/reasoning fields from
@@ -13,6 +15,7 @@ import (
 // when thinking mode is enabled on the same request.
 type reasoningToolChoiceCompatRoundTripper struct {
 	base http.RoundTripper
+	cfg  *config.OpenAIConfig
 }
 
 func (rt *reasoningToolChoiceCompatRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -32,7 +35,13 @@ func (rt *reasoningToolChoiceCompatRoundTripper) RoundTrip(req *http.Request) (*
 		return nil, err
 	}
 
-	patched, perr := StripReasoningIfForcedToolChoice(body)
+	patched := body
+	var perr error
+	if isDeepSeekToolChoiceCompatProfile(rt.cfg) {
+		patched, perr = StripToolChoiceForThinkingMode(body)
+	} else {
+		patched, perr = StripReasoningIfForcedToolChoice(body)
+	}
 	if perr != nil {
 		patched = body
 	}
@@ -40,4 +49,20 @@ func (rt *reasoningToolChoiceCompatRoundTripper) RoundTrip(req *http.Request) (*
 	req.ContentLength = int64(len(patched))
 	req.Header.Set("Content-Length", strconv.Itoa(len(patched)))
 	return rt.base.RoundTrip(req)
+}
+
+func isDeepSeekToolChoiceCompatProfile(cfg *config.OpenAIConfig) bool {
+	if cfg == nil {
+		return false
+	}
+	profile := strings.ToLower(strings.TrimSpace(cfg.Reasoning.ProfileEffective()))
+	if profile == "deepseek" || profile == "deepseek_compat" {
+		return true
+	}
+	if profile != "" && profile != "auto" {
+		return false
+	}
+	baseURL := strings.ToLower(cfg.BaseURL)
+	model := strings.ToLower(cfg.Model)
+	return strings.Contains(baseURL, "deepseek") || strings.Contains(model, "deepseek")
 }
