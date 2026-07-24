@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 	"testing"
@@ -68,6 +69,80 @@ func TestAgent_NewAgent_CustomConfig(t *testing.T) {
 
 	if agent.maxIterations != 15 {
 		t.Errorf("迭代次数不匹配。期望: 15, 实际: %d", agent.maxIterations)
+	}
+}
+
+func TestBuildToolFailureMessageAuthorizationDenied(t *testing.T) {
+	msg := buildToolFailureMessage(
+		"list_project_facts",
+		"tool authorization denied: no access to project",
+		errors.New("tool authorization denied: no access to project"),
+	)
+	for _, want := range []string{
+		"工具名称: list_project_facts",
+		"错误详情: tool authorization denied: no access to project",
+	} {
+		if !strings.Contains(msg, want) {
+			t.Fatalf("message missing %q:\n%s", want, msg)
+		}
+	}
+	for _, notWant := range []string{
+		"可能的原因",
+		"建议",
+		"错误类型",
+		"工具 \"list_project_facts\" 不存在或未启用",
+		"单次执行超时",
+	} {
+		if strings.Contains(msg, notWant) {
+			t.Fatalf("message should not include generic hint %q:\n%s", notWant, msg)
+		}
+	}
+}
+
+func TestBuildToolFailureMessageCanceled(t *testing.T) {
+	msg := buildToolFailureMessage(
+		"long_running_tool",
+		"工具调用已被手动终止（MCP 监控页）。智能体将携带此结果继续后续步骤，整条任务不会因此被停止。",
+		context.Canceled,
+	)
+
+	for _, want := range []string{
+		"工具名称: long_running_tool",
+		"错误详情: 工具调用已被手动终止",
+	} {
+		if !strings.Contains(msg, want) {
+			t.Fatalf("message missing %q:\n%s", want, msg)
+		}
+	}
+}
+
+func TestBuildToolFailureMessageDeadlineExceeded(t *testing.T) {
+	msg := buildToolFailureMessage(
+		"nmap",
+		"工具执行超过 15 分钟被自动终止（可在 config.yaml 的 agent.tool_timeout_minutes 中调整）",
+		context.DeadlineExceeded,
+	)
+
+	for _, want := range []string{
+		"工具名称: nmap",
+		"错误详情: 工具执行超过 15 分钟被自动终止",
+	} {
+		if !strings.Contains(msg, want) {
+			t.Fatalf("message missing %q:\n%s", want, msg)
+		}
+	}
+}
+
+func TestBuildToolFailureMessageUnknownKeepsGenericFallback(t *testing.T) {
+	msg := buildToolFailureMessage("custom_tool", "dial tcp: connection reset by peer", errors.New("dial tcp: connection reset by peer"))
+
+	for _, want := range []string{
+		"工具名称: custom_tool",
+		"错误详情: dial tcp: connection reset by peer",
+	} {
+		if !strings.Contains(msg, want) {
+			t.Fatalf("message missing %q:\n%s", want, msg)
+		}
 	}
 }
 
