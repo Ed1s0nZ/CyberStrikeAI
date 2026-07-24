@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
-var factKeyPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._/-]*$`)
+var factKeyPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._/-]*$`)
 
 // ValidateFactKey 校验事实 key（项目内唯一标识）。
 func ValidateFactKey(key string) error {
@@ -22,7 +22,7 @@ func ValidateFactKey(key string) error {
 		return fmt.Errorf("fact_key 过长（最多 128 字符）")
 	}
 	if !factKeyPattern.MatchString(key) {
-		return fmt.Errorf("fact_key 格式无效，仅允许小写字母、数字及 . _ / -，且须以小写字母或数字开头")
+		return fmt.Errorf("fact_key 格式无效，仅允许字母、数字及 . _ / -，且须以字母或数字开头（支持驼峰命名）")
 	}
 	return nil
 }
