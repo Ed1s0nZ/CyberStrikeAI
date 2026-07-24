@@ -4568,3 +4568,4 @@ document.addEventListener('languagechange', function () {
 
 window.initSettingsCustomSelects = initSettingsCustomSelects;
 window.refreshSettingsCustomSelects = refreshSettingsCustomSelects;
+window.closeAllSettingsCustomSelects = closeAllSettingsCustomSelects;

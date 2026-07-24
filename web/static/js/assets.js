@@ -57,6 +57,12 @@ function syncAssetSelect(selectOrId) {
     if (typeof syncSettingsCustomSelect === 'function') syncSettingsCustomSelect(select);
 }
 
+function closeAssetCustomSelects() {
+    if (typeof closeAllSettingsCustomSelects === 'function') {
+        closeAllSettingsCustomSelects();
+    }
+}
+
 function assetT(key, fallback, options) {
     if (window.i18next && typeof window.i18next.t === 'function') {
         const value = window.i18next.t(key, options || {});
@@ -874,6 +880,7 @@ async function openAssetProjectModal() {
 }
 
 function closeAssetProjectModal() {
+    closeAssetCustomSelects();
     if (typeof closeAppModal === 'function') closeAppModal('asset-project-modal');
     else document.getElementById('asset-project-modal').style.display = 'none';
 }
@@ -922,6 +929,7 @@ function openAssetBulkEdit() {
 }
 
 function closeAssetBulkEdit() {
+    closeAssetCustomSelects();
     if (typeof closeAppModal === 'function') closeAppModal('asset-bulk-edit-modal');
     else document.getElementById('asset-bulk-edit-modal').style.display = 'none';
 }
@@ -1279,6 +1287,7 @@ async function openAssetEditor(indexOrAsset) {
 
 function closeAssetEditor(force) {
     if (!force && assetPageState.editorDirty && !confirm(assetT('assets.discardChanges', '放弃尚未保存的更改吗？'))) return;
+    closeAssetCustomSelects();
     if (typeof closeAppModal === 'function') closeAppModal('asset-editor-modal');
     else document.getElementById('asset-editor-modal').style.display = 'none';
     const returnFocus = assetPageState.editorReturnFocus;
