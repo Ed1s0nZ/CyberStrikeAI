@@ -34,7 +34,39 @@ Saved workflows can be bound to a role under **Role Management**. When `workflow
 
 ---
 
-## 3. Execution model (read this before configuring)
+## 3. Natural-language Draft Generation
+
+The Workflows page provides a **Create from natural language** entry point. After a user describes a security operations goal, CyberStrikeAI generates an editable draft and returns a structured audit result:
+
+- Draft generation does not save, dry-run, or execute tools automatically.
+- The server endpoint is `POST /api/workflows/generate-draft`, protected by `workflow:write`.
+- The response includes `graph`, `meta`, `capabilities`, `audit`, and `stats`; after applying the draft to the canvas, normal save validation still runs.
+- High-risk language such as executing scripts, isolating hosts, blocking, deleting, or exploitation is marked as `high_risk` and defaults to HITL approval or `requires_human_confirmation`.
+- Tool capabilities are matched against the available tool list; unmatched capabilities fall back to Agent draft nodes and are surfaced in `audit.missing_fields` / `audit.assumptions`.
+- If server generation is unavailable, the frontend uses a local deterministic fallback and still returns an editable draft with risk notes.
+
+Example request:
+
+```http
+POST /api/workflows/generate-draft
+Content-Type: application/json
+
+{
+  "prompt": "Scan target assets for open ports, create a vulnerability task when critical ports are found, ask the owner for approval, and output a report",
+  "options": {
+    "include_objective": true,
+    "allow_schedule": false,
+    "allow_high_risk": false
+  },
+  "available_tools": [
+    { "key": "nmap", "name": "nmap", "enabled": true }
+  ]
+}
+```
+
+---
+
+## 4. Execution model (read this before configuring)
 
 The engine executes the workflow as a **directed graph**, starting from the **Start** node and following edges to downstream nodes.
 
@@ -116,7 +148,7 @@ Agent B still receives Agent A’s output even when a condition node lies betwee
 
 ---
 
-## 4. Template syntax
+## 5. Template syntax
 
 ### 4.1 Basic format
 
@@ -198,7 +230,7 @@ Field bindings can read ordinary fields such as `output` or `message`, and also 
 
 ---
 
-## 5. Node types and configuration
+## 6. Node types and configuration
 
 ### 5.1 Start
 
@@ -318,7 +350,7 @@ Optional node for an end summary template (less common in role-bound flows).
 
 ---
 
-## 6. Edge configuration
+## 7. Edge configuration
 
 Select an **edge** to configure its **condition** in the right panel.
 
@@ -335,7 +367,7 @@ If no edge condition is set:
 
 ---
 
-## 7. Full example: passing Agent output across a condition
+## 8. Full example: passing Agent output across a condition
 
 ### 7.1 Graph structure
 
@@ -384,7 +416,7 @@ Start → Agent (initial value) → Condition → Agent (transform) → Output
 
 ---
 
-## 8. Bind to a role and run
+## 9. Bind to a role and run
 
 ### 8.1 Bind in Role Management
 
@@ -414,7 +446,7 @@ If no Output node is reached or no branch matches, `outputs` may be empty and th
 
 ---
 
-## 9. Debugging, dry-run, and replay
+## 10. Debugging, dry-run, and replay
 
 ### 9.1 Safe dry-run
 
@@ -487,7 +519,7 @@ Token and cost metrics depend on whether the underlying model/Agent events repor
 
 ---
 
-## 10. Validation before save
+## 11. Validation before save
 
 On save, the system checks:
 
@@ -510,7 +542,7 @@ On save, the system checks:
 
 ---
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
@@ -526,7 +558,7 @@ On save, the system checks:
 
 ---
 
-## 12. Best practices
+## 13. Best practices
 
 1. **Meaningful names**: Use descriptive output variable names (`scan_result`, `parsed_targets`) instead of reusing `agent_result` everywhere.  
 2. **Prefer `outputs` for cross-node data**: If a condition, tool, or HITL node might sit in between, use named variables.  
@@ -539,7 +571,7 @@ On save, the system checks:
 
 ---
 
-## 13. Code references (for developers)
+## 14. Code references (for developers)
 
 | Module | Path |
 |--------|------|
