@@ -1424,6 +1424,7 @@ type ProcessDetailsSummary struct {
 
 type ProcessDetailsToolExecution struct {
 	ProcessDetailID string `json:"processDetailId,omitempty"`
+	ResultDetailID  string `json:"resultDetailId,omitempty"`
 	ToolName        string `json:"toolName,omitempty"`
 	ToolCallID      string `json:"toolCallId,omitempty"`
 	ExecutionID     string `json:"executionId,omitempty"`
@@ -1552,6 +1553,7 @@ func (db *DB) GetProcessDetailsSummary(messageID string) (*ProcessDetailsSummary
 				if toolCallID != "" {
 					lastMatchedToolIndexByCallID[toolCallID] = idx
 				}
+				summary.ToolExecutions[idx].ResultDetailID = strings.TrimSpace(detailID)
 				if summary.ToolExecutions[idx].ToolName == "" {
 					summary.ToolExecutions[idx].ToolName = toolName
 				}

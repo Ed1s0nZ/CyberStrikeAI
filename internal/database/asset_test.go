@@ -383,7 +383,12 @@ func TestAssetScanLinkReturnsTimeAndRelatedVulnerabilities(t *testing.T) {
 	if linked.LastScanAt == nil || linked.LastScanConversationID != conv.ID || linked.VulnerabilityCount != 1 || linked.RiskLevel != "high" {
 		t.Fatalf("unexpected scan metadata: %#v", linked)
 	}
-	if _, err := db.Exec(`UPDATE vulnerabilities SET status='fixed' WHERE conversation_id=?`, conv.ID); err != nil {
+	vulns, err := db.ListVulnerabilities(10, 0, VulnerabilityListFilter{ConversationID: conv.ID})
+	if err != nil || len(vulns) != 1 {
+		t.Fatalf("list linked vulnerabilities: len=%d err=%v", len(vulns), err)
+	}
+	vulns[0].Status = "fixed"
+	if err := db.UpdateVulnerability(vulns[0].ID, vulns[0]); err != nil {
 		t.Fatal(err)
 	}
 	resolved, err := db.GetAsset(assets[0].ID, RBACListAccess{Scope: RBACScopeAll})

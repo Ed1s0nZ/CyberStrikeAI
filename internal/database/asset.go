@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 	"golang.org/x/net/idna"
 )
 
@@ -50,6 +51,7 @@ type Asset struct {
 	LastScanTaskID         string     `json:"last_scan_task_id,omitempty"`
 	VulnerabilityCount     int        `json:"vulnerability_count"`
 	RiskLevel              string     `json:"risk_level"`
+	RiskScore              int        `json:"-"`
 	OwnerUserID            string     `json:"-"`
 }
 
@@ -443,15 +445,15 @@ func assetWhere(filter AssetListFilter, access RBACListAccess) (string, []interf
 		args = append(args, *filter.Port)
 	}
 	if filter.RiskLevel != "" {
-		query += " AND " + assetRiskLevelExpr + " = ?"
+		query += " AND " + assetRiskLevelCachedExpr + " = ?"
 		args = append(args, strings.ToLower(strings.TrimSpace(filter.RiskLevel)))
 	}
 	if filter.MinVulnerabilities != nil {
-		query += " AND " + assetVulnerabilityCountExpr + " >= ?"
+		query += " AND " + assetVulnerabilityCountCachedExpr + " >= ?"
 		args = append(args, *filter.MinVulnerabilities)
 	}
 	if filter.MaxVulnerabilities != nil {
-		query += " AND " + assetVulnerabilityCountExpr + " <= ?"
+		query += " AND " + assetVulnerabilityCountCachedExpr + " <= ?"
 		args = append(args, *filter.MaxVulnerabilities)
 	}
 	for _, item := range []struct {
@@ -573,20 +575,24 @@ const assetVulnerabilityMatchExpr = `(
 
 const assetVulnerabilityCountExpr = `(SELECT COUNT(DISTINCT v.id) FROM vulnerabilities v WHERE ` + assetVulnerabilityMatchExpr + `)`
 
-const assetRiskScoreExpr = `COALESCE((
+const assetRiskScoreQueryExpr = `COALESCE((
 	SELECT MAX(CASE LOWER(COALESCE(v.severity,'')) WHEN 'critical' THEN 5 WHEN 'high' THEN 4 WHEN 'medium' THEN 3 WHEN 'low' THEN 2 WHEN 'info' THEN 1 ELSE 0 END)
 	FROM vulnerabilities v
 	WHERE LOWER(COALESCE(v.status,'open')) NOT IN ('fixed','false_positive','ignored') AND ` + assetVulnerabilityMatchExpr + `
 ),0)`
 
-const assetRiskLevelExpr = `(CASE WHEN ` + assetEffectiveLastScanExpr + ` IS NULL THEN 'unassessed' ELSE CASE ` + assetRiskScoreExpr + `
+const assetRiskLevelQueryExpr = `(CASE WHEN ` + assetEffectiveLastScanExpr + ` IS NULL THEN 'unassessed' ELSE CASE ` + assetRiskScoreQueryExpr + `
 	WHEN 5 THEN 'critical' WHEN 4 THEN 'high' WHEN 3 THEN 'medium' WHEN 2 THEN 'low' WHEN 1 THEN 'info' ELSE 'normal' END END)`
+
+const assetVulnerabilityCountCachedExpr = `COALESCE(assets.vulnerability_count,0)`
+const assetRiskScoreCachedExpr = `COALESCE(assets.risk_score,0)`
+const assetRiskLevelCachedExpr = `COALESCE(NULLIF(assets.risk_level,''),'unassessed')`
 
 const assetSelectColumns = `assets.id,COALESCE(assets.project_id,''),COALESCE(p.name,''),assets.host,assets.ip,assets.port,assets.domain,assets.protocol,assets.title,assets.server,assets.country,
 	assets.province,assets.city,assets.responsible_person,assets.department,assets.business_system,assets.environment,assets.criticality,
 	assets.source,assets.source_query,assets.status,assets.tags_json,assets.first_seen_at,assets.last_seen_at,assets.created_at,assets.updated_at,
 	` + assetEffectiveLastScanExpr + `,COALESCE(assets.last_scan_conversation_id,''),COALESCE(assets.last_scan_queue_id,''),COALESCE(assets.last_scan_task_id,''),
-	` + assetVulnerabilityCountExpr + `,` + assetRiskLevelExpr
+	` + assetVulnerabilityCountCachedExpr + `,` + assetRiskLevelCachedExpr
 
 // MarkAssetScanned links an asset to the conversation or batch subtask created from it.
 // The link lets the asset list show the latest scan time and vulnerabilities produced by that scan.
@@ -600,6 +606,9 @@ func (db *DB) MarkAssetScanned(id, conversationID, queueID, taskID string, acces
 	n, _ := res.RowsAffected()
 	if n == 0 {
 		return sql.ErrNoRows
+	}
+	if err := db.RefreshAssetRiskCache(id); err != nil {
+		return err
 	}
 	return nil
 }
@@ -629,6 +638,9 @@ func (db *DB) CompleteAssetScan(id, conversationID string, access RBACListAccess
 	if n == 0 {
 		return sql.ErrNoRows
 	}
+	if err := db.RefreshAssetRiskCache(id); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -636,6 +648,136 @@ func (db *DB) BatchTaskBelongsToQueue(taskID, queueID string) bool {
 	var count int
 	err := db.QueryRow(`SELECT COUNT(*) FROM batch_tasks WHERE id=? AND queue_id=?`, strings.TrimSpace(taskID), strings.TrimSpace(queueID)).Scan(&count)
 	return err == nil && count > 0
+}
+
+func assetRiskLevelFromScore(score int, scanned bool) string {
+	if !scanned {
+		return "unassessed"
+	}
+	switch score {
+	case 5:
+		return "critical"
+	case 4:
+		return "high"
+	case 3:
+		return "medium"
+	case 2:
+		return "low"
+	case 1:
+		return "info"
+	default:
+		return "normal"
+	}
+}
+
+// RefreshAssetRiskCache recalculates the denormalized fields used by the asset
+// list. Keeping this in the database layer makes Web API and MCP writes share
+// one consistency path.
+func (db *DB) RefreshAssetRiskCache(assetID string) error {
+	assetID = strings.TrimSpace(assetID)
+	if assetID == "" {
+		return nil
+	}
+	var count int
+	if err := db.QueryRow("SELECT "+assetVulnerabilityCountExpr+" FROM assets WHERE assets.id=?", assetID).Scan(&count); err != nil {
+		if err == sql.ErrNoRows {
+			return nil
+		}
+		return fmt.Errorf("刷新资产漏洞数量失败: %w", err)
+	}
+	var score int
+	if err := db.QueryRow("SELECT "+assetRiskScoreQueryExpr+" FROM assets WHERE assets.id=?", assetID).Scan(&score); err != nil {
+		return fmt.Errorf("刷新资产风险分数失败: %w", err)
+	}
+	var lastScan interface{}
+	if err := db.QueryRow("SELECT "+assetEffectiveLastScanExpr+" FROM assets WHERE assets.id=?", assetID).Scan(&lastScan); err != nil {
+		return fmt.Errorf("刷新资产扫描状态失败: %w", err)
+	}
+	level := assetRiskLevelFromScore(score, lastScan != nil)
+	if _, err := db.Exec(`UPDATE assets SET vulnerability_count=?, risk_score=?, risk_level=? WHERE id=?`, count, score, level, assetID); err != nil {
+		return fmt.Errorf("更新资产风险缓存失败: %w", err)
+	}
+	return nil
+}
+
+func (db *DB) RefreshAllAssetRiskCache() error {
+	rows, err := db.Query(`SELECT id FROM assets`)
+	if err != nil {
+		return fmt.Errorf("查询资产列表失败: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		if err := db.RefreshAssetRiskCache(id); err != nil {
+			return err
+		}
+	}
+	return rows.Err()
+}
+
+func (db *DB) AssetIDsForVulnerabilityConversations(conversationIDs []string) ([]string, error) {
+	seen := map[string]struct{}{}
+	cleaned := make([]string, 0, len(conversationIDs))
+	for _, id := range conversationIDs {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		cleaned = append(cleaned, id)
+	}
+	if len(cleaned) == 0 {
+		return nil, nil
+	}
+	placeholders := strings.TrimRight(strings.Repeat("?,", len(cleaned)), ",")
+	args := make([]interface{}, 0, len(cleaned)*2)
+	for _, id := range cleaned {
+		args = append(args, id)
+	}
+	for _, id := range cleaned {
+		args = append(args, id)
+	}
+	rows, err := db.Query(`SELECT DISTINCT assets.id FROM assets
+		WHERE assets.last_scan_conversation_id IN (`+placeholders+`)
+		OR assets.last_scan_task_id IN (SELECT bt.id FROM batch_tasks bt WHERE bt.conversation_id IN (`+placeholders+`))`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("查询受影响资产失败: %w", err)
+	}
+	defer rows.Close()
+	assetIDs := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		assetIDs = append(assetIDs, id)
+	}
+	return assetIDs, rows.Err()
+}
+
+func (db *DB) RefreshAssetRiskCacheForConversations(conversationIDs ...string) error {
+	assetIDs, err := db.AssetIDsForVulnerabilityConversations(conversationIDs)
+	if err != nil {
+		return err
+	}
+	for _, id := range assetIDs {
+		if err := db.RefreshAssetRiskCache(id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (db *DB) refreshAssetRiskCacheForConversationsBestEffort(conversationIDs ...string) {
+	if err := db.RefreshAssetRiskCacheForConversations(conversationIDs...); err != nil && db.logger != nil {
+		db.logger.Warn("刷新资产风险缓存失败", zap.Error(err))
+	}
 }
 
 func (db *DB) ListAssets(limit, offset int, filter AssetListFilter, access RBACListAccess) ([]*Asset, int, error) {
@@ -726,9 +868,9 @@ func assetOrderBy(sortBy, sortOrder string) string {
 	case "port":
 		expression = "assets.port"
 	case "vulnerability_count":
-		expression = assetVulnerabilityCountExpr
+		expression = assetVulnerabilityCountCachedExpr
 	case "risk_level":
-		expression = assetRiskScoreExpr
+		expression = assetRiskScoreCachedExpr
 	default:
 		expression = "assets.last_seen_at"
 	}

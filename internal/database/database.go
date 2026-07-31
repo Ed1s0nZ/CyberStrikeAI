@@ -421,6 +421,7 @@ func (db *DB) initTables() error {
 		responsible_person TEXT NOT NULL DEFAULT '', department TEXT NOT NULL DEFAULT '', business_system TEXT NOT NULL DEFAULT '',
 		environment TEXT NOT NULL DEFAULT '', criticality TEXT NOT NULL DEFAULT '',
 		source TEXT NOT NULL DEFAULT 'manual', source_query TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'active',
+		vulnerability_count INTEGER NOT NULL DEFAULT 0, risk_score INTEGER NOT NULL DEFAULT 0, risk_level TEXT NOT NULL DEFAULT 'unassessed',
 		tags_json TEXT NOT NULL DEFAULT '[]', first_seen_at DATETIME NOT NULL, last_seen_at DATETIME NOT NULL,
 		created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL, owner_user_id TEXT,
 		FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
@@ -745,6 +746,9 @@ func (db *DB) initTables() error {
 	CREATE INDEX IF NOT EXISTS idx_assets_status ON assets(status);
 	CREATE INDEX IF NOT EXISTS idx_assets_owner ON assets(owner_user_id);
 	CREATE INDEX IF NOT EXISTS idx_assets_project ON assets(project_id);
+	CREATE INDEX IF NOT EXISTS idx_assets_vulnerability_count ON assets(vulnerability_count);
+	CREATE INDEX IF NOT EXISTS idx_assets_risk_score ON assets(risk_score);
+	CREATE INDEX IF NOT EXISTS idx_assets_risk_level ON assets(risk_level);
 	CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
 	CREATE INDEX IF NOT EXISTS idx_projects_updated_at ON projects(updated_at);
 	CREATE INDEX IF NOT EXISTS idx_project_facts_project_id ON project_facts(project_id);
@@ -977,7 +981,6 @@ func (db *DB) initTables() error {
 	if _, err := db.Exec(createIndexes); err != nil {
 		return fmt.Errorf("创建索引失败: %w", err)
 	}
-
 	db.logger.Debug("数据库表初始化完成")
 	return nil
 }
@@ -1027,6 +1030,9 @@ func (db *DB) migrateAssetsTable() error {
 		{"business_system", "ALTER TABLE assets ADD COLUMN business_system TEXT NOT NULL DEFAULT ''"},
 		{"environment", "ALTER TABLE assets ADD COLUMN environment TEXT NOT NULL DEFAULT ''"},
 		{"criticality", "ALTER TABLE assets ADD COLUMN criticality TEXT NOT NULL DEFAULT ''"},
+		{"vulnerability_count", "ALTER TABLE assets ADD COLUMN vulnerability_count INTEGER NOT NULL DEFAULT 0"},
+		{"risk_score", "ALTER TABLE assets ADD COLUMN risk_score INTEGER NOT NULL DEFAULT 0"},
+		{"risk_level", "ALTER TABLE assets ADD COLUMN risk_level TEXT NOT NULL DEFAULT 'unassessed'"},
 	}
 	for _, column := range columns {
 		var count int

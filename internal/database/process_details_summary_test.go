@@ -22,10 +22,13 @@ func TestProcessDetailsSummaryDoesNotGuessIDLessResultsByOrder(t *testing.T) {
 		{"toolName": "http-framework-test", "success": true},
 		{"toolName": "http-framework-test", "success": true},
 	}
+	var resultIDs []string
 	for _, result := range results {
-		if err := db.AddProcessDetail(messageID, conversationID, "tool_result", "result", result); err != nil {
+		resultID, err := db.AddProcessDetailWithID(messageID, conversationID, "tool_result", "result", result)
+		if err != nil {
 			t.Fatalf("AddProcessDetail(tool_result): %v", err)
 		}
+		resultIDs = append(resultIDs, resultID)
 	}
 
 	summary, err := db.GetProcessDetailsSummary(messageID)
@@ -38,6 +41,9 @@ func TestProcessDetailsSummaryDoesNotGuessIDLessResultsByOrder(t *testing.T) {
 	for i, execution := range summary.ToolExecutions[:2] {
 		if execution.Status != "completed" {
 			t.Fatalf("execution %d status = %q, want completed", i, execution.Status)
+		}
+		if execution.ResultDetailID != resultIDs[i] {
+			t.Fatalf("execution %d result detail id = %q, want %q", i, execution.ResultDetailID, resultIDs[i])
 		}
 	}
 	for i, execution := range summary.ToolExecutions[2:4] {
