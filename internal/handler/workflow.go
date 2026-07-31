@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -45,6 +46,12 @@ type workflowDryRunRequest struct {
 	Graph     json.RawMessage        `json:"graph,omitempty"`
 	GraphJSON json.RawMessage        `json:"graph_json,omitempty"`
 	Inputs    map[string]interface{} `json:"inputs,omitempty"`
+}
+
+type workflowGenerateDraftRequest struct {
+	Prompt         string                      `json:"prompt"`
+	Options        workflowrunner.DraftOptions `json:"options"`
+	AvailableTools []workflowrunner.DraftTool  `json:"available_tools,omitempty"`
 }
 
 func (h *WorkflowHandler) List(c *gin.Context) {
@@ -122,6 +129,44 @@ func (h *WorkflowHandler) DryRun(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+	c.JSON(http.StatusOK, gin.H{"result": result})
+}
+
+func (h *WorkflowHandler) GenerateDraft(c *gin.Context) {
+	var req workflowGenerateDraftRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的请求参数: " + err.Error()})
+		return
+	}
+	draftReq := workflowrunner.DraftRequest{
+		Prompt:         req.Prompt,
+		Options:        req.Options,
+		AvailableTools: req.AvailableTools,
+	}
+	var result *workflowrunner.DraftResult
+	var llmErr error
+	if h.cfg != nil {
+		if llmCfg, _, ok := h.cfg.ResolveAIChannel(""); ok && strings.TrimSpace(llmCfg.APIKey) != "" && strings.TrimSpace(llmCfg.Model) != "" {
+			result, llmErr = workflowrunner.GenerateDraftFromLLM(c.Request.Context(), draftReq, llmCfg, h.logger)
+		} else {
+			llmErr = errors.New("AI 通道未配置 api_key 或 model")
+		}
+	} else {
+		llmErr = errors.New("工作流生成器未加载平台 AI 配置")
+	}
+	if llmErr != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "大模型生成失败: " + llmErr.Error()})
+		return
+	}
+	if h.audit != nil {
+		h.audit.RecordOK(c, "workflow", "generate_draft", "自然语言生成工作流草稿", "", "", map[string]interface{}{
+			"generator": result.Generator,
+			"nodes":     result.Stats["nodes"],
+			"edges":     result.Stats["edges"],
+			"high_risk": result.Audit.HighRisk,
+			"savable":   result.Audit.Savable,
+		})
 	}
 	c.JSON(http.StatusOK, gin.H{"result": result})
 }

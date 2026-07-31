@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -74,5 +75,28 @@ func TestWorkflowPackageHandlerInspectionAndCreateImport(t *testing.T) {
 	saved, _ := db.GetWorkflowDefinition("wf-api")
 	if saved == nil || saved.Version != 1 {
 		t.Fatalf("saved=%#v", saved)
+	}
+}
+
+func TestWorkflowHandlerGenerateDraft(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := NewWorkflowHandler(nil, zap.NewNop())
+	body := bytes.NewBufferString(`{"prompt":"对目标资产做端口扫描，如果发现高危端口就执行加固脚本，最后输出报告","options":{"include_objective":true},"available_tools":[{"key":"nmap","name":"nmap","enabled":true}]}`)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/workflows/generate-draft", body)
+	c.Request.Header.Set("Content-Type", "application/json")
+	h.GenerateDraft(c)
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(resp.Error, "大模型生成失败") {
+		t.Fatalf("unexpected error: %#v", resp.Error)
 	}
 }
