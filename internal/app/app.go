@@ -1362,6 +1362,7 @@ func setupRoutes(
 		protected.POST("/workflows/runs/:runId/resume", workflowHandler.ResumeRun)
 		protected.POST("/workflows/validate", workflowHandler.Validate)
 		protected.POST("/workflows/dry-run", workflowHandler.DryRun)
+		protected.POST("/workflows/generate-draft", workflowHandler.GenerateDraft)
 		protected.GET("/workflows/:id/package", workflowHandler.ExportPackage)
 		protected.POST("/workflow-package-inspections", workflowHandler.CreatePackageInspection)
 		protected.GET("/workflow-package-inspections/:inspectionId", workflowHandler.GetPackageInspection)
