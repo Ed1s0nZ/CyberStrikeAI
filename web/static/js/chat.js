@@ -3584,13 +3584,14 @@ function setPendingMcpExecutionIds(messageElement, executionIds) {
 
 function normalizeToolExecutionSummaryForButton(raw) {
     const data = raw && typeof raw === 'object' ? raw : {};
-    return {
-        toolName: data.toolName || data.name || '',
-        status: data.status || '',
-        executionId: data.executionId || '',
-        toolCallId: data.toolCallId || '',
-        processDetailId: data.processDetailId || ''
-    };
+	return {
+	    toolName: data.toolName || data.name || '',
+	    status: data.status || '',
+	    executionId: data.executionId || '',
+	    toolCallId: data.toolCallId || '',
+	    processDetailId: data.processDetailId || '',
+	    resultDetailId: data.resultDetailId || ''
+	};
 }
 
 function cacheToolExecutionSummaries(messageElement, summaries) {
@@ -3924,6 +3925,15 @@ async function fetchProcessDetailDataForModal(detailId) {
     return detail && detail.data ? detail.data : null;
 }
 
+async function fetchProcessDetailForModal(detailId) {
+    const id = detailId != null ? String(detailId).trim() : '';
+    if (!id || typeof apiFetch !== 'function') return null;
+    const res = await apiFetch('/api/process-details/' + encodeURIComponent(id));
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) return null;
+    return j && j.processDetail ? j.processDetail : null;
+}
+
 function processToolResultTextFromData(resultData) {
     if (!resultData) return '';
     const noResultText = typeof window.t === 'function' ? window.t('timeline.noResult') : '无结果';
@@ -3950,6 +3960,56 @@ function processToolResultToMCPResult(resultData, rawText) {
 }
 
 async function showMCPDetailFromProcessToolItem(messageElement, summary, index) {
+    const item = normalizeToolExecutionSummaryForButton(summary);
+    if (item.processDetailId) {
+        const callDetail = await fetchProcessDetailForModal(item.processDetailId);
+        const callData = callDetail && callDetail.data ? callDetail.data : null;
+        if (callData) {
+            const args = typeof window.parseToolCallArgsFromData === 'function'
+                ? window.parseToolCallArgsFromData(callData)
+                : (callData.argumentsObj || {});
+            let resultData = callData._mergedResult || null;
+            let resultDetailId = item.resultDetailId || callData._mergedResultDetailId || '';
+            let rawText = resultData ? processToolResultTextFromData(resultData) : '';
+            const resultPayloadDeferred = resultData && resultData._payloadDeferred === true;
+            const resultOnlyHasPreview = resultData && resultData.result == null && resultData.error == null && resultData.resultPreview != null;
+            if (resultDetailId && (!resultData || resultPayloadDeferred || resultOnlyHasPreview)) {
+                const resultDetail = await fetchProcessDetailForModal(resultDetailId);
+                const fullResult = resultDetail && resultDetail.data ? resultDetail.data : null;
+                if (fullResult) {
+                    resultData = fullResult;
+                    rawText = processToolResultTextFromData(fullResult);
+                }
+            }
+            const displayState = resultData && typeof window.getToolResultDisplayState === 'function'
+                ? window.getToolResultDisplayState(resultData, { rawText: rawText })
+                : null;
+            const backgroundRunning = (displayState && displayState.kind === 'background_running') || String(item.status || '').toLowerCase() === 'background_running';
+            const success = resultData
+                ? !(displayState ? displayState.isError : (resultData.isError || resultData.success === false))
+                : String(item.status || '').toLowerCase() !== 'failed';
+            const status = backgroundRunning
+                ? 'background_running'
+                : (resultData || item.status
+                    ? (success ? 'completed' : 'failed')
+                    : 'running');
+            const exec = {
+                id: (resultData && resultData.executionId) || item.executionId || callData.executionId || '',
+                toolName: item.toolName || callData.toolName || (typeof window.t === 'function' ? window.t('chat.unknownTool') : '未知工具'),
+                status: status,
+                startTime: callDetail.createdAt || '',
+                arguments: args || {},
+                result: processToolResultToMCPResult(resultData, rawText),
+                error: resultData && resultData.error ? String(resultData.error) : ''
+            };
+            openAppModal('mcp-detail-modal', { focus: false });
+            deferModalContent(function () {
+                renderMCPDetailModal(exec);
+            });
+            return;
+        }
+    }
+
     const target = await findToolExecutionTimelineItem(messageElement, summary, index);
     if (!target) {
         alert(typeof window.t === 'function'

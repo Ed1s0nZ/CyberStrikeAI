@@ -3088,6 +3088,7 @@
                         <div class="page-header-actions">
                             <button class="btn-secondary" onclick="refreshWorkflows()" data-i18n="common.refresh">刷新</button>
                             <button class="btn-secondary" data-require-permission="workflow:write" type="button" onclick="openWorkflowPackageImportModal()" data-i18n="workflows.package.importLocal">导入本地包</button>
+                            <button class="btn-secondary" data-require-permission="workflow:write" type="button" onclick="openWorkflowAiModal()" data-i18n="workflows.ai.open">用自然语言创建</button>
                             <button class="btn-primary" onclick="newWorkflowDraft()" data-i18n="workflows.newGraph">新建工作流</button>
                         </div>
                     </div>
@@ -3139,6 +3140,10 @@
                                         <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.4v13.2a1 1 0 0 0 1.55.84l9.2-6.6a1 1 0 0 0 0-1.68l-9.2-6.6A1 1 0 0 0 8 5.4Z"/></svg>
                                         <span class="workflow-toolbar-label" data-i18n="workflows.dryRun">试运行</span>
                                     </button>
+                                    <button class="btn-secondary btn-small workflow-toolbar-button workflow-ai-button" data-require-permission="workflow:write" type="button" onclick="openWorkflowAiModal()">
+                                        <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3Z"/><path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14Z"/></svg>
+                                        <span class="workflow-toolbar-label" data-i18n="workflows.ai.generate">生成草稿</span>
+                                    </button>
                                     <details class="workflow-more-actions" id="workflow-more-actions" data-require-permission-any="workflow:read workflow:delete">
                                         <summary class="btn-secondary btn-small workflow-more-actions-trigger" aria-haspopup="menu">
                                             <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
@@ -3164,7 +3169,8 @@
                             </section>
                             <section class="workflow-canvas-wrap" ondragover="workflowCanvasDragOver(event)" ondrop="workflowCanvasDrop(event)">
                                 <div id="workflow-canvas"></div>
-                                <div id="workflow-canvas-empty" class="workflow-canvas-empty" data-i18n="workflows.canvasEmpty">从左侧拖拽节点到画布，或点击节点按钮快速添加</div>
+                                <div id="workflow-canvas-empty" class="workflow-canvas-empty" data-i18n="workflows.canvasEmpty">从左侧拖拽节点到画布，或用自然语言生成工作流</div>
+                                <div id="workflow-ai-canvas-status" class="workflow-ai-canvas-status" hidden data-i18n="workflows.ai.canvasRendering">AI 正在编排画布…</div>
                             </section>
                         </main>
                         <aside class="workflow-properties">
@@ -5565,6 +5571,40 @@
             <div class="modal-footer workflow-dry-run-modal-footer">
                 <button type="button" class="btn-secondary btn-small" onclick="closeWorkflowDryRunModal()" data-i18n="common.cancel">取消</button>
                 <button type="submit" class="btn-primary btn-small" data-i18n="workflows.dryRun">试运行</button>
+            </div>
+        </form>
+    </div>
+    <div id="workflow-ai-modal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="workflow-ai-modal-title" onclick="if(event.target===this)closeWorkflowAiModal()" onkeydown="if(event.key==='Escape')closeWorkflowAiModal()">
+        <form class="modal-content workflow-ai-modal-content" onsubmit="event.preventDefault(); generateWorkflowFromNaturalLanguage()" onclick="event.stopPropagation()">
+            <div class="modal-header workflow-ai-modal-header">
+                <div>
+                    <h2 id="workflow-ai-modal-title" data-i18n="workflows.ai.title">用自然语言创建工作流</h2>
+                    <p class="workflow-ai-subtitle" data-i18n="workflows.ai.subtitle">AI 会生成可编辑草稿，不会自动保存或运行。</p>
+                </div>
+                <button type="button" class="modal-close" onclick="closeWorkflowAiModal()" data-i18n="common.close" data-i18n-attr="aria-label" data-i18n-skip-text="true" aria-label="关闭"></button>
+            </div>
+            <div class="modal-body workflow-ai-modal-body">
+                <div class="form-group workflow-ai-prompt-field">
+                    <label for="workflow-ai-prompt" data-i18n="workflows.ai.promptLabel">工作流需求</label>
+                    <textarea id="workflow-ai-prompt" class="form-input" rows="5" data-i18n="workflows.ai.promptPlaceholder" data-i18n-attr="placeholder" placeholder="例如：持续监控一个域名的子域名、证书和暴露页面，发现新增资产后生成报告"></textarea>
+                </div>
+                <div class="workflow-ai-examples" aria-label="示例需求" data-i18n="workflows.ai.examplesLabel" data-i18n-attr="aria-label">
+                    <button type="button" class="btn-secondary btn-small" onclick="useWorkflowAiExample('domainMonitor')" data-i18n="workflows.ai.exampleDomain">域名监控</button>
+                    <button type="button" class="btn-secondary btn-small" onclick="useWorkflowAiExample('reportReview')" data-i18n="workflows.ai.exampleReport">报告审批</button>
+                    <button type="button" class="btn-secondary btn-small" onclick="useWorkflowAiExample('assetTriage')" data-i18n="workflows.ai.exampleTriage">资产研判</button>
+                </div>
+                <div class="workflow-ai-options">
+                    <label><input type="checkbox" id="workflow-ai-include-objective" checked> <span data-i18n="workflows.ai.includeObjective">同时生成 objective 配置</span></label>
+                    <label><input type="checkbox" id="workflow-ai-allow-schedule"> <span data-i18n="workflows.ai.allowSchedule">允许生成定时触发建议</span></label>
+                    <label><input type="checkbox" id="workflow-ai-allow-high-risk"> <span data-i18n="workflows.ai.allowHighRisk">允许包含高风险节点草稿</span></label>
+                </div>
+                <div id="workflow-ai-progress" class="workflow-ai-progress" hidden aria-live="polite"></div>
+                <div id="workflow-ai-result" class="workflow-ai-result" aria-live="polite"></div>
+            </div>
+            <div class="modal-footer workflow-ai-modal-footer">
+                <button type="button" class="btn-secondary btn-small" onclick="closeWorkflowAiModal()" data-i18n="common.cancel">取消</button>
+                <button id="workflow-ai-apply-btn" type="button" class="btn-secondary btn-small" onclick="applyWorkflowAiDraft()" disabled data-i18n="workflows.ai.apply">渲染到画布</button>
+                <button id="workflow-ai-generate-btn" type="submit" class="btn-primary btn-small" data-i18n="workflows.ai.generate">生成草稿</button>
             </div>
         </form>
     </div>

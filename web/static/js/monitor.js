@@ -5681,7 +5681,7 @@ function updateMonitorTimelineSection() {
 }
 
 
-const MCP_STATS_TOP_N = 3;
+const MCP_STATS_TOP_N = 6;
 const MCP_TIMELINE_RANGES = ['24h', '7d', '30d'];
 
 function getMcpMonitorTimelineRange() {

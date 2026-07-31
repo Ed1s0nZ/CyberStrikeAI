@@ -37,6 +37,12 @@
         requestSignature: '',
         dragDepth: 0
     };
+    const workflowAiState = {
+        draft: null,
+        result: null,
+        activeStep: '',
+        animating: false
+    };
     const WORKFLOW_PACKAGE_INSPECTION_STORAGE_KEY = 'csai.workflow-package.inspection-id';
     const WORKFLOW_PACKAGE_IMPORT_STORAGE_KEY = 'csai.workflow-package.import-id';
 
@@ -67,6 +73,18 @@
     const NODE_PLACEMENT_PADDING = 20;
 
     const WORKFLOW_EDIT_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+    const WORKFLOW_AI_TOOL_HINTS = [
+        { keywords: ['子域名', 'subdomain', 'subfinder', 'amass'], tools: ['subfinder', 'amass'], label: '子域名发现' },
+        { keywords: ['端口', 'port', 'nmap', 'rustscan', 'masscan'], tools: ['nmap', 'rustscan', 'masscan'], label: '端口扫描' },
+        { keywords: ['漏洞', 'vuln', '漏洞扫描', 'nuclei', 'nikto', 'zap'], tools: ['nuclei', 'nikto', 'zap'], label: '漏洞扫描' },
+        { keywords: ['目录', '路径', '暴露页面', 'dir', 'ffuf', 'gobuster', 'feroxbuster'], tools: ['ffuf', 'gobuster', 'feroxbuster', 'dirsearch'], label: '暴露面探测' },
+        { keywords: ['证书', 'certificate', 'crt'], tools: ['subfinder'], label: '证书与域名线索收集' },
+        { keywords: ['云', 'cloud', '配置审计', 'prowler', 'scout'], tools: ['prowler', 'scout-suite'], label: '云配置审计' },
+        { keywords: ['容器', '镜像', 'k8s', 'kubernetes', 'trivy', 'kube'], tools: ['trivy', 'kube-bench', 'kube-hunter'], label: '容器安全检查' },
+        { keywords: ['情报', '威胁情报', 'threat', 'ioc', 'virustotal', 'shodan', 'fofa'], tools: ['virustotal_search', 'shodan_search', 'fofa_search'], label: '威胁情报收集' }
+    ];
+    const WORKFLOW_AI_HIGH_RISK_RE = /(隔离|封禁|加固|修复|执行|命令|脚本|删除|清理|阻断|封锁|攻击|利用|getshell|shell|payload|exploit|isolate|block|execute|script|delete|exploit|payload)/i;
+    const WORKFLOW_AI_PROGRESS_STEPS = ['understand', 'match', 'draft', 'audit'];
 
     function esc(text) {
         if (typeof escapeHtml === 'function') return escapeHtml(text == null ? '' : String(text));
@@ -166,6 +184,10 @@
     function graphToElements(graph) {
         const nodes = (graph.nodes || []).map((node, index) => ({
             group: 'nodes',
+            classes: [
+                node.config && node.config.generated_by === 'natural_language' ? 'ai-generated' : '',
+                node.config && (node.config.risk_level === 'high' || node.config.requires_human_confirmation === 'true') ? 'high-risk' : ''
+            ].filter(Boolean).join(' '),
             data: {
                 id: node.id || `node-${index + 1}`,
                 label: node.label || wfNodeLabel(node.type) || node.id || _t('workflows.nodeFallback', { n: index + 1 }),
@@ -265,6 +287,8 @@
                 { selector: 'node[type="hitl"]', style: { 'background-color': '#0f766e', 'border-color': '#5eead4' } },
                 { selector: 'node[type="output"]', style: { 'background-color': '#4338ca', 'border-color': '#a5b4fc' } },
                 { selector: 'node[type="end"]', style: { 'background-color': '#be123c', 'border-color': '#fb7185' } },
+                { selector: 'node.ai-generated', style: { 'border-width': 2, 'border-color': '#38bdf8' } },
+                { selector: 'node.high-risk', style: { 'border-width': 3, 'border-color': '#f97316' } },
                 {
                     selector: 'edge',
                     style: {
@@ -1350,6 +1374,559 @@
         }
     }
 
+    function workflowAiOption(id) {
+        const el = document.getElementById(id);
+        return !!(el && el.checked);
+    }
+
+    function workflowAiSleep(ms) {
+        return new Promise(function (resolve) { setTimeout(resolve, ms); });
+    }
+
+    function workflowAiStepLabel(step) {
+        return _t('workflows.ai.steps.' + step);
+    }
+
+    function workflowAiSetProgress(activeStep, done) {
+        workflowAiState.activeStep = activeStep || '';
+        const wrap = document.getElementById('workflow-ai-progress');
+        if (!wrap) return;
+        if (!activeStep && !done) {
+            wrap.hidden = true;
+            wrap.innerHTML = '';
+            return;
+        }
+        wrap.hidden = false;
+        const activeIndex = WORKFLOW_AI_PROGRESS_STEPS.indexOf(activeStep);
+        wrap.innerHTML = WORKFLOW_AI_PROGRESS_STEPS.map(function (step, index) {
+            const complete = done || (activeIndex >= 0 && index < activeIndex);
+            const active = !done && step === activeStep;
+            return `<span class="${complete ? 'is-complete' : ''} ${active ? 'is-active' : ''}">
+                <b>${complete ? '✓' : index + 1}</b>
+                <small>${esc(workflowAiStepLabel(step))}</small>
+            </span>`;
+        }).join('');
+    }
+
+    function workflowAiPreviewItems(graph) {
+        const nodes = (graph.nodes || []).slice().sort(function (a, b) {
+            const ax = a.position && typeof a.position.x === 'number' ? a.position.x : 0;
+            const bx = b.position && typeof b.position.x === 'number' ? b.position.x : 0;
+            const ay = a.position && typeof a.position.y === 'number' ? a.position.y : 0;
+            const by = b.position && typeof b.position.y === 'number' ? b.position.y : 0;
+            return ax === bx ? ay - by : ax - bx;
+        });
+        return nodes.slice(0, 9);
+    }
+
+    function workflowAiPreviewHtml(graph) {
+        const items = workflowAiPreviewItems(graph);
+        if (!items.length) return '';
+        return `<div class="workflow-ai-preview" aria-label="${esc(_t('workflows.ai.preview'))}">
+            <div class="workflow-ai-preview-title">${esc(_t('workflows.ai.preview'))}</div>
+            <div class="workflow-ai-preview-flow">
+                ${items.map(function (node, index) {
+                    const type = node.type || 'tool';
+                    const cfg = node.config || {};
+                    const risky = cfg.risk_level === 'high' || cfg.requires_human_confirmation === 'true';
+                    return `<span class="workflow-ai-preview-node is-${esc(type)} ${risky ? 'is-risky' : ''}">
+                        <small>${esc(wfNodeLabel(type))}</small>
+                        <strong>${esc(node.label || wfNodeLabel(type))}</strong>
+                    </span>${index < items.length - 1 ? '<i aria-hidden="true">→</i>' : ''}`;
+                }).join('')}
+            </div>
+        </div>`;
+    }
+
+    function workflowAiSlug(text) {
+        const raw = String(text || '').trim().toLowerCase();
+        const ascii = raw.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        if (ascii) return ascii.slice(0, 48);
+        let hash = 0;
+        for (let i = 0; i < raw.length; i++) hash = ((hash << 5) - hash + raw.charCodeAt(i)) | 0;
+        return 'ai-workflow-' + Math.abs(hash || Date.now()).toString(36);
+    }
+
+    function workflowAiMatchTool(toolNames) {
+        if (!workflowToolOptions.length) return '';
+        const enabled = workflowToolOptions.filter(tool => tool.enabled !== false);
+        const all = enabled.length ? enabled : workflowToolOptions;
+        for (const wanted of toolNames || []) {
+            const lower = String(wanted || '').toLowerCase();
+            const found = all.find(tool => String(tool.key || '').toLowerCase().includes(lower));
+            if (found) return found.key;
+        }
+        return '';
+    }
+
+    function workflowAiDetectCapabilities(prompt) {
+        const lower = String(prompt || '').toLowerCase();
+        const capabilities = [];
+        WORKFLOW_AI_TOOL_HINTS.forEach(function (hint) {
+            if (hint.keywords.some(keyword => lower.indexOf(String(keyword).toLowerCase()) !== -1)) {
+                capabilities.push({
+                    label: hint.label,
+                    tool_name: workflowAiMatchTool(hint.tools),
+                    tool_candidates: hint.tools.slice()
+                });
+            }
+        });
+        if (!capabilities.length) {
+            capabilities.push({ label: _t('workflows.ai.resultCapabilities'), tool_name: '', tool_candidates: [] });
+        }
+        return capabilities;
+    }
+
+    function workflowAiNode(id, type, label, x, y, config) {
+        return {
+            id,
+            type,
+            label,
+            position: { x, y },
+            config: Object.assign(configWithDefaults(type, {}), config || {}, {
+                generated_by: 'natural_language',
+                needs_review: 'true'
+            })
+        };
+    }
+
+    function workflowAiEdge(id, source, target, label, config) {
+        return {
+            id,
+            source,
+            target,
+            label: label || '',
+            config: config || {}
+        };
+    }
+
+    function workflowAiBuildDraft(prompt, options) {
+        const capabilities = workflowAiDetectCapabilities(prompt);
+        const wantsApproval = /(审批|确认|审核|负责人|人工|review|approve|approval|human)/i.test(prompt);
+        const wantsReport = /(报告|汇总|输出|通知|任务|工单|report|summary|notify|ticket)/i.test(prompt);
+        const wantsCondition = /(如果|发现|存在|高危|新增|失败|通过|否则|if|when|high|critical|new|fail)/i.test(prompt);
+        const highRisk = WORKFLOW_AI_HIGH_RISK_RE.test(prompt);
+        const nodes = [];
+        const edges = [];
+        const assumptions = [];
+        const riskWarnings = [];
+        let x = 120;
+        const y = 150;
+        let nodeIndex = 1;
+        let edgeIndex = 1;
+        let openConditionId = '';
+
+        function nextId(prefix) {
+            const id = prefix + '-' + nodeIndex;
+            nodeIndex += 1;
+            return id;
+        }
+        function add(type, label, config, yy) {
+            const id = nextId(type);
+            nodes.push(workflowAiNode(id, type, label, x, yy || y, config));
+            x += 210;
+            return id;
+        }
+        function connect(source, target, label, config) {
+            edges.push(workflowAiEdge('edge-ai-' + edgeIndex, source, target, label, config));
+            edgeIndex += 1;
+        }
+
+        const start = add('start', wfNodeLabel('start'), { input_keys: 'message, conversationId, projectId, target' });
+        let previous = start;
+        capabilities.forEach(function (capability) {
+            const hasTool = !!capability.tool_name;
+            const id = add(hasTool ? 'tool' : 'agent', capability.label, hasTool ? {
+                tool_name: capability.tool_name,
+                arguments: '{"target":"{{inputs.target}}","message":"{{inputs.message}}"}',
+                timeout_seconds: '120',
+                join_strategy: 'all_merge'
+            } : {
+                agent_mode: 'eino_single',
+                input_binding: { from: 'previous', field: 'output' },
+                instruction: capability.label + '。根据用户需求执行安全流程步骤，并输出结构化结果：' + prompt,
+                output_key: 'agent_result',
+                join_strategy: 'all_merge',
+                missing_tool_candidates: capability.tool_candidates.join(', ')
+            });
+            connect(previous, id);
+            previous = id;
+            if (!hasTool && capability.tool_candidates.length) {
+                assumptions.push(capability.label + ' 未匹配到已启用工具，已生成 Agent 草稿节点。');
+            }
+        });
+
+        if (wantsCondition) {
+            const condition = add('condition', highRisk ? '是否需要高风险处置' : '是否满足触发条件', {
+                expression: highRisk ? '{{previous.output}} contains "高危"' : '{{previous.output}} != ""',
+                join_strategy: 'all_merge'
+            });
+            connect(previous, condition);
+            openConditionId = condition;
+            const report = add('output', wantsReport ? '输出报告' : wfNodeLabel('output'), {
+                output_key: 'result',
+                source_binding: { from: 'previous', field: 'output' },
+                static_value: '',
+                join_strategy: 'all_merge'
+            }, y + 130);
+            connect(condition, report, _t('workflows.edges.no'), { condition: '{{previous.matched}} == "false"', branch: 'false' });
+            previous = condition;
+        }
+
+        if (highRisk) {
+            let insertedApproval = false;
+            if (!options.allowHighRisk || wantsApproval) {
+                const approval = add('hitl', '人工审批', {
+                    prompt: '请确认是否允许继续执行高风险处置：' + prompt,
+                    prompt_binding: { from: 'previous', field: 'output' },
+                    reviewer: 'human',
+                    join_strategy: 'all_merge',
+                    risk_level: 'high'
+                });
+                connect(previous, approval, previous === openConditionId ? _t('workflows.edges.yes') : '', previous === openConditionId ? { condition: '{{previous.matched}} == "true"', branch: 'true' } : {});
+                if (previous === openConditionId) openConditionId = '';
+                previous = approval;
+                insertedApproval = true;
+            }
+            const action = add('agent', '执行受控处置', {
+                agent_mode: 'eino_single',
+                input_binding: { from: 'previous', field: 'output' },
+                instruction: '仅在授权范围内生成处置步骤草稿；实际执行前必须由人工确认。用户需求：' + prompt,
+                output_key: 'remediation_plan',
+                join_strategy: 'all_merge',
+                risk_level: 'high',
+                requires_human_confirmation: 'true'
+            });
+            connect(previous, action, previous === openConditionId ? _t('workflows.edges.yes') : '', previous === openConditionId ? { condition: '{{previous.matched}} == "true"', branch: 'true' } : {});
+            if (previous === openConditionId) openConditionId = '';
+            previous = action;
+            riskWarnings.push(insertedApproval
+                ? '检测到高风险动作，已加入人工确认与 requires_human_confirmation 标记。'
+                : '检测到高风险动作，已保留为草稿并添加 requires_human_confirmation 标记。');
+        } else if (wantsApproval && !nodes.some(node => node.type === 'hitl')) {
+            const approval = add('hitl', '人工审批', {
+                prompt: '请审核工作流阶段结果：' + prompt,
+                prompt_binding: { from: 'previous', field: 'output' },
+                reviewer: 'human',
+                join_strategy: 'all_merge'
+            });
+            connect(previous, approval);
+            previous = approval;
+        }
+
+        const output = add('output', wantsReport ? '输出报告' : wfNodeLabel('output'), {
+            output_key: 'result',
+            source_binding: { from: 'previous', field: 'output' },
+            static_value: '',
+            join_strategy: 'all_merge'
+        });
+        connect(previous, output, previous === openConditionId ? _t('workflows.edges.yes') : '', previous === openConditionId ? { condition: '{{previous.matched}} == "true"', branch: 'true' } : {});
+
+        const graph = {
+            nodes,
+            edges,
+            config: {
+                schema_version: 1,
+                generated_by: 'natural_language',
+                source_prompt: prompt,
+                objective: options.includeObjective ? prompt : ''
+            }
+        };
+        if (options.allowSchedule && /(每天|每周|定时|周期|持续|daily|weekly|schedule|monitor)/i.test(prompt)) {
+            graph.config.trigger_suggestion = /(每天|daily)/i.test(prompt) ? 'daily' : 'scheduled';
+            assumptions.push('已记录定时触发建议；保存后仍需在触发器或角色绑定处配置。');
+        }
+        return {
+            graph,
+            meta: {
+                id: workflowAiSlug(prompt),
+                name: prompt.length > 22 ? prompt.slice(0, 22) + '...' : prompt,
+                description: prompt,
+                enabled: true
+            },
+            generator: 'deterministic-fallback',
+            audit: {
+                risk_warnings: riskWarnings,
+                assumptions: assumptions,
+                high_risk: highRisk,
+                needs_hitl: nodes.some(node => node.type === 'hitl'),
+                savable: validateWorkflowGraph(graph).length === 0
+            },
+            assumptions,
+            riskWarnings,
+            capabilities,
+            stats: { nodes: nodes.length, edges: edges.length }
+        };
+    }
+
+    function workflowAiAvailableToolsPayload() {
+        return (workflowToolOptions || []).map(function (tool) {
+            return {
+                key: tool.key || tool.name || '',
+                name: tool.name || '',
+                enabled: tool.enabled !== false
+            };
+        }).filter(function (tool) {
+            return tool.key || tool.name;
+        });
+    }
+
+    async function workflowAiGenerateDraftOnServer(prompt, options) {
+        const response = await apiFetch('/api/workflows/generate-draft', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt: prompt,
+                options: {
+                    include_objective: !!options.includeObjective,
+                    allow_schedule: !!options.allowSchedule,
+                    allow_high_risk: !!options.allowHighRisk
+                },
+                available_tools: workflowAiAvailableToolsPayload()
+            })
+        });
+        const data = await response.json().catch(function () { return {}; });
+        if (!response.ok) {
+            throw new Error(data.error || _t('workflows.ai.generateFailed'));
+        }
+        const result = data.result || data;
+        if (!result || !result.graph) {
+            throw new Error(_t('workflows.ai.generateFailed'));
+        }
+        result.generator = result.generator || 'server';
+        return result;
+    }
+
+    function workflowAiRenderResult(result) {
+        const target = document.getElementById('workflow-ai-result');
+        const applyBtn = document.getElementById('workflow-ai-apply-btn');
+        if (!target) return;
+        if (!result) {
+            target.innerHTML = '';
+            if (applyBtn) applyBtn.disabled = true;
+            return;
+        }
+        const graph = result.graph || defaultGraph();
+        const errors = validateWorkflowGraph(graph);
+        const audit = result.audit || {};
+        const risks = audit.risk_warnings || result.riskWarnings || [];
+        const assumptions = audit.assumptions || result.assumptions || [];
+        const missing = audit.missing_fields || [];
+        const stats = result.stats || {};
+        const generator = String(result.generator || '');
+        const generatorKey = generator === 'llm'
+            ? 'workflows.ai.generatorLLM'
+            : (generator === 'deterministic'
+                ? 'workflows.ai.generatorServer'
+                : (generator.indexOf('fallback') !== -1 ? 'workflows.ai.generatorFallback' : 'workflows.ai.generatorUnknown'));
+        const capabilityText = (result.capabilities || []).map(function (cap) {
+            return cap.label + (cap.tool_name ? ' -> ' + cap.tool_name : (cap.toolName ? ' -> ' + cap.toolName : ''));
+        });
+        target.innerHTML = `
+            ${workflowAiPreviewHtml(graph)}
+            <div class="workflow-ai-result-grid">
+                <span>${esc(_t('workflows.ai.resultNodes'))}<strong>${stats.nodes || (graph.nodes || []).length}</strong></span>
+                <span>${esc(_t('workflows.ai.resultEdges'))}<strong>${stats.edges || (graph.edges || []).length}</strong></span>
+                <span>${esc(_t('workflows.ai.resultRisk'))}<strong>${risks.length ? esc(_t('workflows.ai.riskHigh')) : esc(_t('workflows.ai.riskLow'))}</strong></span>
+                <span>${esc(_t('workflows.ai.resultSaveState'))}<strong>${errors.length ? esc(_t('workflows.ai.no')) : esc(_t('workflows.ai.yes'))}</strong></span>
+            </div>
+            <div class="workflow-ai-result-section"><strong>${esc(_t(generatorKey))}</strong><p>${esc(generator === 'llm' ? _t('workflows.ai.llmTitle') : (generator === 'deterministic' ? _t('workflows.ai.serverTitle') : _t('workflows.ai.fallbackTitle')))}</p></div>
+            ${capabilityText.length ? '<div class="workflow-ai-result-section"><strong>' + esc(_t('workflows.ai.capabilityTrace')) + '</strong><ul>' + capabilityText.map(item => '<li>' + esc(item) + '</li>').join('') + '</ul></div>' : ''}
+            ${missing.length ? '<div class="workflow-ai-result-section is-attention"><strong>' + esc(_t('workflows.ai.missingFields')) + '</strong><ul>' + missing.map(item => '<li>' + esc(item) + '</li>').join('') + '</ul></div>' : ''}
+            ${assumptions.length ? '<div class="workflow-ai-result-section"><strong>' + esc(_t('workflows.ai.assumptions')) + '</strong><ul>' + assumptions.map(item => '<li>' + esc(item) + '</li>').join('') + '</ul></div>' : ''}
+            ${risks.length ? '<div class="workflow-ai-result-section is-warning"><strong>' + esc(_t('workflows.ai.riskWarnings')) + '</strong><ul>' + risks.map(item => '<li>' + esc(item) + '</li>').join('') + '</ul></div>' : ''}
+            ${errors.length ? '<div class="workflow-ai-result-section is-warning"><strong>' + esc(_t('workflows.audit.validationIssues')) + '</strong><ul>' + errors.map(item => '<li>' + esc(item) + '</li>').join('') + '</ul></div>' : ''}
+        `;
+        if (applyBtn) applyBtn.disabled = !!errors.length;
+    }
+
+    function workflowAiApplyGraph(result) {
+        if (!result || !result.graph) return;
+        fillWorkflowForm({
+            id: '',
+            name: result.meta.name,
+            description: result.meta.description,
+            enabled: true,
+            graph_json: result.graph
+        });
+        syncWorkflowMetaIdField(false, result.meta.id);
+        updateWorkflowCanvasTitle();
+        if (cy && cy.nodes().length) {
+            cy.fit(cy.elements(), 60);
+            const generated = cy.nodes('.ai-generated');
+            if (generated.length) {
+                generated.addClass('just-added');
+                const risky = generated.filter('.high-risk');
+                if (risky.length) risky.select();
+                setTimeout(function () {
+                    if (cy) cy.nodes('.ai-generated').removeClass('just-added');
+                }, 1200);
+            }
+        }
+    }
+
+    function workflowAiSortedNodes(graph) {
+        return (graph.nodes || []).slice().sort(function (a, b) {
+            const ax = a.position && typeof a.position.x === 'number' ? a.position.x : 0;
+            const bx = b.position && typeof b.position.x === 'number' ? b.position.x : 0;
+            const ay = a.position && typeof a.position.y === 'number' ? a.position.y : 0;
+            const by = b.position && typeof b.position.y === 'number' ? b.position.y : 0;
+            return ax === bx ? ay - by : ax - bx;
+        });
+    }
+
+    async function workflowAiAnimateGraph(result) {
+        if (!result || !result.graph || workflowAiState.animating) return;
+        workflowAiState.animating = true;
+        const status = document.getElementById('workflow-ai-canvas-status');
+        if (status) status.hidden = false;
+        try {
+            initCy();
+            if (!cy) {
+                workflowAiApplyGraph(result);
+                return;
+            }
+            const graph = parseGraph(result.graph);
+            syncWorkflowMetaForm({
+                id: '',
+                name: result.meta && result.meta.name ? result.meta.name : '',
+                description: result.meta && result.meta.description ? result.meta.description : '',
+                enabled: true
+            });
+            currentWorkflowId = '';
+            syncWorkflowMetaIdField(false, result.meta && result.meta.id ? result.meta.id : '');
+            updateWorkflowCanvasTitle();
+            resetSequences(graph);
+            cy.elements().remove();
+            updateEmptyState();
+            closeWorkflowDryRunPanel();
+            renderWorkflowList();
+            const nodeElements = graphToElements({ nodes: workflowAiSortedNodes(graph), edges: [] });
+            const edgeElements = graphToElements({ nodes: [], edges: graph.edges || [] });
+            for (const ele of nodeElements) {
+                const added = cy.add(ele);
+                selectWorkflowElement(added);
+                added.addClass('just-added');
+                cy.animate({ center: { eles: added }, duration: 180 });
+                await workflowAiSleep(120);
+                added.removeClass('just-added');
+            }
+            for (const edge of edgeElements) {
+                const added = cy.add(edge);
+                added.select();
+                await workflowAiSleep(80);
+                added.unselect();
+            }
+            if (cy.nodes().length) {
+                layoutWorkflowGraph(true);
+                await workflowAiSleep(320);
+                const risky = cy.nodes('.high-risk');
+                if (risky.length) {
+                    selectWorkflowElement(risky.first());
+                } else {
+                    selectWorkflowElement(null);
+                }
+            }
+            updateEmptyState();
+        } finally {
+            workflowAiState.animating = false;
+            if (status) status.hidden = true;
+        }
+    }
+
+    window.openWorkflowAiModal = function () {
+        if (typeof requirePermission === 'function' && !requirePermission('workflow:write')) return;
+        workflowAiState.draft = null;
+        workflowAiState.result = null;
+        workflowAiSetProgress('', false);
+        workflowAiRenderResult(null);
+        const prompt = document.getElementById('workflow-ai-prompt');
+        const generateBtn = document.getElementById('workflow-ai-generate-btn');
+        if (generateBtn) generateBtn.disabled = false;
+        if (typeof openAppModal === 'function') {
+            openAppModal('workflow-ai-modal', { focusEl: prompt });
+        }
+    };
+
+    window.closeWorkflowAiModal = function () {
+        if (typeof closeAppModal === 'function') closeAppModal('workflow-ai-modal');
+    };
+
+    window.useWorkflowAiExample = function (key) {
+        const prompt = document.getElementById('workflow-ai-prompt');
+        if (!prompt) return;
+        prompt.value = _t('workflows.ai.examples.' + key);
+        prompt.focus();
+    };
+
+    window.generateWorkflowFromNaturalLanguage = async function () {
+        const promptEl = document.getElementById('workflow-ai-prompt');
+        const generateBtn = document.getElementById('workflow-ai-generate-btn');
+        const prompt = promptEl ? promptEl.value.trim() : '';
+        if (!prompt) {
+            if (typeof showNotification === 'function') showNotification(_t('workflows.ai.promptRequired'), 'warning');
+            return;
+        }
+        if (generateBtn) {
+            generateBtn.disabled = true;
+            generateBtn.textContent = _t('workflows.ai.generating');
+        }
+        try {
+            workflowAiRenderResult(null);
+            workflowAiSetProgress('understand');
+            await workflowAiSleep(140);
+            await loadWorkflowTools();
+            workflowAiSetProgress('match');
+            await workflowAiSleep(140);
+            const options = {
+                includeObjective: workflowAiOption('workflow-ai-include-objective'),
+                allowSchedule: workflowAiOption('workflow-ai-allow-schedule'),
+                allowHighRisk: workflowAiOption('workflow-ai-allow-high-risk')
+            };
+            workflowAiSetProgress('draft');
+            const result = await workflowAiGenerateDraftOnServer(prompt, options);
+            workflowAiSetProgress('audit');
+            await workflowAiSleep(120);
+            workflowAiState.draft = result.graph;
+            workflowAiState.result = result;
+            workflowAiRenderResult(result);
+            workflowAiSetProgress('', true);
+            if (validateWorkflowGraph(result.graph).length && typeof showNotification === 'function') {
+                showNotification(_t('workflows.ai.generatedWithIssues'), 'warning');
+            }
+        } catch (error) {
+            workflowAiState.draft = null;
+            workflowAiState.result = null;
+            workflowAiSetProgress('', false);
+            workflowAiRenderResult(null);
+            if (typeof showNotification === 'function') showNotification(error.message || _t('workflows.ai.generateFailed'), 'error');
+        } finally {
+            if (generateBtn) {
+                generateBtn.disabled = false;
+                generateBtn.textContent = _t('workflows.ai.generate');
+            }
+        }
+    };
+
+    window.applyWorkflowAiDraft = async function () {
+        if (!workflowAiState.result) return;
+        const applyBtn = document.getElementById('workflow-ai-apply-btn');
+        if (applyBtn) {
+            applyBtn.disabled = true;
+            applyBtn.textContent = _t('workflows.ai.rendering');
+        }
+        closeWorkflowAiModal();
+        try {
+            await workflowAiAnimateGraph(workflowAiState.result);
+            if (typeof showNotification === 'function') showNotification(_t('workflows.ai.applied'), 'success');
+        } finally {
+            if (applyBtn) {
+                applyBtn.disabled = false;
+                applyBtn.textContent = _t('workflows.ai.apply');
+            }
+        }
+    };
+
     window.refreshWorkflows = async function () {
         initCy();
         const list = document.getElementById('workflow-list');
@@ -1818,15 +2395,20 @@
 
     window.layoutWorkflowGraph = function (animate) {
         if (!cy || !cy.nodes().length) return;
-        cy.layout({
+        const layout = cy.layout({
             name: 'breadthfirst',
             directed: true,
             padding: 40,
             spacingFactor: 1.25,
             animate: animate !== false,
             animationDuration: 250
-        }).run();
-        cy.fit(undefined, 40);
+        });
+        layout.one('layoutstop', function () {
+            if (cy && cy.elements().length) cy.fit(cy.elements(), 40);
+        });
+        layout.run();
+        if (animate === false && cy.elements().length) cy.fit(cy.elements(), 40);
+        return layout;
     };
 
     window.updateWorkflowSelectedProperty = function () {
@@ -2458,7 +3040,7 @@
         if (page && typeof window.applyTranslations === 'function') {
             window.applyTranslations(page);
         }
-        ['workflow-dry-run-modal', 'workflow-package-import-modal', 'workflow-package-overwrite-modal'].forEach(function (id) {
+        ['workflow-dry-run-modal', 'workflow-ai-modal', 'workflow-package-import-modal', 'workflow-package-overwrite-modal'].forEach(function (id) {
             const modal = document.getElementById(id);
             if (modal && typeof window.applyTranslations === 'function') window.applyTranslations(modal);
         });
