@@ -157,8 +157,14 @@ func TestWorkflowRunPermissionIsSeparateFromDefinitionManagement(t *testing.T) {
 	if got := permissionForRequest(http.MethodPost, "/api/workflows/runs/run-1/resume"); got != "workflow:execute" {
 		t.Fatalf("resume permission = %q, want workflow:execute", got)
 	}
+	if got := permissionForRequest(http.MethodPost, "/api/workflows/generate-draft"); got != "workflow:write" {
+		t.Fatalf("generate draft permission = %q, want workflow:write", got)
+	}
 	if got := permissionForRequest(http.MethodPut, "/api/workflows/workflow-1"); got != "workflow:write" {
 		t.Fatalf("definition permission = %q, want workflow:write", got)
+	}
+	if isProcessGlobalMutationPath("/workflows/generate-draft") {
+		t.Fatalf("generate draft should not be treated as a process-global mutation")
 	}
 }
 
