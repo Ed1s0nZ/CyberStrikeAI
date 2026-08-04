@@ -155,6 +155,46 @@ func TestShodanSearchReportsShortfallWhenTotalExceedsMatches(t *testing.T) {
 	}
 }
 
+func TestQuakeSearchHandlesStringErrorCode(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Setenv("QUAKE_API_KEY", "")
+
+	quakeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("X-QuakeToken"); got != "test-quake-key" {
+			t.Fatalf("Quake token = %q, want test-quake-key", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":"q5000","message":"查询语法错误"}`))
+	}))
+	defer quakeServer.Close()
+
+	h := NewFofaHandler(&config.Config{
+		Quake: config.SpaceSearchConfig{
+			BaseURL: quakeServer.URL,
+			APIKey:  "test-quake-key",
+		},
+	}, zap.NewNop())
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	body := `{"provider":"quake","query":"bad query","fields":"ip,port","size":10,"page":1}`
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/fofa/search", strings.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	h.Search(ctx)
+
+	if recorder.Code != http.StatusBadGateway {
+		t.Fatalf("Search() status = %d, want %d, body = %s", recorder.Code, http.StatusBadGateway, recorder.Body.String())
+	}
+	bodyText := recorder.Body.String()
+	if !strings.Contains(bodyText, "查询语法错误") {
+		t.Fatalf("response should include Quake error message, got %s", bodyText)
+	}
+	if strings.Contains(bodyText, "cannot unmarshal") {
+		t.Fatalf("response exposed JSON type decoding failure: %s", bodyText)
+	}
+}
+
 func TestExtractInfoCollectJSONObject(t *testing.T) {
 	t.Parallel()
 	cases := []struct {

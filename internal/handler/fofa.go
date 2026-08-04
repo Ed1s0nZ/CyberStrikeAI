@@ -767,7 +767,7 @@ func (h *FofaHandler) searchQuake(c *gin.Context, req fofaSearchRequest, apiKey 
 		body["include"] = fields
 	}
 	var apiResp struct {
-		Code       int                      `json:"code"`
+		Code       interface{}              `json:"code"`
 		Message    string                   `json:"message"`
 		TotalCount int                      `json:"total_count"`
 		Data       []map[string]interface{} `json:"data"`
@@ -780,7 +780,7 @@ func (h *FofaHandler) searchQuake(c *gin.Context, req fofaSearchRequest, apiKey 
 	if !h.doJSONRequest(c, http.MethodPost, u.String(), apiKey, "X-QuakeToken", body, &apiResp, "Quake") {
 		return
 	}
-	if apiResp.Code != 0 {
+	if !isZeroSpaceSearchCode(apiResp.Code) {
 		msg := strings.TrimSpace(apiResp.Message)
 		if msg == "" {
 			msg = "Quake 返回错误"
@@ -799,6 +799,23 @@ func (h *FofaHandler) searchQuake(c *gin.Context, req fofaSearchRequest, apiKey 
 		ResultsCount: len(apiResp.Data),
 		Results:      projectRows(apiResp.Data, fields),
 	})
+}
+
+func isZeroSpaceSearchCode(code interface{}) bool {
+	switch v := code.(type) {
+	case nil:
+		return false
+	case int:
+		return v == 0
+	case int64:
+		return v == 0
+	case float64:
+		return v == 0
+	case string:
+		return strings.TrimSpace(v) == "0"
+	default:
+		return false
+	}
 }
 
 func (h *FofaHandler) searchShodan(c *gin.Context, req fofaSearchRequest, apiKey string) {
