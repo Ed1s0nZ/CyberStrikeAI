@@ -31,7 +31,8 @@ func TestIsCommandFailureResult(t *testing.T) {
 }
 
 func TestFormatCommandFailureFromErr(t *testing.T) {
-	cmd := exec.Command("sh", "-c", "exit 42")
+	shell, arg, cmdStr := shellExecPair("exit 42", "exit 42")
+	cmd := exec.Command(shell, arg, cmdStr)
 	err := cmd.Run()
 	got := FormatCommandFailureFromErr(err, "oops")
 	if got != "命令执行失败: exit status 42\n输出: oops" {
