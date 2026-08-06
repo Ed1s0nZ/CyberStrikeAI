@@ -137,6 +137,7 @@ function downloadAssetTemplate(format) {
         [assetT('assets.templateGuideRequired', '必填：target，或 host / ip / domain 中至少一项')],
         [assetT('assets.templateGuideTarget', 'target 示例：https://example.com:443、example.com、1.1.1.1:22')],
         [assetT('assets.templateGuideProject', 'project 填写系统中已有的项目名称或项目 ID，留空表示不绑定')],
+        [assetT('assets.templateGuideDomain', 'domain 填资产自身域名（如 app.example.com），勿填根域名；留空时从 target 自动解析')],
         [assetT('assets.templateGuideTags', 'tags 使用逗号分隔，最多 30 个')],
         [assetT('assets.templateGuideStatus', 'status 仅支持 active / inactive，留空默认为 active')],
         [assetT('assets.templateGuideLimit', '请在“Assets”工作表中填写，最多 100000 行')]
@@ -272,7 +273,7 @@ function parseAssetImportMatrix(matrix, fileName) {
         const parsed = assetImportRecord(values, index + 2);
         if (!parsed.error) {
             const asset = parsed.asset;
-            const key = `${String(asset.domain || asset.ip || asset.host).toLowerCase()}|${asset.port || 0}|${asset.protocol || ''}`;
+            const key = [asset.ip, asset.domain, asset.host, asset.port || 0, asset.protocol || ''].map(v => String(v || '').toLowerCase()).join('|');
             if (seen.has(key)) parsed.error = assetT('assets.duplicateFileRow', `与第 ${seen.get(key)} 行重复`, { row: seen.get(key) });
             else seen.set(key, parsed.rowNumber);
         }
@@ -322,7 +323,7 @@ function assetImportRecord(values, rowNumber) {
     const tags = String(values.tags || '').split(/[,，;；|]/).map(tag => tag.trim()).filter(Boolean);
     if (tags.length > 30 || tags.some(tag => Array.from(tag).length > 64)) return fail(assetT('assets.importTagsInvalid', '标签最多 30 个，单个标签最多 64 个字符'));
     const asset = {
-        host: values.host || parsed.host || '', ip, domain, port, protocol,
+        host: values.host || parsed.host || target || '', ip, domain, port, protocol,
         title: values.title || '', server: values.server || '', country: values.country || '',
         province: values.province || '', city: values.city || '', responsible_person: values.responsible_person || '',
         department: values.department || '', business_system: values.business_system || '', environment, criticality, status, tags,

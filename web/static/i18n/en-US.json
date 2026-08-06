@@ -1126,6 +1126,7 @@
     "templateGuideRequired": "Required: target, or at least one of host / ip / domain",
     "templateGuideTarget": "target examples: https://example.com:443, example.com, 1.1.1.1:22",
     "templateGuideProject": "project accepts an existing project name or ID; leave blank for no project",
+    "templateGuideDomain": "domain is the asset's own hostname (e.g. app.example.com), not the root domain; auto-parsed from target if empty",
     "templateGuideTags": "Separate tags with commas; at most 30 tags",
     "templateGuideStatus": "status accepts active / inactive and defaults to active",
     "templateGuideLimit": "Enter data in the Assets sheet; up to 100,000 rows",

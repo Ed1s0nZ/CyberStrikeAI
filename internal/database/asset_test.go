@@ -98,7 +98,7 @@ func TestAssetUpsertDeduplicatesAndUpdates(t *testing.T) {
 	if err != nil || result.Created != 1 || result.Updated != 0 {
 		t.Fatalf("first upsert = %#v, %v", result, err)
 	}
-	second := &Asset{Domain: "example.com", Port: 443, Protocol: "https", Title: "New", Server: "nginx", Source: "fofa"}
+	second := &Asset{Host: "https://example.com", Domain: "example.com", Port: 443, Protocol: "https", Title: "New", Server: "nginx", Source: "fofa"}
 	result, err = db.UpsertAssets([]*Asset{second}, "user-a")
 	if err != nil || result.Created != 0 || result.Updated != 1 {
 		t.Fatalf("second upsert = %#v, %v", result, err)
@@ -445,5 +445,48 @@ func TestAssetListFlexibleFiltersAndOldestScanPagination(t *testing.T) {
 	filtered, total, err := db.ListAssets(20, 0, AssetListFilter{Source: "fofa", Port: &port, LastScanBefore: &recent}, access)
 	if err != nil || total != 1 || len(filtered) != 1 || filtered[0].ID != assets[0].ID {
 		t.Fatalf("structured filters: total=%d assets=%#v err=%v", total, filtered, err)
+	}
+}
+
+func TestAssetDedupCompositeKey(t *testing.T) {
+	db, err := NewDB(filepath.Join(t.TempDir(), "asset-composite-dedup.db"), zap.NewNop())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	// 同 domain 同 port 不同 ip → 两条
+	if _, err := db.UpsertAssets([]*Asset{
+		{IP: "1.1.1.1", Domain: "example.com", Port: 443, Protocol: "https"},
+		{IP: "2.2.2.2", Domain: "example.com", Port: 443, Protocol: "https"},
+	}, "", true); err != nil {
+		t.Fatal(err)
+	}
+	// 同 ip 同 port 不同 domain → 两条（vhost/SNI 保留）
+	if _, err := db.UpsertAssets([]*Asset{
+		{IP: "3.3.3.3", Domain: "app1.example.com", Port: 443, Protocol: "https"},
+		{IP: "3.3.3.3", Domain: "app2.example.com", Port: 443, Protocol: "https"},
+	}, "", true); err != nil {
+		t.Fatal(err)
+	}
+	// 同 ip 同 domain 不同 port → 两条
+	if _, err := db.UpsertAssets([]*Asset{
+		{IP: "4.4.4.4", Domain: "example.com", Port: 80, Protocol: "http"},
+		{IP: "4.4.4.4", Domain: "example.com", Port: 443, Protocol: "https"},
+	}, "", true); err != nil {
+		t.Fatal(err)
+	}
+	// 完全相同 → 合并（created=1, updated=1）
+	result, err := db.UpsertAssets([]*Asset{
+		{IP: "5.5.5.5", Domain: "example.com", Port: 8443, Protocol: "https"},
+		{IP: "5.5.5.5", Domain: "example.com", Port: 8443, Protocol: "https"},
+	}, "", true)
+	if err != nil || result.Created != 1 || result.Updated != 1 {
+		t.Fatalf("identical assets should merge: result=%#v err=%v", result, err)
+	}
+
+	_, total, err := db.ListAssets(100, 0, AssetListFilter{}, RBACListAccess{Scope: RBACScopeAll})
+	if err != nil || total != 7 {
+		t.Fatalf("expected 7 distinct assets, got total=%d err=%v", total, err)
 	}
 }

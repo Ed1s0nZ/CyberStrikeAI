@@ -273,14 +273,13 @@ func validAssetDomain(domain string) bool {
 }
 
 func assetDedupKey(a *Asset) string {
-	target := a.Domain
-	if target == "" {
-		target = a.IP
-	}
-	if target == "" {
-		target = strings.ToLower(a.Host)
-	}
-	return strings.Join([]string{target, strconv.Itoa(a.Port), a.Protocol}, "|")
+	return strings.Join([]string{
+		strings.ToLower(a.IP),
+		strings.ToLower(a.Domain),
+		strings.ToLower(a.Host),
+		strconv.Itoa(a.Port),
+		a.Protocol,
+	}, "|")
 }
 
 func appendAssetAccess(query string, args []interface{}, access RBACListAccess, alias string) (string, []interface{}) {
