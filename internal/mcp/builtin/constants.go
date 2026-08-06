@@ -136,8 +136,9 @@ func IsBuiltinTool(toolName string) bool {
 	}
 }
 
-// GetAllBuiltinTools 返回所有内置工具名称列表
-func GetAllBuiltinTools() []string {
+// GetCoreBuiltinTools 返回高频核心内置工具（每轮调用常驻，控制 token 开销）。
+// webshell_*/batch_task_*/c2_* 等专项工具不在此列，由 tool_search 按需解锁。
+func GetCoreBuiltinTools() []string {
 	return []string{
 		ToolRecordVulnerability,
 		ToolListVulnerabilities,
@@ -160,6 +161,12 @@ func GetAllBuiltinTools() []string {
 		ToolGetToolExecution,
 		ToolWaitToolExecution,
 		ToolCancelToolExecution,
+	}
+}
+
+// GetAllBuiltinTools 返回所有内置工具名称列表
+func GetAllBuiltinTools() []string {
+	return append(append([]string(nil), GetCoreBuiltinTools()...), []string{
 		ToolWebshellExec,
 		ToolWebshellFileList,
 		ToolWebshellFileRead,
@@ -191,5 +198,5 @@ func GetAllBuiltinTools() []string {
 		ToolC2Event,
 		ToolC2Profile,
 		ToolC2File,
-	}
+	}...)
 }

@@ -229,7 +229,7 @@ func RunDeepAgent(
 				return nil, fmt.Errorf("子代理 %q 工具: %w", id, err)
 			}
 
-			subToolsForCfg, subPre, subToolSearchActive, err := prependEinoMiddlewares(ctx, &ma.EinoMiddleware, einoMWSub, subTools, einoLoc, skillsRoot, conversationID, projectID, logger)
+			subToolsForCfg, subPre, subToolSearchActive, subDynToolNames, err := prependEinoMiddlewares(ctx, &ma.EinoMiddleware, einoMWSub, subTools, einoLoc, skillsRoot, conversationID, projectID, logger)
 			if err != nil {
 				return nil, fmt.Errorf("子代理 %q eino 中间件: %w", id, err)
 			}
@@ -264,6 +264,7 @@ func RunDeepAgent(
 				toolMaxBytes:     toolMaxBytesFromMW(&ma.EinoMiddleware),
 				conversationID:   conversationID,
 				middlewareConfig: &ma.EinoMiddleware,
+				dynamicToolNames: toolNameSet(subDynToolNames),
 			})
 
 			subInstrFinal := project.AppendVisionImageAnalysisIfReady(instr, appCfg.Vision.Ready())
@@ -344,7 +345,7 @@ func RunDeepAgent(
 	if err != nil {
 		return nil, err
 	}
-	mainToolsForCfg, mainOrchestratorPre, mainToolSearchActive, err := prependEinoMiddlewares(ctx, &ma.EinoMiddleware, einoMWMain, mainTools, einoLoc, skillsRoot, conversationID, projectID, logger)
+	mainToolsForCfg, mainOrchestratorPre, mainToolSearchActive, mainDynToolNames, err := prependEinoMiddlewares(ctx, &ma.EinoMiddleware, einoMWMain, mainTools, einoLoc, skillsRoot, conversationID, projectID, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -433,6 +434,7 @@ func RunDeepAgent(
 		conversationID:   conversationID,
 		trace:            modelFacingTrace,
 		middlewareConfig: &ma.EinoMiddleware,
+		dynamicToolNames: toolNameSet(mainDynToolNames),
 	})
 
 	supHandlers := []adk.ChatModelAgentMiddleware{}
@@ -452,6 +454,7 @@ func RunDeepAgent(
 		conversationID:   conversationID,
 		trace:            modelFacingTrace,
 		middlewareConfig: &ma.EinoMiddleware,
+		dynamicToolNames: toolNameSet(mainDynToolNames),
 	})
 
 	mainToolsCfg := adk.ToolsConfig{
@@ -531,6 +534,7 @@ func RunDeepAgent(
 				conversationID:   conversationID,
 				skipTrace:        true,
 				middlewareConfig: &ma.EinoMiddleware,
+				dynamicToolNames: toolNameSet(mainDynToolNames),
 			}),
 		})
 		if perr != nil {
