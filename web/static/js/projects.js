@@ -897,12 +897,12 @@ function renderProjectsSidebar() {
             p.pinned ? `<span class="projects-list-item-badge">${escapeHtml(tp('projects.pinned'))}</span>` : '',
             p.status === 'archived' ? `<span class="projects-list-item-badge">${escapeHtml(tp('projects.archived'))}</span>` : '',
         ].join('');
-        return `<div class="projects-list-item${active}${archived}" data-id="${escapeHtml(p.id)}" onclick="selectProject('${escapeHtml(p.id)}')">
+        return `<div class="projects-list-item${active}${archived}" data-id="${escapeAttr(p.id)}" onclick="selectProject(${escapeJsStringAttr(p.id)})">
             <div class="projects-list-item-body">
                 <div class="projects-list-item-name">${escapeHtml(p.name)}${badges}</div>
                 <div class="projects-list-item-meta">${formatProjectTime(p.updated_at)}</div>
             </div>
-            <button type="button" class="projects-list-item-menu" title="${escapeHtml(tp('projects.projectActions'))}" aria-label="${escapeHtml(tp('projects.projectActions'))}" onclick="showProjectListActionMenu(event, '${escapeHtml(p.id)}')">⋯</button>
+            <button type="button" class="projects-list-item-menu" title="${escapeHtml(tp('projects.projectActions'))}" aria-label="${escapeHtml(tp('projects.projectActions'))}" onclick="showProjectListActionMenu(event, ${escapeJsStringAttr(p.id)})">⋯</button>
         </div>`;
     }).join('');
     updateProjectsDetailVisibility();
@@ -1324,8 +1324,8 @@ function renderGraphEdgesListHtml(factKey, graphData, selectedEdgeId) {
             const synthetic = isSyntheticGraphEdge(e);
             const deleteBtn = synthetic
                 ? `<span class="project-fact-graph-edge-synthetic" title="${escapeHtml(tp('projects.graphEdgeSynthetic'))}">—</span>`
-                : `<button type="button" class="project-fact-graph-edge-delete" data-edge-id="${escapeHtml(e.id)}" onclick="event.stopPropagation(); deleteProjectFactEdge(this.dataset.edgeId)" title="${escapeHtml(tp('projects.graphDeleteEdge'))}"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>`;
-            return `<div class="project-fact-graph-edge-item${selected}" data-edge-id="${escapeHtml(e.id)}" onclick="focusProjectFactGraphEdge(${JSON.stringify(e.id)})">
+                : `<button type="button" class="project-fact-graph-edge-delete" data-edge-id="${escapeAttr(e.id)}" onclick="event.stopPropagation(); deleteProjectFactEdge(this.dataset.edgeId)" title="${escapeAttr(tp('projects.graphDeleteEdge'))}"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>`;
+            return `<div class="project-fact-graph-edge-item${selected}" data-edge-id="${escapeAttr(e.id)}" onclick="focusProjectFactGraphEdge(${escapeJsStringAttr(e.id)})">
                 <span class="project-fact-graph-edge-dir">${escapeHtml(dirLabel)}</span>
                 <span class="project-fact-graph-edge-type">${escapeHtml(e.type || '')}</span>
                 <span class="project-fact-graph-edge-peer" title="${escapeHtml(src + ' → ' + tgt)}">${escapeHtml(src)} → ${escapeHtml(tgt)}</span>
@@ -2459,6 +2459,18 @@ function escapeHtml(s) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+}
+
+function escapeAttr(s) {
+    return escapeHtml(s).replace(/'/g, '&#39;');
+}
+
+function escapeJsString(text) {
+    return JSON.stringify(String(text == null ? '' : text));
+}
+
+function escapeJsStringAttr(text) {
+    return escapeAttr(escapeJsString(text));
 }
 
 function getChatProjectSelection() {

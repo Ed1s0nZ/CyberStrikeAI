@@ -194,7 +194,7 @@ function renderKnowledgeItemsByCategories(categoriesWithItems) {
         const categoryCount = categoryData.itemCount || categoryItems.length;
         
         html += `
-            <div class="knowledge-category-section" data-category="${escapeHtml(category)}">
+            <div class="knowledge-category-section" data-category="${escapeAttr(category)}">
                 <div class="knowledge-category-header">
                     <div class="knowledge-category-info">
                         <h3 class="knowledge-category-title">${escapeHtml(category)}</h3>
@@ -245,7 +245,7 @@ function renderKnowledgeItems(items) {
         const categoryCount = categoryItems.length;
         
         html += `
-            <div class="knowledge-category-section" data-category="${escapeHtml(category)}">
+            <div class="knowledge-category-section" data-category="${escapeAttr(category)}">
                 <div class="knowledge-category-header">
                     <div class="knowledge-category-info">
                         <h3 class="knowledge-category-title">${escapeHtml(category)}</h3>
@@ -347,10 +347,10 @@ function renderKnowledgeItemCard(item) {
     }
     
     return `
-        <div class="knowledge-item-card" data-id="${item.id}" data-category="${escapeHtml(item.category)}">
+        <div class="knowledge-item-card" data-id="${escapeAttr(item.id)}" data-category="${escapeAttr(item.category)}">
             <div class="knowledge-item-card-header">
                 <div class="knowledge-item-card-title-row">
-                    <h4 class="knowledge-item-card-title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</h4>
+                    <h4 class="knowledge-item-card-title" title="${escapeAttr(item.title)}">${escapeHtml(item.title)}</h4>
                     <div class="knowledge-item-card-actions">
                         <button class="knowledge-item-action-btn" data-require-permission="knowledge:write" onclick="editKnowledgeItem('${item.id}')" title="编辑">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1435,13 +1435,13 @@ function renderRetrievalLogs(logs) {
                         ${log.conversationId ? `
                             <div class="retrieval-log-detail-item">
                                 <span class="detail-label">${_t('retrievalLogs.conversationId')}</span>
-                                <code class="detail-value" title="${_t('retrievalLogs.clickToCopy')}" data-copy-title-copied="${_t('common.copied')}" data-copy-title-click="${_t('retrievalLogs.clickToCopy')}" onclick="var t=this; navigator.clipboard.writeText('${escapeHtml(log.conversationId)}').then(function(){ t.title=t.getAttribute('data-copy-title-copied')||'Copied!'; setTimeout(function(){ t.title=t.getAttribute('data-copy-title-click')||'Click to copy'; }, 2000); });" style="cursor: pointer;">${escapeHtml(log.conversationId)}</code>
+                                <code class="detail-value" title="${escapeAttr(_t('retrievalLogs.clickToCopy'))}" data-copy-title-copied="${escapeAttr(_t('common.copied'))}" data-copy-title-click="${escapeAttr(_t('retrievalLogs.clickToCopy'))}" onclick="var t=this; navigator.clipboard.writeText(${escapeJsStringAttr(log.conversationId)}).then(function(){ t.title=t.getAttribute('data-copy-title-copied')||'Copied!'; setTimeout(function(){ t.title=t.getAttribute('data-copy-title-click')||'Click to copy'; }, 2000); });" style="cursor: pointer;">${escapeHtml(log.conversationId)}</code>
                             </div>
                         ` : ''}
                         ${log.messageId ? `
                             <div class="retrieval-log-detail-item">
                                 <span class="detail-label">${_t('retrievalLogs.messageId')}</span>
-                                <code class="detail-value" title="${_t('retrievalLogs.clickToCopy')}" data-copy-title-copied="${_t('common.copied')}" data-copy-title-click="${_t('retrievalLogs.clickToCopy')}" onclick="var el=this; navigator.clipboard.writeText('${escapeHtml(log.messageId)}').then(function(){ el.title=el.getAttribute('data-copy-title-copied')||el.title; setTimeout(function(){ el.title=el.getAttribute('data-copy-title-click')||el.title; }, 2000); });" style="cursor: pointer;">${escapeHtml(log.messageId)}</code>
+                                <code class="detail-value" title="${escapeAttr(_t('retrievalLogs.clickToCopy'))}" data-copy-title-copied="${escapeAttr(_t('common.copied'))}" data-copy-title-click="${escapeAttr(_t('retrievalLogs.clickToCopy'))}" onclick="var el=this; navigator.clipboard.writeText(${escapeJsStringAttr(log.messageId)}).then(function(){ el.title=el.getAttribute('data-copy-title-copied')||el.title; setTimeout(function(){ el.title=el.getAttribute('data-copy-title-click')||el.title; }, 2000); });" style="cursor: pointer;">${escapeHtml(log.messageId)}</code>
                             </div>
                         ` : ''}
                         <div class="retrieval-log-detail-item">
@@ -1470,7 +1470,7 @@ function renderRetrievalLogs(logs) {
                             </svg>
                             ${_t('retrievalLogs.viewDetails')}
                         </button>
-                        <button class="btn-secondary btn-sm retrieval-log-delete-btn" onclick="deleteRetrievalLog('${escapeHtml(log.id)}', ${index})" style="margin-top: 12px; margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; color: var(--error-color, #dc3545); border-color: var(--error-color, #dc3545);" onmouseover="this.style.backgroundColor='rgba(220, 53, 69, 0.1)'; this.style.color='#dc3545';" onmouseout="this.style.backgroundColor=''; this.style.color='var(--error-color, #dc3545)';" title="${_t('common.delete')}">
+                        <button class="btn-secondary btn-sm retrieval-log-delete-btn" onclick="deleteRetrievalLog(${escapeJsStringAttr(log.id)}, ${index})" style="margin-top: 12px; margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; color: var(--error-color, #dc3545); border-color: var(--error-color, #dc3545);" onmouseover="this.style.backgroundColor='rgba(220, 53, 69, 0.1)'; this.style.color='#dc3545';" onmouseout="this.style.backgroundColor=''; this.style.color='var(--error-color, #dc3545)';" title="${escapeAttr(_t('common.delete'))}">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
@@ -1910,7 +1910,7 @@ function showRetrievalLogDetailsModal(log, retrievedItems) {
                             <div style="padding: 12px; background: var(--bg-secondary); border-radius: 6px;">
                                 <div style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 4px;">${_t('retrievalLogs.conversationId')}</div>
                                 <code style="font-size: 0.8125rem; color: var(--text-primary); word-break: break-all; cursor: pointer;" 
-                                      onclick="navigator.clipboard.writeText('${escapeHtml(log.conversationId)}'); this.title='已复制!'; setTimeout(() => this.title='点击复制', 2000);" 
+                                      onclick="navigator.clipboard.writeText(${escapeJsStringAttr(log.conversationId)}); this.title='已复制!'; setTimeout(() => this.title='点击复制', 2000);" 
                                       title="点击复制">${escapeHtml(log.conversationId)}</code>
                             </div>
                         ` : ''}
@@ -1918,7 +1918,7 @@ function showRetrievalLogDetailsModal(log, retrievedItems) {
                             <div style="padding: 12px; background: var(--bg-secondary); border-radius: 6px;">
                                 <div style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 4px;">${_t('retrievalLogs.messageId')}</div>
                                 <code style="font-size: 0.8125rem; color: var(--text-primary); word-break: break-all; cursor: pointer;" 
-                                      onclick="navigator.clipboard.writeText('${escapeHtml(log.messageId)}'); this.title='已复制!'; setTimeout(() => this.title='点击复制', 2000);" 
+                                      onclick="navigator.clipboard.writeText(${escapeJsStringAttr(log.messageId)}); this.title='已复制!'; setTimeout(() => this.title='点击复制', 2000);" 
                                       title="点击复制">${escapeHtml(log.messageId)}</code>
                             </div>
                         ` : ''}
@@ -2004,6 +2004,18 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function escapeJsString(text) {
+    return JSON.stringify(String(text == null ? '' : text));
+}
+
+function escapeAttr(text) {
+    return escapeHtml(text).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function escapeJsStringAttr(text) {
+    return escapeAttr(escapeJsString(text));
 }
 
 function formatTime(timeStr) {
@@ -2319,4 +2331,3 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
-

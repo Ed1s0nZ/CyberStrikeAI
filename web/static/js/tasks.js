@@ -108,6 +108,18 @@ if (typeof escapeHtml === 'undefined') {
     }
 }
 
+function escapeJsString(text) {
+    return JSON.stringify(String(text == null ? '' : text));
+}
+
+function escapeAttr(text) {
+    return escapeHtml(text).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function escapeJsStringAttr(text) {
+    return escapeAttr(escapeJsString(text));
+}
+
 // 任务管理状态
 const tasksState = {
     allTasks: [],
@@ -526,33 +538,33 @@ function renderTaskItem(task, statusMap, isHistory = false) {
         : '';
 
     return `
-        <div class="task-item ${isHistory ? 'task-item-history' : ''}" data-task-id="${task.conversationId}" data-started-at="${task.startedAt}" data-status="${task.status}">
+        <div class="task-item ${isHistory ? 'task-item-history' : ''}" data-task-id="${escapeAttr(task.conversationId)}" data-started-at="${escapeAttr(task.startedAt)}" data-status="${escapeAttr(task.status)}">
             <div class="task-header">
                 <div class="task-info">
                     ${canCancel ? `
                         <label class="task-checkbox">
                             <input type="checkbox" ${isSelected ? 'checked' : ''} 
-                                   onchange="toggleTaskSelection('${task.conversationId}', this.checked)">
+                                   onchange="toggleTaskSelection(${escapeJsStringAttr(task.conversationId)}, this.checked)">
                         </label>
                     ` : '<div class="task-checkbox-placeholder"></div>'}
                     <span class="task-status ${status.class}">${status.text}</span>
                     ${isHistory ? '<span class="task-history-badge" title="' + _t('tasks.historyBadge') + '">📜</span>' : ''}
-                    <span class="task-message" title="${escapeHtml((task.title || task.message || _t('tasks.unnamedTask')))}">${escapeHtml((task.title || task.message || _t('tasks.unnamedTask')))}</span>
+                    <span class="task-message" title="${escapeAttr((task.title || task.message || _t('tasks.unnamedTask')))}">${escapeHtml((task.title || task.message || _t('tasks.unnamedTask')))}</span>
                 </div>
                 <div class="task-actions">
                     ${duration ? `<span class="task-duration" title="${_t('tasks.duration')}">⏱ ${duration}</span>` : ''}
                     <span class="task-time" title="${isHistory && completedText ? _t('tasks.completedAt') : _t('tasks.startedAt')}">
                         ${isHistory && completedText ? completedText : timeText}
                     </span>
-                    ${canCancel ? `<button class="btn-secondary btn-small" onclick="cancelTask('${task.conversationId}', this)">` + _t('tasks.cancelTask') + `</button>` : ''}
-                    ${task.conversationId ? `<button class="btn-secondary btn-small" onclick="navigateToVulnerabilitiesFromTasksPage('conversation', '${task.conversationId}')">` + _t('tasks.viewVulnerabilities') + `</button>` : ''}
-                    ${task.conversationId ? `<button class="btn-secondary btn-small" onclick="viewConversation('${task.conversationId}')">` + _t('tasks.viewConversation') + `</button>` : ''}
+                    ${canCancel ? `<button class="btn-secondary btn-small" onclick="cancelTask(${escapeJsStringAttr(task.conversationId)}, this)">` + _t('tasks.cancelTask') + `</button>` : ''}
+                    ${task.conversationId ? `<button class="btn-secondary btn-small" onclick="navigateToVulnerabilitiesFromTasksPage('conversation', ${escapeJsStringAttr(task.conversationId)})">` + _t('tasks.viewVulnerabilities') + `</button>` : ''}
+                    ${task.conversationId ? `<button class="btn-secondary btn-small" onclick="viewConversation(${escapeJsStringAttr(task.conversationId)})">` + _t('tasks.viewConversation') + `</button>` : ''}
                 </div>
             </div>
             ${task.conversationId ? `
                 <div class="task-details">
                     <span class="task-id-label">` + _t('tasks.conversationIdLabel') + `:</span>
-                    <span class="task-id-value" title="` + _t('tasks.clickToCopy') + `" onclick="copyTaskId('${task.conversationId}')">${escapeHtml(task.conversationId)}</span>
+                    <span class="task-id-value" title="` + _t('tasks.clickToCopy') + `" onclick="copyTaskId(${escapeJsStringAttr(task.conversationId)})">${escapeHtml(task.conversationId)}</span>
                 </div>
             ` : ''}
         </div>
@@ -1593,7 +1605,7 @@ function renderBatchQueues() {
         const doneCount = stats.completed + stats.failed + stats.cancelled;
 
         return `
-            <div class="batch-queue-item batch-queue-item--compact${cardMod}${noActionsClass}" data-queue-id="${queue.id}" onclick="showBatchQueueDetail('${queue.id}')">
+            <div class="batch-queue-item batch-queue-item--compact${cardMod}${noActionsClass}" data-queue-id="${escapeAttr(queue.id)}" onclick="showBatchQueueDetail(${escapeJsStringAttr(queue.id)})">
                 <div class="batch-queue-item__inner batch-queue-item__inner--grid">
                     <div class="batch-queue-item__lead">
                         <div class="batch-queue-item__title-row">
@@ -1601,7 +1613,7 @@ function renderBatchQueues() {
                             <div class="batch-queue-item__titles">${titleBlock}</div>
                         </div>
                         <p class="batch-queue-item__config">${configLine}${cronPausedNote}</p>
-                        <p class="batch-queue-item__idline batch-queue-item__idline--lead"><code title="${escapeHtml(queue.id)}">${shortId}</code><span class="batch-queue-item__idsep">\u00b7</span><span>${escapeHtml(_t('tasks.createdTimeLabel'))}\u00a0${escapeHtml(new Date(queue.createdAt).toLocaleString())}</span></p>
+                        <p class="batch-queue-item__idline batch-queue-item__idline--lead"><code title="${escapeAttr(queue.id)}">${shortId}</code><span class="batch-queue-item__idsep">\u00b7</span><span>${escapeHtml(_t('tasks.createdTimeLabel'))}\u00a0${escapeHtml(new Date(queue.createdAt).toLocaleString())}</span></p>
                     </div>
                     <div class="batch-queue-item__cluster">
                         <div class="batch-queue-item__status-inline">
@@ -1616,8 +1628,8 @@ function renderBatchQueues() {
                         </div>
                     </div>
                     <div class="batch-queue-item__actions-col" onclick="event.stopPropagation();">
-                        <button type="button" class="batch-queue-icon-btn" onclick="navigateToVulnerabilitiesFromTasksPage('queue', '${queue.id}')" title="${escapeHtml(_t('tasks.viewVulnerabilitiesQueueTitle'))}" aria-label="${escapeHtml(_t('tasks.viewVulnerabilitiesQueueTitle'))}"><svg class="batch-queue-icon-btn__svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></button>
-                        ${canDelete ? `<button type="button" class="batch-queue-icon-btn batch-queue-icon-btn--danger" onclick="deleteBatchQueueFromList('${queue.id}')" title="${escapeHtml(_t('tasks.deleteQueue'))}" aria-label="${escapeHtml(_t('tasks.deleteQueue'))}"><svg class="batch-queue-icon-btn__svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>` : ''}
+                        <button type="button" class="batch-queue-icon-btn" onclick="navigateToVulnerabilitiesFromTasksPage('queue', ${escapeJsStringAttr(queue.id)})" title="${escapeHtml(_t('tasks.viewVulnerabilitiesQueueTitle'))}" aria-label="${escapeHtml(_t('tasks.viewVulnerabilitiesQueueTitle'))}"><svg class="batch-queue-icon-btn__svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></button>
+                        ${canDelete ? `<button type="button" class="batch-queue-icon-btn batch-queue-icon-btn--danger" onclick="deleteBatchQueueFromList(${escapeJsStringAttr(queue.id)})" title="${escapeHtml(_t('tasks.deleteQueue'))}" aria-label="${escapeHtml(_t('tasks.deleteQueue'))}"><svg class="batch-queue-icon-btn__svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>` : ''}
                     </div>
                 </div>
             </div>
@@ -1835,7 +1847,7 @@ async function showBatchQueueDetail(queueId) {
 
         deferModalContent(function () {
         content.innerHTML = `
-            <div class="batch-queue-detail-layout" data-bq-detail-for="${escapeHtml(queue.id)}">
+            <div class="batch-queue-detail-layout" data-bq-detail-for="${escapeAttr(queue.id)}">
             <section class="batch-queue-detail-hero">
                 <span class="batch-queue-status ${pres.class}">${escapeHtml(pres.text)}</span>
                 ${pres.sublabel ? `<p class="batch-queue-detail-hero__sub">${escapeHtml(pres.sublabel)}</p>` : ''}
@@ -1872,15 +1884,15 @@ async function showBatchQueueDetail(queueId) {
                     const canEdit = allowSubtaskMutation && task.status !== 'running';
                     const canRunSingle = batchQueueCanRunSingleTask(queue, task);
                     const runSingleUnavailableTitle = escapeHtml(batchQueueRunSingleTaskDisabledReason(queue, task));
-                    const taskMessageEscaped = escapeHtml(task.message).replace(/'/g, "&#39;").replace(/"/g, "&quot;").replace(/\n/g, "\\n");
+                    const taskMessageEscaped = escapeAttr(task.message).replace(/\n/g, "\\n");
                     return `
-                        <div class="batch-task-item ${task.status === 'running' ? 'batch-task-item-active' : ''}" data-queue-id="${queue.id}" data-task-id="${task.id}" data-task-message="${taskMessageEscaped}">
+                        <div class="batch-task-item ${task.status === 'running' ? 'batch-task-item-active' : ''}" data-queue-id="${escapeAttr(queue.id)}" data-task-id="${escapeAttr(task.id)}" data-task-message="${taskMessageEscaped}">
                             <div class="batch-task-header">
                                 <span class="batch-task-index">#${index + 1}</span>
                                 <span class="batch-task-status ${taskStatus.class}">${taskStatus.text}</span>
-                                <span class="batch-task-message" title="${escapeHtml(task.message)}">${escapeHtml(task.message)}</span>
-                                <button class="btn-secondary btn-small batch-task-run-btn" ${canRunSingle ? `onclick="runSingleBatchTask('${queue.id}', '${task.id}'); event.stopPropagation();"` : `disabled title="${runSingleUnavailableTitle}"`}>` + _t('tasks.runSingleTask') + `</button>
-                                ${task.conversationId ? `<button class="btn-secondary btn-small" onclick="viewBatchTaskConversation('${task.conversationId}'); event.stopPropagation();">` + _t('tasks.viewConversation') + `</button>` : ''}
+                                <span class="batch-task-message" title="${escapeAttr(task.message)}">${escapeHtml(task.message)}</span>
+                                <button class="btn-secondary btn-small batch-task-run-btn" ${canRunSingle ? `onclick="runSingleBatchTask(${escapeJsStringAttr(queue.id)}, ${escapeJsStringAttr(task.id)}); event.stopPropagation();"` : `disabled title="${runSingleUnavailableTitle}"`}>` + _t('tasks.runSingleTask') + `</button>
+                                ${task.conversationId ? `<button class="btn-secondary btn-small" onclick="viewBatchTaskConversation(${escapeJsStringAttr(task.conversationId)}); event.stopPropagation();">` + _t('tasks.viewConversation') + `</button>` : ''}
                                 ${canEdit ? `<button class="btn-secondary btn-small batch-task-edit-btn" onclick="editBatchTaskFromElement(this); event.stopPropagation();">` + _t('common.edit') + `</button>` : ''}
                                 ${canEdit ? `<button class="btn-secondary btn-small btn-danger batch-task-delete-btn" onclick="deleteBatchTaskFromElement(this); event.stopPropagation();">` + _t('common.delete') + `</button>` : ''}
                             </div>
@@ -2182,7 +2194,7 @@ function editBatchTaskFromElement(button) {
     // 替换消息为内联编辑区域
     const editDiv = document.createElement('div');
     editDiv.className = 'batch-task-inline-edit';
-    editDiv.innerHTML = `<textarea id="bq-task-edit-${escapeHtml(taskId)}">${escapeHtml(decodedMessage)}</textarea>`;
+    editDiv.innerHTML = `<textarea id="bq-task-edit-${escapeAttr(taskId)}">${escapeHtml(decodedMessage)}</textarea>`;
     msgSpan.style.display = 'none';
     msgSpan.parentNode.insertBefore(editDiv, msgSpan.nextSibling);
 
@@ -2474,7 +2486,7 @@ function startInlineEditTitle() {
     const untitledText = _t('tasks.batchQueueUntitled');
     const val = currentTitle === untitledText ? '' : currentTitle;
     container.innerHTML = `<span class="bq-inline-edit-controls">
-        <input type="text" id="bq-edit-title" value="${escapeHtml(val)}" placeholder="${escapeHtml(_t('batchImportModal.queueTitleHint') || '')}" style="width:180px;" />
+        <input type="text" id="bq-edit-title" value="${escapeAttr(val)}" placeholder="${escapeAttr(_t('batchImportModal.queueTitleHint') || '')}" style="width:180px;" />
     </span>`;
     const inp = document.getElementById('bq-edit-title');
     if (inp) {
@@ -2534,8 +2546,8 @@ function startInlineEditRole() {
         const currentRole = queue.role || '';
         const roles = (Array.isArray(batchQueuesState.loadedRoles) ? batchQueuesState.loadedRoles : []).filter(r => r.name !== '默认' && r.enabled !== false).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh-CN'));
         const currentInList = !currentRole || roles.some(r => r.name === currentRole);
-        const orphanOpt = !currentInList ? `<option value="${escapeHtml(currentRole)}" selected>${escapeHtml(currentRole)} (${escapeHtml(_t('batchQueueDetailModal.roleNotFound') || '已移除')})</option>` : '';
-        const opts = roles.map(r => `<option value="${escapeHtml(r.name)}" ${r.name === currentRole ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('');
+        const orphanOpt = !currentInList ? `<option value="${escapeAttr(currentRole)}" selected>${escapeHtml(currentRole)} (${escapeHtml(_t('batchQueueDetailModal.roleNotFound') || '已移除')})</option>` : '';
+        const opts = roles.map(r => `<option value="${escapeAttr(r.name)}" ${r.name === currentRole ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('');
         container.innerHTML = `<span class="bq-inline-edit-controls">
             <select id="bq-edit-role">
                 <option value="">${escapeHtml(_t('batchImportModal.defaultRole'))}</option>
@@ -2762,7 +2774,7 @@ function startInlineEditSchedule() {
                 <option value="manual" ${!isCron ? 'selected' : ''}>${escapeHtml(_t('batchImportModal.scheduleModeManual'))}</option>
                 <option value="cron" ${isCron ? 'selected' : ''}>${escapeHtml(_t('batchImportModal.scheduleModeCron'))}</option>
             </select>
-            <input type="text" id="bq-edit-cron-expr" class="bq-edit-cron-expr" value="${escapeHtml(queue.cronExpr || '')}" placeholder="${_t('batchImportModal.cronExprPlaceholder', { interpolation: { escapeValue: false } })}" style="${!isCron ? 'display:none;' : ''}" />
+            <input type="text" id="bq-edit-cron-expr" class="bq-edit-cron-expr" value="${escapeAttr(queue.cronExpr || '')}" placeholder="${escapeAttr(_t('batchImportModal.cronExprPlaceholder', { interpolation: { escapeValue: false } }))}" style="${!isCron ? 'display:none;' : ''}" />
         </span>`;
         refreshBatchFormSelect('bq-edit-schedule-mode', { inline: true });
         let schedCancelled = false;

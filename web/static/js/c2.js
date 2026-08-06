@@ -113,10 +113,10 @@
             if (!id || seen.has(id)) return;
             seen.add(id);
             const label = c2ProjectDisplayName(id, name);
-            html += `<option value="${escapeHtml(id)}"${id === selected ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+            html += `<option value="${escapeAttr(id)}"${id === selected ? ' selected' : ''}>${escapeHtml(label)}</option>`;
         });
         if (selected && !seen.has(selected)) {
-            html += `<option value="${escapeHtml(selected)}" selected>${escapeHtml(c2ProjectDisplayName(selected))}</option>`;
+            html += `<option value="${escapeAttr(selected)}" selected>${escapeHtml(c2ProjectDisplayName(selected))}</option>`;
         }
         return html;
     }
@@ -147,7 +147,7 @@
     }
 
     function c2ProjectBindSelectHtml(listener) {
-        return `<select class="c2-project-bind-select" data-id="${escapeHtml(listener.id || '')}" title="${escapeHtml(c2t('assets.project') || '所属项目')}" onclick="event.stopPropagation()" onchange="C2.bindListenerProject(this.dataset.id, this.value)">${c2ProjectOptionsHtml(c2ResourceProjectId(listener))}</select>`;
+        return `<select class="c2-project-bind-select" data-id="${escapeAttr(listener.id || '')}" title="${escapeAttr(c2t('assets.project') || '所属项目')}" onclick="event.stopPropagation()" onchange="C2.bindListenerProject(this.dataset.id, this.value)">${c2ProjectOptionsHtml(c2ResourceProjectId(listener))}</select>`;
     }
 
     function withC2ProjectQuery(url) {
@@ -478,7 +478,7 @@
         if (empty) valueClasses.push('is-empty');
         const rowCls = opts && opts.full ? ' c2-session-info-dl__row--full' : '';
         const copyBtn = (opts && opts.copy && !empty)
-            ? `<button type="button" class="c2-session-info-copy" title="${escapeHtml(c2t('c2.sessions.infoCopy'))}" aria-label="${escapeHtml(c2t('c2.sessions.infoCopy'))}" onclick="event.stopPropagation(); C2.copyText(${JSON.stringify(String(value))})">
+            ? `<button type="button" class="c2-session-info-copy" title="${escapeAttr(c2t('c2.sessions.infoCopy'))}" aria-label="${escapeAttr(c2t('c2.sessions.infoCopy'))}" data-c2-copy-value="${escapeAttr(String(value))}">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
                </button>`
             : '';
@@ -486,7 +486,7 @@
             <div class="c2-session-info-dl__row${rowCls}">
                 <dt class="c2-session-info-dl__label">${escapeHtml(label)}</dt>
                 <dd class="${valueClasses.join(' ')}">
-                    <span class="c2-session-info-dl__text" title="${escapeHtml(empty ? '' : display)}">${escapeHtml(display)}</span>
+                    <span class="c2-session-info-dl__text" title="${escapeAttr(empty ? '' : display)}">${escapeHtml(display)}</span>
                     ${copyBtn}
                 </dd>
             </div>`;
@@ -543,16 +543,16 @@
                     <div class="c2-session-info-block__head">
                         <span class="c2-session-info-block__icon c2-session-info-block__icon--note" aria-hidden="true"></span>
                         <span>${escapeHtml(c2t('c2.sessions.infoSectionNote'))}</span>
-                        <button type="button" class="c2-session-note-edit-btn" data-require-permission="c2:write" onclick='C2.beginEditSessionNote(${JSON.stringify(s.id)})'>${escapeHtml(c2t('c2.sessions.noteEdit'))}</button>
+                        <button type="button" class="c2-session-note-edit-btn" data-require-permission="c2:write" data-c2-action="session-note-edit" data-c2-id="${escapeAttr(s.id)}">${escapeHtml(c2t('c2.sessions.noteEdit'))}</button>
                     </div>
                     <div class="c2-session-info-note${noteEmpty ? ' is-empty' : ''}" id="c2-session-note-view">${escapeHtml(noteText || c2t('c2.sessions.infoNoteEmpty'))}</div>
                     <div class="c2-session-note-editor" id="c2-session-note-editor" hidden>
-                        <textarea id="c2-session-note-input" class="c2-session-note-textarea" maxlength="2000" rows="4" placeholder="${escapeHtml(c2t('c2.sessions.notePlaceholder'))}">${escapeHtml(noteText)}</textarea>
+                        <textarea id="c2-session-note-input" class="c2-session-note-textarea" maxlength="2000" rows="4" placeholder="${escapeAttr(c2t('c2.sessions.notePlaceholder'))}">${escapeHtml(noteText)}</textarea>
                         <div class="c2-session-note-editor__footer">
                             <span class="c2-session-note-counter" id="c2-session-note-counter">${noteText.length}/2000</span>
                             <div class="c2-session-note-editor__actions">
                                 <button type="button" class="btn-secondary btn-sm" onclick="C2.cancelEditSessionNote()">${escapeHtml(c2t('common.cancel'))}</button>
-                                <button type="button" class="btn-primary btn-sm" id="c2-session-note-save" onclick='C2.saveSessionNote(${JSON.stringify(s.id)})'>${escapeHtml(c2t('common.save'))}</button>
+                                <button type="button" class="btn-primary btn-sm" id="c2-session-note-save" data-c2-action="session-note-save" data-c2-id="${escapeAttr(s.id)}">${escapeHtml(c2t('common.save'))}</button>
                             </div>
                         </div>
                     </div>
@@ -638,15 +638,19 @@
         return div.innerHTML;
     }
 
+    function escapeAttr(text) {
+        return escapeHtml(text).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
     /** 任务列表操作按钮（查看/取消/删除）— 事件委托 */
     function bindC2TaskActionDelegation() {
         if (document.documentElement.dataset.c2TaskActionsBound === '1') return;
         document.documentElement.dataset.c2TaskActionsBound = '1';
         document.addEventListener('click', function(e) {
-            const btn = e.target.closest('[data-c2-task-action]');
-            if (!btn) return;
-            e.preventDefault();
-            e.stopPropagation();
+	            const btn = e.target.closest('[data-c2-task-action]');
+	            if (!btn) return;
+	            e.preventDefault();
+	            e.stopImmediatePropagation();
             const action = btn.getAttribute('data-c2-task-action');
             const id = btn.getAttribute('data-task-id');
             if (!id) return;
@@ -657,6 +661,75 @@
     }
     bindC2TaskActionDelegation();
 
+    /** C2 动态内容操作按钮 — 避免把用户可控值拼入 inline onclick */
+    function bindC2SafeActionDelegation() {
+        if (document.documentElement.dataset.c2SafeActionsBound === '1') return;
+        document.documentElement.dataset.c2SafeActionsBound = '1';
+        document.addEventListener('click', function(e) {
+            const copyBtn = e.target.closest('[data-c2-copy-value]');
+            if (copyBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                C2.copyText(copyBtn.getAttribute('data-c2-copy-value') || '');
+                return;
+            }
+
+            const fileBtn = e.target.closest('[data-c2-file-action]');
+            if (fileBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const name = fileBtn.getAttribute('data-c2-file-name') || '';
+                const action = fileBtn.getAttribute('data-c2-file-action');
+                if (action === 'open') C2.openDirectory(name);
+                else if (action === 'download') C2.downloadFile(name);
+                return;
+            }
+
+            const stopEl = e.target.closest('[data-c2-stop-action]');
+            const actionEl = e.target.closest('[data-c2-action]');
+            if (stopEl && (!actionEl || !stopEl.contains(actionEl))) return;
+            if (!actionEl) return;
+            e.preventDefault();
+            e.stopPropagation();
+            runC2SafeAction(actionEl);
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            const actionEl = e.target.closest('[data-c2-action][role="button"]');
+            if (!actionEl) return;
+            e.preventDefault();
+            runC2SafeAction(actionEl);
+        });
+    }
+    bindC2SafeActionDelegation();
+
+    function runC2SafeAction(el) {
+        const action = el.getAttribute('data-c2-action');
+        const id = el.getAttribute('data-c2-id') || '';
+        switch (action) {
+            case 'session-note-edit': C2.beginEditSessionNote(id); break;
+            case 'session-note-save': C2.saveSessionNote(id); break;
+            case 'listener-start': C2.startListener(id); break;
+            case 'listener-stop': C2.stopListener(id); break;
+            case 'listener-edit': C2.editListener(id); break;
+            case 'listener-delete': C2.deleteListener(id); break;
+            case 'listener-save': C2.saveListener(id); break;
+            case 'session-select': C2.selectSession(id); break;
+            case 'session-delete': C2.deleteSessionRecord(id); break;
+            case 'session-sleep': C2.setSessionSleep(id); break;
+            case 'session-kill': C2.killSession(id); break;
+            case 'session-tasks-refresh': C2.loadSessionTasks(id); break;
+            case 'task-view': C2.viewTask(id); break;
+            case 'event-view': C2.viewEvent(id); break;
+            case 'event-delete': C2.deleteEventById(id); break;
+            case 'profile-delete': C2.deleteProfile(id); break;
+            case 'payload-download': {
+                if (typeof window.__c2DownloadPayload === 'function') window.__c2DownloadPayload(id);
+                break;
+            }
+        }
+    }
+
     /** 监听器表单：Malleable Profile 下拉选项 HTML（value / 文本已转义） */
     function listenerProfileSelectHtml(selectedProfileId) {
         const sel = selectedProfileId ? String(selectedProfileId) : '';
@@ -665,7 +738,7 @@
             if (!p) continue;
             const pid = p.id || p.ID;
             if (!pid) continue;
-            const idEsc = escapeHtml(String(pid));
+            const idEsc = escapeAttr(String(pid));
             const nameEsc = escapeHtml(p.name || pid);
             const selected = sel && String(pid) === sel ? ' selected' : '';
             opts += `<option value="${idEsc}"${selected}>${nameEsc}</option>`;
@@ -852,7 +925,7 @@
             const profilePid = listenerResolvedProfileId(l);
             const profileName = listenerProfileDisplayName(l);
             const profileBadge = profilePid
-                ? '<div class="c2-listener-profile-badge" title="' + escapeHtml(c2t('c2.listeners.profileBadgeTitle')) + '"><span class="c2-listener-profile-dot" aria-hidden="true"></span><span>' + escapeHtml(profileName) + '</span></div>'
+                ? '<div class="c2-listener-profile-badge" title="' + escapeAttr(c2t('c2.listeners.profileBadgeTitle')) + '"><span class="c2-listener-profile-dot" aria-hidden="true"></span><span>' + escapeHtml(profileName) + '</span></div>'
                 : '';
             const cb = C2.getListenerCallbackHost(l);
             const cbRow = cb
@@ -868,7 +941,7 @@
             const bindVal = escapeHtml(String(l.bindHost)) + ':' + escapeHtml(String(l.bindPort));
 
             return `
-            <article class="c2-listener-card c2-listener-card--${stUi}" data-listener-id="${escapeHtml(l.id)}">
+            <article class="c2-listener-card c2-listener-card--${stUi}" data-listener-id="${escapeAttr(l.id)}">
                 <div class="c2-listener-card-head">
                     <div class="c2-ltype-mark ${typeVis}" title="${fullType}"><span>${typeMark}</span></div>
                     <div class="c2-listener-card-head-main">
@@ -877,7 +950,7 @@
                             <span class="c2-listener-pill c2-listener-pill--${stUi}">${pillLabel}</span>
                         </div>
                         <div class="c2-listener-id-row">
-                            <code class="c2-listener-id-full" title="${escapeHtml(l.id)}">${escapeHtml(l.id)}</code>
+                            <code class="c2-listener-id-full" title="${escapeAttr(l.id)}">${escapeHtml(l.id)}</code>
                         </div>
                     </div>
                 </div>
@@ -894,11 +967,11 @@
                 </div>
                 <div class="c2-listener-card-actions">
                     ${l.status === 'stopped'
-                        ? `<button type="button" class="btn-primary btn-sm" data-require-permission="c2:write" onclick="C2.startListener('${l.id}')">▶ ${escapeHtml(c2t('c2.listeners.start'))}</button>`
-                        : `<button type="button" class="btn-secondary btn-sm" data-require-permission="c2:write" onclick="C2.stopListener('${l.id}')">⏹ ${escapeHtml(c2t('c2.listeners.stop'))}</button>`
+                        ? `<button type="button" class="btn-primary btn-sm" data-require-permission="c2:write" data-c2-action="listener-start" data-c2-id="${escapeAttr(l.id)}">▶ ${escapeHtml(c2t('c2.listeners.start'))}</button>`
+                        : `<button type="button" class="btn-secondary btn-sm" data-require-permission="c2:write" data-c2-action="listener-stop" data-c2-id="${escapeAttr(l.id)}">⏹ ${escapeHtml(c2t('c2.listeners.stop'))}</button>`
                     }
-                    <button type="button" class="btn-secondary btn-sm" data-require-permission="c2:write" onclick="C2.editListener('${l.id}')">${escapeHtml(c2t('c2.listeners.edit'))}</button>
-                    <button type="button" class="btn-danger btn-sm" data-require-permission="c2:delete" onclick="C2.deleteListener('${l.id}')">${escapeHtml(c2t('c2.listeners.delete'))}</button>
+                    <button type="button" class="btn-secondary btn-sm" data-require-permission="c2:write" data-c2-action="listener-edit" data-c2-id="${escapeAttr(l.id)}">${escapeHtml(c2t('c2.listeners.edit'))}</button>
+                    <button type="button" class="btn-danger btn-sm" data-require-permission="c2:delete" data-c2-action="listener-delete" data-c2-id="${escapeAttr(l.id)}">${escapeHtml(c2t('c2.listeners.delete'))}</button>
                 </div>
             </article>`;
         }).join('');
@@ -963,7 +1036,7 @@
                 <div class="c2-form-row">
                     <div class="c2-form-group">
                         <label>${escapeHtml(c2t('c2.listeners.name'))}</label>
-                        <input type="text" id="c2-listener-name" class="form-control" placeholder="${escapeHtml(c2t('c2.listeners.placeholderNameExample'))}">
+                        <input type="text" id="c2-listener-name" class="form-control" placeholder="${escapeAttr(c2t('c2.listeners.placeholderNameExample'))}">
                     </div>
                     <div class="c2-form-group">
                         <label>${escapeHtml(c2t('c2.listeners.type'))}</label>
@@ -1003,7 +1076,7 @@
                 </div>
                 <div class="c2-form-group">
                     <label>${escapeHtml(c2t('c2.listeners.remark'))}</label>
-                    <input type="text" id="c2-listener-remark" class="form-control" placeholder="${escapeHtml(c2t('c2.listeners.placeholderRemarkLong'))}">
+                    <input type="text" id="c2-listener-remark" class="form-control" placeholder="${escapeAttr(c2t('c2.listeners.placeholderRemarkLong'))}">
                 </div>
                 <div class="c2-form-group" id="c2-listener-legacy-shell-group" style="display:none;">
                     <label class="c2-checkbox-label">
@@ -1191,7 +1264,7 @@
             <div class="c2-modal-body">
                 <div class="c2-form-group">
                     <label>${escapeHtml(c2t('c2.listeners.name'))}</label>
-                    <input type="text" id="c2-listener-name" class="form-control" value="${escapeHtml(l.name)}">
+                    <input type="text" id="c2-listener-name" class="form-control" value="${escapeAttr(l.name)}">
                 </div>
                 <div class="c2-form-group">
                     <label>${escapeHtml(c2t('assets.project') || '所属项目')}</label>
@@ -1200,7 +1273,7 @@
                 <div class="c2-form-row">
                     <div class="c2-form-group">
                         <label>${escapeHtml(c2t('c2.listeners.bindHost'))}</label>
-                        <input type="text" id="c2-listener-host" class="form-control" value="${escapeHtml(String(l.bindHost))}">
+                        <input type="text" id="c2-listener-host" class="form-control" value="${escapeAttr(String(l.bindHost))}">
                     </div>
                     <div class="c2-form-group">
                         <label>${escapeHtml(c2t('c2.listeners.bindPort'))}</label>
@@ -1215,12 +1288,12 @@
                 </div>
                 <div class="c2-form-group">
                     <label>${escapeHtml(c2t('c2.listeners.callbackHost'))}</label>
-                    <input type="text" id="c2-listener-callback-host" class="form-control" value="${escapeHtml(cbHost)}">
+                    <input type="text" id="c2-listener-callback-host" class="form-control" value="${escapeAttr(cbHost)}">
                     <div class="form-hint">${escapeHtml(c2t('c2.listeners.callbackHostHint'))}</div>
                 </div>
                 <div class="c2-form-group">
                     <label>${escapeHtml(c2t('c2.listeners.remark'))}</label>
-                    <input type="text" id="c2-listener-remark" class="form-control" value="${escapeHtml(l.remark || '')}">
+                    <input type="text" id="c2-listener-remark" class="form-control" value="${escapeAttr(l.remark || '')}">
                 </div>
                 ${lt === 'tcp_reverse' ? `
                 <div class="c2-form-group" id="c2-listener-legacy-shell-group">
@@ -1233,7 +1306,7 @@
             </div>
             <div class="c2-modal-footer">
                 <button class="btn-secondary" onclick="C2.closeModal()">${escapeHtml(c2t('common.cancel'))}</button>
-                <button class="btn-primary" onclick="C2.saveListener('${l.id}')">${escapeHtml(c2t('common.save'))}</button>
+                <button class="btn-primary" data-c2-action="listener-save" data-c2-id="${escapeAttr(l.id)}">${escapeHtml(c2t('common.save'))}</button>
             </div>
         `;
             C2.refreshFormSelects(content);
@@ -1304,11 +1377,11 @@
         const listenerOpts = ['<option value="">' + escapeHtml(c2t('c2.sessions.filterAllListeners')) + '</option>']
             .concat(listeners.map(l => {
                 const sel = f.listener_id === l.id ? ' selected' : '';
-                return `<option value="${escapeHtml(l.id)}"${sel}>${escapeHtml(l.name)}</option>`;
+                return `<option value="${escapeAttr(l.id)}"${sel}>${escapeHtml(l.name)}</option>`;
             })).join('');
         toolbar.innerHTML = `
             <div class="c2-sessions-filter-row">
-                <select id="c2-session-filter-status" class="form-control c2-native-select" title="${escapeHtml(c2t('c2.sessions.status'))}" onchange="C2.applySessionFilter()">
+                <select id="c2-session-filter-status" class="form-control c2-native-select" title="${escapeAttr(c2t('c2.sessions.status'))}" onchange="C2.applySessionFilter()">
                     <option value="">${escapeHtml(c2t('c2.sessions.filterAllStatus'))}</option>
                     <option value="active"${f.status === 'active' ? ' selected' : ''}>${escapeHtml(c2t('c2.sessions.active'))}</option>
                     <option value="sleeping"${f.status === 'sleeping' ? ' selected' : ''}>${escapeHtml(c2t('c2.sessions.sleeping'))}</option>
@@ -1316,7 +1389,7 @@
                 </select>
                 <select id="c2-session-filter-listener" class="form-control c2-native-select" onchange="C2.applySessionFilter()">${listenerOpts}</select>
             </div>
-            <input type="text" id="c2-session-filter-search" class="form-control" placeholder="${escapeHtml(c2t('c2.sessions.filterSearchPlaceholder'))}" value="${escapeHtml(f.search || '')}" onkeydown="if(event.key==='Enter'){C2.applySessionFilter();}">
+            <input type="text" id="c2-session-filter-search" class="form-control" placeholder="${escapeAttr(c2t('c2.sessions.filterSearchPlaceholder'))}" value="${escapeAttr(f.search || '')}" onkeydown="if(event.key==='Enter'){C2.applySessionFilter();}">
             <div class="c2-sessions-toolbar-meta">
                 <label class="c2-sessions-select-all-label">
                     <input type="checkbox" id="c2-sessions-select-all" onchange="C2.onSessionsSelectAll(this.checked)">
@@ -1452,10 +1525,13 @@
             const osEmpty = isEmptyInfoValue(s.os) && isEmptyInfoValue(s.arch);
             return `
             <div class="c2-session-item ${s.id === C2.selectedSessionId ? 'active' : ''}" 
-                 data-status="${escapeHtml(s.status || '')}"
-                 onclick="C2.selectSession('${s.id}')">
-                <input type="checkbox" class="c2-session-item-check c2-session-row-check" data-id="${escapeHtml(s.id)}"
-                    onclick="event.stopPropagation();" onchange="C2.syncSessionsToolbar()">
+                 data-status="${escapeAttr(s.status || '')}"
+                 data-c2-action="session-select"
+                 data-c2-id="${escapeAttr(s.id)}"
+                 role="button"
+                 tabindex="0">
+                <input type="checkbox" class="c2-session-item-check c2-session-row-check" data-id="${escapeAttr(s.id)}"
+                    data-c2-stop-action="1" onchange="C2.syncSessionsToolbar()">
                 <div class="c2-session-item-body">
                     <div class="c2-session-header">
                         <div class="c2-session-host-row">
@@ -1474,8 +1550,8 @@
                         <span class="c2-session-chip c2-session-chip--dim">PID ${escapeHtml(String(s.pid != null ? s.pid : '—'))}</span>
                     </div>
                     <div class="c2-session-item-footer">
-                        <span class="c2-session-meta c2-session-item-time" title="${escapeHtml(formatTime(s.lastCheckIn))}">${escapeHtml(formatRelativeTime(s.lastCheckIn) || formatTime(s.lastCheckIn))}</span>
-                        <button type="button" class="c2-session-card-delete" data-require-permission="c2:delete" onclick="event.stopPropagation(); C2.deleteSessionRecord('${s.id}');">${escapeHtml(c2t('c2.sessions.cardDeleteSession'))}</button>
+                        <span class="c2-session-meta c2-session-item-time" title="${escapeAttr(formatTime(s.lastCheckIn))}">${escapeHtml(formatRelativeTime(s.lastCheckIn) || formatTime(s.lastCheckIn))}</span>
+                        <button type="button" class="c2-session-card-delete" data-require-permission="c2:delete" data-c2-action="session-delete" data-c2-id="${escapeAttr(s.id)}">${escapeHtml(c2t('c2.sessions.cardDeleteSession'))}</button>
                     </div>
                 </div>
             </div>`;
@@ -1531,7 +1607,7 @@
                             </div>
                             <div class="c2-session-hero__sub${isEmptyInfoValue(s.username) && isEmptyInfoValue(s.os) ? ' is-muted' : ''}">${escapeHtml(sessionMetaLine(s))}</div>
                             <div class="c2-session-hero__chips">
-                                <span class="c2-session-hero-chip is-mono" title="${escapeHtml(c2t('c2.sessions.infoSessionId'))}">${escapeHtml(s.id)}</span>
+                                <span class="c2-session-hero-chip is-mono" title="${escapeAttr(c2t('c2.sessions.infoSessionId'))}">${escapeHtml(s.id)}</span>
                                 <span class="c2-session-hero-chip">${escapeHtml(s.internalIp || '—')}</span>
                                 <span class="c2-session-hero-chip">PID ${escapeHtml(String(s.pid != null ? s.pid : '—'))}</span>
                             </div>
@@ -1544,8 +1620,8 @@
                             <span class="c2-session-hero__heartbeat-value">${escapeHtml(heartbeatRel)}</span>
                         </div>
                         <div class="c2-session-actions">
-                            <button class="btn-secondary btn-sm" data-require-permission="c2:write" onclick="C2.setSessionSleep('${s.id}')">${escapeHtml(c2t('c2.sessions.btnSleep'))}</button>
-                            <button class="btn-danger btn-sm" data-require-permission="c2:write" onclick="C2.killSession('${s.id}')">${escapeHtml(c2t('c2.sessions.kill'))}</button>
+                            <button class="btn-secondary btn-sm" data-require-permission="c2:write" data-c2-action="session-sleep" data-c2-id="${escapeAttr(s.id)}">${escapeHtml(c2t('c2.sessions.btnSleep'))}</button>
+                            <button class="btn-danger btn-sm" data-require-permission="c2:write" data-c2-action="session-kill" data-c2-id="${escapeAttr(s.id)}">${escapeHtml(c2t('c2.sessions.kill'))}</button>
                         </div>
                     </div>
                 </div>
@@ -1571,7 +1647,7 @@
                             <div class="c2-file-toolbar">
                                 <button class="btn-ghost btn-sm" onclick="C2.goToParentDirectory()">${escapeHtml(c2t('c2.files.parent'))}</button>
                                 <button class="btn-ghost btn-sm" onclick="C2.refreshFiles()">${escapeHtml(c2t('c2.files.refresh'))}</button>
-                                <button type="button" class="btn-ghost btn-sm" id="c2-file-upload-btn" data-require-permission="c2:write" onclick="C2.openFileUploadPicker()" title="${escapeHtml(c2t('c2.files.upload'))}">${escapeHtml(c2t('c2.files.upload'))}</button>
+                                <button type="button" class="btn-ghost btn-sm" id="c2-file-upload-btn" data-require-permission="c2:write" onclick="C2.openFileUploadPicker()" title="${escapeAttr(c2t('c2.files.upload'))}">${escapeHtml(c2t('c2.files.upload'))}</button>
                                 <input type="file" id="c2-file-upload-input" style="display:none" onchange="C2.onC2FileUploadPick(event)" />
                                 <span id="c2-current-path" class="c2-path-breadcrumb">/</span>
                             </div>
@@ -1698,7 +1774,7 @@
                                 <p class="c2-sleep-modal__host">${escapeHtml(hostLabel)}</p>
                             </div>
                         </div>
-                        <button type="button" class="c2-modal-close" onclick="C2.closeModal()" aria-label="${escapeHtml(c2t('common.close'))}">&times;</button>
+                        <button type="button" class="c2-modal-close" onclick="C2.closeModal()" aria-label="${escapeAttr(c2t('common.close'))}">&times;</button>
                     </div>
                     <div class="c2-sleep-modal__current">${escapeHtml(currentLine)}</div>
                     <div class="c2-sleep-modal__body">
@@ -2778,16 +2854,16 @@
                                 <td>
                                     <div class="c2-file-name">
                                         <span class="${iconCls}" aria-hidden="true"></span>
-                                        <span class="c2-file-name-text" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>
+                                        <span class="c2-file-name-text" title="${escapeAttr(entry.name)}">${escapeHtml(entry.name)}</span>
                                     </div>
                                 </td>
-                                <td title="${escapeHtml(String(entry.size || ''))}">${escapeHtml(sizeLabel)}</td>
+                                <td title="${escapeAttr(String(entry.size || ''))}">${escapeHtml(sizeLabel)}</td>
                                 <td>${escapeHtml(entry.mode)}</td>
                                 <td>
-                                    ${entry.isDir
-                                        ? `<button class="btn-ghost btn-sm c2-file-action-btn" onclick='C2.openDirectory(${JSON.stringify(entry.name)})'>${escapeHtml(c2t('c2.files.open'))}</button>`
-                                        : `<button class="btn-ghost btn-sm c2-file-action-btn" onclick='C2.downloadFile(${JSON.stringify(entry.name)})'>${escapeHtml(c2t('c2.files.download'))}</button>`
-                                    }
+                                    <button type="button"
+                                        class="btn-ghost btn-sm c2-file-action-btn"
+                                        data-c2-file-action="${entry.isDir ? 'open' : 'download'}"
+                                        data-c2-file-name="${escapeAttr(entry.name)}">${escapeHtml(c2t(entry.isDir ? 'c2.files.open' : 'c2.files.download'))}</button>
                                 </td>
                             </tr>
                         `;
@@ -3366,7 +3442,7 @@
                                 <span class="c2-session-tasks-heading">${escapeHtml(c2t('c2.tasks.sessionTaskHistory'))}</span>
                                 <span class="c2-session-tasks-count">0</span>
                             </div>
-                            <button type="button" class="btn-ghost btn-sm c2-session-tasks-refresh" onclick="C2.loadSessionTasks('${escapeHtml(sessionId)}')">${refreshBtn}</button>
+                            <button type="button" class="btn-ghost btn-sm c2-session-tasks-refresh" data-c2-action="session-tasks-refresh" data-c2-id="${escapeAttr(sessionId)}">${refreshBtn}</button>
                         </div>
                         <div class="c2-empty-inline">
                             <div class="c2-empty-inline__icon" aria-hidden="true"></div>
@@ -3383,7 +3459,7 @@
                             <span class="c2-session-tasks-heading">${escapeHtml(c2t('c2.tasks.sessionTaskHistory'))}</span>
                             <span class="c2-session-tasks-count">${countLabel}</span>
                         </div>
-                        <button type="button" class="btn-ghost btn-sm c2-session-tasks-refresh" onclick="C2.loadSessionTasks('${escapeHtml(sessionId)}')">${refreshBtn}</button>
+                        <button type="button" class="btn-ghost btn-sm c2-session-tasks-refresh" data-c2-action="session-tasks-refresh" data-c2-id="${escapeAttr(sessionId)}">${refreshBtn}</button>
                     </div>
                     <div class="c2-session-tasks-rows">
                         ${tasks.map(t => {
@@ -3395,11 +3471,11 @@
                             const isPending = status === 'queued' || status === 'sent' || status === 'running';
                             const timeStr = formatTime(t.completedAt || t.createdAt);
                             return `
-                            <div class="c2-session-task-row ${isPending ? 'is-pending' : ''}" data-status="${escapeHtml(status)}">
+                            <div class="c2-session-task-row ${isPending ? 'is-pending' : ''}" data-status="${escapeAttr(status)}">
                                 <div class="c2-session-task-row__main">
-                                    <span class="c2-task-status-dot ${escapeHtml(status)}" title="${escapeHtml(taskStatusLabel(status))}"></span>
+                                    <span class="c2-task-status-dot ${escapeAttr(status)}" title="${escapeAttr(taskStatusLabel(status))}"></span>
                                     <span class="c2-task-type-badge c2-task-type-badge--${typeCat}">${escapeHtml(t.taskType || '-')}</span>
-                                    <div class="c2-session-task-row__cmd" title="${escapeHtml(cmd || '')}">
+                                    <div class="c2-session-task-row__cmd" title="${escapeAttr(cmd || '')}">
                                         ${cmdShort
                                             ? `<code class="c2-session-task-command">${escapeHtml(cmdShort)}</code>`
                                             : `<span class="c2-session-task-command c2-session-task-command--muted">—</span>`}
@@ -3408,8 +3484,8 @@
                                 <div class="c2-session-task-row__meta">
                                     <span class="c2-status-badge ${escapeHtml(status)}">${escapeHtml(taskStatusLabel(status))}</span>
                                     <span class="c2-session-task-duration">${formatDuration(t.durationMs)}</span>
-                                    <span class="c2-session-task-time" title="${escapeHtml(timeStr)}">${escapeHtml(formatRelativeTime(t.completedAt || t.createdAt) || timeStr)}</span>
-                                    <button type="button" class="btn-secondary btn-small c2-session-task-view" data-c2-task-action="view" data-task-id="${escapeHtml(rawId)}">${escapeHtml(c2t('c2.tasks.view'))}</button>
+                                    <span class="c2-session-task-time" title="${escapeAttr(timeStr)}">${escapeHtml(formatRelativeTime(t.completedAt || t.createdAt) || timeStr)}</span>
+                                    <button type="button" class="btn-secondary btn-small c2-session-task-view" data-c2-task-action="view" data-task-id="${escapeAttr(rawId)}">${escapeHtml(c2t('c2.tasks.view'))}</button>
                                 </div>
                             </div>`;
                         }).join('')}
@@ -3446,7 +3522,7 @@
                 <thead>
                     <tr>
                         <th class="c2-tasks-table-col-check">
-                            <label class="c2-task-check-label" title="${escapeHtml(c2t('c2.tasks.selectAll'))}">
+                            <label class="c2-task-check-label" title="${escapeAttr(c2t('c2.tasks.selectAll'))}">
                                 <input type="checkbox" id="c2-tasks-select-all" onchange="C2.onTasksSelectAll(this.checked)">
                             </label>
                         </th>
@@ -3461,10 +3537,11 @@
                     </tr>
                 </thead>
                 <tbody>
-                    ${C2.tasks.map(t => {
-                        const rawId = t.id || '';
-                        const tid = escapeHtml(rawId);
-                        const status = String(t.status || '');
+	                    ${C2.tasks.map(t => {
+	                        const rawId = t.id || '';
+	                        const tid = escapeHtml(rawId);
+	                        const tidAttr = escapeAttr(rawId);
+	                        const status = String(t.status || '');
                         const rowStatus = escapeHtml(status || 'queued');
                         const typeCat = taskTypeCategory(t.taskType);
                         const sessionFull = t.sessionId ? String(t.sessionId) : '';
@@ -3478,25 +3555,25 @@
                         const cmdEsc = escapeHtml(cmd);
                         const canCancel = status === 'queued' || status === 'sent';
                         return `
-                        <tr class="c2-tasks-row c2-tasks-row--${rowStatus}" data-task-id="${tid}" onclick="C2.viewTask('${tid}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();C2.viewTask('${tid}')}" role="button" tabindex="0">
-                            <td class="c2-tasks-table-col-check" onclick="event.stopPropagation();">
+	                        <tr class="c2-tasks-row c2-tasks-row--${rowStatus}" data-task-id="${tidAttr}" data-c2-action="task-view" data-c2-id="${tidAttr}" role="button" tabindex="0">
+                            <td class="c2-tasks-table-col-check" data-c2-stop-action="1">
                                 <label class="c2-task-check-label">
-                                    <input type="checkbox" class="c2-task-row-check" data-id="${tid}" onchange="C2.syncTasksToolbar()">
+	                                    <input type="checkbox" class="c2-task-row-check" data-id="${tidAttr}" onchange="C2.syncTasksToolbar()">
                                 </label>
                             </td>
                             <td class="c2-tasks-col-time">${escapeHtml(formatTime(t.createdAt))}</td>
                             <td><span class="c2-status-badge ${escapeHtml(status)}">${escapeHtml(taskStatusLabel(status))}</span></td>
                             <td><span class="c2-task-type-badge c2-task-type-badge--${typeCat}">${escapeHtml(t.taskType || '-')}</span></td>
-                            <td class="c2-tasks-col-command" title="${cmdEsc}">${cmdEsc || dash}</td>
-                            <td class="c2-tasks-col-mono" title="${escapeHtml(sessionFull)}">${sessionShort || dash}</td>
-                            <td class="c2-tasks-col-mono" title="${tid}">${taskShort || dash}</td>
+                            <td class="c2-tasks-col-command" title="${escapeAttr(cmd)}">${cmdEsc || dash}</td>
+	                            <td class="c2-tasks-col-mono" title="${escapeAttr(sessionFull)}">${sessionShort || dash}</td>
+	                            <td class="c2-tasks-col-mono" title="${tidAttr}">${taskShort || dash}</td>
                             <td class="c2-tasks-col-duration">${formatDuration(t.durationMs)}</td>
-                            <td class="c2-tasks-table-col-actions" onclick="event.stopPropagation();">
+                            <td class="c2-tasks-table-col-actions" data-c2-stop-action="1">
                                 <div class="c2-tasks-row-actions">
                                     ${canCancel
-                                        ? `<button type="button" class="c2-tasks-cancel-btn" data-c2-task-action="cancel" data-task-id="${tid}" title="${cancelTitle}" aria-label="${cancelTitle}">${escapeHtml(c2t('c2.tasks.cancelBtn'))}</button>`
-                                        : ''}
-                                    <button type="button" class="c2-tasks-delete-btn" data-require-permission="c2:delete" data-c2-task-action="delete" data-task-id="${tid}" title="${delTitle}" aria-label="${delTitle}">${deleteIcon}</button>
+	                                        ? `<button type="button" class="c2-tasks-cancel-btn" data-c2-task-action="cancel" data-task-id="${tidAttr}" title="${cancelTitle}" aria-label="${cancelTitle}">${escapeHtml(c2t('c2.tasks.cancelBtn'))}</button>`
+	                                        : ''}
+	                                    <button type="button" class="c2-tasks-delete-btn" data-require-permission="c2:delete" data-c2-task-action="delete" data-task-id="${tidAttr}" title="${delTitle}" aria-label="${delTitle}">${deleteIcon}</button>
                                 </div>
                             </td>
                         </tr>`;
@@ -3717,7 +3794,7 @@
     C2.renderPayloadPage = function() {
         const optionsHtml = C2.listeners.length > 0
             ? C2.listeners.map(l =>
-                `<option value="${l.id}">${escapeHtml(l.name)} (${l.type} ${l.bindHost}:${l.bindPort})</option>`
+                `<option value="${escapeAttr(l.id)}">${escapeHtml(l.name)} (${escapeHtml(l.type)} ${escapeHtml(l.bindHost)}:${escapeHtml(l.bindPort)})</option>`
               ).join('')
             : '<option value="">' + escapeHtml(c2t('c2.payloads.noListenersOption')) + '</option>';
 
@@ -3734,7 +3811,7 @@
             let buildOptionsHtml;
             if (listeners.length > 0) {
                 buildOptionsHtml = listeners.map(l =>
-                    `<option value="${l.id}">${escapeHtml(l.name)} (${l.type} ${l.bindHost}:${l.bindPort})</option>`
+                    `<option value="${escapeAttr(l.id)}">${escapeHtml(l.name)} (${escapeHtml(l.type)} ${escapeHtml(l.bindHost)}:${escapeHtml(l.bindPort)})</option>`
                 ).join('');
             } else {
                 buildOptionsHtml = '<option value="">' + escapeHtml(c2t('c2.payloads.noListenersOption')) + '</option>';
@@ -3831,7 +3908,7 @@
                             <div>✓ ${escapeHtml(c2t('c2.payloads.buildSuccessTitle'))}</div>
                             <div>${escapeHtml(c2t('c2.payloads.buildMetaOsArch', { os: data.payload?.os, arch: data.payload?.arch }))}</div>
                             <div>${escapeHtml(c2t('c2.payloads.buildSize', { bytes: data.payload?.size_bytes }))}</div>
-                            <button onclick="window.__c2DownloadPayload('${data.payload?.download_path?.split('/').pop()}')"
+                            <button type="button" data-c2-action="payload-download" data-c2-id="${escapeAttr(data.payload?.download_path?.split('/').pop() || '')}"
                                class="btn-primary" style="margin-top:8px;display:inline-block;cursor:pointer;">${escapeHtml(c2t('c2.payloads.download'))}</button>
                         </div>
                     `;
@@ -4213,7 +4290,7 @@
                 <thead>
                     <tr>
                         <th class="c2-events-table-col-check">
-                            <label class="c2-event-check-label" title="${escapeHtml(c2t('c2.events.selectAll'))}">
+                            <label class="c2-event-check-label" title="${escapeAttr(c2t('c2.events.selectAll'))}">
                                 <input type="checkbox" id="c2-events-select-all" onchange="C2.onEventsSelectAll(this.checked)">
                             </label>
                         </th>
@@ -4227,8 +4304,10 @@
                     </tr>
                 </thead>
                 <tbody>
-                    ${C2.events.map(e => {
-                        const eid = escapeHtml(e.id || '');
+	                    ${C2.events.map(e => {
+	                        const rawId = e.id || '';
+	                        const eid = escapeHtml(rawId);
+	                        const eidAttr = escapeAttr(rawId);
                         const levelCls = eventLevelBadgeClass(e.level);
                         const catCls = eventCategoryBadgeClass(e.category);
                         const sessionShort = e.sessionId ? escapeHtml(String(e.sessionId).substring(0, 10)) + (String(e.sessionId).length > 10 ? '\u2026' : '') : '';
@@ -4236,20 +4315,20 @@
                         const msg = escapeHtml(e.message || '');
                         const rowLevel = escapeHtml(e.level || 'info');
                         return `
-                        <tr class="c2-events-row c2-events-row--${rowLevel}" data-event-id="${eid}" onclick="C2.viewEvent('${eid}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();C2.viewEvent('${eid}')}" role="button" tabindex="0">
-                            <td class="c2-events-table-col-check" onclick="event.stopPropagation();">
+	                        <tr class="c2-events-row c2-events-row--${rowLevel}" data-event-id="${eidAttr}" data-c2-action="event-view" data-c2-id="${eidAttr}" role="button" tabindex="0">
+                            <td class="c2-events-table-col-check" data-c2-stop-action="1">
                                 <label class="c2-event-check-label">
-                                    <input type="checkbox" class="c2-event-check" data-id="${eid}" onchange="C2.syncEventsToolbar()">
+	                                    <input type="checkbox" class="c2-event-check" data-id="${eidAttr}" onchange="C2.syncEventsToolbar()">
                                 </label>
                             </td>
                             <td class="c2-events-col-time">${escapeHtml(formatTime(e.createdAt))}</td>
                             <td><span class="c2-event-level-badge ${levelCls}">${escapeHtml(eventLevelLabel(e.level))}</span></td>
                             <td><span class="${catCls}">${escapeHtml(eventCategoryLabel(e.category))}</span></td>
-                            <td class="c2-events-col-message" title="${msg}">${msg || dash}</td>
-                            <td class="c2-events-col-mono" title="${escapeHtml(e.sessionId || '')}">${sessionShort || dash}</td>
-                            <td class="c2-events-col-mono" title="${escapeHtml(e.taskId || '')}">${taskShort || dash}</td>
-                            <td class="c2-events-table-col-actions" onclick="event.stopPropagation();">
-                                <button type="button" class="c2-events-delete-btn" data-require-permission="c2:delete" onclick="C2.deleteEventById('${eid}')" title="${delTitle}" aria-label="${delTitle}">${deleteIcon}</button>
+	                            <td class="c2-events-col-message" title="${escapeAttr(e.message || '')}">${msg || dash}</td>
+	                            <td class="c2-events-col-mono" title="${escapeAttr(e.sessionId || '')}">${sessionShort || dash}</td>
+	                            <td class="c2-events-col-mono" title="${escapeAttr(e.taskId || '')}">${taskShort || dash}</td>
+                            <td class="c2-events-table-col-actions" data-c2-stop-action="1">
+	                                <button type="button" class="c2-events-delete-btn" data-require-permission="c2:delete" data-c2-action="event-delete" data-c2-id="${eidAttr}" title="${delTitle}" aria-label="${delTitle}">${deleteIcon}</button>
                             </td>
                         </tr>`;
                     }).join('')}
@@ -4364,7 +4443,7 @@
             <div class="c2-profile-card">
                 <div class="c2-profile-header">
                     <h4>${escapeHtml(p.name)}</h4>
-                    <button class="btn-danger btn-sm" data-require-permission="c2:delete" onclick="C2.deleteProfile('${p.id}')">${escapeHtml(c2t('common.delete'))}</button>
+                    <button class="btn-danger btn-sm" data-require-permission="c2:delete" data-c2-action="profile-delete" data-c2-id="${escapeAttr(p.id)}">${escapeHtml(c2t('common.delete'))}</button>
                 </div>
                 <div class="c2-profile-info">
                     <div><strong>UA:</strong> ${escapeHtml(p.userAgent || defVal)}</div>
@@ -4389,7 +4468,7 @@
             <div class="c2-modal-body">
                 <div class="c2-form-group">
                     <label>${escapeHtml(c2t('c2.profiles.profileNameLabel'))}</label>
-                    <input type="text" id="c2-profile-name" class="form-control" placeholder="${escapeHtml(c2t('c2.profiles.placeholderProfileName'))}">
+                    <input type="text" id="c2-profile-name" class="form-control" placeholder="${escapeAttr(c2t('c2.profiles.placeholderProfileName'))}">
                 </div>
                 <div class="c2-form-group">
                     <label>${escapeHtml(c2t('c2.profiles.userAgent'))}</label>

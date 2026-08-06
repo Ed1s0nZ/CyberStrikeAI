@@ -632,6 +632,18 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+function escapeJsString(text) {
+    return JSON.stringify(String(text == null ? '' : text));
+}
+
+function escapeAttr(text) {
+    return escapeHtml(text).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function escapeJsStringAttr(text) {
+    return escapeAttr(escapeJsString(text));
+}
+
 /** @param {string} text @param {{ profile?: 'chat'|'timeline' }} [options] */
 function formatMarkdown(text, options) {
     if (typeof window.csMarkdownSanitize !== 'undefined') {
@@ -863,7 +875,7 @@ async function loadRobotAccountBindings() {
                 <div class="robot-binding-account-name"><strong>${escapeHtml(platformLabels[binding.platform] || binding.platform || '-')}</strong><span>已连接</span></div>
                 <small>账号标识 ${escapeHtml(binding.external_user_hint || '-')} · 更新于 ${escapeHtml(formatRobotBindingTime(binding.updated_at))}</small>
             </div>
-            <button type="button" class="btn-secondary btn-small robot-binding-unbind-btn" onclick="deleteRobotAccountBinding('${escapeHtml(binding.id || '')}')">解除绑定</button>
+            <button type="button" class="btn-secondary btn-small robot-binding-unbind-btn" onclick="deleteRobotAccountBinding(${escapeJsStringAttr(binding.id || '')})">解除绑定</button>
         </div>`).join('');
 	if (typeof window.loadVulnerabilityAlertSubscription === 'function') {
 		window.loadVulnerabilityAlertSubscription();

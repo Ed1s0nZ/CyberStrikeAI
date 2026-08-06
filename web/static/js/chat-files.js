@@ -13,6 +13,10 @@ let chatFilesPage = 1;
 let chatFilesPageSize = 20;
 let chatFilesSearchDebounceTimer = null;
 
+function chatFilesEscapeAttr(text) {
+    return escapeHtml(text).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 const CHAT_FILES_GROUP_STORAGE_KEY = 'csai_chat_files_group_by';
 const CHAT_FILES_BROWSE_PATH_KEY = 'csai_chat_files_browse_path';
 const CHAT_FILES_PAGE_SIZE_STORAGE_KEY = 'csai_chat_files_page_size';
@@ -1077,7 +1081,7 @@ function renderChatFilesTable() {
             <td>${escapeHtml(f.date || '—')}</td>
             <td class="chat-files-cell-conv"><code title="${convTitleEsc}">${convEsc}</code></td>
             <td class="chat-files-cell-subpath" title="${escapeHtml(subRaw || '')}">${subCellInner}</td>
-            <td class="chat-files-cell-name" title="${escapeHtml(pathForTitle)}">${nameEsc}${sourceBadge}</td>
+            <td class="chat-files-cell-name" title="${chatFilesEscapeAttr(pathForTitle)}">${nameEsc}${sourceBadge}</td>
             <td>${formatChatFileBytes(f.size || 0)}</td>
             <td>${escapeHtml(dt)}</td>
             <td class="chat-files-actions">
@@ -1178,7 +1182,7 @@ function renderChatFilesTable() {
                 ? `<button type="button" class="btn-icon btn-danger" title="${tDeleteFolder}" data-chat-folder-name="${nameAttr}" onclick="chatFilesDeleteFolderFromBtn(event, this)">${svgTrash}</button>`
                 : '';
             return `<tr class="chat-files-tr-folder chat-files-tr-folder--nav" role="button" tabindex="0" data-chat-folder-name="${nameAttr}" onclick="chatFilesOnFolderRowClick(event)" onkeydown="chatFilesOnFolderRowKeydown(event)">
-                <td class="chat-files-tree-name-cell chat-files-tree-name-cell--folder" title="${escapeHtml(folderTitle)}">
+                <td class="chat-files-tree-name-cell chat-files-tree-name-cell--folder" title="${chatFilesEscapeAttr(folderTitle)}">
                     <span class="chat-files-tree-name-inner">${svgFolder}<span class="chat-files-tree-name-text">${escapeHtml(folderDisplay.text)}</span></span>
                 </td>
                 <td class="chat-files-tree-muted">—</td>
@@ -1228,7 +1232,7 @@ function renderChatFilesTable() {
             const menuHtml = menuParts.join('');
 
             return `<tr class="chat-files-tr-file">
-                <td class="chat-files-tree-name-cell" title="${escapeHtml(pathForTitle)}">
+                <td class="chat-files-tree-name-cell" title="${chatFilesEscapeAttr(pathForTitle)}">
                     <span class="chat-files-tree-name-inner">${svgFile}<span class="chat-files-tree-name-text">${nameEsc}${sourceBadge}</span></span>
                 </td>
                 <td>${formatChatFileBytes(f.size || 0)}</td>

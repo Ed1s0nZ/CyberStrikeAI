@@ -8495,7 +8495,14 @@ function createConversationListItemWithMenu(conversation, isPinned) {
         if (group) {
             const groupTag = document.createElement('div');
             groupTag.className = 'conversation-group-tag';
-            groupTag.innerHTML = `<span class="group-tag-icon">${group.icon || '📁'}</span><span class="group-tag-name">${group.name}</span>`;
+            const groupTagIcon = document.createElement('span');
+            groupTagIcon.className = 'group-tag-icon';
+            groupTagIcon.textContent = group.icon || '📁';
+            const groupTagName = document.createElement('span');
+            groupTagName.className = 'group-tag-name';
+            groupTagName.textContent = group.name;
+            groupTag.appendChild(groupTagIcon);
+            groupTag.appendChild(groupTagName);
             groupTag.title = `分组: ${group.name}`;
             contentWrapper.appendChild(groupTag);
         }
@@ -9044,12 +9051,23 @@ async function showMoveToGroupSubmenu() {
             
             const item = document.createElement('div');
             item.className = 'context-submenu-item';
-            item.innerHTML = `
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                <span>${group.name}</span>
-            `;
+            const folderIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            folderIcon.setAttribute('width', '16');
+            folderIcon.setAttribute('height', '16');
+            folderIcon.setAttribute('viewBox', '0 0 24 24');
+            folderIcon.setAttribute('fill', 'none');
+            folderIcon.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            const folderPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            folderPath.setAttribute('d', 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z');
+            folderPath.setAttribute('stroke', 'currentColor');
+            folderPath.setAttribute('stroke-width', '2');
+            folderPath.setAttribute('stroke-linecap', 'round');
+            folderPath.setAttribute('stroke-linejoin', 'round');
+            folderIcon.appendChild(folderPath);
+            const label = document.createElement('span');
+            label.textContent = group.name;
+            item.appendChild(folderIcon);
+            item.appendChild(label);
             item.onclick = () => {
                 moveConversationToGroup(contextMenuConversationId, group.id);
             };
