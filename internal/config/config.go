@@ -1029,6 +1029,16 @@ type SecurityConfig struct {
 	Tools               []ToolConfig `yaml:"tools,omitempty"`                 // 向后兼容：支持在主配置文件中定义工具
 	ToolsDir            string       `yaml:"tools_dir,omitempty"`             // 工具配置文件目录（新方式）
 	ToolDescriptionMode string       `yaml:"tool_description_mode,omitempty"` // 工具描述模式: "short" | "full"，默认 short
+	// DangerousCommandEnabled 是否启用 exec 危险命令拦截（内置黑名单 + 自定义正则）。
+	// 缺省视为 true；false 整体关闭（不推荐，破坏性命令可直达系统）。
+	DangerousCommandEnabled *bool `yaml:"dangerous_command_enabled,omitempty" json:"dangerous_command_enabled,omitempty"`
+	// DangerousCommandBlocklist 追加的危险命令正则（小写不敏感；非法正则自动忽略）。
+	DangerousCommandBlocklist []string `yaml:"dangerous_command_blocklist,omitempty" json:"dangerous_command_blocklist,omitempty"`
+}
+
+// DangerousCommandEnabledEffective 返回危险命令拦截开关的有效值（缺省 true）。
+func (s SecurityConfig) DangerousCommandEnabledEffective() bool {
+	return s.DangerousCommandEnabled == nil || *s.DangerousCommandEnabled
 }
 
 type DatabaseConfig struct {
@@ -1370,6 +1380,12 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("解析配置文件失败: %w", err)
 	}
 
+	// Secret fields env expansion: support ${VAR} / ${VAR:-default} (same syntax as external_mcp).
+	// Keep API keys / global MCP token out of plaintext config; values come from the runtime env.
+	cfg.MCP.AuthHeaderValue = expandEnvVar(cfg.MCP.AuthHeaderValue)
+	cfg.OpenAI.APIKey = expandEnvVar(cfg.OpenAI.APIKey)
+	cfg.Knowledge.Embedding.APIKey = expandEnvVar(cfg.Knowledge.Embedding.APIKey)
+
 	if cfg.Auth.SessionDurationHours <= 0 {
 		cfg.Auth.SessionDurationHours = 12
 	}
@@ -1377,6 +1393,14 @@ func Load(path string) (*Config, error) {
 		cfg.Audit.MaxDetailBytes = 8192
 	}
 	cfg.ApplyDefaultAIChannel()
+	// Default-channel fallback overwrites cfg.OpenAI.APIKey with channel.api_key; expand env vars here again.
+	cfg.OpenAI.APIKey = expandEnvVar(cfg.OpenAI.APIKey)
+	for _id, _ch := range cfg.AI.Channels {
+		if _ch.APIKey != "" {
+			_ch.APIKey = expandEnvVar(_ch.APIKey)
+			cfg.AI.Channels[_id] = _ch
+		}
+	}
 	if err := validateModelOutputLimits(cfg.OpenAI, cfg.MultiAgent.EinoMiddleware); err != nil {
 		return nil, err
 	}

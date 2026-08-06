@@ -186,6 +186,8 @@ func (e *Executor) ExecuteTool(ctx context.Context, toolName string, args map[st
 	}
 
 	// 执行命令
+	// Windows 命令行长度限制 ~8191 字符：python -c 携带超长内联脚本时自动写入临时 .py 文件
+	cmdArgs = rewritePythonInlineScriptToTemp(toolConfig.Command, cmdArgs)
 	cmd := exec.CommandContext(ctx, toolConfig.Command, cmdArgs...)
 	applyDefaultTerminalEnv(cmd)
 	attachNonInteractiveStdin(cmd)
@@ -801,12 +803,35 @@ func (e *Executor) executeSystemCommand(ctx context.Context, args map[string]int
 		zap.String("command", command),
 	)
 
+	// 危险命令全局拦截（所有执行路径生效，见 dangerous_command.go）
+	if e.config == nil || e.config.DangerousCommandEnabledEffective() {
+		var custom []string
+		if e.config != nil {
+			custom = e.config.DangerousCommandBlocklist
+		}
+		if reason, hit := MatchDangerousCommand(command, custom); hit {
+			e.logger.Warn("危险命令已被拦截",
+				zap.String("command", command),
+				zap.String("reason", reason),
+			)
+			return &mcp.ToolResult{
+				Content: []mcp.Content{
+					{
+						Type: "text",
+						Text: fmt.Sprintf("已拦截危险命令（%s），拒绝执行。\n命令: %s\n如需放行请调整 config.yaml 的 security.dangerous_command_blocklist / dangerous_command_enabled。", reason, command),
+					},
+				},
+				IsError: true,
+			}, nil
+		}
+	}
+
 	command = PrepareShellCommandForExecute(command)
 
-	// 获取shell类型（可选，默认为sh）
-	shell := "sh"
+	// 获取shell类型和参数标志
+	shell, shellArg := getSystemShell()
 	if s, ok := args["shell"].(string); ok && s != "" {
-		shell = s
+		shell, shellArg = resolveShellArg(s)
 	}
 
 	// 获取工作目录（可选）
@@ -821,10 +846,10 @@ func (e *Executor) executeSystemCommand(ctx context.Context, args map[string]int
 	// 构建命令
 	var cmd *exec.Cmd
 	if workDir != "" {
-		cmd = exec.CommandContext(ctx, shell, "-c", command)
+		cmd = exec.CommandContext(ctx, shell, shellArg, command)
 		cmd.Dir = workDir
 	} else {
-		cmd = exec.CommandContext(ctx, shell, "-c", command)
+		cmd = exec.CommandContext(ctx, shell, shellArg, command)
 	}
 	ConfigureShellCmdForAgentExecute(cmd)
 
@@ -843,15 +868,20 @@ func (e *Executor) executeSystemCommand(ctx context.Context, args map[string]int
 		commandWithoutAmpersand = strings.TrimSpace(commandWithoutAmpersand)
 
 		// 构建新命令：后台作业重定向标准流后 echo $pid（与 RedirectBackgroundJobStdio 一致）。
-		pidCommand := RedirectBackgroundJobStdio(commandWithoutAmpersand+" &") + " pid=$!; echo $pid"
+		var pidCommand string
+		if runtime.GOOS == "windows" {
+			pidCommand = commandWithoutAmpersand
+		} else {
+			pidCommand = RedirectBackgroundJobStdio(commandWithoutAmpersand+" &") + " pid=$!; echo $pid"
+		}
 
 		// 创建新命令来获取PID
 		var pidCmd *exec.Cmd
 		if workDir != "" {
-			pidCmd = exec.CommandContext(ctx, shell, "-c", pidCommand)
+			pidCmd = exec.CommandContext(ctx, shell, shellArg, pidCommand)
 			pidCmd.Dir = workDir
 		} else {
-			pidCmd = exec.CommandContext(ctx, shell, "-c", pidCommand)
+			pidCmd = exec.CommandContext(ctx, shell, shellArg, pidCommand)
 		}
 		ConfigureShellCmdForAgentExecute(pidCmd)
 
@@ -970,7 +1000,7 @@ func (e *Executor) executeSystemCommand(ctx context.Context, args map[string]int
 		output, err = streamCommandOutput(ctx, cmd, cb, ResolveShellNoOutputTimeoutSeconds(e.shellNoOutputTimeoutSec), e.toolOutputMaxBytes, spill)
 		if err != nil && shouldRetryWithPTY(output) {
 			e.logger.Info("检测到系统命令需要 TTY，使用 PTY 重试")
-			cmd2 := exec.CommandContext(ctx, shell, "-c", command)
+			cmd2 := exec.CommandContext(ctx, shell, shellArg, command)
 			if workDir != "" {
 				cmd2.Dir = workDir
 			}
@@ -981,7 +1011,7 @@ func (e *Executor) executeSystemCommand(ctx context.Context, args map[string]int
 		output, err = combinedOutputCancellableWithLimit(ctx, cmd, e.toolOutputMaxBytes, spill)
 		if err != nil && shouldRetryWithPTY(output) {
 			e.logger.Info("检测到系统命令需要 TTY，使用 PTY 重试")
-			cmd2 := exec.CommandContext(ctx, shell, "-c", command)
+			cmd2 := exec.CommandContext(ctx, shell, shellArg, command)
 			if workDir != "" {
 				cmd2.Dir = workDir
 			}
@@ -1391,6 +1421,10 @@ func applyDefaultTerminalEnv(cmd *exec.Cmd) {
 	if !has("LINES") {
 		cmd.Env = append(cmd.Env, "LINES=40")
 	}
+	// 修复 Windows GBK 编码导致 Python 工具 UnicodeEncodeError
+	if !has("PYTHONIOENCODING") {
+		cmd.Env = append(cmd.Env, "PYTHONIOENCODING=utf-8")
+	}
 }
 
 func shouldRetryWithPTY(output string) bool {
@@ -1601,6 +1635,43 @@ func (e *Executor) convertToOpenAIType(configType string) string {
 		)
 		return configType
 	}
+}
+
+// rewritePythonInlineScriptToTemp 检测 python -c 超长脚本，超过 Windows 命令行限制时写入临时 .py 文件
+func rewritePythonInlineScriptToTemp(command string, cmdArgs []string) []string {
+	if runtime.GOOS != "windows" {
+		return cmdArgs
+	}
+	if !strings.HasSuffix(command, "python") && !strings.HasSuffix(command, "python.exe") {
+		return cmdArgs
+	}
+	// 查找 -c <script> 模式并计算总命令行长度
+	for i := 0; i < len(cmdArgs)-1; i++ {
+		if cmdArgs[i] == "-c" && i+1 < len(cmdArgs) {
+			script := cmdArgs[i+1]
+			if len(script) < 3000 {
+				return cmdArgs // 脚本较短，命令行不会超限
+			}
+			// 写入临时文件
+			tmpFile, err := os.CreateTemp("", "cyberstrike-tool-*.py")
+			if err != nil {
+				return cmdArgs // 回退到原始行为
+			}
+			if _, err := tmpFile.WriteString(script); err != nil {
+				tmpFile.Close()
+				os.Remove(tmpFile.Name())
+				return cmdArgs
+			}
+			tmpFile.Close()
+			// 替换 -c script 为临时文件路径
+			newArgs := make([]string, 0, len(cmdArgs)-1)
+			newArgs = append(newArgs, cmdArgs[:i]...)
+			newArgs = append(newArgs, tmpFile.Name())
+			newArgs = append(newArgs, cmdArgs[i+2:]...)
+			return newArgs
+		}
+	}
+	return cmdArgs
 }
 
 // getExitCode 从错误中提取退出码，如果不是ExitError则返回nil
