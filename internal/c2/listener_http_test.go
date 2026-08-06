@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -225,5 +226,89 @@ func TestHTTPBeaconListener_HandleFileServe(t *testing.T) {
 				t.Fatalf("got %q want %q", got, want)
 			}
 		})
+	}
+}
+
+func TestHTTPBeaconListener_HandleUploadConfinesTaskID(t *testing.T) {
+	tmp := t.TempDir()
+	store := filepath.Join(tmp, "c2store")
+	keyB64, err := GenerateAESKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := "test-implant-token-upload"
+	l := &HTTPBeaconListener{
+		rec: &database.C2Listener{
+			EncryptionKey: keyB64,
+			ImplantToken:  token,
+		},
+		manager: NewManager(nil, zap.NewNop(), store),
+		logger:  zap.NewNop(),
+	}
+
+	encrypted, err := EncryptAESGCM(keyB64, []byte("safe upload"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/upload?task_id=t_safe123", strings.NewReader(encrypted))
+	req.Header.Set("X-Implant-Token", token)
+	rr := httptest.NewRecorder()
+
+	l.handleUpload(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%q", rr.Code, rr.Body.String())
+	}
+	got, err := os.ReadFile(filepath.Join(store, "uploads", "t_safe123.bin"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "safe upload" {
+		t.Fatalf("content=%q", got)
+	}
+
+	evilBody, err := EncryptAESGCM(keyB64, []byte("owned"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	evilReq := httptest.NewRequest(http.MethodPost, "/upload?task_id=..%2Fowned", strings.NewReader(evilBody))
+	evilReq.Header.Set("X-Implant-Token", token)
+	evilRR := httptest.NewRecorder()
+
+	l.handleUpload(evilRR, evilReq)
+
+	if evilRR.Code != http.StatusNotFound {
+		t.Fatalf("status=%d body=%q", evilRR.Code, evilRR.Body.String())
+	}
+	if _, err := os.Stat(filepath.Join(store, "owned.bin")); !os.IsNotExist(err) {
+		t.Fatalf("outside file exists or stat failed unexpectedly: %v", err)
+	}
+}
+
+func TestHTTPBeaconListener_HandleResultRejectsPlaintextJSON(t *testing.T) {
+	keyB64, err := GenerateAESKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := &HTTPBeaconListener{
+		rec: &database.C2Listener{
+			EncryptionKey: keyB64,
+			ImplantToken:  "test-implant-token-result",
+		},
+		logger: zap.NewNop(),
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/result", strings.NewReader(`{"task_id":"t_test","success":true}`))
+	req.Header.Set("X-Implant-Token", "test-implant-token-result")
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	l.handleResult(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("status=%d body=%q", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "404 Not Found") {
+		t.Fatalf("expected disguised 404 body, got %q", rr.Body.String())
 	}
 }

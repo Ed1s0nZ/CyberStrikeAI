@@ -11,6 +11,10 @@ function getAssetPageSize() {
 const assetPageState = { page: 1, pageSize: getAssetPageSize(), total: 0, totalPages: 1, items: [], projects: [], projectsLoaded: false, detailIndex: -1, editIndex: -1, detailAsset: null, editAsset: null, selected: new Map(), selectionQuery: '', allMatchingSelected: false, scanMode: 'chat', scanAssets: [], editorTags: [], editorDirty: false, editorBusy: false, editorReturnFocus: null, editorInteractionsReady: false, editorParsedTarget: '', importRows: [], importFileName: '', importBusy: false, importInteractionsReady: false, importReturnFocus: null };
 let assetOverviewDays = 30;
 
+function assetEscapeAttr(text) {
+    return escapeHtml(text).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 const ASSET_CUSTOM_SELECT_IDS = [
     'asset-status-filter',
     'asset-project-filter',
@@ -1240,14 +1244,14 @@ function populateAssetProjectSelects() {
         const el = document.getElementById(id);
         if (!el) return;
         const current = el.value;
-        el.innerHTML = `<option value="">${escapeHtml(emptyLabel)}</option>` + assetPageState.projects.map(project => `<option value="${escapeHtml(project.id)}">${escapeHtml(project.name)}${project.status === 'archived' ? ' · ' + escapeHtml(assetT('assets.archived', '已归档')) : ''}</option>`).join('');
+        el.innerHTML = `<option value="">${escapeHtml(emptyLabel)}</option>` + assetPageState.projects.map(project => `<option value="${assetEscapeAttr(project.id)}">${escapeHtml(project.name)}${project.status === 'archived' ? ' · ' + escapeHtml(assetT('assets.archived', '已归档')) : ''}</option>`).join('');
         el.value = current;
         syncAssetSelect(el);
     });
     const batch = document.getElementById('asset-batch-project');
     if (batch) {
         const current = batch.value;
-        batch.innerHTML = `<option value="" disabled hidden>${escapeHtml(assetT('assets.chooseProject', '请选择项目'))}</option>` + assetPageState.projects.map(project => `<option value="${escapeHtml(project.id)}">${escapeHtml(project.name)}${project.status === 'archived' ? ' · ' + escapeHtml(assetT('assets.archived', '已归档')) : ''}</option>`).join('');
+        batch.innerHTML = `<option value="" disabled hidden>${escapeHtml(assetT('assets.chooseProject', '请选择项目'))}</option>` + assetPageState.projects.map(project => `<option value="${assetEscapeAttr(project.id)}">${escapeHtml(project.name)}${project.status === 'archived' ? ' · ' + escapeHtml(assetT('assets.archived', '已归档')) : ''}</option>`).join('');
         batch.value = current;
         syncAssetSelect(batch);
     }

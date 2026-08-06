@@ -209,11 +209,13 @@ func (l *TCPReverseListener) handleTCPBeaconSession(conn net.Conn, br *bufio.Rea
 			if err != nil {
 				return
 			}
-			dir := filepath.Join(l.manager.StorageDir(), "uploads")
+			dir, dst, err := uploadPathForTask(l.manager.StorageDir(), up.TaskID)
+			if err != nil {
+				return
+			}
 			if err := os.MkdirAll(dir, 0o755); err != nil {
 				return
 			}
-			dst := filepath.Join(dir, up.TaskID+".bin")
 			if err := os.WriteFile(dst, plainFile, 0o644); err != nil {
 				return
 			}

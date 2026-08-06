@@ -198,7 +198,7 @@ function renderSidebar() {
         const li = document.createElement('li');
         li.className = 'api-group-item';
         const groupLabel = translateApiDocTag(group);
-        li.innerHTML = `<a href="#" class="api-group-link" data-group="${escapeHtml(group)}">${escapeHtml(groupLabel)}</a>`;
+        li.innerHTML = `<a href="#" class="api-group-link" data-group="${escapeAttr(group)}">${escapeHtml(groupLabel)}</a>`;
         groupList.appendChild(li);
     });
     
@@ -265,7 +265,7 @@ function createEndpointCard(endpoint) {
         <div class="api-endpoint-header">
             <div class="api-endpoint-title">
                 <span class="api-method ${methodClass}">${endpoint.method.toUpperCase()}</span>
-                <span class="api-path">${endpoint.path}</span>
+                <span class="api-path">${escapeHtml(endpoint.path)}</span>
                 ${tagHtml}
             </div>
         </div>
@@ -541,7 +541,7 @@ function renderTestSection(endpoint) {
         bodyInput = `
             <div class="api-test-input-group">
                 <label>${escapeHtml(_t('apiDocs.requestBodyJson'))}</label>
-                <textarea id="${bodyInputId}" class="test-body-input" placeholder='${escapeHtml(_t('apiDocs.requestBodyPlaceholder'))}'>${defaultBody}</textarea>
+                <textarea id="${escapeAttr(bodyInputId)}" class="test-body-input" placeholder='${escapeAttr(_t('apiDocs.requestBodyPlaceholder'))}'>${escapeHtml(defaultBody)}</textarea>
             </div>
         `;
     }
@@ -554,8 +554,8 @@ function renderTestSection(endpoint) {
             const inputId = `test-param-${param.name}-${escapeId(path)}-${method}`;
             return `
                 <div class="api-test-input-group">
-                    <label>${param.name} <span style="color: var(--error-color);">*</span></label>
-                    <input type="text" id="${inputId}" placeholder="${param.description || param.name}" required>
+                    <label>${escapeHtml(param.name)} <span style="color: var(--error-color);">*</span></label>
+                    <input type="text" id="${escapeAttr(inputId)}" placeholder="${escapeAttr(param.description || param.name)}" required>
                 </div>
             `;
         }).join('');
@@ -572,11 +572,11 @@ function renderTestSection(endpoint) {
             const required = param.required ? '<span style="color: var(--error-color);">*</span>' : '<span style="color: var(--text-muted);">' + escapeHtml(_t('apiDocs.optional')) + '</span>';
             return `
                 <div class="api-test-input-group">
-                    <label>${param.name} ${required}</label>
+                    <label>${escapeHtml(param.name)} ${required}</label>
                     <input type="${param.schema?.type === 'number' || param.schema?.type === 'integer' ? 'number' : 'text'}" 
-                           id="${inputId}" 
-                           placeholder="${placeholder}" 
-                           value="${defaultValue}"
+                           id="${escapeAttr(inputId)}" 
+                           placeholder="${escapeAttr(placeholder)}" 
+                           value="${escapeAttr(defaultValue)}"
                            ${param.required ? 'required' : ''}>
                 </div>
             `;
@@ -598,13 +598,13 @@ function renderTestSection(endpoint) {
                 ${queryParamsInput ? `<div style="margin-top: 16px;"><div style="font-weight: 500; margin-bottom: 8px; color: var(--text-primary);">${queryParamsTitle}</div>${queryParamsInput}</div>` : ''}
                 ${bodyInput}
                 <div class="api-test-buttons">
-                    <button class="api-test-btn primary" onclick="testAPI('${method}', '${escapeHtml(path)}', '${endpoint.operationId || ''}')">
+                    <button class="api-test-btn primary" onclick="testAPI(${escapeJsStringAttr(method)}, ${escapeJsStringAttr(path)}, ${escapeJsStringAttr(endpoint.operationId || '')})">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polygon points="5 3 19 12 5 21 5 3"/>
                         </svg>
                         ${sendRequestLabel}
                     </button>
-                    <button class="api-test-btn copy-curl" onclick="copyCurlCommand(event, '${method}', '${escapeHtml(path)}')" title="${copyCurlTitle}">
+                    <button class="api-test-btn copy-curl" onclick="copyCurlCommand(event, ${escapeJsStringAttr(method)}, ${escapeJsStringAttr(path)})" title="${copyCurlTitle}">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
                             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="2"/>
@@ -1004,6 +1004,18 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function escapeJsString(text) {
+    return JSON.stringify(String(text == null ? '' : text));
+}
+
+function escapeAttr(text) {
+    return escapeHtml(text).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function escapeJsStringAttr(text) {
+    return escapeAttr(escapeJsString(text));
 }
 
 // ID转义（用于HTML ID属性）

@@ -166,6 +166,10 @@ if (typeof escapeHtml === 'undefined') {
     }
 }
 
+function escapeAttr(text) {
+    return escapeHtml(text).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function getFofaFormElements() {
     return {
         query: document.getElementById('fofa-query'),
@@ -1115,11 +1119,11 @@ function renderFofaResults(payload) {
             if (f === 'host') {
                 const href = normalizeHttpLink(text);
                 if (href) {
-                    const safeHref = escapeHtml(href);
-                    return `<td class="info-collect-cell" data-field="${escapeHtml(f)}" data-full="${escapeHtml(text)}" title="${escapeHtml(text)}"><a class="info-collect-link" href="${safeHref}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">${escapeHtml(text)}</a></td>`;
+                    const safeHref = escapeAttr(href);
+                    return `<td class="info-collect-cell" data-field="${escapeAttr(f)}" data-full="${escapeAttr(text)}" title="${escapeAttr(text)}"><a class="info-collect-link" href="${safeHref}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">${escapeHtml(text)}</a></td>`;
                 }
             }
-            return `<td class="info-collect-cell" data-field="${escapeHtml(f)}" data-full="${escapeHtml(text)}" title="${escapeHtml(text)}"><span class="info-collect-cell-text">${escapeHtml(text)}</span></td>`;
+            return `<td class="info-collect-cell" data-field="${escapeAttr(f)}" data-full="${escapeAttr(text)}" title="${escapeAttr(text)}"><span class="info-collect-cell-text">${escapeHtml(text)}</span></td>`;
         }).join('');
 
         const actionHtml = `

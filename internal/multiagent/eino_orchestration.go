@@ -9,7 +9,6 @@ import (
 	"cyberstrike-ai/internal/config"
 	"cyberstrike-ai/internal/database"
 
-	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/adk/prebuilt/planexecute"
 	"github.com/cloudwego/eino/components/model"
@@ -19,8 +18,8 @@ import (
 
 // PlanExecuteRootArgs 构建 Eino adk/prebuilt/planexecute 根 Agent 所需参数。
 type PlanExecuteRootArgs struct {
-	MainToolCallingModel *openai.ChatModel
-	ExecModel            *openai.ChatModel
+	MainToolCallingModel model.ToolCallingChatModel
+	ExecModel            model.ToolCallingChatModel
 	OrchInstruction      string
 	ToolsCfg             adk.ToolsConfig
 	ExecMaxIter          int

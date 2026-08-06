@@ -121,10 +121,11 @@ func RunEinoSingleChatModelAgent(
 	}
 	reasoning.ApplyToEinoChatModelConfig(baseModelCfg, &appCfg.OpenAI, reasoningClient)
 
-	mainModel, err := einoopenai.NewChatModel(ctx, baseModelCfg)
+	baseMainModel, err := einoopenai.NewChatModel(ctx, baseModelCfg)
 	if err != nil {
 		return nil, fmt.Errorf("eino single 模型: %w", err)
 	}
+	mainModel := newStreamToolCallIndexRepairModel(baseMainModel)
 
 	mainSumMw, err := newEinoSummarizationMiddleware(ctx, mainModel, appCfg, &ma.EinoMiddleware, conversationID, db, projectID, logger)
 	if err != nil {
