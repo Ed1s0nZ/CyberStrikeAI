@@ -3008,10 +3008,7 @@ function renderProcessDetails(messageId, processDetails, options) {
     const renderedMcpIds = collectMcpExecutionIdsFromProcessDetails(processDetails);
     if (renderedMcpIds.length > 0) {
         setPendingMcpExecutionIds(messageElement, renderedMcpIds);
-    }
-    const renderedToolCount = processDetails.filter((d) => d && d.eventType === 'tool_call').length;
-    if (renderedToolCount > 0) {
-        setMcpExecutionSummaryCount(messageElement, renderedToolCount);
+        setMcpExecutionSummaryCount(messageElement, renderedMcpIds.length);
     }
     if (typeof window.coalesceProcessDetailsToolPairs === 'function') {
         processDetails = window.coalesceProcessDetailsToolPairs(processDetails);
@@ -3360,7 +3357,6 @@ function prefetchProcessDetailsSummaryHint(messageId, messageElement) {
             const j = await res.json().catch(() => ({}));
             if (!res.ok || !j.summary) return;
             const s = j.summary;
-            const toolCount = parseInt(s.toolCount, 10) || 0;
             const summaryMcpIds = Array.isArray(s.mcpExecutionIds) ? s.mcpExecutionIds : [];
             const summaryTools = Array.isArray(s.toolExecutions) ? s.toolExecutions : [];
             if (summaryTools.length > 0) {
@@ -3369,7 +3365,11 @@ function prefetchProcessDetailsSummaryHint(messageId, messageElement) {
             if (summaryMcpIds.length > 0) {
                 setPendingMcpExecutionIds(messageElement, summaryMcpIds);
             }
-            const buttonToolCount = summaryTools.length > 0 ? summaryTools.length : (toolCount || summaryMcpIds.length);
+            const summaryToolExecutionCount = summaryTools
+                .map(normalizeToolExecutionSummaryForButton)
+                .filter((item) => item.executionId)
+                .length;
+            const buttonToolCount = summaryToolExecutionCount > 0 ? summaryToolExecutionCount : summaryMcpIds.length;
             if (buttonToolCount > 0) {
                 setMcpExecutionSummaryCount(messageElement, buttonToolCount);
             }
@@ -3463,7 +3463,9 @@ function getPendingToolExecutionSummaryCount(messageElement) {
     }
     try {
         const tools = JSON.parse(messageElement.dataset.pendingToolExecutionSummaries);
-        return Array.isArray(tools) ? tools.length : 0;
+        return Array.isArray(tools)
+            ? tools.map(normalizeToolExecutionSummaryForButton).filter((item) => item.executionId).length
+            : 0;
     } catch (e) {
         return 0;
     }
@@ -3598,7 +3600,7 @@ function cacheToolExecutionSummaries(messageElement, summaries) {
     if (!messageElement || !messageElement.dataset || !Array.isArray(summaries)) return [];
     const normalized = summaries
         .map(normalizeToolExecutionSummaryForButton)
-        .filter((item) => item.toolName || item.executionId || item.toolCallId);
+        .filter((item) => item.executionId);
     if (normalized.length > 0) {
         messageElement.dataset.toolExecutionSummaries = JSON.stringify(normalized);
     } else {
@@ -3758,128 +3760,6 @@ function syncMcpToolsToggleButton(messageElement) {
     toolsToggle.innerHTML = '<span>' + formatMcpToolsToggleLabel(count, expanded) + '</span>';
 }
 
-function cssEscapeValue(value) {
-    const s = String(value || '');
-    if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
-        return CSS.escape(s);
-    }
-    return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-}
-
-async function ensureProcessDetailsForToolFocus(messageElement, anchorId) {
-    if (!messageElement || !messageElement.id) return null;
-    const detailsId = 'process-details-' + messageElement.id;
-    let detailsContainer = document.getElementById(detailsId);
-    const backendId = messageElement.dataset ? String(messageElement.dataset.backendMessageId || '').trim() : '';
-    if (detailsContainer && detailsContainer.dataset && detailsContainer.dataset.lazyNotLoaded === '1' && backendId && typeof window.loadProcessDetailsPaginated === 'function') {
-        await window.loadProcessDetailsPaginated(messageElement.id, backendId, { autoLoadAll: false, anchorId: anchorId || '' });
-        detailsContainer = document.getElementById(detailsId);
-    } else if (!detailsContainer && backendId && typeof renderProcessDetails === 'function') {
-        renderProcessDetails(messageElement.id, null);
-        detailsContainer = document.getElementById(detailsId);
-        if (detailsContainer && typeof window.loadProcessDetailsPaginated === 'function') {
-            await window.loadProcessDetailsPaginated(messageElement.id, backendId, { autoLoadAll: false, anchorId: anchorId || '' });
-            detailsContainer = document.getElementById(detailsId);
-        }
-    }
-    if (typeof window.expandProcessDetailsTimeline === 'function') {
-        window.expandProcessDetailsTimeline(messageElement.id);
-    } else if (typeof toggleProcessDetails === 'function') {
-        const timeline = detailsContainer && detailsContainer.querySelector('.progress-timeline');
-        if (!timeline || !timeline.classList.contains('expanded')) {
-            toggleProcessDetails(null, messageElement.id);
-        }
-    }
-    return document.getElementById(detailsId);
-}
-
-async function focusToolExecutionInProcessDetails(messageElement, summary, index) {
-    const item = normalizeToolExecutionSummaryForButton(summary);
-    let detailsContainer = await ensureProcessDetailsForToolFocus(messageElement, item.processDetailId || '');
-    let timeline = detailsContainer && detailsContainer.querySelector('.progress-timeline');
-    if (!timeline) return;
-    let target = null;
-    if (item.processDetailId) {
-        target = timeline.querySelector('[data-process-detail-id="' + cssEscapeValue(item.processDetailId) + '"]');
-    }
-    if (!target && item.toolCallId) {
-        target = timeline.querySelector('[data-tool-call-id="' + cssEscapeValue(item.toolCallId) + '"]');
-    }
-    if (!target) {
-        const toolItems = timeline.querySelectorAll('.timeline-item-tool_call');
-        target = toolItems[index] || null;
-    }
-    if (!target && item.processDetailId && messageElement.dataset && messageElement.dataset.backendMessageId && typeof window.loadProcessDetailsPaginated === 'function') {
-        await window.loadProcessDetailsPaginated(messageElement.id, messageElement.dataset.backendMessageId, {
-            autoLoadAll: false,
-            anchorId: item.processDetailId
-        });
-        detailsContainer = document.getElementById('process-details-' + messageElement.id);
-        timeline = detailsContainer && detailsContainer.querySelector('.progress-timeline');
-        target = timeline ? timeline.querySelector('[data-process-detail-id="' + cssEscapeValue(item.processDetailId) + '"]') : null;
-    }
-    if (!target) return;
-    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    target.classList.remove('timeline-item-focus-pulse');
-    void target.offsetWidth;
-    target.classList.add('timeline-item-focus-pulse');
-    setTimeout(() => {
-        target.classList.remove('timeline-item-focus-pulse');
-    }, 2200);
-}
-
-async function findToolExecutionTimelineItem(messageElement, summary, index) {
-    const item = normalizeToolExecutionSummaryForButton(summary);
-    let detailsContainer = await ensureProcessDetailsForToolFocus(messageElement, item.processDetailId || '');
-    let timeline = detailsContainer && detailsContainer.querySelector('.progress-timeline');
-    if (!timeline) return null;
-    let target = null;
-    if (item.processDetailId) {
-        target = timeline.querySelector('[data-process-detail-id="' + cssEscapeValue(item.processDetailId) + '"]');
-    }
-    if (!target && item.toolCallId) {
-        target = timeline.querySelector('[data-tool-call-id="' + cssEscapeValue(item.toolCallId) + '"]');
-    }
-    if (!target && item.processDetailId && messageElement.dataset && messageElement.dataset.backendMessageId && typeof window.loadProcessDetailsPaginated === 'function') {
-        await window.loadProcessDetailsPaginated(messageElement.id, messageElement.dataset.backendMessageId, {
-            autoLoadAll: false,
-            anchorId: item.processDetailId
-        });
-        detailsContainer = document.getElementById('process-details-' + messageElement.id);
-        timeline = detailsContainer && detailsContainer.querySelector('.progress-timeline');
-        target = timeline ? timeline.querySelector('[data-process-detail-id="' + cssEscapeValue(item.processDetailId) + '"]') : null;
-    }
-    return target;
-}
-
-async function resolveToolExecutionSummaryForFocus(messageElement, executionId, index) {
-    const wantedExecutionId = executionId == null ? '' : String(executionId).trim();
-    let summaries = getCachedToolExecutionSummaries(messageElement);
-    let item = wantedExecutionId
-        ? summaries.find((summary) => summary.executionId === wantedExecutionId)
-        : summaries[index];
-    if (item && (item.processDetailId || item.toolCallId)) return item;
-
-    const backendId = messageElement && messageElement.dataset
-        ? String(messageElement.dataset.backendMessageId || '').trim()
-        : '';
-    if (!backendId || typeof apiFetch !== 'function') return item || null;
-    try {
-        const res = await apiFetch('/api/messages/' + encodeURIComponent(backendId) + '/process-details?summary=1');
-        const payload = await res.json().catch(() => ({}));
-        if (!res.ok || !payload.summary || !Array.isArray(payload.summary.toolExecutions)) {
-            return item || null;
-        }
-        summaries = cacheToolExecutionSummaries(messageElement, payload.summary.toolExecutions);
-        item = wantedExecutionId
-            ? summaries.find((summary) => summary.executionId === wantedExecutionId)
-            : summaries[index];
-        return item || null;
-    } catch (e) {
-        return item || null;
-    }
-}
-
 function toggleMcpToolList(assistantMessageId) {
     const messageEl = document.getElementById(assistantMessageId);
     if (!messageEl) return;
@@ -3891,9 +3771,7 @@ function toggleMcpToolList(assistantMessageId) {
         !getPendingToolExecutionSummaryCount(messageEl) &&
         !toolList.querySelector('.mcp-detail-btn')
     ) {
-        if (typeof toggleProcessDetails === 'function') {
-            toggleProcessDetails(null, assistantMessageId);
-        }
+        syncMcpToolsToggleButton(messageEl);
         return;
     }
     const willExpand = !toolList.classList.contains('expanded');
@@ -3915,174 +3793,15 @@ window.setMcpExecutionSummaryCount = setMcpExecutionSummaryCount;
 window.setPendingMcpExecutionIds = setPendingMcpExecutionIds;
 window.setPendingToolExecutionSummaries = setPendingToolExecutionSummaries;
 
-async function fetchProcessDetailDataForModal(detailId) {
-    const id = detailId != null ? String(detailId).trim() : '';
-    if (!id || typeof apiFetch !== 'function') return null;
-    const res = await apiFetch('/api/process-details/' + encodeURIComponent(id));
-    const j = await res.json().catch(() => ({}));
-    if (!res.ok) return null;
-    const detail = j && j.processDetail ? j.processDetail : null;
-    return detail && detail.data ? detail.data : null;
-}
-
-async function fetchProcessDetailForModal(detailId) {
-    const id = detailId != null ? String(detailId).trim() : '';
-    if (!id || typeof apiFetch !== 'function') return null;
-    const res = await apiFetch('/api/process-details/' + encodeURIComponent(id));
-    const j = await res.json().catch(() => ({}));
-    if (!res.ok) return null;
-    return j && j.processDetail ? j.processDetail : null;
-}
-
-function processToolResultTextFromData(resultData) {
-    if (!resultData) return '';
-    const noResultText = typeof window.t === 'function' ? window.t('timeline.noResult') : '无结果';
-    const result = resultData.result != null
-        ? resultData.result
-        : (resultData.error != null ? resultData.error : (resultData.resultPreview != null ? resultData.resultPreview : noResultText));
-    return typeof result === 'string' ? result : JSON.stringify(result);
-}
-
-function processToolResultToMCPResult(resultData, rawText) {
-    if (!resultData) return null;
-    const displayState = typeof window.getToolResultDisplayState === 'function'
-        ? window.getToolResultDisplayState(resultData, { rawText: rawText })
-        : { kind: ((resultData.isError || resultData.success === false) ? 'error' : 'success'), isError: !!(resultData.isError || resultData.success === false) };
-    const isError = !!displayState.isError;
-    let text = rawText;
-    if (text == null || String(text) === '') {
-        text = processToolResultTextFromData(resultData);
-    }
-    return {
-        content: [{ type: 'text', text: String(text || '') }],
-        isError: isError
-    };
-}
-
-async function showMCPDetailFromProcessToolItem(messageElement, summary, index) {
-    const item = normalizeToolExecutionSummaryForButton(summary);
-    if (item.processDetailId) {
-        const callDetail = await fetchProcessDetailForModal(item.processDetailId);
-        const callData = callDetail && callDetail.data ? callDetail.data : null;
-        if (callData) {
-            const args = typeof window.parseToolCallArgsFromData === 'function'
-                ? window.parseToolCallArgsFromData(callData)
-                : (callData.argumentsObj || {});
-            let resultData = callData._mergedResult || null;
-            let resultDetailId = item.resultDetailId || callData._mergedResultDetailId || '';
-            let rawText = resultData ? processToolResultTextFromData(resultData) : '';
-            const resultPayloadDeferred = resultData && resultData._payloadDeferred === true;
-            const resultOnlyHasPreview = resultData && resultData.result == null && resultData.error == null && resultData.resultPreview != null;
-            if (resultDetailId && (!resultData || resultPayloadDeferred || resultOnlyHasPreview)) {
-                const resultDetail = await fetchProcessDetailForModal(resultDetailId);
-                const fullResult = resultDetail && resultDetail.data ? resultDetail.data : null;
-                if (fullResult) {
-                    resultData = fullResult;
-                    rawText = processToolResultTextFromData(fullResult);
-                }
-            }
-            const displayState = resultData && typeof window.getToolResultDisplayState === 'function'
-                ? window.getToolResultDisplayState(resultData, { rawText: rawText })
-                : null;
-            const backgroundRunning = (displayState && displayState.kind === 'background_running') || String(item.status || '').toLowerCase() === 'background_running';
-            const success = resultData
-                ? !(displayState ? displayState.isError : (resultData.isError || resultData.success === false))
-                : String(item.status || '').toLowerCase() !== 'failed';
-            const status = backgroundRunning
-                ? 'background_running'
-                : (resultData || item.status
-                    ? (success ? 'completed' : 'failed')
-                    : 'running');
-            const exec = {
-                id: (resultData && resultData.executionId) || item.executionId || callData.executionId || '',
-                toolName: item.toolName || callData.toolName || (typeof window.t === 'function' ? window.t('chat.unknownTool') : '未知工具'),
-                status: status,
-                startTime: callDetail.createdAt || '',
-                arguments: args || {},
-                result: processToolResultToMCPResult(resultData, rawText),
-                error: resultData && resultData.error ? String(resultData.error) : ''
-            };
-            openAppModal('mcp-detail-modal', { focus: false });
-            deferModalContent(function () {
-                renderMCPDetailModal(exec);
-            });
-            return;
-        }
-    }
-
-    const target = await findToolExecutionTimelineItem(messageElement, summary, index);
-    if (!target) {
-        alert(typeof window.t === 'function'
-            ? window.t('chat.toolExecutionDetailPending')
-            : '工具执行详情尚未同步，请稍后重试。');
-        return;
-    }
-    const state = typeof window.getToolCallDetailState === 'function'
-        ? window.getToolCallDetailState(target)
-        : {};
-    let args = state.args;
-    let resultData = state.resultData;
-    let rawText = state.rawText;
-    if ((!args || Object.keys(args).length === 0) && state.processDetailId) {
-        const fullCall = await fetchProcessDetailDataForModal(state.processDetailId);
-        if (fullCall) {
-            args = typeof window.parseToolCallArgsFromData === 'function'
-                ? window.parseToolCallArgsFromData(fullCall)
-                : (fullCall.argumentsObj || {});
-        }
-    }
-    const resultDetailId = state.resultDetailId || target.dataset.toolResultDetailId || '';
-    const resultPayloadDeferred = resultData && resultData._payloadDeferred === true;
-    const resultOnlyHasPreview = resultData && resultData.result == null && resultData.error == null && resultData.resultPreview != null;
-    if (resultDetailId && (!resultData || resultPayloadDeferred || resultOnlyHasPreview)) {
-        const fullResult = await fetchProcessDetailDataForModal(resultDetailId);
-        if (fullResult) {
-            resultData = fullResult;
-            rawText = processToolResultTextFromData(fullResult);
-        }
-    }
-    const toolName = (summary && summary.toolName) || target.dataset.toolName || (typeof window.t === 'function' ? window.t('chat.unknownTool') : '未知工具');
-    const displayState = resultData && typeof window.getToolResultDisplayState === 'function'
-        ? window.getToolResultDisplayState(resultData, { rawText: rawText })
-        : null;
-    const backgroundRunning = (displayState && displayState.kind === 'background_running') || target.dataset.toolDisplayStatus === 'background_running';
-    const success = resultData ? !(displayState ? displayState.isError : (resultData.isError || resultData.success === false)) : target.dataset.toolSuccess !== '0';
-    const status = backgroundRunning
-        ? 'background_running'
-        : (resultData || target.classList.contains('tool-call-completed') || target.classList.contains('tool-call-failed')
-            ? (success ? 'completed' : 'failed')
-            : 'running');
-    const exec = {
-        id: (resultData && resultData.executionId) || (summary && summary.executionId) || '',
-        toolName: toolName,
-        status: status,
-        startTime: target.dataset.createdAtIso || '',
-        arguments: args || {},
-        result: processToolResultToMCPResult(resultData, rawText),
-        error: resultData && resultData.error ? String(resultData.error) : ''
-    };
-    openAppModal('mcp-detail-modal', { focus: false });
-    deferModalContent(function () {
-        renderMCPDetailModal(exec);
-    });
-}
-
 async function openTaskToolExecutionDetail(messageElement, item, index) {
-    let detailItem = item;
-    if (!detailItem.executionId) {
-        const refreshedItem = await resolveToolExecutionSummaryForFocus(messageElement, '', index);
-        detailItem = refreshedItem || detailItem;
-    }
-    if (detailItem.executionId) {
-        await showMCPDetail(detailItem.executionId);
-        return;
-    }
-    await showMCPDetailFromProcessToolItem(messageElement, detailItem, index);
+    const detailItem = normalizeToolExecutionSummaryForButton(item);
+    if (!detailItem.executionId) return;
+    await showMCPDetail(detailItem.executionId);
 }
 
 /**
  * 声明式渲染工具调用列表。
- * 过程摘要提供完整展示入口；executionIds 只补充可直接打开监控详情的 ID。
+ * 工具详情只以 executionId 作为稳定入口；缺少 executionId 的历史摘要不渲染为工具详情入口。
  * 每次更新整体替换列表，避免增量追加产生双重状态。
  */
 function renderMcpCallButtons(messageElement) {
@@ -4092,7 +3811,8 @@ function renderMcpCallButtons(messageElement) {
     const toolList = chrome.toolList;
     const executionIds = getCachedMcpExecutionIds(messageElement);
     const summaries = getCachedToolExecutionSummaries(messageElement);
-    const items = selectToolExecutionSummariesForButtons(summaries, executionIds);
+    const items = selectToolExecutionSummariesForButtons(summaries, executionIds)
+        .filter((item) => item && item.executionId);
 
     const renderVersion = String((parseInt(toolList.dataset.renderVersion, 10) || 0) + 1);
     toolList.dataset.renderVersion = renderVersion;
