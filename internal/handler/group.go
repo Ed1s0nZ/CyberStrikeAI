@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"cyberstrike-ai/internal/database"
 	"cyberstrike-ai/internal/security"
@@ -17,12 +20,52 @@ type GroupHandler struct {
 	logger *zap.Logger
 }
 
+const (
+	maxGroupNameRunes = 64
+	maxGroupIconRunes = 16
+)
+
 // NewGroupHandler 创建新的分组处理器
 func NewGroupHandler(db *database.DB, logger *zap.Logger) *GroupHandler {
 	return &GroupHandler{
 		db:     db,
 		logger: logger,
 	}
+}
+
+func validateGroupTextField(field, value string, maxRunes int, required bool) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		if required {
+			return "", errors.New(field + "不能为空")
+		}
+		return "", nil
+	}
+	if utf8.RuneCountInString(value) > maxRunes {
+		return "", errors.New(field + "过长")
+	}
+	for _, r := range value {
+		switch r {
+		case '<', '>', '"', '\'', '`':
+			return "", errors.New(field + "包含非法字符")
+		}
+		if r < 0x20 || r == 0x7f {
+			return "", errors.New(field + "包含非法控制字符")
+		}
+	}
+	return value, nil
+}
+
+func validateGroupFields(name, icon string) (string, string, error) {
+	validName, err := validateGroupTextField("分组名称", name, maxGroupNameRunes, true)
+	if err != nil {
+		return "", "", err
+	}
+	validIcon, err := validateGroupTextField("分组图标", icon, maxGroupIconRunes, false)
+	if err != nil {
+		return "", "", err
+	}
+	return validName, validIcon, nil
 }
 
 // CreateGroupRequest 创建分组请求
@@ -39,13 +82,14 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 		return
 	}
 
-	if req.Name == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "分组名称不能为空"})
+	name, icon, err := validateGroupFields(req.Name, req.Icon)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	session, _ := security.CurrentSession(c)
-	group, err := h.db.CreateGroup(req.Name, req.Icon, session.UserID)
+	group, err := h.db.CreateGroup(name, icon, session.UserID)
 	if err != nil {
 		h.logger.Error("创建分组失败", zap.Error(err))
 		// 如果是名称重复错误，返回400状态码
@@ -111,12 +155,13 @@ func (h *GroupHandler) UpdateGroup(c *gin.Context) {
 		return
 	}
 
-	if req.Name == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "分组名称不能为空"})
+	name, icon, err := validateGroupFields(req.Name, req.Icon)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := h.db.UpdateGroup(id, req.Name, req.Icon); err != nil {
+	if err := h.db.UpdateGroup(id, name, icon); err != nil {
 		h.logger.Error("更新分组失败", zap.Error(err))
 		// 如果是名称重复错误，返回400状态码
 		if err.Error() == "分组名称已存在" {
