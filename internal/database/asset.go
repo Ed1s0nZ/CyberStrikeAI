@@ -97,7 +97,7 @@ type AssetImportResult struct {
 
 func normalizeAsset(a *Asset) {
 	a.Host = strings.TrimSpace(a.Host)
-	a.IP = strings.ToLower(strings.TrimSpace(a.IP))
+	a.IP = strings.ToLower(strings.Trim(strings.TrimSpace(a.IP), "[]"))
 	a.Domain = strings.ToLower(strings.TrimSpace(a.Domain))
 	a.Protocol = strings.ToLower(strings.TrimSpace(a.Protocol))
 	a.Title = strings.TrimSpace(a.Title)

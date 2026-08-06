@@ -490,3 +490,19 @@ func TestAssetDedupCompositeKey(t *testing.T) {
 		t.Fatalf("expected 7 distinct assets, got total=%d err=%v", total, err)
 	}
 }
+
+func TestAssetDedupIPv6BracketNormalization(t *testing.T) {
+	db, err := NewDB(filepath.Join(t.TempDir(), "asset-ipv6-dedup.db"), zap.NewNop())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	// [::1] 和 ::1 应视为同一资产：normalizeAsset 去括号后 dedup key 一致
+	result, err := db.UpsertAssets([]*Asset{
+		{IP: "[::1]", Port: 443, Protocol: "https"},
+		{IP: "::1", Port: 443, Protocol: "https"},
+	}, "", true)
+	if err != nil || result.Created != 1 || result.Updated != 1 {
+		t.Fatalf("bracketed vs bare IPv6 should dedup: result=%#v err=%v", result, err)
+	}
+}
