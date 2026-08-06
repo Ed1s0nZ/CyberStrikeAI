@@ -291,16 +291,13 @@ func (l *HTTPBeaconListener) handleResult(w http.ResponseWriter, r *http.Request
 	}
 	var report TaskResultReport
 	plaintext, decErr := DecryptAESGCM(l.rec.EncryptionKey, string(body))
-	if decErr == nil {
-		if err := json.Unmarshal(plaintext, &report); err != nil {
-			l.disguisedReject(w)
-			return
-		}
-	} else {
-		if err := json.Unmarshal(body, &report); err != nil {
-			l.disguisedReject(w)
-			return
-		}
+	if decErr != nil {
+		l.disguisedReject(w)
+		return
+	}
+	if err := json.Unmarshal(plaintext, &report); err != nil {
+		l.disguisedReject(w)
+		return
 	}
 	if err := l.manager.IngestTaskResult(report); err != nil {
 		http.Error(w, "ingest result failed", http.StatusInternalServerError)
@@ -341,12 +338,15 @@ func (l *HTTPBeaconListener) handleUpload(w http.ResponseWriter, r *http.Request
 		l.disguisedReject(w)
 		return
 	}
-	dir := filepath.Join(l.manager.StorageDir(), "uploads")
+	dir, dst, err := uploadPathForTask(l.manager.StorageDir(), taskID)
+	if err != nil {
+		l.disguisedReject(w)
+		return
+	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		http.Error(w, "mkdir failed", http.StatusInternalServerError)
 		return
 	}
-	dst := filepath.Join(dir, taskID+".bin")
 	if err := os.WriteFile(dst, plaintext, 0o644); err != nil {
 		http.Error(w, "save failed", http.StatusInternalServerError)
 		return

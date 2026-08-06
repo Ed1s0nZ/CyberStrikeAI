@@ -42,6 +42,11 @@ type Manager struct {
 // MCPToolC2Task 与 MCP builtin、c2_task 工具名一致，供 HITL 白名单与 Agent 侧对齐。
 const MCPToolC2Task = "c2_task"
 
+var (
+	resultBlobSuffixPattern = regexp.MustCompile(`^\.[A-Za-z0-9][A-Za-z0-9_-]{0,31}$`)
+	uploadTaskIDPattern     = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$`)
+)
+
 // HITLBridge 把"危险任务"桥到现有 internal/handler/hitl 审批流的接口。
 // internal/app 实例化时传入；空实现表示禁用 HITL 拦截（开发期方便）。
 type HITLBridge interface {
@@ -736,18 +741,24 @@ func (m *Manager) IngestTaskResult(report TaskResultReport) error {
 }
 
 func (m *Manager) saveResultBlob(taskID, b64Content, suffix string) (string, error) {
-	suffix = strings.TrimSpace(suffix)
-	if suffix == "" {
-		suffix = ".bin"
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" || taskID == "." || taskID == ".." ||
+		strings.ContainsAny(taskID, `/\`) {
+		return "", fmt.Errorf("invalid task_id")
 	}
-	if !strings.HasPrefix(suffix, ".") {
-		suffix = "." + suffix
+
+	suffix, err := normalizeResultBlobSuffix(suffix)
+	if err != nil {
+		return "", err
 	}
 	dir := filepath.Join(m.storageDir, "results")
 	if err := osMkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
 	path := filepath.Join(dir, taskID+suffix)
+	if err := ensurePathInDir(dir, path); err != nil {
+		return "", err
+	}
 	data, err := base64Decode(b64Content)
 	if err != nil {
 		return "", err
@@ -756,6 +767,52 @@ func (m *Manager) saveResultBlob(taskID, b64Content, suffix string) (string, err
 		return "", err
 	}
 	return path, nil
+}
+
+func uploadPathForTask(storageDir, taskID string) (dir, path string, err error) {
+	taskID = strings.TrimSpace(taskID)
+	if !uploadTaskIDPattern.MatchString(taskID) {
+		return "", "", fmt.Errorf("invalid task_id")
+	}
+	dir = filepath.Join(storageDir, "uploads")
+	path = filepath.Join(dir, taskID+".bin")
+	if err := ensurePathInDir(dir, path); err != nil {
+		return "", "", err
+	}
+	return dir, path, nil
+}
+
+func normalizeResultBlobSuffix(suffix string) (string, error) {
+	suffix = strings.TrimSpace(suffix)
+	if suffix == "" {
+		return ".bin", nil
+	}
+	if !strings.HasPrefix(suffix, ".") {
+		suffix = "." + suffix
+	}
+	if !resultBlobSuffixPattern.MatchString(suffix) {
+		return "", fmt.Errorf("invalid blob suffix")
+	}
+	return suffix, nil
+}
+
+func ensurePathInDir(dir, path string) error {
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return err
+	}
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	rel, err := filepath.Rel(absDir, absPath)
+	if err != nil {
+		return err
+	}
+	if rel == "." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || rel == ".." || filepath.IsAbs(rel) {
+		return fmt.Errorf("path escapes result directory")
+	}
+	return nil
 }
 
 // ----------------------------------------------------------------------------
