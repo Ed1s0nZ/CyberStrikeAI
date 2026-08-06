@@ -137,7 +137,7 @@ function downloadAssetTemplate(format) {
         [assetT('assets.templateGuideRequired', '必填：target，或 host / ip / domain 中至少一项')],
         [assetT('assets.templateGuideTarget', 'target 示例：https://example.com:443、example.com、1.1.1.1:22')],
         [assetT('assets.templateGuideProject', 'project 填写系统中已有的项目名称或项目 ID，留空表示不绑定')],
-        [assetT('assets.templateGuideDomain', 'domain 填资产自身域名（如 app.example.com），勿填根域名；留空时从 target 自动解析')],
+        [assetT('assets.templateGuideDomain', 'domain 可填根域名或子域名；留空时从 target 自动解析')],
         [assetT('assets.templateGuideTags', 'tags 使用逗号分隔，最多 30 个')],
         [assetT('assets.templateGuideStatus', 'status 仅支持 active / inactive，留空默认为 active')],
         [assetT('assets.templateGuideLimit', '请在“Assets”工作表中填写，最多 100000 行')]
