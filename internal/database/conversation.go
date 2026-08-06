@@ -1342,7 +1342,7 @@ func (db *DB) AddProcessDetailWithID(messageID, conversationID, eventType, messa
 		}
 	}
 
-	_, err := db.Exec(
+	_, err := db.RetryExec("AddProcessDetail",
 		"INSERT INTO process_details (id, message_id, conversation_id, event_type, message, data, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
 		id, messageID, conversationID, eventType, message, dataJSON, time.Now(),
 	)
