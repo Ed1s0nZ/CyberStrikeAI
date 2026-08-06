@@ -1,6 +1,7 @@
 name: "dalfox"
 command: "dalfox"
 # dalfox v2+ 使用子命令，单目标模式为 `dalfox url <target>`，不再支持根级的 -u
+
 args:
   - "url"
 enabled: true

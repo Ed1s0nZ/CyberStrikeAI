@@ -1,6 +1,6 @@
 name: "lightx"
 command: "lightx"
-enabled: false
+enabled: true
 short_description: "轻量级资产发现与漏洞扫描工具"
 description: |
   Lightx 是一个高效的轻量级扫描工具，支持对单个目标、IP 段或文件列表进行快速探测。

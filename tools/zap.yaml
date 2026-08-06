@@ -1,6 +1,6 @@
 name: "zap"
 command: "zap-cli"
-enabled: false
+enabled: true
 short_description: "OWASP ZAP Web应用安全扫描器"
 description: |
   OWASP ZAP是一个Web应用安全扫描器，用于发现Web应用中的安全漏洞。

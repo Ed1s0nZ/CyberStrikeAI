@@ -1,5 +1,5 @@
 name: "fofa_search"
-command: "python3"
+command: "python"
 args:
   - "-c"
   - |
@@ -192,7 +192,7 @@ args:
         }
         print(json.dumps(error_result, ensure_ascii=False, indent=2))
         sys.exit(1)
-enabled: false
+enabled: true
 short_description: "FOFA网络空间搜索引擎，支持灵活的查询参数配置"
 description: |
   FOFA是一个网络空间测绘搜索引擎，可以通过多种查询条件搜索互联网资产。

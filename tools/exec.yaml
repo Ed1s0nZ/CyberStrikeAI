@@ -1,16 +1,18 @@
 name: "exec"
-command: "sh"
-args: ["-c"]
+command: "powershell"
+args: ["-NoProfile", "-Command"]
 enabled: true
 # 简短描述（用于工具列表，减少token消耗）
+
 short_description: "系统命令执行工具，用于执行Shell命令和系统操作（谨慎使用）"
 # 工具详细描述
+
 description: |
-  系统命令执行工具，用于执行Shell命令和系统操作。
+  系统命令执行工具，用于执行PowerShell命令和系统操作。
 
   **主要功能：**
-  - 执行任意Shell命令
-  - 支持bash、sh等shell
+  - 通过PowerShell执行任意系统命令
+  - 支持管道、重定向、变量等PowerShell特性
   - 可以指定工作目录
   - 返回命令执行结果
 
@@ -27,27 +29,28 @@ description: |
   - ⚠️ 建议限制可执行的命令范围
   - ⚠️ 不要执行不可信的命令
 # 参数定义
+
 parameters:
   - name: "command"
     type: "string"
     description: |
-      要执行的系统命令。可以是任何有效的Shell命令。
+      要执行的系统命令。可以是任何有效的PowerShell命令。
 
       **格式要求：**
-      - 完整的Shell命令
-      - 可以包含管道、重定向等Shell特性
+      - 完整的PowerShell命令
+      - 可以包含管道、重定向等PowerShell特性
       - 支持环境变量
 
       **示例值：**
-      - 简单命令: "ls -la"
-      - 带管道: "ps aux | grep nginx"
-      - 文件操作: "cat /etc/passwd"
-      - 网络命令: "curl http://example.com"
-      - 系统信息: "uname -a"
-      - 查找文件: "find /var/log -name '*.log'"
+      - 文件列表: "Get-ChildItem"
+      - 进程查找: "Get-Process | Where-Object {$_.CPU -gt 10}"
+      - 文件内容: "Get-Content .\\config.yaml"
+      - 网络请求: "Invoke-WebRequest http://example.com"
+      - 系统信息: "Get-ComputerInfo"
+      - 查找文件: "Get-ChildItem -Recurse -Filter '*.log'"
 
       **注意事项：**
-      - 命令会在指定的shell中执行
+      - 命令通过PowerShell执行
       - 确保命令语法正确
       - 注意命令的安全影响
       - 必需参数，不能为空
@@ -57,24 +60,23 @@ parameters:
   - name: "shell"
     type: "string"
     description: |
-      使用的Shell类型，默认为sh。
+      使用的Shell类型，默认为powershell。
 
       **可选值：**
-      - sh: 标准Shell（默认）
-      - bash: Bash Shell
-      - zsh: Z Shell
-      - 其他系统可用的shell
+      - powershell: Windows PowerShell（默认）
+      - pwsh: PowerShell Core
+      - cmd: Windows命令提示符
 
       **示例值：**
-      - "sh" (默认)
-      - "bash"
-      - "zsh"
+      - "powershell" (默认)
+      - "pwsh"
+      - "cmd"
 
       **注意事项：**
       - 确保指定的shell在系统中可用
       - 不同shell的命令语法可能略有差异
     required: false
-    default: "sh"
+    default: "powershell"
   - name: "workdir"
     type: "string"
     description: |

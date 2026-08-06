@@ -1,6 +1,6 @@
 name: "feroxbuster"
 command: "feroxbuster"
-enabled: false
+enabled: true
 short_description: "递归内容发现工具"
 description: |
   Feroxbuster是一个快速、简单的递归内容发现工具。

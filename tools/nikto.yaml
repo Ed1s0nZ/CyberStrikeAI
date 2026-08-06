@@ -2,10 +2,13 @@ name: "nikto"
 command: "nikto"
 enabled: true
 # 允许的退出码列表：nikto在找到漏洞时会返回退出码1，这是正常的成功状态
+
 allowed_exit_codes: [1]
 # 简短描述（用于工具列表，减少token消耗）
+
 short_description: "Web服务器扫描工具，用于检测Web服务器和应用程序中的已知漏洞和配置错误"
 # 工具详细描述
+
 description: |
   Web服务器扫描工具，用于检测Web服务器和应用程序中的已知漏洞、配置错误和潜在安全问题。
 
@@ -29,6 +32,7 @@ description: |
   - 建议在授权范围内使用
   - 扫描结果需要人工验证
 # 参数定义
+
 parameters:
   - name: "target"
     type: "string"
