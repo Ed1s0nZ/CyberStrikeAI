@@ -8,10 +8,11 @@ import (
 
 const toolSearchToolName = "tool_search"
 
-// HitlExemptMetaTools 为编排/元工具：不直接执行攻击动作，但会阻塞 agent 控制流。
+// HitlExemptMetaTools 为编排/元工具及限定在本地工作区的低风险工具。
 // tool_search 必须免审批，否则其 HITL 拒绝结果与 Eino toolsearch 中间件不兼容（会硬崩 ChatModel）。
 var HitlExemptMetaTools = []string{
 	toolSearchToolName,
+	"write_file",
 	"skill",
 	"task",
 	"write_todos",

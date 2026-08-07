@@ -138,7 +138,7 @@ hitl:
   # 已决策审计日志保留天数（与 MCP 监控一致；省略默认 90；0 表示不自动清理）
   retention_days: 90
   # 按你环境里的真实工具名增删（与侧栏一致、小写不敏感）；不需要全局免审批可改为 []
-  tool_whitelist: [read_file, list_dir, glob, grep, tool_search, upsert_project_fact]
+  tool_whitelist: [read_file, write_file, list_dir, glob, grep, tool_search, upsert_project_fact]
   # audit_agent_prompt: |  # 审批模式；留空使用内置默认，可在「人机协同」页编辑
   # audit_agent_prompt_review_edit: |  # 审查编辑模式；留空使用内置默认
 
