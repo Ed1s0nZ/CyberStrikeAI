@@ -290,7 +290,7 @@ func assetDedupKey(a *Asset) string {
 // into a readable validation error. Under the ip+domain combined identity,
 // editing an asset's identifiers to exactly match an existing asset triggers it.
 func translateAssetDedupConflict(err error) error {
-	if err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed: assets.dedup_key") {
+	if err != nil && strings.Contains(strings.ToLower(err.Error()), "unique constraint failed: assets.dedup_key") {
 		return assetValidationErrorf("目标标识与已有资产冲突，请先合并重复资产或修改 IP/域名/端口/协议")
 	}
 	return err
@@ -332,10 +332,6 @@ func (db *DB) UpsertAssets(assets []*Asset, ownerUserID string, allowGlobal ...b
 			return result, fmt.Errorf("第 %d 个资产无效: %w", result.Created+result.Updated+result.Skipped+1, err)
 		}
 		key := assetDedupKey(asset)
-		if key == "|||0|" {
-			result.Skipped++
-			continue
-		}
 		var existingID string
 		var existingOwner sql.NullString
 		err := tx.QueryRow(`SELECT id,owner_user_id FROM assets WHERE dedup_key = ?`, key).Scan(&existingID, &existingOwner)
@@ -901,9 +897,6 @@ func (db *DB) UpdateAsset(id string, a *Asset, access RBACListAccess) error {
 		return err
 	}
 	key := assetDedupKey(a)
-	if key == "|||0|" {
-		return fmt.Errorf("资产目标不能为空")
-	}
 	tags, _ := json.Marshal(a.Tags)
 	where, args := appendAssetAccess(" WHERE id = ?", []interface{}{id}, access, "assets")
 	res, err := db.Exec(`UPDATE assets SET dedup_key=?,project_id=?,host=?,ip=?,port=?,domain=?,protocol=?,title=?,server=?,country=?,province=?,city=?,
