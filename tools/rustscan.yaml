@@ -25,9 +25,9 @@ parameters:
     required: true
     flag: "-a"
     format: "flag"
-
-  # -p, --ports；范围请用 range (-r)，勿把 1-1000 填进 ports
   - name: "ports"
+    # -p, --ports；范围请用 range (-r)，勿把 1-1000 填进 ports
+
     type: "string"
     description: |
       要扫描的端口，**仅**逗号分隔列表，对应 `-p`。
@@ -36,9 +36,9 @@ parameters:
     required: false
     flag: "-p"
     format: "flag"
-
-  # -r, --range（与 ports 列表二选一或按官方说明组合）
   - name: "range"
+    # -r, --range（与 ports 列表二选一或按官方说明组合）
+
     type: "string"
     description: |
       端口范围，格式 start-end，对应 `-r`。
@@ -47,18 +47,18 @@ parameters:
     required: false
     flag: "-r"
     format: "flag"
-
-  # -u, --ulimit
   - name: "ulimit"
+    # -u, --ulimit
+
     type: "int"
     description: "提升扫描用的 ulimit；依系统 fd 限制调整"
     required: false
     flag: "-u"
     format: "flag"
     default: 5000
-
-  # --scripts：none | default | custom（CLI 默认 default）
   - name: "scripts"
+    # --scripts：none | default | custom（CLI 默认 default）
+
     type: "string"
     description: |
       脚本级别；**必须**传字符串，勿传 true/false。
@@ -73,34 +73,34 @@ parameters:
       - "none"
       - "default"
       - "custom"
-
-  # -g, --greppable：仅端口列表，无 Nmap 输出
   - name: "greppable"
+    # -g, --greppable：仅端口列表，无 Nmap 输出
+
     type: "bool"
     description: "Greppable 模式：只输出端口，适合脚本解析或写入文件"
     required: false
     flag: "-g"
     format: "flag"
     default: false
-
-  # -b, --batch-size [default: 4500]
   - name: "batch_size"
+    # -b, --batch-size [default: 4500]
+
     type: "int"
     description: "每批并发端口数；越大越快，受 OS 打开文件数限制。官方默认 4500"
     required: false
     flag: "-b"
     format: "flag"
-
-  # -t, --timeout ms [default: 1500]
   - name: "timeout_ms"
+    # -t, --timeout ms [default: 1500]
+
     type: "int"
     description: "单端口超时（毫秒）。官方默认 1500"
     required: false
     flag: "-t"
     format: "flag"
-
-  # --scan-order serial | random [default: serial]
   - name: "scan_order"
+    # --scan-order serial | random [default: serial]
+
     type: "string"
     description: "扫描顺序：serial 升序；random 随机"
     required: false
@@ -109,40 +109,39 @@ parameters:
     options:
       - "serial"
       - "random"
-
-  # --top：top 1000 端口
   - name: "top_ports"
+    # --top：top 1000 端口
+
     type: "bool"
     description: "使用内置 top 1000 端口（等价于传 `--top`）"
     required: false
     flag: "--top"
     format: "flag"
     default: false
-
-  # -e, --exclude-ports
   - name: "exclude_ports"
+    # -e, --exclude-ports
+
     type: "string"
     description: "排除端口，逗号分隔。示例：`80,443`"
     required: false
     flag: "-e"
     format: "flag"
-
-  # -x, --exclude-addresses
   - name: "exclude_addresses"
+    # -x, --exclude-addresses
+
     type: "string"
     description: "排除地址，逗号分隔 CIDR/IP/主机"
     required: false
     flag: "-x"
     format: "flag"
-
-  # --tries [default: 1]
   - name: "tries"
+    # --tries [default: 1]
+
     type: "int"
     description: "判定关闭前的重试次数；0 会被纠正为 1"
     required: false
     flag: "--tries"
     format: "flag"
-
   - name: "additional_args"
     type: "string"
     description: |

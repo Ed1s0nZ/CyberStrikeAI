@@ -1,6 +1,9 @@
 package security
 
-import "strings"
+import (
+	"runtime"
+	"strings"
+)
 
 const backgroundJobStdioRedirect = " </dev/null >/dev/null 2>&1"
 
@@ -82,7 +85,7 @@ func segmentHasStdioRedirect(segment string) bool {
 }
 
 // RedirectBackgroundJobStdio 为每个独立 & 前的后台段注入 </dev/null >/dev/null 2>&1，
-// 避免后台子进程占用 execute/exec 管道导致挂死。
+// 避免后台子进程占用 execute/exec 管道导致挂死。仅适用于 bash/sh 语义的命令。
 func RedirectBackgroundJobStdio(command string) string {
 	positions := findStandaloneAmpersandPositions(command)
 	if len(positions) == 0 {
@@ -105,7 +108,13 @@ func RedirectBackgroundJobStdio(command string) string {
 }
 
 // PrepareShellCommandForExecute 组合 execute/exec 用的非交互包装与后台 IO 重定向。
-// 须先注入 exec </dev/null，再改写 & 后台段，否则段内 </dev/null 会使 stdin 重定向被误判为已存在。
+// Unix 下须先注入 exec </dev/null，再改写 & 后台段，否则段内 </dev/null 会使 stdin 重定向被误判为已存在。
+// Windows 上 PowerShell/cmd 不支持 bash 的 exec </dev/null 与 >/dev/null 语法，
+// stdin 关闭已由 Go 层 attachNonInteractiveStdin 处理、PAGER 等环境由 applyDefaultTerminalEnv 处理，
+// 故 Windows 直接返回原命令，避免 ParserError。
 func PrepareShellCommandForExecute(shellCommand string) string {
+	if runtime.GOOS == "windows" {
+		return shellCommand
+	}
 	return RedirectBackgroundJobStdio(PrepareNonInteractiveShellCommand(shellCommand))
 }

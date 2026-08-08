@@ -1,5 +1,5 @@
 name: "shodan_search"
-command: "python3"
+command: "python"
 args:
   - "-c"
   - |
@@ -293,7 +293,7 @@ args:
         }
         print(json.dumps(error_result, ensure_ascii=False, indent=2))
         sys.exit(1)
-enabled: false
+enabled: true
 short_description: "Shodan网络空间搜索，支持search与count模式"
 description: |
   Shodan 资产搜索工具，基于官方 Developer API 实现，支持快速检索和统计分析。

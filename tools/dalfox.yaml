@@ -1,8 +1,10 @@
 name: "dalfox"
 command: "dalfox"
-# dalfox v2+ 使用子命令，单目标模式为 `dalfox url <target>`，不再支持根级的 -u
+# dalfox v3 使用子命令，单目标模式为 `dalfox scan <target>`（v2 的 `url` 子命令已移除；
+# 根级不带子命令时不接受任何 options，必须显式 scan）
+
 args:
-  - "url"
+  - "scan"
 enabled: true
 short_description: "高级XSS漏洞扫描器"
 description: |
@@ -23,38 +25,39 @@ parameters:
   - name: "url"
     type: "string"
     description: |
-      目标URL。dalfox 单目标模式为子命令 url，此处作为 url 后的第一个位置参数传入。
-      示例等价 CLI：dalfox url "http://target/page?q=test"
+      目标URL。作为 scan 子命令后的第一个位置参数传入。
+      示例等价 CLI：dalfox scan "http://target/page?q=test"
     required: true
     position: 0
     format: "positional"
-  - name: "pipe_mode"
-    type: "bool"
-    description: "使用管道模式输入"
+  - name: "input_type"
+    type: "string"
+    description: |
+      输入类型（v3 的 --input-type，替代 v2 的 --pipe）：auto/url/file/pipe/raw-http/har。
+      管道模式输入传 pipe。默认 auto。
     required: false
-    flag: "--pipe"
+    flag: "--input-type"
     format: "flag"
-    default: false
   - name: "blind"
     type: "string"
     description: "盲XSS回调地址（例如Burp Collaborator URL）"
     required: false
     flag: "--blind"
     format: "flag"
-  - name: "mining_dom"
+  - name: "skip_mining_dom"
     type: "bool"
-    description: "启用DOM挖掘"
+    description: "跳过DOM挖掘（v3 默认启用 DOM 挖掘，传 true 时渲染 --skip-mining-dom）"
     required: false
-    flag: "--mining-dom"
+    flag: "--skip-mining-dom"
     format: "flag"
-    default: true
-  - name: "mining_dict"
+    default: false
+  - name: "skip_mining_dict"
     type: "bool"
-    description: "启用字典挖掘"
+    description: "跳过字典挖掘（v3 默认启用字典挖掘，传 true 时渲染 --skip-mining-dict）"
     required: false
-    flag: "--mining-dict"
+    flag: "--skip-mining-dict"
     format: "flag"
-    default: true
+    default: false
   - name: "additional_args"
     type: "string"
     description: |

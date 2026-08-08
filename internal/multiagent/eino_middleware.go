@@ -97,7 +97,8 @@ func mergeAlwaysVisibleToolNames(configured []string) []string {
 		add(n)
 	}
 	// Always include hardcoded backend builtin MCP tools from constants.
-	for _, n := range builtin.GetAllBuiltinTools() {
+	// 仅合并高频核心内置（漏洞/资产/事实/知识库/执行控制）；webshell/batch_task/C2 由 tool_search 按需解锁，降低每轮常驻工具 schema 的 token 开销。
+	for _, n := range builtin.GetCoreBuiltinTools() {
 		add(n)
 	}
 	return merged
@@ -162,16 +163,16 @@ func prependEinoMiddlewares(
 	conversationID string,
 	projectID string,
 	logger *zap.Logger,
-) (outTools []tool.BaseTool, extraHandlers []adk.ChatModelAgentMiddleware, toolSearchActive bool, err error) {
+) (outTools []tool.BaseTool, extraHandlers []adk.ChatModelAgentMiddleware, toolSearchActive bool, dynamicToolNames []string, err error) {
 	if mw == nil {
-		return tools, nil, false, nil
+		return tools, nil, false, nil, nil
 	}
 	outTools = tools
 
 	if mw.PatchToolCallsEffective() {
 		patchMW, perr := patchtoolcalls.New(ctx, &patchtoolcalls.Config{})
 		if perr != nil {
-			return nil, nil, false, fmt.Errorf("patchtoolcalls: %w", perr)
+			return nil, nil, false, nil, fmt.Errorf("patchtoolcalls: %w", perr)
 		}
 		extraHandlers = append(extraHandlers, patchMW)
 	}
@@ -182,7 +183,7 @@ func prependEinoMiddlewares(
 		} else {
 			redMW, rerr := buildReductionMiddleware(ctx, *mw, projectID, conversationID, einoLoc, logger)
 			if rerr != nil {
-				return nil, nil, false, rerr
+				return nil, nil, false, nil, rerr
 			}
 			extraHandlers = append(extraHandlers, redMW)
 		}
@@ -201,11 +202,12 @@ func prependEinoMiddlewares(
 		if split && len(dynamic) > 0 {
 			ts, terr := toolsearch.New(ctx, &toolsearch.Config{DynamicTools: dynamic})
 			if terr != nil {
-				return nil, nil, false, fmt.Errorf("toolsearch: %w", terr)
+				return nil, nil, false, nil, fmt.Errorf("toolsearch: %w", terr)
 			}
 			extraHandlers = append(extraHandlers, ts)
 			outTools = static
 			toolSearchActive = true
+			dynamicToolNames = collectToolNames(ctx, dynamic)
 			if logger != nil {
 				logger.Info("eino middleware: tool_search enabled",
 					zap.Int("static_tools", len(static)),
@@ -226,12 +228,12 @@ func prependEinoMiddlewares(
 			}
 			baseDir := filepath.Join(skillsRoot, rel, sanitizeEinoPathSegment(conversationID))
 			if mk := os.MkdirAll(baseDir, 0o755); mk != nil {
-				return nil, nil, toolSearchActive, fmt.Errorf("plantask mkdir: %w", mk)
+				return nil, nil, toolSearchActive, dynamicToolNames, fmt.Errorf("plantask mkdir: %w", mk)
 			}
 			ptBE := newLocalPlantaskBackend(einoLoc)
 			pt, perr := plantask.New(ctx, &plantask.Config{Backend: ptBE, BaseDir: baseDir})
 			if perr != nil {
-				return nil, nil, toolSearchActive, fmt.Errorf("plantask: %w", perr)
+				return nil, nil, toolSearchActive, dynamicToolNames, fmt.Errorf("plantask: %w", perr)
 			}
 			extraHandlers = append(extraHandlers, pt)
 			if logger != nil {
@@ -240,7 +242,7 @@ func prependEinoMiddlewares(
 		}
 	}
 
-	return outTools, extraHandlers, toolSearchActive, nil
+	return outTools, extraHandlers, toolSearchActive, dynamicToolNames, nil
 }
 
 func deepExtrasFromConfig(ma *config.MultiAgentConfig) (outputKey string, taskDesc func(context.Context, []adk.Agent) (string, error)) {

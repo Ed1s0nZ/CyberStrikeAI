@@ -1,6 +1,6 @@
 name: "pacu"
 command: "pacu"
-enabled: false
+enabled: true
 short_description: "AWS渗透测试框架"
 description: |
   Pacu是一个AWS渗透测试框架，用于测试AWS环境的安全性。

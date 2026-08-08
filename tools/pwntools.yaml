@@ -1,5 +1,5 @@
 name: "pwntools"
-command: "python3"
+command: "python"
 args:
   - "-c"
   - |

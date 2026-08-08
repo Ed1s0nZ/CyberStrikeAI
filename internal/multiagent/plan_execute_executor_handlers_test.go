@@ -68,7 +68,7 @@ func TestPrependEinoMiddlewares_Main_IncludesPatch(t *testing.T) {
 	mw.ReductionEnable = false
 	mw.ToolSearchEnable = false
 	mw.PlantaskEnable = false
-	_, extra, _, err := prependEinoMiddlewares(ctx, mw, einoMWMain, stubTools(25), nil, "", "conv-test", "", nil)
+	_, extra, _, _, err := prependEinoMiddlewares(ctx, mw, einoMWMain, stubTools(25), nil, "", "conv-test", "", nil)
 	if err != nil {
 		t.Fatalf("prependEinoMiddlewares: %v", err)
 	}

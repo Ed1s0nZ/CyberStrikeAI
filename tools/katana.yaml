@@ -44,6 +44,15 @@ parameters:
     flag: "-fx"
     format: "flag"
     default: true
+  - name: "proxy"
+    type: "string"
+    description: |
+      HTTP/SOCKS代理地址，用于通过代理爬取目标。
+      仅在需要走代理访问目标时填写，内网/直连目标请留空。
+      示例：http://127.0.0.1:7891
+    required: false
+    flag: "-proxy"
+    format: "flag"
   - name: "additional_args"
     type: "string"
     description: |

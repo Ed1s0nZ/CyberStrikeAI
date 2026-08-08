@@ -2,8 +2,10 @@ name: "sqlmap"
 command: "sqlmap"
 enabled: true
 # 简短描述（用于工具列表，减少token消耗）
+
 short_description: "自动化SQL注入检测和利用工具，用于发现和利用SQL注入漏洞"
 # 工具详细描述
+
 description: |
   自动化SQL注入检测和利用工具，用于发现和利用SQL注入漏洞。
 
@@ -26,6 +28,7 @@ description: |
   - 建议在测试环境中先验证
   - 使用 --batch 参数避免交互式提示
 # 参数定义
+
 parameters:
   - name: "url"
     type: "string"

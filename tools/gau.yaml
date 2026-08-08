@@ -36,6 +36,15 @@ parameters:
     flag: "--subs"
     format: "flag"
     default: true
+  - name: "proxy"
+    type: "string"
+    description: |
+      HTTP代理地址，用于访问境外数据源（Wayback、CommonCrawl、OTX等）。
+      国内网络环境访问境外源需配置此参数。
+      示例：http://127.0.0.1:7891
+    required: false
+    flag: "--proxy"
+    format: "flag"
   - name: "additional_args"
     type: "string"
     description: |

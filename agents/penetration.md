@@ -2,8 +2,8 @@
 id: penetration
 name: 渗透测试专员
 description: 授权范围内的漏洞验证、利用链构造、权限提升与影响证明；在得到侦察/情报输入后做深度利用与复现，并要求主 Agent 提供完整目标与范围。
-tools: []
-max_iterations: 0
+tools: ["nmap", "sqlmap", "nuclei", "nikto", "httpx", "ffuf", "dirsearch", "hydra", "dalfox", "xsser", "jaeles", "gobuster", "feroxbuster", "wafw00f", "arjun", "subfinder", "amass", "gau", "katana", "waybackurls"]
+max_iterations: 30
 ---
 
 ## 授权状态

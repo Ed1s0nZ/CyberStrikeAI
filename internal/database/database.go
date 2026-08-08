@@ -9,14 +9,14 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 	"go.uber.org/zap"
 )
 
 const (
 	// SQLite 在 WAL 模式下建议使用较保守的连接数，降低长读快照导致 checkpoint 饥饿的概率。
-	sqliteMaxOpenConns = 25
-	sqliteMaxIdleConns = 5
+	sqliteMaxOpenConns = 4
+	sqliteMaxIdleConns = 2
 	// 以页为单位的自动 checkpoint 触发阈值（默认 1000 页，约 4MB @ 4KB/page）。
 	sqliteWALAutoCheckpointPages = 1000
 	// 控制 WAL 目标上限，避免异常场景持续膨胀（256MB）。
@@ -35,6 +35,9 @@ func configureDBPool(db *sql.DB) {
 
 // configureSQLitePragmas 调整 WAL 回收行为，降低 -wal 文件长期膨胀风险。
 func configureSQLitePragmas(db *sql.DB) error {
+	if _, err := db.Exec("PRAGMA busy_timeout = 15000"); err != nil {
+		return fmt.Errorf("设置 busy_timeout 失败: %w", err)
+	}
 	if _, err := db.Exec(fmt.Sprintf("PRAGMA wal_autocheckpoint=%d", sqliteWALAutoCheckpointPages)); err != nil {
 		return fmt.Errorf("设置 wal_autocheckpoint 失败: %w", err)
 	}
@@ -59,6 +62,38 @@ type DB struct {
 	closeOnce                sync.Once
 	closeErr                 error
 	vulnerabilityCreatedHook func(*Vulnerability)
+}
+
+// retryOnBusy 在 SQLITE_BUSY 错误时自动重试，最多 15 秒。
+func (db *DB) retryOnBusy(fn func() error, label string) error {
+	const maxRetries = 30
+	var lastErr error
+	for i := 0; i < maxRetries; i++ {
+		err := fn()
+		if err == nil {
+			return nil
+		}
+		if !strings.Contains(err.Error(), "database is locked") {
+			return err
+		}
+		lastErr = err
+		if i == 0 {
+			db.logger.Warn("数据库繁忙，等待重试", zap.String("label", label))
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	return fmt.Errorf("%s: 重试 %d 次后仍失败: %w", label, maxRetries, lastErr)
+}
+
+// RetryExec 包装 Exec，自动重试 SQLITE_BUSY。
+func (db *DB) RetryExec(label string, query string, args ...any) (sql.Result, error) {
+	var result sql.Result
+	err := db.retryOnBusy(func() error {
+		var e error
+		result, e = db.Exec(query, args...)
+		return e
+	}, label)
+	return result, err
 }
 
 // startPassiveCheckpointLoop 启动后台 PASSIVE checkpoint 循环。
@@ -122,7 +157,7 @@ func (db *DB) runPassiveCheckpoint(trigger string) {
 
 // NewDB 创建数据库连接
 func NewDB(dbPath string, logger *zap.Logger) (*DB, error) {
-	db, err := sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_foreign_keys=1&_busy_timeout=5000&_synchronous=NORMAL")
+	db, err := sql.Open("sqlite", dbPath+"?_journal_mode=WAL&_foreign_keys=1&_busy_timeout=5000&_synchronous=NORMAL")
 	if err != nil {
 		return nil, fmt.Errorf("打开数据库失败: %w", err)
 	}
@@ -1671,7 +1706,7 @@ func (db *DB) migrateC2ListenersTable() error {
 
 // NewKnowledgeDB 创建知识库数据库连接（只包含知识库相关的表）
 func NewKnowledgeDB(dbPath string, logger *zap.Logger) (*DB, error) {
-	sqlDB, err := sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_foreign_keys=1&_busy_timeout=5000&_synchronous=NORMAL")
+	sqlDB, err := sql.Open("sqlite", dbPath+"?_journal_mode=WAL&_foreign_keys=1&_busy_timeout=5000&_synchronous=NORMAL")
 	if err != nil {
 		return nil, fmt.Errorf("打开知识库数据库失败: %w", err)
 	}

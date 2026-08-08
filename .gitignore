@@ -22,6 +22,13 @@ dist/
 build/
 coverage.out
 coverage.html
+*.exe
+*.exe.bak*
+
+# Local evidence / pentest artifacts (kept outside repo in d:\CyberStrikeAI\evidence)
+evidence/
+reports/
+bootstrap_pkg/
 
 # Logs and temporary files
 *.log

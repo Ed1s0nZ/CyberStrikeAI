@@ -2,6 +2,7 @@ name: "wpscan"
 command: "wpscan"
 enabled: true
 # 允许的退出码列表：wpscan在目标不是WordPress站点时会返回退出码4，这是正常的信息性输出
+
 allowed_exit_codes: [4]
 short_description: "WordPress安全扫描器，用于检测WordPress漏洞"
 description: |
