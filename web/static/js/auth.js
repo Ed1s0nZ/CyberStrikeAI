@@ -13,9 +13,52 @@ let robotBindingExpiresAt = 0;
 let robotBindingLifetimeMs = 5 * 60 * 1000;
 let activeRobotBindingCode = '';
 
+// 验证码状态
+let captchaEnabled = false;
+let captchaID = '';
+
 function isTokenValid() {
     return !!authToken && authTokenExpiry instanceof Date && authTokenExpiry.getTime() > Date.now();
 }
+
+async function loadCaptchaIfNeeded() {
+    try {
+        const res = await fetch('/api/auth/captcha');
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        captchaEnabled = !!data.enabled;
+        const row = document.getElementById('login-captcha-row');
+        if (!row) return;
+        if (captchaEnabled) {
+            row.style.display = '';
+            // 已有验证码时不重新生成，避免多次调用 showLoginOverlay 导致验证码意外刷新
+            if (!captchaID) {
+                captchaID = data.id || '';
+                const img = document.getElementById('login-captcha-img');
+                if (img && data.b64s) img.src = data.b64s;
+            }
+        } else {
+            row.style.display = 'none';
+        }
+    } catch (_) {
+        // 网络异常时不显示验证码，允许继续登录
+    }
+}
+
+async function refreshLoginCaptcha() {
+    try {
+        const res = await fetch('/api/auth/captcha');
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        captchaID = data.id || '';
+        const img = document.getElementById('login-captcha-img');
+        if (img && data.b64s) img.src = data.b64s;
+        const input = document.getElementById('login-captcha');
+        if (input) input.value = '';
+    } catch (_) {}
+}
+
+window.refreshLoginCaptcha = refreshLoginCaptcha;
 
 function saveAuth(token, expiresAt, meta = {}) {
     const expiry = expiresAt instanceof Date ? expiresAt : new Date(expiresAt);
@@ -104,11 +147,10 @@ function showLoginOverlay(message = '') {
         if (message) {
             errorBox.textContent = message;
             errorBox.style.display = 'block';
-        } else {
-            errorBox.textContent = '';
-            errorBox.style.display = 'none';
         }
+        // 无消息时保留已有错误，避免后台 apiFetch 触发 ensureAuthenticated 时意外清除
     }
+    loadCaptchaIfNeeded();
     setTimeout(function () {
         if (usernameInput && !usernameInput.value) {
             usernameInput.focus();
@@ -123,6 +165,7 @@ function hideLoginOverlay() {
     const errorBox = document.getElementById('login-error');
     const usernameInput = document.getElementById('login-username');
     const passwordInput = document.getElementById('login-password');
+    const captchaInput = document.getElementById('login-captcha');
     closeAppModal('login-overlay');
     if (errorBox) {
         errorBox.textContent = '';
@@ -131,9 +174,14 @@ function hideLoginOverlay() {
     if (passwordInput) {
         passwordInput.value = '';
     }
+    if (captchaInput) {
+        captchaInput.value = '';
+    }
     if (usernameInput && !authUser) {
         usernameInput.value = '';
     }
+    // 重置验证码状态，确保下次打开弹窗时获取新验证码
+    captchaID = '';
 }
 
 function ensureAuthPromise() {
@@ -254,6 +302,12 @@ async function submitLogin(event) {
         return;
     }
 
+    // 用户主动提交时清除上一次的错误提示
+    if (errorBox) {
+        errorBox.textContent = '';
+        errorBox.style.display = 'none';
+    }
+
     const username = usernameInput ? usernameInput.value.trim() : '';
     const password = passwordInput.value.trim();
     if (!password) {
@@ -272,12 +326,19 @@ async function submitLogin(event) {
     }
 
     try {
+        const captchaInput = document.getElementById('login-captcha');
+        const captchaVal = captchaInput ? captchaInput.value.trim() : '';
+        const body = { username, password };
+        if (captchaEnabled) {
+            body.captcha_id = captchaID;
+            body.captcha = captchaVal;
+        }
         const response = await fetch('/api/auth/login', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ username, password }),
+            body: JSON.stringify(body),
         });
         const result = await response.json().catch(() => ({}));
         if (!response.ok || !result.token) {
@@ -287,6 +348,10 @@ async function submitLogin(event) {
                     : '登录失败，请检查密码';
                 errorBox.textContent = result.error || fallback;
                 errorBox.style.display = 'block';
+            }
+            // 验证码错误时刷新验证码
+            if (result.captcha_required || captchaEnabled) {
+                await refreshLoginCaptcha();
             }
             return;
         }
@@ -910,7 +975,7 @@ async function logout() {
         // 无论如何都清除本地认证信息
         clearAuthStorage();
         hideLoginOverlay();
-        showLoginOverlay(typeof window.t === 'function' ? window.t('auth.loggedOut') : '已退出登录');
+        showLoginOverlay();
     }
 }
 

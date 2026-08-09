@@ -394,6 +394,8 @@ func New(cfg *config.Config, log *logger.Logger, configPath string) (*App, error
 	groupHandler := handler.NewGroupHandler(db, log.Logger)
 	authHandler := handler.NewAuthHandler(authManager, cfg, configPath, log.Logger)
 	authHandler.SetAudit(auditSvc)
+	captchaSvc := handler.NewCaptchaService()
+	authHandler.SetCaptchaService(captchaSvc)
 	attackChainHandler := handler.NewAttackChainHandler(db, &cfg.OpenAI, log.Logger)
 	vulnerabilityHandler := handler.NewVulnerabilityHandler(db, log.Logger)
 	assetHandler := handler.NewAssetHandler(db, log.Logger)
@@ -900,6 +902,7 @@ func setupRoutes(
 	authRoutes := api.Group("/auth")
 	loginRL := security.NewRateLimiter(10, 1*time.Minute)
 	{
+		authRoutes.GET("/captcha", authHandler.GetCaptcha)
 		authRoutes.POST("/login", security.RateLimitMiddleware(loginRL), authHandler.Login)
 		authRoutes.POST("/logout", security.AuthMiddleware(authManager), authHandler.Logout)
 		authRoutes.POST("/change-password", security.AuthMiddleware(authManager), security.RequirePermission("auth:self"), authHandler.ChangePassword)

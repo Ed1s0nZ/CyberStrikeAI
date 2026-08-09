@@ -256,6 +256,11 @@ func (h *ConfigHandler) ApplyWechatRobotBinding(wc config.RobotWechatConfig) err
 	return nil
 }
 
+// AuthPublicConfig 暴露给前端的认证配置（不含敏感字段）。
+type AuthPublicConfig struct {
+	CaptchaEnabled bool `json:"captcha_enabled"`
+}
+
 // GetConfigResponse 获取配置响应
 type GetConfigResponse struct {
 	AI         config.AIConfig          `json:"ai"`
@@ -273,6 +278,7 @@ type GetConfigResponse struct {
 	Robots     config.RobotsConfig      `json:"robots,omitempty"`
 	MultiAgent config.MultiAgentPublic  `json:"multi_agent,omitempty"`
 	C2         config.C2Public          `json:"c2"`
+	Auth       AuthPublicConfig         `json:"auth"`
 }
 
 // ToolConfigInfo 工具配置信息
@@ -379,6 +385,7 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 		C2:         h.config.C2.Public(),
 		Robots:     h.config.Robots,
 		MultiAgent: multiPub,
+		Auth:       AuthPublicConfig{CaptchaEnabled: h.config.Auth.CaptchaEnabled},
 	})
 }
 
@@ -706,6 +713,11 @@ func (h *ConfigHandler) GetTools(c *gin.Context) {
 	})
 }
 
+// AuthConfigUpdate 认证配置更新请求（仅含可由前端更改的字段）。
+type AuthConfigUpdate struct {
+	CaptchaEnabled *bool `json:"captcha_enabled,omitempty"`
+}
+
 // UpdateConfigRequest 更新配置请求
 type UpdateConfigRequest struct {
 	AI         *config.AIConfig            `json:"ai,omitempty"`
@@ -723,6 +735,7 @@ type UpdateConfigRequest struct {
 	Robots     *config.RobotsConfig        `json:"robots,omitempty"`
 	MultiAgent *config.MultiAgentAPIUpdate `json:"multi_agent,omitempty"`
 	C2         *config.C2APIUpdate         `json:"c2,omitempty"`
+	Auth       *AuthConfigUpdate           `json:"auth,omitempty"`
 }
 
 // AgentConfigUpdate 用于 PATCH /api/config 的 agent 段：仅 JSON 中出现的字段（指针非 nil）覆盖内存配置。
@@ -1125,6 +1138,14 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 					}
 				}
 			}
+		}
+	}
+
+	// 更新认证配置（验证码开关）
+	if req.Auth != nil {
+		if req.Auth.CaptchaEnabled != nil {
+			h.config.Auth.CaptchaEnabled = *req.Auth.CaptchaEnabled
+			h.logger.Info("更新验证码配置", zap.Bool("captcha_enabled", h.config.Auth.CaptchaEnabled))
 		}
 	}
 
@@ -1699,6 +1720,7 @@ func (h *ConfigHandler) saveConfig() error {
 	updateAgentConfig(root, h.config.Agent)
 	updateMCPConfig(root, h.config.MCP)
 	updateAIConfig(root, h.config.AI)
+	updateAuthConfig(root, h.config.Auth)
 	removeKeyFromMap(root.Content[0], "openai")
 	updateVisionConfig(root, h.config.Vision)
 	updateFOFAConfig(root, h.config.FOFA)
@@ -1817,6 +1839,13 @@ func updateAgentConfig(doc *yaml.Node, agent config.AgentConfig) {
 	setIntInMap(agentNode, "external_mcp_circuit_failure_threshold", agent.ExternalMCPCircuitFailureThreshold)
 	setIntInMap(agentNode, "external_mcp_circuit_cooldown_seconds", agent.ExternalMCPCircuitCooldownSeconds)
 	setStringInMap(agentNode, "system_prompt_path", agent.SystemPromptPath)
+}
+
+func updateAuthConfig(doc *yaml.Node, cfg config.AuthConfig) {
+	root := doc.Content[0]
+	authNode := ensureMap(root, "auth")
+	setIntInMap(authNode, "session_duration_hours", cfg.SessionDurationHours)
+	setBoolInMap(authNode, "captcha_enabled", cfg.CaptchaEnabled)
 }
 
 func updateMCPConfig(doc *yaml.Node, cfg config.MCPConfig) {

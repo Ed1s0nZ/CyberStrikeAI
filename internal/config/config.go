@@ -1189,7 +1189,8 @@ func normalizeHitlModeForPrompt(mode string) string {
 }
 
 type AuthConfig struct {
-	SessionDurationHours int `yaml:"session_duration_hours" json:"session_duration_hours"`
+	SessionDurationHours int  `yaml:"session_duration_hours" json:"session_duration_hours"`
+	CaptchaEnabled       bool `yaml:"captcha_enabled" json:"captcha_enabled"`
 }
 
 // MonitorConfig MCP 状态监控（tool_executions）保留策略。
