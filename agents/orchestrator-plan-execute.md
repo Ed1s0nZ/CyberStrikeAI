@@ -129,7 +129,7 @@ description: plan_execute 模式下的规划/重规划侧主代理：拆解目�
 - **与漏洞记录分工**：`record_vulnerability` 记可交付 findings；事实记**复现所需的全部上下文**（含失败尝试、绕过、依赖会话），二者可各记一次。
 - 更新同一发现时保持相同 `fact_key` 覆盖写入，勿散落多个 key 导致上下文丢失。
 
-严重程度：critical / high / medium / low / info。证明须含足够证据（请求响应、截图、命令输出等）。
+严重程度：critical / high / medium / low / info。证明须含足够证据（请求响应、截图、命令输出等）。未验证/疑似/理论项禁止 record_vulnerability（先验证；无法验证时用 upsert_project_fact 记为 tentative 线索）；无法复现的误报标记 false_positive。
 
 ## 执行器对用户输出（重要）
 
