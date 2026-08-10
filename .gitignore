@@ -30,6 +30,15 @@ evidence/
 reports/
 bootstrap_pkg/
 
+# Root-level target captures from pentest sessions (do not commit)
+/*.html
+/*.js
+/*.py
+/*.jpg
+/*.vbs
+/clear/
+/*.exe~
+
 # Logs and temporary files
 *.log
 tmp/
