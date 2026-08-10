@@ -133,7 +133,8 @@
                 : '回到底部';
         }
         fab.setAttribute('aria-label', label);
-        fab.textContent = label;
+        fab.setAttribute('title', label);
+        fab.classList.toggle('has-pending-new', hasPendingNewBelow);
     }
 
     function canAutoScrollNow(wasPinnedBeforeDomUpdate) {

@@ -23,7 +23,7 @@
             }
         })();
     </script>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260810-1">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260810-9">
     <link rel="stylesheet" href="/static/css/c2.css">
     <link rel="stylesheet" href="/static/vendor/xterm.css">
     <script src="/static/js/router.js"></script>
@@ -1084,8 +1084,8 @@
 	                                                </div>
 	                                                <div class="hitl-config-field hitl-config-field--tools">
 	                                                    <label class="hitl-config-label" for="hitl-sensitive-tools" data-i18n="chat.hitlWhitelistTools">白名单工具（免审批，逗号分隔）</label>
-	                                                    <textarea id="hitl-sensitive-tools" class="hitl-config-textarea" rows="3" spellcheck="false" autocomplete="off" data-i18n="chat.hitlWhitelistPlaceholder" data-i18n-attr="placeholder" placeholder=""></textarea>
-	                                                    <p class="hitl-config-hint" data-i18n="chat.hitlWhitelistHint">每行一个或逗号分隔；与 config 中全局白名单合并展示。</p>
+	                                                    <textarea id="hitl-sensitive-tools" class="hitl-config-textarea" rows="6" spellcheck="false" autocomplete="off" data-i18n="chat.hitlWhitelistPlaceholder" data-i18n-attr="placeholder" placeholder=""></textarea>
+	                                                    <p class="hitl-config-hint" data-i18n="chat.hitlWhitelistHint">每行一个或逗号分隔；与 config 中全局白名单合并生效。</p>
 	                                                </div>
 	                                            </div>
 	                                        </div>
@@ -1154,13 +1154,19 @@
                             </div>
                             <div id="active-tasks-bar" class="active-tasks-bar"></div>
                             <div id="chat-messages" class="chat-messages"></div>
-                            <button type="button" id="chat-scroll-to-bottom" class="chat-scroll-to-bottom" aria-label="回到底部" title="回到底部">↓ 回到底部</button>
+                            <button type="button" id="chat-scroll-to-bottom" class="chat-scroll-to-bottom" aria-label="回到底部" title="回到底部">
+                                <span class="chat-scroll-to-bottom-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+                            </button>
                             <div id="chat-input-container" class="chat-input-container">
-                                <div class="chat-input-primary-row">
+                                <div class="chat-composer-context" aria-label="当前会话上下文">
                                 <div class="chat-input-leading">
                                 <div class="role-selector-wrapper project-selector-wrapper">
                                     <button type="button" id="chat-project-btn" class="role-selector-btn" onclick="toggleChatProjectPanel()" aria-label="选择项目" aria-haspopup="listbox" aria-expanded="false" title="绑定项目后共享事实黑板（跨对话）" data-i18n="projects.chatSelectorButton" data-i18n-attr="aria-label,title">
-                                        <span class="role-selector-icon" aria-hidden="true">📁</span>
+                                        <span class="role-selector-icon" aria-hidden="true">
+                                            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M3.5 6.5A2.5 2.5 0 0 1 6 4h4l2 2h6A2.5 2.5 0 0 1 20.5 8.5v8A2.5 2.5 0 0 1 18 19H6a2.5 2.5 0 0 1-2.5-2.5v-10z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+                                            </svg>
+                                        </span>
                                         <span id="chat-project-text" class="role-selector-text" data-i18n="projects.noProject">无项目</span>
                                         <svg class="role-selector-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                                             <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1267,6 +1273,8 @@
                                     <input type="hidden" id="agent-mode-select" value="eino_single" autocomplete="off">
                                 </div>
                                 </div>
+                                </div>
+                                <div class="chat-input-primary-row chat-composer-surface">
                                 <div class="chat-input-with-files">
                                     <div id="chat-file-list" class="chat-file-list" aria-label="已选文件列表"></div>
                                     <div id="chat-attachment-progress" class="chat-upload-progress-row" hidden role="status" aria-live="polite">
@@ -1274,22 +1282,45 @@
                                         <span class="chat-upload-progress-label" id="chat-attachment-progress-label"></span>
                                     </div>
                                     <div class="chat-input-field">
-                                        <textarea id="chat-input" data-i18n="chat.inputPlaceholder" data-i18n-attr="placeholder" data-i18n-skip-text="true" placeholder="输入测试目标或命令... (输入 @ 选择工具 | Shift+Enter 换行，Enter 发送)" rows="1"></textarea>
+                                        <textarea id="chat-input" data-i18n="chat.inputPlaceholder" data-i18n-attr="placeholder" data-i18n-skip-text="true" placeholder="输入测试目标或命令…  @ 选择工具" rows="1"></textarea>
                                         <div id="mention-suggestions" class="mention-suggestions" role="listbox" aria-label="工具提及候选"></div>
                                     </div>
                                 </div>
-                                <input type="file" id="chat-file-input" class="chat-file-input-hidden" multiple accept="*" data-i18n="chat.selectFile" data-i18n-attr="title" title="选择文件">
-                                <button type="button" class="chat-upload-btn" onclick="document.getElementById('chat-file-input').click()" data-i18n="chat.uploadFile" data-i18n-attr="title" title="上传文件（可多选或拖拽到此处）">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                    </svg>
-                                </button>
-                                <button type="button" class="send-btn" id="chat-send-btn" data-require-permission="chat:write" onclick="sendMessage()">
-                                    <span data-i18n="chat.send">发送</span>
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                        <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-                                    </svg>
-                                </button>
+                                <div class="chat-composer-footer">
+                                    <div class="chat-composer-footer-leading">
+                                        <input type="file" id="chat-file-input" class="chat-file-input-hidden" multiple accept="*" data-i18n="chat.selectFile" data-i18n-attr="title" title="选择文件">
+                                        <button type="button" class="chat-upload-btn" onclick="document.getElementById('chat-file-input').click()" data-i18n="chat.uploadFile" data-i18n-attr="title,aria-label" data-i18n-skip-text="true" title="上传文件（可多选或拖拽到此处）" aria-label="上传文件（可多选或拖拽到此处）">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                                            </svg>
+                                        </button>
+                                        <button type="button" id="chat-hitl-shortcut" class="chat-session-shortcut chat-hitl-shortcut" onclick="openChatSessionSettings('hitl', event)" data-i18n="chat.sessionSettingsAria" data-i18n-attr="aria-label,title" data-i18n-skip-text="true" aria-label="打开会话设置" title="打开会话设置">
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                                <path d="M12 3l7 3v5c0 4.6-2.8 8.2-7 10-4.2-1.8-7-5.4-7-10V6l7-3z" stroke="currentColor" stroke-width="1.65" stroke-linejoin="round"/>
+                                                <path d="M9.5 12l1.7 1.7 3.5-3.7" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/>
+                                            </svg>
+                                            <span id="chat-hitl-shortcut-text">Agent 审查：关闭</span>
+                                            <svg class="chat-session-shortcut-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <div class="chat-composer-footer-trailing">
+                                        <button type="button" id="chat-model-shortcut" class="chat-session-shortcut chat-session-meta" onclick="openChatSessionSettings('ai', event)" data-i18n="chat.modelSettingsAria" data-i18n-attr="aria-label,title" data-i18n-skip-text="true" aria-label="打开 AI 通道设置" title="打开 AI 通道设置">
+                                            <span id="chat-model-shortcut-text">默认通道</span>
+                                        </button>
+                                        <span class="chat-composer-meta-divider" aria-hidden="true"></span>
+                                        <button type="button" id="chat-reasoning-shortcut" class="chat-session-shortcut chat-session-meta" onclick="openChatSessionSettings('reasoning', event)" data-i18n="chat.sessionSettingsAria" data-i18n-attr="aria-label,title" data-i18n-skip-text="true" aria-label="打开会话设置" title="打开会话设置">
+                                            <span id="chat-reasoning-shortcut-text">系统</span>
+                                        </button>
+                                        <button type="button" class="send-btn" id="chat-send-btn" data-require-permission="chat:write" onclick="sendMessage()" data-i18n="chat.send" data-i18n-attr="aria-label,title" data-i18n-skip-text="true" aria-label="发送" title="发送">
+                                            <span class="send-btn-label" data-i18n="chat.send">发送</span>
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                                <path d="M12 19V5M6.5 10.5L12 5l5.5 5.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
                                 </div>
                             </div>
                         </div>
@@ -6729,10 +6760,10 @@
     <script src="/static/js/assets.js?v=20260717-7"></script>
     <script src="/static/js/agents.js"></script>
     <script src="/static/js/dashboard.js"></script>
-    <script src="/static/js/chat-scroll.js"></script>
-    <script src="/static/js/monitor.js?v=20260723-1"></script>
-    <script src="/static/js/chat.js?v=20260810-1"></script>
-    <script src="/static/js/hitl.js"></script>
+    <script src="/static/js/chat-scroll.js?v=20260810-1"></script>
+    <script src="/static/js/monitor.js?v=20260810-1"></script>
+    <script src="/static/js/chat.js?v=20260810-8"></script>
+    <script src="/static/js/hitl.js?v=20260810-2"></script>
     <script src="/static/js/settings.js?v=20260717-1"></script>
     <script src="/static/js/audit-datetime-picker.js"></script>
     <script src="/static/js/audit.js"></script>

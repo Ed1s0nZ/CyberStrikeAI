@@ -352,9 +352,9 @@ function showHitlPageWhitelistFeedback(text, isError) {
     el.className = 'hitl-apply-feedback' + (isError ? ' hitl-apply-feedback--error' : '');
 }
 
-function syncHitlSidebarWhitelistDisplay(toolsStr) {
-    const sidebarEl = document.getElementById('hitl-sensitive-tools');
-    if (sidebarEl) sidebarEl.value = toolsStr;
+function syncHitlSidebarWhitelistDisplay(_toolsStr) {
+    // The chat field is conversation-scoped. Updating the global allowlist page
+    // must not replace it with a merged global + conversation display value.
 }
 
 async function fetchHitlGlobalToolWhitelist() {

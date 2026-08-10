@@ -17,6 +17,9 @@ function syncAgentLiveStreamConversationId(cid) {
         if (live && live.active) {
             live.conversationId = cid;
         }
+        if (typeof window.updateChatPrimaryActionState === 'function') {
+            window.updateChatPrimaryActionState();
+        }
     } catch (e) { /* ignore */ }
 }
 
@@ -5066,6 +5069,9 @@ function renderActiveTasks(tasks) {
 
     const normalizedTasks = Array.isArray(tasks) ? tasks : [];
     conversationExecutionTracker.update(normalizedTasks);
+    if (typeof window.updateChatPrimaryActionState === 'function') {
+        window.updateChatPrimaryActionState();
+    }
     if (typeof window.updateProjectFolderTaskStatuses === 'function') {
         window.updateProjectFolderTaskStatuses(normalizedTasks);
     }
