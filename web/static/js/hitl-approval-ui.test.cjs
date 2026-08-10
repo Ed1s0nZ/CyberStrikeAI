@@ -57,21 +57,23 @@ test('项目对话列表能同时显示等待批准与运行状态', () => {
     assert.match(projects, /api\/hitl\/pending\?page=1&pageSize=200/);
     assert.match(projects, /function bindProjectApprovalProgress/);
     assert.match(projects, /project-approval-progress-value/);
-    assert.match(projects, /setInterval\(update, 250\)/);
+    assert.match(projects, /PROJECT_APPROVAL_TICK_INTERVAL_MS = 1000/);
+    assert.match(projects, /function registerProjectApprovalTicker/);
     assert.match(monitor, /function renderDirectHitlSidebarApproval/);
     assert.match(monitor, /hitlSidebarApprovalSyncTimer = window\.setInterval/);
 });
 
-test('项目文件夹汇总待审批数量并按最早到期时间变色', () => {
+test('项目文件夹汇总待审批数量并按最早到期时间使用绿黄红三档变色', () => {
     assert.match(projects, /waitingApprovalCount/);
     assert.match(projects, /aggregate: true, count: folderApprovals\.length/);
     assert.match(projects, /currentExpiry < earliestExpiry/);
     assert.match(projects, /PROJECT_APPROVAL_URGENCY_CLASSES/);
     assert.match(projects, /remaining <= 60 \* 1000/);
     assert.match(projects, /remaining <= 3 \* 60 \* 1000/);
-    assert.match(projects, /remaining <= 5 \* 60 \* 1000/);
+    assert.doesNotMatch(projects, /remaining <= 5 \* 60 \* 1000/);
     assert.match(projects, /project-task-status--approval-summary/);
     assert.equal(zh.hitl.waitingApprovalCount, '等待批准 {{count}}');
+    assert.equal(zh.hitl.approvalUrgencyMoreThanThree, '最早审批将在 3 分钟后到期');
     assert.equal(typeof en.hitl.waitingApprovalCount, 'string');
     const urgencyFunctionSource = projects.match(
         /function projectApprovalUrgencyLevel\(remainingMilliseconds, hasDeadline\) \{[\s\S]*?\n\}/
@@ -79,8 +81,10 @@ test('项目文件夹汇总待审批数量并按最早到期时间变色', () =>
     assert.ok(urgencyFunctionSource, '应提供可测试的审批紧急程度函数');
     const urgencyLevel = vm.runInNewContext(`(${urgencyFunctionSource[0]})`);
     assert.equal(urgencyLevel(6 * 60 * 1000, true), 'normal');
-    assert.equal(urgencyLevel(4 * 60 * 1000, true), 'warning');
-    assert.equal(urgencyLevel(2 * 60 * 1000, true), 'urgent');
+    assert.equal(urgencyLevel(4 * 60 * 1000, true), 'normal');
+    assert.equal(urgencyLevel(3 * 60 * 1000 + 1, true), 'normal');
+    assert.equal(urgencyLevel(3 * 60 * 1000, true), 'warning');
+    assert.equal(urgencyLevel(2 * 60 * 1000, true), 'warning');
     assert.equal(urgencyLevel(30 * 1000, true), 'critical');
     assert.equal(urgencyLevel(0, false), 'normal');
 });
@@ -120,6 +124,39 @@ test('无项目对话使用独立虚拟文件夹且新任务默认解除项目�
 test('单个对话的审批徽标随倒计时同步切换紧急颜色', () => {
     assert.match(projects, /bindProjectApprovalProgress\(status, details\);\s*bindProjectApprovalUrgency\(status, details, label\);/);
     assert.match(fs.readFileSync('web/static/css/style.css', 'utf8'), /\.project-task-status--approval\.is-urgency-critical/);
+});
+
+test('项目状态刷新复用单一计时器且切换对话不重复请求完整项目上下文', () => {
+    assert.match(projects, /const projectApprovalTickerEntries = new Set\(\)/);
+    assert.match(projects, /if \(!changed\) return/);
+    assert.match(projects, /options\.reloadFolders !== false/);
+    assert.match(chat, /refreshChatProjectSelector\(\{ reloadFolders: false, renderFolders: false \}\)/);
+    assert.match(projects, /function selectChatProjectConversationItem/);
+    assert.match(projects, /options\.renderFolders !== false/);
+    assert.match(projects, /projectConversationPreviewSuppressedUntil = Date\.now\(\) \+ 700/);
+    assert.match(projects, /project-task-status-group--folder/);
+    assert.doesNotMatch(fs.readFileSync('web/static/css/style.css', 'utf8'), /project-task-status-group--folder \.project-task-status--running/);
+    assert.match(fs.readFileSync('web/static/css/style.css', 'utf8'), /\.active-tasks-bar \{[\s\S]*?padding: 13px 24px 14px;/);
+});
+
+test('运行中对话切换会取消旧事件流并仅恢复最新一页过程详情', () => {
+    assert.match(chat, /window\.cancelRunningTaskEventStream\(conversationId\)/);
+    assert.match(monitor, /function cancelRunningTaskEventStream/);
+    assert.match(monitor, /abortController\.abort\(\)/);
+    assert.match(monitor, /signal: abortController\.signal/);
+    assert.match(monitor, /initialLatest: true/);
+    assert.match(monitor, /autoLoadAll: false/);
+});
+
+test('任务结束后对话内审批按钮会变灰并禁止继续操作', () => {
+    assert.match(monitor, /ready: false/);
+    assert.match(monitor, /function setHitlApprovalTaskAvailability/);
+    assert.match(monitor, /conversationExecutionTracker\.ready && !conversationExecutionTracker\.isRunning\(id\)/);
+    assert.match(monitor, /button\.disabled = true/);
+    assert.match(monitor, /syncHitlApprovalTaskAvailability\(\)/);
+    assert.match(fs.readFileSync('web/static/css/style.css', 'utf8'), /hitl-approval-task-closed/);
+    assert.equal(zh.hitl.taskClosedApprovalUnavailable, '任务已结束，审批不可用');
+    assert.equal(typeof en.hitl.taskClosedApprovalUnavailable, 'string');
 });
 
 test('旧会话首次升级到五分钟默认审批时限，仍允许用户之后主动选择不限时', () => {

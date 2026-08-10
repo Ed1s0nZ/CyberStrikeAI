@@ -2554,12 +2554,16 @@ const chatProjectFolderContext = {
 };
 const PROJECT_FOLDER_PREVIEW_OPEN_DELAY_MS = 160;
 const PROJECT_FOLDER_PREVIEW_CLOSE_DELAY_MS = 120;
+const PROJECT_APPROVAL_TICK_INTERVAL_MS = 1000;
+const projectApprovalTickerEntries = new Set();
+let projectApprovalTickerId = 0;
 let projectFolderPreviewOpenTimer = null;
 let projectFolderPreviewCloseTimer = null;
 let projectFolderPreviewAnchor = null;
 let projectConversationPreviewOpenTimer = null;
 let projectConversationPreviewCloseTimer = null;
 let projectConversationPreviewAnchor = null;
+let projectConversationPreviewSuppressedUntil = 0;
 
 function readProjectFolderCompletionSeen() {
     try {
@@ -2636,31 +2640,45 @@ function formatProjectApprovalRemaining(milliseconds) {
     return minutes + ':' + String(seconds % 60).padStart(2, '0');
 }
 
+function registerProjectApprovalTicker(status, update) {
+    const entry = { status, update };
+    if (update() === false) return;
+    projectApprovalTickerEntries.add(entry);
+    if (projectApprovalTickerId) return;
+    projectApprovalTickerId = window.setInterval(() => {
+        projectApprovalTickerEntries.forEach((candidate) => {
+            if (!candidate.status.isConnected || candidate.update() === false) {
+                projectApprovalTickerEntries.delete(candidate);
+            }
+        });
+        if (!projectApprovalTickerEntries.size) {
+            window.clearInterval(projectApprovalTickerId);
+            projectApprovalTickerId = 0;
+        }
+    }, PROJECT_APPROVAL_TICK_INTERVAL_MS);
+}
+
 function bindProjectApprovalProgress(status, details) {
     const timing = getProjectApprovalTiming(details);
     if (!timing.timeoutSeconds || !timing.expiresAt) return;
     const time = status.querySelector('.project-approval-time');
     const value = status.querySelector('.project-approval-progress-value');
     const update = () => {
-        if (!status.isConnected) {
-            window.clearInterval(status._approvalProgressTimer);
-            return;
-        }
         const remaining = Math.max(0, timing.expiresAt - Date.now());
         const percent = Math.max(0, Math.min(100, remaining / (timing.timeoutSeconds * 1000) * 100));
         if (time) time.textContent = formatProjectApprovalRemaining(remaining);
         if (value) value.style.width = `${percent.toFixed(2)}%`;
         status.setAttribute('aria-valuenow', String(Math.round(percent)));
         if (remaining <= 0) {
-            window.clearInterval(status._approvalProgressTimer);
             status.classList.add('is-expired');
+            return false;
         }
+        return true;
     };
     status.setAttribute('role', 'progressbar');
     status.setAttribute('aria-valuemin', '0');
     status.setAttribute('aria-valuemax', '100');
-    update();
-    status._approvalProgressTimer = window.setInterval(update, 250);
+    registerProjectApprovalTicker(status, update);
 }
 
 const PROJECT_APPROVAL_URGENCY_CLASSES = [
@@ -2674,8 +2692,7 @@ function projectApprovalUrgencyLevel(remainingMilliseconds, hasDeadline) {
     if (!hasDeadline) return 'normal';
     const remaining = Math.max(0, Number(remainingMilliseconds) || 0);
     if (remaining <= 60 * 1000) return 'critical';
-    if (remaining <= 3 * 60 * 1000) return 'urgent';
-    if (remaining <= 5 * 60 * 1000) return 'warning';
+    if (remaining <= 3 * 60 * 1000) return 'warning';
     return 'normal';
 }
 
@@ -2692,9 +2709,8 @@ function getProjectApprovalUrgency(details) {
     const level = projectApprovalUrgencyLevel(remaining, true);
     const urgencyLabels = {
         critical: pickerMessage(tp, 'hitl.approvalUrgencyWithinOne', '最早审批将在 1 分钟内到期'),
-        urgent: pickerMessage(tp, 'hitl.approvalUrgencyOneToThree', '最早审批将在 1–3 分钟内到期'),
-        warning: pickerMessage(tp, 'hitl.approvalUrgencyThreeToFive', '最早审批将在 3–5 分钟内到期'),
-        normal: pickerMessage(tp, 'hitl.approvalUrgencyMoreThanFive', '最早审批将在 5 分钟后到期'),
+        warning: pickerMessage(tp, 'hitl.approvalUrgencyOneToThree', '最早审批将在 1–3 分钟内到期'),
+        normal: pickerMessage(tp, 'hitl.approvalUrgencyMoreThanThree', '最早审批将在 3 分钟后到期'),
     };
     return {
         level,
@@ -2706,25 +2722,18 @@ function getProjectApprovalUrgency(details) {
 function bindProjectApprovalUrgency(status, details, baseLabel) {
     const timing = getProjectApprovalTiming(details);
     const update = () => {
-        if (!status.isConnected && status._approvalUrgencyTimer) {
-            window.clearInterval(status._approvalUrgencyTimer);
-            status._approvalUrgencyTimer = 0;
-            return;
-        }
         const urgency = getProjectApprovalUrgency(details);
         status.classList.remove(...PROJECT_APPROVAL_URGENCY_CLASSES);
         status.classList.add(`is-urgency-${urgency.level}`);
         status.dataset.approvalUrgency = urgency.level;
         status.setAttribute('aria-label', `${baseLabel}，${urgency.label}`);
         status.title = `${baseLabel} · ${urgency.label}`;
-        if (timing.expiresAt && urgency.remaining <= 0 && status._approvalUrgencyTimer) {
-            window.clearInterval(status._approvalUrgencyTimer);
-            status._approvalUrgencyTimer = 0;
-        }
+        return !(timing.expiresAt && urgency.remaining <= 0);
     };
-    update();
     if (timing.timeoutSeconds && timing.expiresAt) {
-        status._approvalUrgencyTimer = window.setInterval(update, 1000);
+        registerProjectApprovalTicker(status, update);
+    } else {
+        update();
     }
 }
 
@@ -2778,7 +2787,9 @@ function appendProjectTaskStatuses(container, kinds, detailsByKind, optionsByKin
         );
         if (status) group.appendChild(status);
     });
-    if (group.childElementCount) container.appendChild(group);
+    if (!group.childElementCount) return null;
+    container.appendChild(group);
+    return group;
 }
 
 function getProjectFolderStatuses(conversations) {
@@ -3104,6 +3115,7 @@ function showProjectConversationPreview(conversation, project, row) {
 }
 
 function scheduleShowProjectConversationPreview(conversation, project, row, immediate = false) {
+    if (Date.now() < projectConversationPreviewSuppressedUntil) return;
     clearTimeout(projectConversationPreviewOpenTimer);
     clearTimeout(projectConversationPreviewCloseTimer);
     projectConversationPreviewOpenTimer = setTimeout(
@@ -3170,12 +3182,13 @@ function appendChatProjectFolderItem(list, project, expandedIds, conversations) 
         const earliestExpiry = getProjectApprovalTiming(earliest).expiresAt || Number.POSITIVE_INFINITY;
         return currentExpiry < earliestExpiry ? approval : earliest;
     }, null);
-    appendProjectTaskStatuses(
+    const folderStatusGroup = appendProjectTaskStatuses(
         label,
         statusKinds,
         { approval: folderApproval },
         { approval: { aggregate: true, count: folderApprovals.length } }
     );
+    if (folderStatusGroup) folderStatusGroup.classList.add('project-task-status-group--folder');
 
     button.appendChild(disclosure);
     button.appendChild(icon);
@@ -3273,6 +3286,9 @@ function appendChatProjectConversationItem(list, conversation, project) {
     button.appendChild(label);
 
     button.addEventListener('click', async () => {
+        projectConversationPreviewSuppressedUntil = Date.now() + 700;
+        hideProjectConversationPreview(true);
+        selectChatProjectConversationItem(conversation.id);
         if (typeof window.loadConversation === 'function') {
             await window.loadConversation(conversation.id);
         }
@@ -3307,6 +3323,21 @@ function appendChatProjectConversationItem(list, conversation, project) {
     row.appendChild(menuButton);
     list.appendChild(row);
 }
+
+function selectChatProjectConversationItem(conversationId) {
+    const id = String(conversationId || '').trim();
+    document.querySelectorAll('.project-conversation-row').forEach((row) => {
+        const button = row.querySelector('.project-conversation-item');
+        const selected = !!id && button?.dataset.conversationId === id;
+        row.classList.toggle('is-selected', selected);
+        if (!button) return;
+        button.classList.toggle('is-selected', selected);
+        if (selected) button.setAttribute('aria-current', 'true');
+        else button.removeAttribute('aria-current');
+    });
+}
+
+window.selectChatProjectConversationItem = selectChatProjectConversationItem;
 
 async function loadChatProjectFolderContext() {
     const conversationsParams = new URLSearchParams({ limit: '1000', offset: '0', sort_by: 'updated_at' });
@@ -3440,6 +3471,8 @@ function updateProjectFolderTaskStatuses(tasks) {
             .filter(Boolean)
     );
     const taskFinished = [...previous].some((conversationId) => !next.has(conversationId));
+    const changed = previous.size !== next.size || [...previous].some((conversationId) => !next.has(conversationId));
+    if (!changed) return;
     chatProjectFolderContext.runningIds = next;
     if (isProjectsCacheReady() && chatProjectFolderContext.ready) {
         renderChatProjectFolders(projectsCacheAll);
@@ -3727,7 +3760,7 @@ async function applyChatProjectSelection(projectId) {
 }
 
 /** 对话页项目选择器：同步按钮文案；若浮层已打开则刷新列表 */
-async function refreshChatProjectSelector() {
+async function refreshChatProjectSelector(options = {}) {
     if (!document.getElementById('chat-project-btn')) return;
     try {
         await normalizeStaleChatProjectSelection();
@@ -3735,7 +3768,11 @@ async function refreshChatProjectSelector() {
     } catch (e) {
         console.warn(e);
     }
-    await refreshChatProjectFolders();
+    if (options.renderFolders !== false) {
+        const reloadFolders = options.reloadFolders !== false || !isProjectsCacheReady() || !chatProjectFolderContext.ready;
+        if (reloadFolders) await refreshChatProjectFolders();
+        else renderChatProjectFolders(projectsCacheAll);
+    }
     const panel = document.getElementById('chat-project-panel');
     if (panel && panel.style.display === 'flex') {
         await loadChatProjectPanelList();

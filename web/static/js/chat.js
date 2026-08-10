@@ -5144,6 +5144,13 @@ async function prefetchLastAssistantProcessDetails() {
 
 async function loadConversation(conversationId) {
     const seq = ++loadConversationRequestSeq;
+    const previousConversationId = currentConversationId;
+    if (typeof window.selectChatProjectConversationItem === 'function') {
+        window.selectChatProjectConversationItem(conversationId);
+    }
+    if (typeof window.cancelRunningTaskEventStream === 'function') {
+        window.cancelRunningTaskEventStream(conversationId);
+    }
     if (typeof window.clearChatHitlApprovalDock === 'function') {
         window.clearChatHitlApprovalDock();
     }
@@ -5221,7 +5228,7 @@ async function loadConversation(conversationId) {
         } catch (e) { /* ignore */ }
         updateChatPrimaryActionState();
         if (typeof refreshChatProjectSelector === 'function') {
-            refreshChatProjectSelector();
+            refreshChatProjectSelector({ reloadFolders: false, renderFolders: false });
         }
         refreshHitlConfigByCurrentConversation();
         const hitlSyncPromise = (typeof window.syncHitlConfigFromServer === 'function')
@@ -5427,6 +5434,9 @@ async function loadConversation(conversationId) {
             });
         }
     } catch (error) {
+        if (seq === loadConversationRequestSeq && typeof window.selectChatProjectConversationItem === 'function') {
+            window.selectChatProjectConversationItem(previousConversationId);
+        }
         console.error('加载对话失败:', error);
         showChatToast('加载对话失败: ' + (error && error.message ? error.message : String(error)), 'error');
     }

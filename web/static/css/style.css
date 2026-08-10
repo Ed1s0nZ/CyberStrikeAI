@@ -8053,7 +8053,7 @@ html[data-theme="dark"] .login-card .login-submit:disabled {
     display: none;
     align-items: center;
     gap: 12px;
-    padding: 13px 24px 14px 108px;
+    padding: 13px 24px 14px;
     margin: 0;
     background: var(--bg-primary);
     border: 1px solid rgba(0, 102, 255, 0.15);
@@ -8093,8 +8093,7 @@ html[data-theme="dark"] .login-card .login-submit:disabled {
 
 @media (max-width: 768px) {
     .active-tasks-bar {
-        padding-right: 16px;
-        padding-left: 60px;
+        padding: 10px 16px;
     }
 }
 
@@ -44894,11 +44893,6 @@ html[data-theme="dark"] .project-conversation-preview-status.is-unread {
     color: #9a6700;
 }
 
-.project-task-status--approval.is-urgency-urgent {
-    background: #ffedd5;
-    color: #c2410c;
-}
-
 .project-task-status--approval.is-urgency-critical {
     background: #fee2e2;
     color: #b42318;
@@ -44931,11 +44925,6 @@ html[data-theme="dark"] .project-task-status--approval.is-urgency-normal {
 html[data-theme="dark"] .project-task-status--approval.is-urgency-warning {
     background: rgba(250, 204, 21, 0.17);
     color: #fde047;
-}
-
-html[data-theme="dark"] .project-task-status--approval.is-urgency-urgent {
-    background: rgba(251, 146, 60, 0.18);
-    color: #fdba74;
 }
 
 html[data-theme="dark"] .project-task-status--approval.is-urgency-critical {
@@ -46334,6 +46323,21 @@ html[data-theme="dark"] .chat-composer-surface > .chat-session-settings-popover 
     min-height: 38px;
     padding: 8px 14px;
     border-radius: 999px;
+}
+
+:is(.hitl-inline-approval, .chat-hitl-approval-dock).hitl-approval-task-closed .hitl-pending-actions :is(button, .btn-primary, .btn-secondary) {
+    border-color: #d1d5db !important;
+    background: #e5e7eb !important;
+    color: #9ca3af !important;
+    box-shadow: none !important;
+    cursor: not-allowed;
+    opacity: 1;
+}
+
+html[data-theme="dark"] :is(.hitl-inline-approval, .chat-hitl-approval-dock).hitl-approval-task-closed .hitl-pending-actions :is(button, .btn-primary, .btn-secondary) {
+    border-color: #374151 !important;
+    background: #273244 !important;
+    color: #7f8b9d !important;
 }
 
 html[data-theme="dark"] .chat-hitl-approval-dock {
