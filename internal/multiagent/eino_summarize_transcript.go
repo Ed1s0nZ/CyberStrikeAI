@@ -1,6 +1,7 @@
 package multiagent
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/cloudwego/eino/adk"
@@ -185,8 +186,77 @@ func formatTranscriptToolCalls(calls []schema.ToolCall) []transcriptToolCall {
 	for _, tc := range calls {
 		out = append(out, transcriptToolCall{
 			Name:      tc.Function.Name,
-			Arguments: tc.Function.Arguments,
+			Arguments: compactToolArguments(tc.Function.Arguments),
 		})
 	}
 	return out
+}
+// compactToolArguments 对 tool_calls 的 arguments JSON 做"值级有损精简"，
+// 降低 transcript 转录时的 token 占用（长路径/base64/长字符串噪声）。
+// 保留参数名与 JSON 结构，仅将超长字符串值截断为可读前缀 + 省略计数；
+// 整体长度也受 maxTotalRunes 上限约束。解析失败时退化为原始串安全截断。
+func compactToolArguments(raw string) string {
+	const maxValueRunes = 160 // 单个字符串值保留的最大 rune 数
+	const maxTotalRunes = 4096 // 精简后整体最大 rune 数
+
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || trimmed == "null" {
+		return trimmed
+	}
+	var obj map[string]any
+	if err := sonic.Unmarshal([]byte(trimmed), &obj); err != nil {
+		return clipString(raw, maxValueRunes)
+	}
+	compactJSONValue(obj, maxValueRunes)
+	b, err := sonic.Marshal(obj)
+	if err != nil {
+		return clipString(raw, maxValueRunes)
+	}
+	out := string(b)
+	if r := []rune(out); len(r) > maxTotalRunes {
+		out = string(r[:maxTotalRunes]) + "…[truncated]"
+	}
+	return out
+}
+
+// compactJSONValue 递归精简任意 JSON 值中的字符串字段，保持结构不变。
+func compactJSONValue(v any, maxRunes int) {
+	switch t := v.(type) {
+	case map[string]any:
+		for k, sub := range t {
+			switch sv := sub.(type) {
+			case string:
+				t[k] = clipString(sv, maxRunes)
+			case map[string]any:
+				compactJSONValue(sv, maxRunes)
+			case []any:
+				compactJSONSlice(sv, maxRunes)
+			}
+		}
+	case []any:
+		compactJSONSlice(t, maxRunes)
+	}
+}
+
+// compactJSONSlice 精简数组中的字符串元素，保持结构不变。
+func compactJSONSlice(arr []any, maxRunes int) {
+	for i, sub := range arr {
+		switch sv := sub.(type) {
+		case string:
+			arr[i] = clipString(sv, maxRunes)
+		case map[string]any:
+			compactJSONValue(sv, maxRunes)
+		case []any:
+			compactJSONSlice(sv, maxRunes)
+		}
+	}
+}
+
+// clipString 将字符串截断为 maxRunes 的 UTF-8 安全前缀并带省略计数。
+func clipString(s string, maxRunes int) string {
+	r := []rune(s)
+	if len(r) <= maxRunes {
+		return s
+	}
+	return string(r[:maxRunes]) + fmt.Sprintf("…[+%d]", len(r)-maxRunes)
 }

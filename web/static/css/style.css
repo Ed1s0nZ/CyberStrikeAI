@@ -4432,6 +4432,21 @@ html[data-theme="dark"] .new-chat-btn:focus-visible {
     margin-top: 8px;
 }
 
+.conversation-usage-summary {
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-secondary, #4a5568);
+    word-break: break-all;
+}
+
+.conversation-usage-summary .conversation-usage-empty {
+    color: var(--text-muted, #718096);
+}
+
+.conversation-usage-summary .conversation-usage-line {
+    color: var(--text-secondary, #4a5568);
+}
+
 .session-hitl-config {
     background: transparent;
     border: none;

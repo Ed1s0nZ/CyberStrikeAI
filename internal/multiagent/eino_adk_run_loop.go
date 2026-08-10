@@ -16,6 +16,7 @@ import (
 
 	"cyberstrike-ai/internal/agent"
 	"cyberstrike-ai/internal/config"
+	"cyberstrike-ai/internal/database"
 	"cyberstrike-ai/internal/einomcp"
 	"cyberstrike-ai/internal/einoobserve"
 	"cyberstrike-ai/internal/openai"
@@ -25,6 +26,31 @@ import (
 	"github.com/cloudwego/eino/schema"
 	"go.uber.org/zap"
 )
+
+// newLLMUsageRecorder 构造将 eino 模型 usage 回传落库的 recorder（db/log 可为 nil，nil-safe）。
+func newLLMUsageRecorder(db *database.DB, logger *zap.Logger) func(einoobserve.UsageRecord) {
+	if db == nil {
+		return nil
+	}
+	return func(rec einoobserve.UsageRecord) {
+		if err := db.RecordLLMUsage(database.LLMUsage{
+			ConversationID:   rec.ConversationID,
+			Phase:            rec.Phase,
+			Model:            rec.Model,
+			PromptTokens:     rec.PromptTokens,
+			CompletionTokens: rec.CompletionTokens,
+			TotalTokens:      rec.TotalTokens,
+			CachedTokens:     rec.CachedTokens,
+			ReasoningTokens:  rec.ReasoningTokens,
+			CreatedAt:        rec.CreatedAt,
+		}); err != nil && logger != nil {
+			logger.Warn("记录 LLM usage 失败",
+				zap.String("conversation_id", rec.ConversationID),
+				zap.String("phase", rec.Phase),
+				zap.Error(err))
+		}
+	}
+}
 
 // normalizeStreamingDelta 将可能是“累计片段”的 chunk 归一化为“纯增量”。
 // 一些模型/桥接层在流式过程中会重复发送已输出前缀，前端若直接 buffer+=chunk 会出现重复文本。
@@ -106,6 +132,9 @@ type einoADKRunLoopArgs struct {
 
 	// EinoCallbacks 可选：为 ADK Runner 注入 eino [callbacks] 全链路观测（见 internal/einoobserve）。
 	EinoCallbacks *config.MultiAgentEinoCallbacksConfig
+
+	// LLMUsageRecorder 可选：模型调用结束时回传权威计费 usage（由调用方落库，见 database.RecordLLMUsage）。
+	LLMUsageRecorder func(einoobserve.UsageRecord)
 
 	// MaxTotalTokens / ToolMaxBytes / ModelName 用于 context overflow 时的激进压缩续跑。
 	MaxTotalTokens int
@@ -376,6 +405,8 @@ func runEinoADKAgentLoop(ctx context.Context, args *einoADKRunLoopArgs, baseMsgs
 			ConversationID:   conversationID,
 			OrchMode:         orchMode,
 			OrchestratorName: orchestratorName,
+			ModelName:        args.ModelName,
+			UsageRecorder:    args.LLMUsageRecorder,
 		})
 	}
 

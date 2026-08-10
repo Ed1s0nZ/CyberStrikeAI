@@ -2791,6 +2791,7 @@ window.getMessageReasoningContent = getMessageReasoningContent;
 window.filterNoiseProcessDetails = filterNoiseProcessDetails;
 window.mergeMessageReasoningContentIntoProcessDetails = mergeMessageReasoningContentIntoProcessDetails;
 window.syncAssistantReasoningContentFromServer = syncAssistantReasoningContentFromServer;
+window.refreshConversationTokenUsage = refreshConversationTokenUsage;
 
 /** 相邻且类型/正文/data 完全一致的过程详情只保留一条（与后端去重一致，避免时间线叠多条相同块） */
 function isEinoAgentHeartbeatProgress(detail) {
@@ -4600,6 +4601,52 @@ async function prefetchLastAssistantProcessDetails() {
     }
 }
 
+/** 格式化 token 数字：中文环境用 万/千，英文环境用 K/M 缩写 */
+function formatTokenCount(n) {
+    const num = Number(n) || 0;
+    const lang = (typeof i18next !== 'undefined' && i18next.language)
+        ? i18next.language
+        : (document.documentElement.lang || 'zh-CN');
+    if (lang && lang.toLowerCase().indexOf('en') === 0) {
+        if (num >= 1000000) return (num / 1000000).toFixed(2).replace(/\.?0+$/, '') + 'M';
+        if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+        return String(num);
+    }
+    if (num >= 10000) return (num / 10000).toFixed(2).replace(/\.?0+$/, '') + ' 万';
+    if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + ' 千';
+    return String(num);
+}
+
+/** 拉取对话级 Token 用量汇总并渲染到会话设置卡片（llm_usage 表聚合；失败静默保持原样） */
+async function refreshConversationTokenUsage(conversationId) {
+    if (!conversationId) return;
+    const container = document.getElementById('conversation-usage-summary');
+    if (!container) return;
+    try {
+        const res = await apiFetch('/api/conversations/' + encodeURIComponent(String(conversationId)) + '/usage');
+        if (!res.ok) return;
+        const j = await res.json();
+        const usage = (j && j.usage) || null;
+        const emptyText = (typeof window.t === 'function' ? window.t('chat.tokenUsageEmpty') : '暂无用量数据');
+        if (!usage || !usage.calls) {
+            container.innerHTML = '<span class="conversation-usage-empty">' + emptyText + '</span>';
+            return;
+        }
+        const t = (key, fallback) => (typeof window.t === 'function' ? window.t(key) : fallback);
+        const parts = [
+            t('chat.tokenUsageTotal', '总消耗') + ': ' + formatTokenCount(usage.totalTokens),
+            t('chat.tokenUsageInput', '输入') + ': ' + formatTokenCount(usage.inputTokens),
+            t('chat.tokenUsageOutput', '输出') + ': ' + formatTokenCount(usage.outputTokens),
+            t('chat.tokenUsageCalls', '调用') + ': ' + usage.calls
+        ];
+        if (usage.cachedTokens > 0) parts.push(t('chat.tokenUsageCached', '缓存命中') + ': ' + formatTokenCount(usage.cachedTokens));
+        if (usage.reasoningTokens > 0) parts.push(t('chat.tokenUsageReasoning', '思考') + ': ' + formatTokenCount(usage.reasoningTokens));
+        container.innerHTML = '<span class="conversation-usage-line">' + parts.join(' · ') + '</span>';
+    } catch (e) {
+        console.warn('refreshConversationTokenUsage failed', e);
+    }
+}
+
 async function loadConversation(conversationId) {
     const seq = ++loadConversationRequestSeq;
     try {
@@ -4687,8 +4734,8 @@ async function loadConversation(conversationId) {
             : Promise.resolve();
         void hitlSyncPromise;
         updateActiveConversation();
-        
-        // 如果攻击链模态框打开且显示的不是当前对话，关闭它
+        // 异步刷新会话 Token 用量卡片（独立于消息渲染，失败静默）
+        refreshConversationTokenUsage(conversationId);
         const attackChainModal = document.getElementById('attack-chain-modal');
         if (attackChainModal && isAppModalOpen('attack-chain-modal')) {
             if (currentAttackChainConversationId !== conversationId) {

@@ -640,6 +640,7 @@ func RunDeepAgent(
 		DA:                      da,
 		ModelFacingTrace:        modelFacingTrace,
 		EinoCallbacks:           &ma.EinoCallbacks,
+		LLMUsageRecorder:        newLLMUsageRecorder(db, logger),
 		MaxTotalTokens:          appCfg.OpenAI.MaxTotalTokens,
 		ToolMaxBytes:            toolMaxBytesFromMW(&ma.EinoMiddleware),
 		ModelName:               appCfg.OpenAI.Model,

@@ -27,7 +27,9 @@ type Conversation struct {
 	Pinned    bool      `json:"pinned"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
-	Messages  []Message `json:"messages,omitempty"`
+	// Usage 对话级 Token 消耗汇总（由 GetConversation 等接口按需填充，列表接口为空）
+	Usage    *LLMUsageSummary `json:"usage,omitempty"`
+	Messages []Message        `json:"messages,omitempty"`
 }
 
 // Message 消息
@@ -802,6 +804,12 @@ func (db *DB) DeleteConversation(id string) error {
 	_, err = db.Exec("DELETE FROM knowledge_retrieval_logs WHERE conversation_id = ?", id)
 	if err != nil {
 		db.logger.Warn("删除知识检索日志失败", zap.String("conversationId", id), zap.Error(err))
+		// 不返回错误，继续删除对话
+	}
+
+	// 显式删除 LLM usage 记录（独立表无外键，需手动清理）
+	if err := db.DeleteLLMUsageByConversation(id); err != nil {
+		db.logger.Warn("删除对话 LLM usage 失败", zap.String("conversationId", id), zap.Error(err))
 		// 不返回错误，继续删除对话
 	}
 

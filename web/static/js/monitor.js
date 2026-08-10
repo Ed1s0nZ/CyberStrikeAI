@@ -2918,6 +2918,10 @@ function handleStreamEvent(event, progressElement, progressId,
             if (progressTaskState.has(progressId)) {
                 finalizeProgressTask(progressId, typeof window.t === 'function' ? window.t('tasks.statusCancelled') : '已取消');
             }
+            // 任务已取消：对话仍可能有部分 usage 落库，刷新用量卡片
+            if (event.data && event.data.conversationId && typeof window.refreshConversationTokenUsage === 'function') {
+                window.refreshConversationTokenUsage(event.data.conversationId);
+            }
             
             // 复用已有助手消息（若有），避免终态事件重复插入消息
             {
@@ -3176,6 +3180,10 @@ function handleStreamEvent(event, progressElement, progressId,
             if (progressTaskState.has(progressId)) {
                 finalizeProgressTask(progressId, typeof window.t === 'function' ? window.t('tasks.statusFailed') : '执行失败');
             }
+            // 任务失败：已发生的模型调用 usage 仍有效，刷新用量卡片
+            if (event.data && event.data.conversationId && typeof window.refreshConversationTokenUsage === 'function') {
+                window.refreshConversationTokenUsage(event.data.conversationId);
+            }
             
             // 复用已有助手消息（若有），避免终态事件重复插入消息
             {
@@ -3242,6 +3250,10 @@ function handleStreamEvent(event, progressElement, progressId,
                 updateActiveConversation();
                 addAttackChainButton(currentConversationId);
                 updateProgressConversation(progressId, event.data.conversationId);
+                // 任务完成：刷新 Token 用量卡片
+                if (typeof window.refreshConversationTokenUsage === 'function') {
+                    window.refreshConversationTokenUsage(event.data.conversationId);
+                }
             }
             if (progressTaskState.has(progressId)) {
                 finalizeProgressTask(progressId, typeof window.t === 'function' ? window.t('tasks.statusCompleted') : '已完成');

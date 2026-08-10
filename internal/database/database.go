@@ -841,6 +841,26 @@ func (db *DB) initTables() error {
 		return fmt.Errorf("创建process_details表失败: %w", err)
 	}
 
+	// 创建 LLM usage 记录表（每次模型调用的权威计费 usage，按对话聚合展示 Token 消耗）
+	if _, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS llm_usage (
+			id TEXT PRIMARY KEY,
+			conversation_id TEXT NOT NULL,
+			phase TEXT NOT NULL DEFAULT '',
+			model TEXT NOT NULL DEFAULT '',
+			prompt_tokens INTEGER NOT NULL DEFAULT 0,
+			completion_tokens INTEGER NOT NULL DEFAULT 0,
+			total_tokens INTEGER NOT NULL DEFAULT 0,
+			cached_tokens INTEGER NOT NULL DEFAULT 0,
+			reasoning_tokens INTEGER NOT NULL DEFAULT 0,
+			created_at DATETIME NOT NULL,
+			FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+		);
+		CREATE INDEX IF NOT EXISTS idx_llm_usage_conversation ON llm_usage(conversation_id, created_at);
+	`); err != nil {
+		return fmt.Errorf("创建llm_usage表失败: %w", err)
+	}
+
 	if _, err := db.Exec(createToolExecutionsTable); err != nil {
 		return fmt.Errorf("创建tool_executions表失败: %w", err)
 	}

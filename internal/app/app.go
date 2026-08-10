@@ -1029,6 +1029,7 @@ func setupRoutes(
 		protected.POST("/conversations", conversationHandler.CreateConversation)
 		protected.GET("/conversations", conversationHandler.ListConversations)
 		protected.GET("/conversations/:id", conversationHandler.GetConversation)
+		protected.GET("/conversations/:id/usage", conversationHandler.GetConversationUsage)
 		protected.GET("/messages/:id/process-details", conversationHandler.GetMessageProcessDetails)
 		protected.GET("/process-details/:id", conversationHandler.GetProcessDetail)
 		protected.PUT("/conversations/:id", conversationHandler.UpdateConversation)

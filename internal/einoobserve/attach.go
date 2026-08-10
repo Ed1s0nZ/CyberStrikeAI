@@ -38,6 +38,24 @@ type Params struct {
 	ConversationID   string
 	OrchMode         string
 	OrchestratorName string
+	// ModelName 模型名兜底：模型回调 RunInfo.Name 为空时使用；透传 openai.model。
+	ModelName string
+	// UsageRecorder 非 nil 时，每次模型调用结束后回传权威计费 usage（Prompt/Completion/Total，含缓存与思考拆分）。
+	UsageRecorder func(UsageRecord)
+}
+
+// UsageRecord 单次模型调用的计费 usage（来自 eino 模型回调 ResponseMeta.Usage）。
+// Phase 为调用方编排模式（eino_single / deep / plan_execute / supervisor / workflow 等）。
+type UsageRecord struct {
+	ConversationID   string
+	Phase            string
+	Model            string
+	PromptTokens     int
+	CompletionTokens int
+	TotalTokens      int
+	CachedTokens     int
+	ReasoningTokens  int
+	CreatedAt        time.Time
 }
 
 // AttachAgentRunCallbacks returns ctx wrapped with callbacks.InitCallbacks when enabled.
@@ -74,9 +92,8 @@ func AttachAgentRunCallbacks(ctx context.Context, cfg *config.MultiAgentEinoCall
 		OnStartFn(h.onStart).
 		OnEndFn(h.onEnd).
 		OnErrorFn(h.onError)
-	if mode == "full" {
-		b = b.OnStartWithStreamInputFn(h.onStartStreamIn).OnEndWithStreamOutputFn(h.onEndStreamOut)
-	}
+	// 流式输出回调在全部模式下注册：非 full 模式只用于提取模型 usage（异步消费副本），不输出 trace。
+	b = b.OnStartWithStreamInputFn(h.onStartStreamIn).OnEndWithStreamOutputFn(h.onEndStreamOut)
 	ri := &callbacks.RunInfo{
 		Name:      "CyberStrikeADKRun",
 		Type:      strings.TrimSpace(p.OrchMode),
@@ -221,6 +238,10 @@ func (h *runHandler) onStart(ctx context.Context, info *callbacks.RunInfo, input
 
 func (h *runHandler) onEnd(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) context.Context {
 	ri := safeRunInfo(info)
+	// 非流式模型调用：直接在 OnEnd 提取权威 usage（acl 层在 Generate 结束时携带 TokenUsage）。
+	if mo := model.ConvCallbackOutput(output); mo != nil && mo.TokenUsage != nil && mo.TokenUsage.TotalTokens > 0 {
+		h.recordUsage(ri, mo.TokenUsage)
+	}
 	spanID, _ := ctx.Value(ctxSpanKey{}).(string)
 	if spanID == "" {
 		spanID = h.popSpan()
@@ -330,6 +351,24 @@ func (h *runHandler) onStartStreamIn(ctx context.Context, info *callbacks.RunInf
 
 func (h *runHandler) onEndStreamOut(ctx context.Context, info *callbacks.RunInfo, output *schema.StreamReader[callbacks.CallbackOutput]) context.Context {
 	ri := safeRunInfo(info)
+	// 流式模型调用：usage 只出现在回调流末条（Message==nil, TokenUsage!=nil），
+	// 异步消费框架为本 handler 复制的独立流（handler 必须关闭自己的副本），不阻塞主链路流式输出。
+	if h.params.UsageRecorder != nil && ri.Component == components.ComponentOfChatModel && output != nil {
+		go func() {
+			defer func() { output.Close() }()
+			for {
+				chunk, err := output.Recv()
+				if err != nil {
+					return
+				}
+				if mo := model.ConvCallbackOutput(chunk); mo != nil && mo.TokenUsage != nil && mo.TokenUsage.TotalTokens > 0 {
+					h.recordUsage(ri, mo.TokenUsage)
+					return
+				}
+			}
+		}()
+		return ctx
+	}
 	if output != nil {
 		output.Close()
 	}
@@ -341,6 +380,28 @@ func (h *runHandler) onEndStreamOut(ctx context.Context, info *callbacks.RunInfo
 		)
 	}
 	return ctx
+}
+
+// recordUsage 通过 Params.UsageRecorder 回传单次模型调用的计费 usage（nil-safe）。
+func (h *runHandler) recordUsage(ri callbacks.RunInfo, tu *model.TokenUsage) {
+	if h.params.UsageRecorder == nil || tu == nil || tu.TotalTokens <= 0 {
+		return
+	}
+	modelName := strings.TrimSpace(ri.Name)
+	if modelName == "" {
+		modelName = strings.TrimSpace(h.params.ModelName)
+	}
+	h.params.UsageRecorder(UsageRecord{
+		ConversationID:   strings.TrimSpace(h.params.ConversationID),
+		Phase:            strings.TrimSpace(h.params.OrchMode),
+		Model:            modelName,
+		PromptTokens:     tu.PromptTokens,
+		CompletionTokens: tu.CompletionTokens,
+		TotalTokens:      tu.TotalTokens,
+		CachedTokens:     tu.PromptTokenDetails.CachedTokens,
+		ReasoningTokens:  tu.CompletionTokensDetails.ReasoningTokens,
+		CreatedAt:        time.Now(),
+	})
 }
 
 func callbackSpanName(info *callbacks.RunInfo) string {

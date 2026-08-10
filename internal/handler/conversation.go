@@ -179,6 +179,26 @@ func (h *ConversationHandler) ListConversations(c *gin.Context) {
 	})
 }
 
+// GetConversationUsage 获取对话级 Token 消耗汇总（llm_usage 表聚合）。
+// 无记录时返回零值汇总，前端据此展示“暂无用量数据”。
+func (h *ConversationHandler) GetConversationUsage(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation id required"})
+		return
+	}
+	summary, err := h.db.GetConversationLLMUsage(id)
+	if err != nil {
+		h.logger.Error("获取对话 LLM usage 失败", zap.String("conversation_id", id), zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询 token 用量失败"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"conversationId": id,
+		"usage":          summary,
+	})
+}
+
 // GetConversation 获取对话
 func (h *ConversationHandler) GetConversation(c *gin.Context) {
 	id := c.Param("id")

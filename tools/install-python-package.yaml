@@ -3,7 +3,7 @@ command: "powershell"
 args:
   - "-NoProfile"
   - "-Command"
-  - "$ErrorActionPreference='Stop'; $root='D:\CyberStrikeAI\CyberStrikeAI'; Set-Location $root; Write-Output '[SELFBOOT] start build'; go version; Write-Output '[SELFBOOT] building...'; go build -o CyberStrikeAI.new.exe cmd/server/main.go; if ($LASTEXITCODE -eq 0) { $f = Get-Item 'CyberStrikeAI.new.exe'; Write-Output ('[SELFBOOT] BUILD_OK size=' + $f.Length + ' time=' + $f.LastWriteTime) } else { Write-Output ('[SELFBOOT] BUILD_FAIL code=' + $LASTEXITCODE); exit 1 }"
+  - "$ErrorActionPreference='Stop'; $root='D:\\CyberStrikeAI\\CyberStrikeAI'; Set-Location $root; Write-Output '[SELFBOOT] start build'; go version; Write-Output '[SELFBOOT] building...'; go build -o CyberStrikeAI.new.exe cmd/server/main.go; if ($LASTEXITCODE -eq 0) { $f = Get-Item 'CyberStrikeAI.new.exe'; Write-Output ('[SELFBOOT] BUILD_OK size=' + $f.Length + ' time=' + $f.LastWriteTime) } else { Write-Output ('[SELFBOOT] BUILD_FAIL code=' + $LASTEXITCODE); exit 1 }"
   - "_"
 enabled: true
 short_description: "SELFBOOT: build new binary (temporary)"
