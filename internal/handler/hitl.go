@@ -471,6 +471,18 @@ func (h *AgentHandler) waitHITLApproval(runCtx context.Context, cancelRun contex
 		return nil, nil
 	}
 	h.enrichHitlApprovalPayload(conversationID, assistantMessageID, payload)
+	approvalStartedAt := time.Now().UTC()
+	timeoutSeconds := int(cfg.Timeout / time.Second)
+	var approvalExpiresAt *time.Time
+	if timeoutSeconds > 0 {
+		expiresAt := approvalStartedAt.Add(cfg.Timeout)
+		approvalExpiresAt = &expiresAt
+	}
+	payload["hitlApproval"] = map[string]interface{}{
+		"createdAt":      approvalStartedAt,
+		"timeoutSeconds": timeoutSeconds,
+		"expiresAt":      approvalExpiresAt,
+	}
 	payloadRaw, _ := json.Marshal(payload)
 	p, err := h.hitlManager.CreatePendingInterrupt(conversationID, assistantMessageID, cfg.Mode, toolName, toolCallID, string(payloadRaw))
 	if err != nil {
@@ -555,6 +567,9 @@ func (h *AgentHandler) waitHITLApproval(runCtx context.Context, cancelRun contex
 		"toolCallId":     toolCallID,
 		"reviewer":       "human",
 		"status":         "pending",
+		"createdAt":      approvalStartedAt,
+		"timeoutSeconds": timeoutSeconds,
+		"expiresAt":      approvalExpiresAt,
 		"payload":        payload,
 	})
 	d, waitErr := h.hitlManager.waitDecision(runCtx, p, cfg.Timeout)
@@ -576,8 +591,15 @@ func (h *AgentHandler) waitHITLApproval(runCtx context.Context, cancelRun contex
 	}
 	if d.Decision == "reject" {
 		rejectMsg := "人工拒绝本次工具调用，模型将基于反馈继续迭代"
-		if strings.Contains(strings.ToLower(strings.TrimSpace(d.Comment)), "timeout") {
+		timedOut := strings.Contains(strings.ToLower(strings.TrimSpace(d.Comment)), "timeout")
+		if timedOut {
 			rejectMsg = "审批超时，安全起见已自动拒绝，模型将基于反馈继续迭代"
+		}
+		status := "decided"
+		decidedBy := "human"
+		if timedOut {
+			status = "timeout"
+			decidedBy = "system"
 		}
 		emitHITL("hitl_rejected", rejectMsg, map[string]interface{}{
 			"conversationId": conversationID,
@@ -585,8 +607,10 @@ func (h *AgentHandler) waitHITLApproval(runCtx context.Context, cancelRun contex
 			"toolName":       toolName,
 			"toolCallId":     toolCallID,
 			"mode":           cfg.Mode,
+			"status":         status,
 			"decision":       "reject",
 			"comment":        d.Comment,
+			"decidedBy":      decidedBy,
 			"reviewer":       "human",
 		})
 		return &d, nil

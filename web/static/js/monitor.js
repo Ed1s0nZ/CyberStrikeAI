@@ -2624,7 +2624,7 @@ function handleStreamEvent(event, progressElement, progressId,
             }
             break;
         }
-        case 'hitl_interrupt':
+        case 'hitl_interrupt': {
             const hitlTargetItem = findToolCallItemForHitl(timeline, event.data || {});
             if (hitlTargetItem && hitlTargetItem.id) {
                 renderInlineHitlApproval(hitlTargetItem.id, event.data || {});
@@ -2636,11 +2636,14 @@ function handleStreamEvent(event, progressElement, progressId,
                 });
                 renderInlineHitlApproval(hitlItemId, event.data || {});
             }
+            renderChatHitlApprovalDock(event.data || {});
+            updateHitlApprovalSidebar(event.data || {}, true);
             try {
                 window.dispatchEvent(new CustomEvent('hitl-interrupt', { detail: event.data || {} }));
             } catch (e) {}
             break;
-        case 'hitl_resumed':
+        }
+        case 'hitl_resumed': {
             if (!resolveInlineHitlDecision(timeline, event.data || {}, 'approve', event.message)) {
                 addTimelineItem(timeline, 'progress', {
                     title: '✅ HITL',
@@ -2648,8 +2651,14 @@ function handleStreamEvent(event, progressElement, progressId,
                     data: event.data
                 });
             }
+            clearChatHitlApprovalDock(event.data && event.data.interruptId);
+            updateHitlApprovalSidebar(event.data || {}, false);
+            try {
+                window.dispatchEvent(new CustomEvent('hitl-resolved', { detail: event.data || {} }));
+            } catch (e) {}
             break;
-        case 'hitl_rejected':
+        }
+        case 'hitl_rejected': {
             if (!resolveInlineHitlDecision(timeline, event.data || {}, 'reject', event.message)) {
                 addTimelineItem(timeline, 'error', {
                     title: '⛔ HITL',
@@ -2657,7 +2666,13 @@ function handleStreamEvent(event, progressElement, progressId,
                     data: event.data
                 });
             }
+            clearChatHitlApprovalDock(event.data && event.data.interruptId);
+            updateHitlApprovalSidebar(event.data || {}, false);
+            try {
+                window.dispatchEvent(new CustomEvent('hitl-resolved', { detail: event.data || {} }));
+            } catch (e) {}
             break;
+        }
 
         case 'user_interrupt_continue': {
             const d = event.data || {};
@@ -3354,6 +3369,175 @@ function handleStreamEvent(event, progressElement, progressId,
     scrollChatMessagesToBottomIfPinned(streamScrollWasPinned);
 }
 
+function hitlApprovalTranslate(key, fallback, vars) {
+    if (typeof window.t !== 'function') return fallback;
+    const value = window.t(key, vars || {});
+    return value && value !== key ? value : fallback;
+}
+
+function hitlApprovalTemplate(key, fallback, vars) {
+    let template = hitlApprovalTranslate(key, fallback);
+    Object.keys(vars || {}).forEach(function (name) {
+        template = template.replaceAll('{{' + name + '}}', String(vars[name]));
+    });
+    return template;
+}
+
+function hitlApprovalPayload(data) {
+    return data && data.payload && typeof data.payload === 'object' ? data.payload : {};
+}
+
+function hitlApprovalArguments(data) {
+    const payload = hitlApprovalPayload(data);
+    if (payload.argumentsObj && typeof payload.argumentsObj === 'object') return payload.argumentsObj;
+    if (payload.arguments && typeof payload.arguments === 'object') return payload.arguments;
+    if (typeof payload.arguments === 'string') {
+        try {
+            const parsed = JSON.parse(payload.arguments);
+            if (parsed && typeof parsed === 'object') return parsed;
+        } catch (e) { /* keep the raw request below */ }
+    }
+    return {};
+}
+
+function findHitlArgumentValue(args, keys) {
+    if (!args || typeof args !== 'object') return '';
+    for (let i = 0; i < keys.length; i++) {
+        const value = args[keys[i]];
+        if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+    const nestedKeys = ['input', 'params', 'options', 'request'];
+    for (let i = 0; i < nestedKeys.length; i++) {
+        const nested = args[nestedKeys[i]];
+        if (nested && typeof nested === 'object') {
+            const found = findHitlArgumentValue(nested, keys);
+            if (found) return found;
+        }
+    }
+    return '';
+}
+
+function describeHitlApprovalRequest(data) {
+    const payload = hitlApprovalPayload(data);
+    const args = hitlApprovalArguments(data);
+    const rawToolName = String(data.toolName || payload.toolName || 'tool').trim() || 'tool';
+    const toolName = rawToolName.toLowerCase();
+    const url = findHitlArgumentValue(args, ['url', 'uri', 'href', 'targetUrl', 'target_url']);
+    const command = findHitlArgumentValue(args, ['command', 'cmd', 'script', 'shell_command']);
+    const path = findHitlArgumentValue(args, ['path', 'filePath', 'file_path', 'filename']);
+    const isBrowser = !!url || /browser|chrome|navigate|open_url|web/.test(toolName);
+    const isCommand = !!command || /(^|::|_)exec$|shell|terminal|command|run_command/.test(toolName);
+    const isFile = !!path || /write_file|edit_file|apply_patch|delete_file|move_file/.test(toolName);
+    let displayTool = rawToolName;
+    let question = hitlApprovalTemplate('hitl.requestGeneric', '允许 CyberStrikeAI 调用 {{tool}}？', { tool: rawToolName });
+    let primary = '';
+    let kind = 'generic';
+    if (isBrowser) {
+        displayTool = 'Browser';
+        kind = 'browser';
+        question = url
+            ? hitlApprovalTemplate('hitl.requestVisitUrl', '允许 CyberStrikeAI 访问 {{url}}？', { url: url })
+            : hitlApprovalTranslate('hitl.requestBrowser', '允许 CyberStrikeAI 使用浏览器？');
+        primary = url;
+    } else if (isCommand) {
+        displayTool = hitlApprovalTranslate('hitl.toolTerminal', 'Terminal');
+        kind = 'command';
+        question = hitlApprovalTranslate('hitl.requestCommand', '允许 CyberStrikeAI 执行这条命令？');
+        primary = command;
+    } else if (isFile) {
+        displayTool = hitlApprovalTranslate('hitl.toolFiles', 'Files');
+        kind = 'file';
+        question = path
+            ? hitlApprovalTemplate('hitl.requestFile', '允许 CyberStrikeAI 修改 {{path}}？', { path: path })
+            : hitlApprovalTranslate('hitl.requestFiles', '允许 CyberStrikeAI 修改文件？');
+        primary = path;
+    }
+    return {
+        rawToolName: rawToolName,
+        displayTool: displayTool,
+        question: question,
+        primary: primary,
+        kind: kind,
+        args: args,
+        argsJSON: JSON.stringify(args, null, 2)
+    };
+}
+
+function getHitlApprovalTiming(data) {
+    const payload = hitlApprovalPayload(data);
+    const approval = payload.hitlApproval && typeof payload.hitlApproval === 'object' ? payload.hitlApproval : {};
+    const timeoutSeconds = Number(data.timeoutSeconds != null ? data.timeoutSeconds : approval.timeoutSeconds);
+    const createdRaw = data.createdAt || approval.createdAt || '';
+    const expiresRaw = data.expiresAt || approval.expiresAt || '';
+    const createdAt = Date.parse(createdRaw);
+    let expiresAt = Date.parse(expiresRaw);
+    const safeTimeout = Number.isFinite(timeoutSeconds) && timeoutSeconds > 0 ? Math.floor(timeoutSeconds) : 0;
+    if (!Number.isFinite(expiresAt) && safeTimeout > 0 && Number.isFinite(createdAt)) {
+        expiresAt = createdAt + safeTimeout * 1000;
+    }
+    return {
+        timeoutSeconds: safeTimeout,
+        createdAt: Number.isFinite(createdAt) ? createdAt : 0,
+        expiresAt: Number.isFinite(expiresAt) ? expiresAt : 0
+    };
+}
+
+function formatHitlRemaining(milliseconds) {
+    const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+}
+
+function buildHitlCountdownHtml(data) {
+    const timing = getHitlApprovalTiming(data);
+    if (!timing.timeoutSeconds || !timing.expiresAt) {
+        return '<div class="hitl-approval-countdown hitl-approval-countdown--unlimited">' +
+            '<span>' + escapeHtml(hitlApprovalTranslate('hitl.timeoutUnlimited', '不限时等待')) + '</span></div>';
+    }
+    const remaining = Math.max(0, timing.expiresAt - Date.now());
+    const percent = Math.max(0, Math.min(100, remaining / (timing.timeoutSeconds * 1000) * 100));
+    return '<div class="hitl-approval-countdown" data-hitl-expires-at="' + timing.expiresAt + '" data-hitl-timeout="' + timing.timeoutSeconds + '">' +
+        '<div class="hitl-approval-countdown-copy"><span>' + escapeHtml(hitlApprovalTranslate('hitl.timeoutAutoReject', '到期自动拒绝')) + '</span>' +
+        '<strong class="hitl-approval-countdown-value">' + formatHitlRemaining(remaining) + '</strong></div>' +
+        '<div class="hitl-approval-progress" aria-hidden="true"><span class="hitl-approval-progress-value" style="width:' + percent.toFixed(2) + '%"></span></div>' +
+        '</div>';
+}
+
+function stopHitlApprovalCountdown(panel) {
+    if (panel && panel.__hitlCountdownTimer) {
+        window.clearInterval(panel.__hitlCountdownTimer);
+        panel.__hitlCountdownTimer = 0;
+    }
+}
+
+function bindHitlApprovalCountdown(panel, data) {
+    if (!panel) return;
+    stopHitlApprovalCountdown(panel);
+    const timing = getHitlApprovalTiming(data);
+    const countdown = panel.querySelector('.hitl-approval-countdown[data-hitl-expires-at]');
+    if (!countdown || !timing.expiresAt || !timing.timeoutSeconds) return;
+    const value = countdown.querySelector('.hitl-approval-countdown-value');
+    const progress = countdown.querySelector('.hitl-approval-progress-value');
+    const update = function () {
+        const remaining = Math.max(0, timing.expiresAt - Date.now());
+        const percent = Math.max(0, Math.min(100, remaining / (timing.timeoutSeconds * 1000) * 100));
+        if (value) value.textContent = formatHitlRemaining(remaining);
+        if (progress) progress.style.width = percent.toFixed(2) + '%';
+        if (remaining <= 0) {
+            stopHitlApprovalCountdown(panel);
+            panel.classList.add('hitl-approval-expired');
+            panel.querySelectorAll('.hitl-inline-approve, .hitl-inline-reject').forEach(function (button) {
+                button.disabled = true;
+            });
+            const status = panel.querySelector('.hitl-inline-status');
+            if (status) status.textContent = hitlApprovalTranslate('hitl.expiredAutoRejected', '审批已超时，正在自动拒绝…');
+        }
+    };
+    update();
+    panel.__hitlCountdownTimer = window.setInterval(update, 250);
+}
+
 function renderToolCallApprovalSummary(item, data) {
     if (!item || !data || !data.interruptId) return;
     let panel = item.querySelector(':scope > .hitl-inline-approval.hitl-tool-approval-summary');
@@ -3379,9 +3563,11 @@ function renderToolCallApprovalSummary(item, data) {
         allowEdit: allowEdit,
         argsJSON: JSON.stringify(argsObj, null, 2)
     });
+    panel.dataset.hitlInterruptId = String(data.interruptId);
     panel.classList.toggle('hitl-inline-done', !!data.resolved || String(data.status || '') === 'decided');
     if (!data.resolved && String(data.reviewer || data.decidedBy || '') !== 'audit_agent' && String(data.status || '') !== 'audit_running') {
         bindInlineHitlApproval(panel, data, { allowEdit: allowEdit });
+        bindHitlApprovalCountdown(panel, data);
     }
 }
 
@@ -3430,6 +3616,7 @@ function renderInlineHitlApproval(itemId, data) {
 
     const panel = document.createElement('div');
     panel.className = 'hitl-inline-approval';
+    panel.dataset.hitlInterruptId = String(data.interruptId);
     panel.innerHTML = buildInlineHitlApprovalHtml(data, {
         toolName: toolName,
         mode: mode,
@@ -3439,6 +3626,7 @@ function renderInlineHitlApproval(itemId, data) {
     });
     contentEl.appendChild(panel);
     bindInlineHitlApproval(panel, data, { allowEdit: allowEdit });
+    bindHitlApprovalCountdown(panel, data);
 }
 
 function resolveInlineHitlDecision(timeline, data, decision, message) {
@@ -3484,6 +3672,7 @@ function resolveInlineHitlDecision(timeline, data, decision, message) {
 
     const panel = item.querySelector('.hitl-inline-approval');
     if (panel) {
+        stopHitlApprovalCountdown(panel);
         panel.classList.add('hitl-inline-done');
         panel.innerHTML = buildInlineHitlApprovalHtml(Object.assign({}, data, {
             resolved: true,
@@ -3523,25 +3712,26 @@ function buildInlineHitlApprovalHtml(data, opts) {
     const toolName = hasToolNameOverride ? String(opts.toolName || '') : (data.toolName || '-');
     const mode = opts && opts.mode ? opts.mode : String(data.mode || 'approval').trim().toLowerCase();
     const allowEdit = opts && opts.allowEdit === true;
-    const argsJSON = opts && opts.argsJSON ? opts.argsJSON : '';
+    const request = describeHitlApprovalRequest(Object.assign({}, data, toolName ? { toolName: toolName } : {}));
+    const argsJSON = opts && opts.argsJSON ? opts.argsJSON : request.argsJSON;
     const reviewer = String(data.reviewer || data.decidedBy || '').trim().toLowerCase();
     const audit = reviewer === 'audit_agent' || String(data.status || '') === 'audit_running';
-    const resolved = !!data.resolved || String(data.status || '') === 'decided' || data.decision === 'approve' || data.decision === 'reject';
+    const status = String(data.status || '').trim().toLowerCase();
+    const timedOut = status === 'timeout' || String(data.decidedBy || '').trim().toLowerCase() === 'system' && /timeout|超时/i.test(String(data.comment || data.decisionMessage || ''));
+    const resolved = !!data.resolved || status === 'decided' || status === 'timeout' || data.decision === 'approve' || data.decision === 'reject';
     const editedArgs = data.editedArgs || data.editedArguments;
     const hasEditedArgs = editedArgs && typeof editedArgs === 'object' && Object.keys(editedArgs).length > 0;
-    const tr = function (key, fallback, vars) {
-        if (typeof window.t !== 'function') return fallback;
-        const value = window.t(key, vars);
-        return value && value !== key ? value : fallback;
-    };
+    const tr = hitlApprovalTranslate;
     const shield = '<svg class="hitl-codex-shield" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 2.2l6 2.5v4.5c0 3.8-2.35 6.55-6 8.6-3.65-2.05-6-4.8-6-8.6V4.7l6-2.5z" stroke="currentColor" stroke-width="1.45" stroke-linejoin="round"/><path d="M7.5 10l1.55 1.55L12.8 7.8" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    const toolHeading = toolName
-        ? '<div class="hitl-codex-tool-row">' + shield + '<span>' + escapeHtml(toolName) + '</span></div>'
+    const toolHeading = toolName || request.displayTool
+        ? '<div class="hitl-codex-tool-row">' + shield + '<span>' + escapeHtml(request.displayTool || toolName) + '</span></div>'
         : '';
     if (resolved) {
-        const ok = data.decision !== 'reject';
+        const ok = !timedOut && data.decision !== 'reject';
         let statusText;
-        if (audit) {
+        if (timedOut) {
+            statusText = tr('hitl.expiredRejected', '审批超时，已自动拒绝');
+        } else if (audit) {
             statusText = ok
                 ? (hasEditedArgs ? tr('hitl.auditEditedApproved', '审计 Agent 已修改参数并批准') : tr('hitl.auditApproved', '审计 Agent 已批准'))
                 : tr('hitl.auditRejected', '审计 Agent 已拒绝');
@@ -3581,37 +3771,41 @@ function buildInlineHitlApprovalHtml(data, opts) {
     const pendingStatus = allowEdit
         ? tr('hitl.waitingHumanReview', '等待人工审查')
         : tr('hitl.waitingHumanApproval', '等待人工审批');
-    const explanation = allowEdit
-        ? tr('hitl.humanReviewExplanation', '请审查并可修改参数，保存后才会执行。')
-        : tr('hitl.humanApprovalExplanation', '此工具调用需要你的确认，通过后才会执行。');
     const rejectLabel = tr('hitl.reject', '拒绝');
     const approveLabel = allowEdit
         ? tr('hitl.saveEditedAndAllow', '保存修改并允许')
         : tr('hitl.allowOnce', '允许一次');
+    const hasArgs = request.args && Object.keys(request.args).length > 0;
+    const primary = request.primary
+        ? '<div class="hitl-approval-primary hitl-approval-primary--' + request.kind + '"><code>' + escapeHtml(request.primary) + '</code></div>'
+        : '';
+    const requestDetails = hasArgs
+        ? '<details class="hitl-approval-details"' + (allowEdit ? ' open' : '') + '><summary>' + escapeHtml(allowEdit
+            ? tr('hitl.editRequestDetails', '查看或修改请求参数')
+            : tr('hitl.viewRequestDetails', '查看请求详情')) + '</summary>' +
+            (allowEdit
+                ? '<textarea class="hitl-edit-args hitl-inline-edit" spellcheck="false">' + escapeHtml(argsJSON === '{}' ? '' : argsJSON) + '</textarea>'
+                : '<pre>' + escapeHtml(argsJSON) + '</pre>') + '</details>'
+        : '';
     return `
         ${toolHeading}
-        <div class="hitl-codex-state hitl-codex-state--pending">
-            ${shield}
-            <strong>${escapeHtml(pendingStatus)}</strong>
+        <div class="hitl-approval-heading">
+            <span class="hitl-approval-eyebrow">${escapeHtml(pendingStatus)}</span>
+            <h3>${escapeHtml(request.question)}</h3>
         </div>
-        <p class="hitl-codex-explainer">${escapeHtml(explanation)}</p>
+        ${primary}
+        ${buildHitlCountdownHtml(data)}
         <div class="hitl-inline-body">
-            ${allowEdit
-                ? `<label class="hitl-inline-field">
-                       <span class="hitl-context-label">${escapeHtml(tr('hitl.reviewArgs', '审查参数（JSON）'))}</span>
-                       <textarea class="hitl-edit-args hitl-inline-edit" placeholder='{"command":"ls -la"}'>${escapeHtml(argsJSON === '{}' ? '' : argsJSON)}</textarea>
-                   </label>`
-                : ''
-            }
-            <label class="hitl-inline-field">
-                <span class="hitl-context-label">${escapeHtml(tr('hitl.commentOptional', '备注（可选）'))}</span>
+            ${requestDetails}
+            <details class="hitl-approval-details hitl-approval-comment-details">
+                <summary>${escapeHtml(tr('hitl.addApprovalComment', '添加审批备注（可选）'))}</summary>
                 <input class="hitl-config-input hitl-inline-comment" type="text" placeholder="${escapeHtml(tr('hitl.commentPlaceholder', '例如：仅允许只读操作'))}">
-            </label>
+            </details>
         </div>
         <div class="hitl-pending-actions hitl-inline-actions">
             <div class="hitl-input-help hitl-inline-status" aria-live="polite"></div>
-            <button class="btn-secondary hitl-inline-reject">${escapeHtml(rejectLabel)}</button>
-            <button class="btn-primary hitl-inline-approve">${escapeHtml(approveLabel)}</button>
+            <button type="button" class="btn-secondary hitl-inline-reject">${escapeHtml(rejectLabel)} <kbd>Esc</kbd></button>
+            <button type="button" class="btn-primary hitl-inline-approve">${escapeHtml(approveLabel)} <kbd>↵</kbd></button>
         </div>
     `;
 }
@@ -3629,7 +3823,7 @@ function bindInlineHitlApproval(panel, data, opts) {
     const editInput = panel.querySelector('.hitl-inline-edit');
     const statusEl = panel.querySelector('.hitl-inline-status');
     const allowEdit = opts && opts.allowEdit === true;
-    if (!approveBtn || !rejectBtn || !commentInput || !statusEl) return;
+    if (!approveBtn || !rejectBtn || !statusEl) return;
 
     if (editInput) {
         autoResizeHitlTextarea(editInput);
@@ -3646,7 +3840,7 @@ function bindInlineHitlApproval(panel, data, opts) {
     const submit = async function (decision) {
         setBusy(true);
         let editedArgs = null;
-        if (allowEdit && editInput) {
+        if (decision === 'approve' && allowEdit && editInput) {
             const raw = String(editInput.value || '').trim();
             if (raw) {
                 try {
@@ -3657,8 +3851,12 @@ function bindInlineHitlApproval(panel, data, opts) {
                     return;
                 }
             }
+            const originalArgs = hitlApprovalArguments(data);
+            if (editedArgs && JSON.stringify(editedArgs) === JSON.stringify(originalArgs)) {
+                editedArgs = null;
+            }
         }
-        const comment = String(commentInput.value || '').trim();
+        const comment = commentInput ? String(commentInput.value || '').trim() : '';
         try {
             if (typeof window.submitHitlDecisionWithPayload === 'function') {
                 const convFollow = data.conversationId || (typeof window.currentConversationId === 'string' ? window.currentConversationId : '');
@@ -3698,6 +3896,11 @@ function bindInlineHitlApproval(panel, data, opts) {
                 markInlineHitlDecision(panel, decision, msg);
             }
             panel.classList.add('hitl-inline-done');
+            stopHitlApprovalCountdown(panel);
+            clearChatHitlApprovalDock(data.interruptId);
+            if (typeof window.setProjectConversationApprovalStatus === 'function') {
+                window.setProjectConversationApprovalStatus(data.conversationId || window.currentConversationId || '', false);
+            }
         } catch (e) {
             statusEl.textContent = '提交失败：' + (e && e.message ? e.message : 'unknown error');
             setBusy(false);
@@ -3706,7 +3909,155 @@ function bindInlineHitlApproval(panel, data, opts) {
 
     approveBtn.onclick = function () { submit('approve'); };
     rejectBtn.onclick = function () { submit('reject'); };
+    if (panel.classList.contains('chat-hitl-approval-dock')) {
+        panel.onkeydown = function (event) {
+            const tag = event.target && event.target.tagName ? event.target.tagName.toLowerCase() : '';
+            const editing = tag === 'input' || tag === 'textarea' || tag === 'summary';
+            if (event.key === 'Escape' && !editing) {
+                event.preventDefault();
+                rejectBtn.click();
+            } else if (event.key === 'Enter' && !editing) {
+                event.preventDefault();
+                approveBtn.click();
+            }
+        };
+    }
 }
+
+function clearChatHitlApprovalDock(interruptId) {
+    const dock = document.getElementById('chat-hitl-approval-dock');
+    if (!dock) return;
+    if (interruptId && dock.dataset.hitlInterruptId && dock.dataset.hitlInterruptId !== String(interruptId)) return;
+    stopHitlApprovalCountdown(dock);
+    dock.hidden = true;
+    dock.innerHTML = '';
+    dock.removeAttribute('data-hitl-interrupt-id');
+    dock.removeAttribute('data-conversation-id');
+    dock.removeAttribute('tabindex');
+    dock.onkeydown = null;
+    const container = dock.closest('.chat-input-container');
+    if (container) container.classList.remove('has-hitl-approval');
+}
+
+function renderChatHitlApprovalDock(data) {
+    const dock = document.getElementById('chat-hitl-approval-dock');
+    if (!dock || !data || !data.interruptId) return false;
+    const conversationId = String(data.conversationId || '').trim();
+    const currentId = String(window.currentConversationId || '').trim();
+    if (conversationId && currentId && conversationId !== currentId) return false;
+    const reviewer = String(data.reviewer || data.decidedBy || '').trim().toLowerCase();
+    if (reviewer === 'audit_agent' || String(data.status || '').trim().toLowerCase() === 'audit_running') return false;
+    let mode = String(data.mode || 'approval').trim().toLowerCase();
+    if (mode === 'feedback' || mode === 'followup') mode = 'approval';
+    const allowEdit = mode === 'review_edit';
+    dock.dataset.hitlInterruptId = String(data.interruptId);
+    dock.dataset.conversationId = conversationId || currentId;
+    dock.setAttribute('tabindex', '-1');
+    dock.innerHTML = buildInlineHitlApprovalHtml(data, {
+        mode: mode,
+        allowEdit: allowEdit,
+        argsJSON: JSON.stringify(hitlApprovalArguments(data), null, 2)
+    });
+    dock.hidden = false;
+    const container = dock.closest('.chat-input-container');
+    if (container) container.classList.add('has-hitl-approval');
+    bindInlineHitlApproval(dock, data, { allowEdit: allowEdit });
+    bindHitlApprovalCountdown(dock, data);
+    return true;
+}
+
+const hitlSidebarApprovalState = new Map();
+let hitlSidebarApprovalSyncTimer = 0;
+
+function renderDirectHitlSidebarApproval(conversationId, data) {
+    const id = String(conversationId || '').trim();
+    if (!id) return false;
+    const button = document.querySelector('.project-conversation-item[data-conversation-id="' + hitlEscapeAttrSelector(id) + '"]');
+    if (!button) return false;
+    const label = button.querySelector('.project-conversation-label');
+    if (!label) return false;
+    let group = label.querySelector('.project-task-status-group');
+    if (!group) {
+        group = document.createElement('span');
+        group.className = 'project-task-status-group';
+        label.appendChild(group);
+    }
+    let status = group.querySelector('.project-task-status--approval');
+    if (!status) {
+        status = document.createElement('span');
+        status.className = 'project-task-status project-task-status--approval';
+        status.innerHTML = '<span class="project-approval-label"></span><span class="project-approval-time"></span>' +
+            '<span class="project-approval-progress"><span class="project-approval-progress-value"></span></span>';
+        group.insertBefore(status, group.firstChild);
+    }
+    const text = hitlApprovalTranslate('hitl.waitingApprovalShort', '等待批准');
+    const labelEl = status.querySelector('.project-approval-label');
+    if (labelEl) labelEl.textContent = text;
+    status.setAttribute('aria-label', text);
+    status.title = text;
+    const timing = getHitlApprovalTiming(data || {});
+    const timeEl = status.querySelector('.project-approval-time');
+    const progressEl = status.querySelector('.project-approval-progress');
+    const valueEl = status.querySelector('.project-approval-progress-value');
+    if (!timing.timeoutSeconds || !timing.expiresAt) {
+        if (timeEl) timeEl.textContent = '';
+        if (progressEl) progressEl.hidden = true;
+        return true;
+    }
+    if (progressEl) progressEl.hidden = false;
+    const remaining = Math.max(0, timing.expiresAt - Date.now());
+    const percent = Math.max(0, Math.min(100, remaining / (timing.timeoutSeconds * 1000) * 100));
+    if (timeEl) timeEl.textContent = formatHitlRemaining(remaining).replace(/^0/, '');
+    if (valueEl) valueEl.style.width = percent.toFixed(2) + '%';
+    status.setAttribute('role', 'progressbar');
+    status.setAttribute('aria-valuemin', '0');
+    status.setAttribute('aria-valuemax', '100');
+    status.setAttribute('aria-valuenow', String(Math.round(percent)));
+    status.classList.toggle('is-expired', remaining <= 0);
+    return true;
+}
+
+function removeDirectHitlSidebarApproval(conversationId) {
+    const id = String(conversationId || '').trim();
+    if (!id) return;
+    const button = document.querySelector('.project-conversation-item[data-conversation-id="' + hitlEscapeAttrSelector(id) + '"]');
+    const status = button && button.querySelector('.project-task-status--approval');
+    const group = status && status.closest('.project-task-status-group');
+    if (status) status.remove();
+    if (group && !group.children.length) group.remove();
+}
+
+function syncDirectHitlSidebarApprovals() {
+    hitlSidebarApprovalState.forEach(function (data, conversationId) {
+        renderDirectHitlSidebarApproval(conversationId, data);
+    });
+    if (!hitlSidebarApprovalState.size && hitlSidebarApprovalSyncTimer) {
+        window.clearInterval(hitlSidebarApprovalSyncTimer);
+        hitlSidebarApprovalSyncTimer = 0;
+    }
+}
+
+function updateHitlApprovalSidebar(data, pending) {
+    const conversationId = String((data && data.conversationId) || window.currentConversationId || '').trim();
+    if (!conversationId) return;
+    if (pending) {
+        hitlSidebarApprovalState.set(conversationId, data || { conversationId: conversationId });
+        renderDirectHitlSidebarApproval(conversationId, data || {});
+        if (!hitlSidebarApprovalSyncTimer) {
+            hitlSidebarApprovalSyncTimer = window.setInterval(syncDirectHitlSidebarApprovals, 500);
+        }
+    } else {
+        hitlSidebarApprovalState.delete(conversationId);
+        removeDirectHitlSidebarApproval(conversationId);
+        syncDirectHitlSidebarApprovals();
+    }
+    if (typeof window.setProjectConversationApprovalStatus === 'function') {
+        window.setProjectConversationApprovalStatus(conversationId, pending, pending ? data : null);
+    }
+}
+
+window.renderChatHitlApprovalDock = renderChatHitlApprovalDock;
+window.clearChatHitlApprovalDock = clearChatHitlApprovalDock;
 
 function markInlineHitlDecision(panel, decision, message) {
     if (!panel) return;
@@ -3996,6 +4347,39 @@ async function restoreHitlInlineForConversation(conversationId) {
         if (!resp.ok) return;
         const data = await resp.json().catch(function () { return {}; });
         const items = Array.isArray(data.items) ? data.items : [];
+        if (typeof window.currentConversationId === 'string' && window.currentConversationId !== conversationId) return;
+        clearChatHitlApprovalDock();
+        const toHitlData = function (item) {
+            let payloadObj = {};
+            try {
+                payloadObj = JSON.parse(String(item.payload || '{}'));
+            } catch (e) {
+                payloadObj = {};
+            }
+            const timing = payloadObj.hitlApproval && typeof payloadObj.hitlApproval === 'object'
+                ? payloadObj.hitlApproval
+                : {};
+            return {
+                interruptId: item.id,
+                mode: item.mode,
+                toolName: item.toolName,
+                toolCallId: item.toolCallId,
+                payload: payloadObj,
+                conversationId: item.conversationId || conversationId,
+                createdAt: timing.createdAt || item.createdAt,
+                timeoutSeconds: timing.timeoutSeconds,
+                expiresAt: timing.expiresAt,
+                reviewer: 'human',
+                status: 'pending'
+            };
+        };
+        if (items.length > 0) {
+            const newestPending = toHitlData(items[0]);
+            renderChatHitlApprovalDock(newestPending);
+            updateHitlApprovalSidebar(newestPending, true);
+        } else {
+            updateHitlApprovalSidebar({ conversationId: conversationId }, false);
+        }
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
             let backendMsgId = item.messageId != null ? String(item.messageId).trim() : '';
@@ -4034,20 +4418,7 @@ async function restoreHitlInlineForConversation(conversationId) {
                 }
             }
             expandProcessDetailsTimeline(clientMsgId);
-            let payloadObj = {};
-            try {
-                payloadObj = JSON.parse(String(item.payload || '{}'));
-            } catch (e) {
-                payloadObj = {};
-            }
-            const hitlData = {
-                interruptId: item.id,
-                mode: item.mode,
-                toolName: item.toolName,
-                toolCallId: item.toolCallId,
-                payload: payloadObj,
-                conversationId: item.conversationId || conversationId
-            };
+            const hitlData = toHitlData(item);
             let hitlItemEl = null;
             if (item.toolCallId) {
                 hitlItemEl = detailsContainer.querySelector('[data-tool-call-id="' + hitlEscapeAttrSelector(String(item.toolCallId)) + '"]');

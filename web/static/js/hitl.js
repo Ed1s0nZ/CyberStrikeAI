@@ -98,6 +98,7 @@ function hitlT(key, fallback, params) {
 
 const HITL_LOGS_PAGE_SIZE_KEY = 'cyberstrike_hitl_logs_page_size';
 const HITL_PENDING_PAGE_SIZE_KEY = 'cyberstrike_hitl_pending_page_size';
+const HITL_TIMEOUT_DEFAULT_MIGRATION_PREFIX = 'cyberstrike-hitl-timeout-default-v1:';
 const HITL_PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 function hitlPaginationT(key, opts, fallback) {
@@ -210,6 +211,21 @@ function normalizeHitlTimeoutSeconds(v, fallback) {
         return f > 0 ? Math.floor(f) : 0;
     }
     return 0;
+}
+
+function shouldMigrateLegacyHitlTimeout(conversationId, timeoutSeconds) {
+    if (!conversationId || normalizeHitlTimeoutSeconds(timeoutSeconds, 0) > 0) return false;
+    try {
+        return localStorage.getItem(HITL_TIMEOUT_DEFAULT_MIGRATION_PREFIX + conversationId) !== '1';
+    } catch (e) {
+        return false;
+    }
+}
+
+function markLegacyHitlTimeoutMigrated(conversationId) {
+    try {
+        localStorage.setItem(HITL_TIMEOUT_DEFAULT_MIGRATION_PREFIX + conversationId, '1');
+    } catch (e) { /* ignore */ }
 }
 
 function getCurrentConversationIdForHitl() {
@@ -532,7 +548,10 @@ async function syncHitlConfigFromServer(conversationId) {
                 mode: localMode,
                 reviewer: localReviewer,
                 sensitiveTools: localToolsStr.split(/[,\n\r]+/).map(function (s) { return s.trim(); }).filter(Boolean),
-                timeoutSeconds: normalizeHitlTimeoutSeconds(cfg.timeoutSeconds, 0)
+                timeoutSeconds: normalizeHitlTimeoutSeconds(
+                    local && local.timeoutSeconds,
+                    normalizeHitlTimeoutSeconds(cfg.timeoutSeconds, 0)
+                )
             };
             saveHitlConversationConfig(conversationId, {
                 mode: localMode,
@@ -544,6 +563,17 @@ async function syncHitlConfigFromServer(conversationId) {
                 console.warn('HITL 会话配置同步到服务器失败（将仅保留本地 UI）:', err);
             });
         }
+    }
+    if (shouldMigrateLegacyHitlTimeout(conversationId, merged.timeoutSeconds)) {
+        merged = Object.assign({}, merged, { timeoutSeconds: 300 });
+        try {
+            await saveHitlConversationConfig(conversationId, merged);
+            markLegacyHitlTimeoutMigrated(conversationId);
+        } catch (err) {
+            console.warn('HITL 旧会话等待时限迁移失败，将在下次加载时重试:', err);
+        }
+    } else if (normalizeHitlTimeoutSeconds(merged.timeoutSeconds, 0) > 0) {
+        markLegacyHitlTimeoutMigrated(conversationId);
     }
     const uiMode = hitlEffectiveEnabled(merged) ? hitlModeNormalize(merged.mode) : 'off';
     const rawArr = Array.isArray(merged.sensitiveTools)

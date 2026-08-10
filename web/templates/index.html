@@ -23,7 +23,7 @@
             }
         })();
     </script>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260810-23">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260810-24">
     <link rel="stylesheet" href="/static/css/c2.css">
     <link rel="stylesheet" href="/static/vendor/xterm.css">
     <script src="/static/js/router.js"></script>
@@ -1082,6 +1082,16 @@
 	                                                    <input type="hidden" id="hitl-reviewer-select" value="human" />
 	                                                    <p class="hitl-config-hint" data-i18n="chat.hitlReviewerHint">可在人工与审计 Agent 之间随时切换；规则与白名单不变。人机协同为「关闭」时也可预先选择。</p>
 	                                                </div>
+	                                                <div class="hitl-config-field" id="hitl-timeout-field">
+	                                                    <label class="hitl-config-label" for="hitl-timeout-select" data-i18n="chat.hitlTimeoutLabel">审批等待时限</label>
+	                                                    <select id="hitl-timeout-select" class="hitl-config-select">
+	                                                        <option value="60" data-i18n="chat.hitlTimeoutOneMinute">1 分钟</option>
+	                                                        <option value="300" selected data-i18n="chat.hitlTimeoutFiveMinutes">5 分钟</option>
+	                                                        <option value="600" data-i18n="chat.hitlTimeoutTenMinutes">10 分钟</option>
+	                                                        <option value="0" data-i18n="chat.hitlTimeoutUnlimited">不限制</option>
+	                                                    </select>
+	                                                    <p class="hitl-config-hint" data-i18n="chat.hitlTimeoutHint">到期未处理将自动拒绝；审批卡片会显示倒计时。</p>
+	                                                </div>
 	                                                <div class="hitl-config-field hitl-config-field--tools">
 	                                                    <label class="hitl-config-label" for="hitl-sensitive-tools" data-i18n="chat.hitlWhitelistTools">白名单工具（免审批，逗号分隔）</label>
 	                                                    <textarea id="hitl-sensitive-tools" class="hitl-config-textarea" rows="6" spellcheck="false" autocomplete="off" data-i18n="chat.hitlWhitelistPlaceholder" data-i18n-attr="placeholder" placeholder=""></textarea>
@@ -1287,6 +1297,7 @@
                                 </div>
                                 </div>
                                 </div>
+                                <section id="chat-hitl-approval-dock" class="chat-hitl-approval-dock" aria-label="待审批操作" aria-live="polite" hidden></section>
                                 <div class="chat-input-primary-row chat-composer-surface">
                                 <div class="chat-input-with-files">
                                     <div id="chat-file-list" class="chat-file-list" aria-label="已选文件列表"></div>
@@ -6774,9 +6785,9 @@
     <script src="/static/js/agents.js"></script>
     <script src="/static/js/dashboard.js"></script>
     <script src="/static/js/chat-scroll.js?v=20260810-5"></script>
-    <script src="/static/js/monitor.js?v=20260810-3"></script>
-    <script src="/static/js/chat.js?v=20260810-10"></script>
-    <script src="/static/js/hitl.js?v=20260810-2"></script>
+    <script src="/static/js/monitor.js?v=20260810-5"></script>
+    <script src="/static/js/chat.js?v=20260810-11"></script>
+    <script src="/static/js/hitl.js?v=20260810-3"></script>
     <script src="/static/js/settings.js?v=20260717-1"></script>
     <script src="/static/js/audit-datetime-picker.js"></script>
     <script src="/static/js/audit.js"></script>
@@ -6787,7 +6798,7 @@
     <script src="/static/js/knowledge.js"></script>
     <script src="/static/js/skills.js"></script>
     <script src="/static/js/fact-graph.js"></script>
-    <script src="/static/js/projects.js?v=20260810-4"></script>
+    <script src="/static/js/projects.js?v=20260810-5"></script>
     <script src="/static/js/vulnerability.js?v=14"></script>
     <script src="/static/js/webshell.js"></script>
     <script src="/static/js/chat-files.js"></script>

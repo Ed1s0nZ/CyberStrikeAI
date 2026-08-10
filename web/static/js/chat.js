@@ -102,6 +102,7 @@ const HITL_MODE_OFF = 'off';
 const HITL_MODE_APPROVAL = 'approval';
 const HITL_MODE_REVIEW_EDIT = 'review_edit';
 const HITL_MODE_OPTIONS = [HITL_MODE_OFF, HITL_MODE_APPROVAL, HITL_MODE_REVIEW_EDIT];
+const DEFAULT_HITL_TIMEOUT_SECONDS = 300;
 // Agent orchestration/control tools are safe baseline exemptions for every
 // conversation. Keep this separate from config.tool_whitelist: the latter is
 // enforced globally by the backend and must not be copied into this field.
@@ -353,6 +354,12 @@ function normalizeHitlMode(mode) {
     return HITL_MODE_OFF;
 }
 
+function normalizeHitlTimeoutForChat(value, fallback) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.max(0, Math.min(86400, Math.round(n)));
+}
+
 function defaultHitlConfig() {
     const serverReviewer = (typeof window !== 'undefined' && window.csaiHitlDefaultReviewer)
         ? window.csaiHitlDefaultReviewer
@@ -361,6 +368,7 @@ function defaultHitlConfig() {
         mode: HITL_MODE_OFF,
         reviewer: normalizeHitlReviewer(serverReviewer),
         sensitiveTools: DEFAULT_HITL_SESSION_TOOL_WHITELIST,
+        timeoutSeconds: DEFAULT_HITL_TIMEOUT_SECONDS,
         updatedAt: ''
     };
 }
@@ -452,6 +460,7 @@ function getHitlLastGlobalConfig() {
             mode: normalizeHitlMode(parsed.mode),
             reviewer: normalizeHitlReviewer(parsed.reviewer),
             sensitiveTools: typeof parsed.sensitiveTools === 'string' ? parsed.sensitiveTools : fallback.sensitiveTools,
+            timeoutSeconds: normalizeHitlTimeoutForChat(parsed.timeoutSeconds, fallback.timeoutSeconds),
             updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : ''
         };
     } catch (e) {
@@ -483,6 +492,7 @@ function getHitlConfigForConversation(conversationId) {
                         mode: normalizeHitlMode(parsed.mode),
                         reviewer: normalizeHitlReviewer(parsed.reviewer),
                         sensitiveTools: typeof parsed.sensitiveTools === 'string' ? parsed.sensitiveTools : fallback.sensitiveTools,
+                        timeoutSeconds: normalizeHitlTimeoutForChat(parsed.timeoutSeconds, fallback.timeoutSeconds),
                         updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : ''
                     };
                 }
@@ -494,6 +504,7 @@ function getHitlConfigForConversation(conversationId) {
             mode: normalizeHitlMode(globalLast.mode),
             reviewer: normalizeHitlReviewer(globalLast.reviewer),
             sensitiveTools: typeof globalLast.sensitiveTools === 'string' ? globalLast.sensitiveTools : fallback.sensitiveTools,
+            timeoutSeconds: normalizeHitlTimeoutForChat(globalLast.timeoutSeconds, fallback.timeoutSeconds),
             updatedAt: typeof globalLast.updatedAt === 'string' ? globalLast.updatedAt : ''
         } : null;
         if (!draftCfg && !g) return fallback;
@@ -517,6 +528,7 @@ function getHitlConfigForConversation(conversationId) {
             mode: normalizeHitlMode(parsed.mode),
             reviewer: normalizeHitlReviewer(parsed.reviewer),
             sensitiveTools: typeof parsed.sensitiveTools === 'string' ? parsed.sensitiveTools : fallback.sensitiveTools,
+            timeoutSeconds: normalizeHitlTimeoutForChat(parsed.timeoutSeconds, fallback.timeoutSeconds),
             updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : ''
         };
     } catch (e) {
@@ -574,6 +586,7 @@ function saveHitlConfigForConversation(conversationId, cfg, opts) {
         mode: normalizeHitlMode(cfg && cfg.mode),
         reviewer: normalizeHitlReviewer(cfg && cfg.reviewer),
         sensitiveTools: typeof (cfg && cfg.sensitiveTools) === 'string' ? cfg.sensitiveTools : '',
+        timeoutSeconds: normalizeHitlTimeoutForChat(cfg && cfg.timeoutSeconds, DEFAULT_HITL_TIMEOUT_SECONDS),
         updatedAt: typeof (cfg && cfg.updatedAt) === 'string' ? cfg.updatedAt : ''
     };
     const key = conversationId ? getHitlStorageKeyByConversation(conversationId) : HITL_DRAFT_KEY;
@@ -591,6 +604,7 @@ function readHitlConfigFromForm() {
     const modeEl = document.getElementById('hitl-mode-select');
     const reviewerEl = document.getElementById('hitl-reviewer-select');
     const toolsEl = document.getElementById('hitl-sensitive-tools');
+    const timeoutEl = document.getElementById('hitl-timeout-select');
     const mode = normalizeHitlMode(modeEl ? modeEl.value : HITL_MODE_OFF);
     const reviewer = normalizeHitlReviewer(reviewerEl ? reviewerEl.value : 'human');
     let sensitiveTools = toolsEl ? String(toolsEl.value || '').trim() : '';
@@ -602,6 +616,7 @@ function readHitlConfigFromForm() {
         mode,
         reviewer,
         sensitiveTools,
+        timeoutSeconds: normalizeHitlTimeoutForChat(timeoutEl ? timeoutEl.value : DEFAULT_HITL_TIMEOUT_SECONDS, DEFAULT_HITL_TIMEOUT_SECONDS),
         updatedAt: new Date().toISOString()
     };
 }
@@ -615,6 +630,7 @@ function applyHitlConfigToUI(cfg) {
     const conf = cfg || defaultHitlConfig();
     const modeEl = document.getElementById('hitl-mode-select');
     const toolsEl = document.getElementById('hitl-sensitive-tools');
+    const timeoutEl = document.getElementById('hitl-timeout-select');
     const uiMode = normalizeHitlMode(conf.mode);
     if (modeEl) modeEl.value = uiMode;
     setHitlReviewerUI(conf.reviewer);
@@ -628,19 +644,29 @@ function applyHitlConfigToUI(cfg) {
     if (toolsEl) {
         toolsEl.value = toolsVal;
     }
+    if (timeoutEl) {
+        const timeoutSeconds = normalizeHitlTimeoutForChat(conf.timeoutSeconds, DEFAULT_HITL_TIMEOUT_SECONDS);
+        const supported = Array.from(timeoutEl.options || []).some(function (option) {
+            return Number(option.value) === timeoutSeconds;
+        });
+        timeoutEl.value = String(supported ? timeoutSeconds : DEFAULT_HITL_TIMEOUT_SECONDS);
+    }
     updateHitlStatusUI(conf);
     refreshSessionSettingsSelects();
 }
 
 function bindHitlSidebarModeListener() {
     const modeEl = document.getElementById('hitl-mode-select');
-    if (!modeEl || modeEl.dataset.hitlModeBound === '1') return;
-    modeEl.dataset.hitlModeBound = '1';
-    modeEl.addEventListener('change', function () {
-        applyHitlConfigToUI(readHitlConfigFromForm());
-        refreshSessionSettingsSelects();
-        scheduleHitlSidebarAutosave(0);
-        updateChatReasoningSummary();
+    const timeoutEl = document.getElementById('hitl-timeout-select');
+    [modeEl, timeoutEl].forEach(function (el) {
+        if (!el || el.dataset.hitlModeBound === '1') return;
+        el.dataset.hitlModeBound = '1';
+        el.addEventListener('change', function () {
+            applyHitlConfigToUI(readHitlConfigFromForm());
+            refreshSessionSettingsSelects();
+            scheduleHitlSidebarAutosave(0);
+            updateChatReasoningSummary();
+        });
     });
 }
 
@@ -1590,7 +1616,8 @@ async function sendMessage() {
             enabled: true,
             mode: normalizeHitlMode(hitlCfg.mode),
             reviewer: normalizeHitlReviewer(hitlCfg.reviewer),
-            sensitiveTools: sensitiveTools
+            sensitiveTools: sensitiveTools,
+            timeoutSeconds: normalizeHitlTimeoutForChat(hitlCfg.timeoutSeconds, DEFAULT_HITL_TIMEOUT_SECONDS)
         };
     }
     if (hasAttachments) {
@@ -5103,6 +5130,9 @@ async function prefetchLastAssistantProcessDetails() {
 
 async function loadConversation(conversationId) {
     const seq = ++loadConversationRequestSeq;
+    if (typeof window.clearChatHitlApprovalDock === 'function') {
+        window.clearChatHitlApprovalDock();
+    }
     try {
         const cachedConversation = getConversationLiteFromCache(conversationId);
         let conversation = null;

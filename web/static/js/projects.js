@@ -2549,6 +2549,7 @@ const chatProjectFolderContext = {
     conversations: [],
     runningIds: new Set(),
     completedByConversation: new Map(),
+    pendingApprovalByConversation: new Map(),
 };
 const PROJECT_FOLDER_PREVIEW_OPEN_DELAY_MS = 160;
 const PROJECT_FOLDER_PREVIEW_CLOSE_DELAY_MS = 120;
@@ -2610,25 +2611,87 @@ function isProjectConversationUnread(conversationId) {
     return !Number.isFinite(seenAt) || completedAt > seenAt;
 }
 
-function createProjectTaskStatus(kind) {
+function getProjectApprovalTiming(details) {
+    if (!details || typeof details !== 'object') return { timeoutSeconds: 0, expiresAt: 0 };
+    let payload = details.payload;
+    if (typeof payload === 'string') {
+        try { payload = JSON.parse(payload); } catch (e) { payload = {}; }
+    }
+    if (!payload || typeof payload !== 'object') payload = {};
+    const approval = payload.hitlApproval && typeof payload.hitlApproval === 'object' ? payload.hitlApproval : {};
+    const timeout = Number(details.timeoutSeconds != null ? details.timeoutSeconds : approval.timeoutSeconds);
+    const timeoutSeconds = Number.isFinite(timeout) && timeout > 0 ? Math.floor(timeout) : 0;
+    const createdAt = Date.parse(details.createdAt || approval.createdAt || '');
+    let expiresAt = Date.parse(details.expiresAt || approval.expiresAt || '');
+    if (!Number.isFinite(expiresAt) && timeoutSeconds > 0 && Number.isFinite(createdAt)) {
+        expiresAt = createdAt + timeoutSeconds * 1000;
+    }
+    return { timeoutSeconds, expiresAt: Number.isFinite(expiresAt) ? expiresAt : 0 };
+}
+
+function formatProjectApprovalRemaining(milliseconds) {
+    const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
+    const minutes = Math.floor(seconds / 60);
+    return minutes + ':' + String(seconds % 60).padStart(2, '0');
+}
+
+function bindProjectApprovalProgress(status, details) {
+    const timing = getProjectApprovalTiming(details);
+    if (!timing.timeoutSeconds || !timing.expiresAt) return;
+    const time = status.querySelector('.project-approval-time');
+    const value = status.querySelector('.project-approval-progress-value');
+    const update = () => {
+        if (!status.isConnected) {
+            window.clearInterval(status._approvalProgressTimer);
+            return;
+        }
+        const remaining = Math.max(0, timing.expiresAt - Date.now());
+        const percent = Math.max(0, Math.min(100, remaining / (timing.timeoutSeconds * 1000) * 100));
+        if (time) time.textContent = formatProjectApprovalRemaining(remaining);
+        if (value) value.style.width = `${percent.toFixed(2)}%`;
+        status.setAttribute('aria-valuenow', String(Math.round(percent)));
+        if (remaining <= 0) {
+            window.clearInterval(status._approvalProgressTimer);
+            status.classList.add('is-expired');
+        }
+    };
+    status.setAttribute('role', 'progressbar');
+    status.setAttribute('aria-valuemin', '0');
+    status.setAttribute('aria-valuemax', '100');
+    update();
+    status._approvalProgressTimer = window.setInterval(update, 250);
+}
+
+function createProjectTaskStatus(kind, details) {
     if (!kind) return null;
     const status = document.createElement('span');
     status.className = `project-task-status project-task-status--${kind}`;
-    const label = kind === 'running'
-        ? pickerMessage(tp, 'tasks.statusRunning', '运行中')
-        : pickerMessage(tp, 'chat.completedUnread', '已完成，尚未查看');
+    const label = kind === 'approval'
+        ? pickerMessage(tp, 'hitl.waitingApprovalShort', '等待批准')
+        : (kind === 'running'
+            ? pickerMessage(tp, 'tasks.statusRunning', '运行中')
+            : pickerMessage(tp, 'chat.completedUnread', '已完成，尚未查看'));
+    if (kind === 'approval') {
+        const timing = getProjectApprovalTiming(details);
+        status.innerHTML = '<span class="project-approval-label"></span>' +
+            (timing.timeoutSeconds && timing.expiresAt
+                ? '<span class="project-approval-time"></span><span class="project-approval-progress"><span class="project-approval-progress-value"></span></span>'
+                : '');
+        status.querySelector('.project-approval-label').textContent = label;
+        bindProjectApprovalProgress(status, details);
+    }
     status.setAttribute('aria-label', label);
     status.title = label;
     return status;
 }
 
-function appendProjectTaskStatuses(container, kinds) {
+function appendProjectTaskStatuses(container, kinds, detailsByKind) {
     const normalizedKinds = Array.from(new Set((Array.isArray(kinds) ? kinds : [kinds]).filter(Boolean)));
     if (!container || !normalizedKinds.length) return;
     const group = document.createElement('span');
     group.className = 'project-task-status-group';
     normalizedKinds.forEach((kind) => {
-        const status = createProjectTaskStatus(kind);
+        const status = createProjectTaskStatus(kind, detailsByKind && detailsByKind[kind]);
         if (status) group.appendChild(status);
     });
     if (group.childElementCount) container.appendChild(group);
@@ -2636,6 +2699,9 @@ function appendProjectTaskStatuses(container, kinds) {
 
 function getProjectFolderStatuses(conversations) {
     const kinds = [];
+    if (conversations.some((conversation) => chatProjectFolderContext.pendingApprovalByConversation.has(conversation.id))) {
+        kinds.push('approval');
+    }
     if (conversations.some((conversation) => isProjectConversationUnread(conversation.id))) {
         kinds.push('unread');
     }
@@ -2921,15 +2987,18 @@ function showProjectConversationPreview(conversation, project, row) {
     }
     projectConversationPreviewAnchor = row;
     const isRunning = chatProjectFolderContext.runningIds.has(conversation.id);
+    const isWaitingApproval = chatProjectFolderContext.pendingApprovalByConversation.has(conversation.id);
     const completed = chatProjectFolderContext.completedByConversation.get(conversation.id);
     const isUnread = !isRunning && isProjectConversationUnread(conversation.id);
-    const status = isRunning
+    const status = isWaitingApproval
+        ? pickerMessage(tp, 'hitl.waitingApprovalShort', '等待批准')
+        : (isRunning
         ? pickerMessage(tp, 'tasks.statusRunning', '执行中')
         : (isUnread
             ? pickerMessage(tp, 'chat.conversationPreviewUnread', '有未读更新')
             : (completed
                 ? pickerMessage(tp, 'chat.conversationPreviewViewed', '已查看')
-                : pickerMessage(tp, 'chat.conversationPreviewConversation', '对话')));
+                : pickerMessage(tp, 'chat.conversationPreviewConversation', '对话'))));
     const statusEl = preview.querySelector('.project-conversation-preview-status');
 
     preview.querySelector('.project-conversation-preview-title').textContent = conversation.title
@@ -2944,7 +3013,7 @@ function showProjectConversationPreview(conversation, project, row) {
     preview.querySelector('.project-conversation-preview-mode').textContent = getProjectConversationModeLabel(conversation);
     statusEl.textContent = status;
     statusEl.className = 'project-conversation-preview-status'
-        + (isRunning ? ' is-running' : (isUnread ? ' is-unread' : ''));
+        + (isWaitingApproval ? ' is-approval' : (isRunning ? ' is-running' : (isUnread ? ' is-unread' : '')));
     preview.hidden = false;
     row.querySelector('.project-conversation-item')?.setAttribute('aria-describedby', preview.id);
     positionProjectConversationPreview(preview, row);
@@ -3003,7 +3072,10 @@ function appendChatProjectFolderItem(list, project, expandedIds, conversations) 
     const label = document.createElement('span');
     label.className = 'project-folder-label';
     label.appendChild(title);
-    appendProjectTaskStatuses(label, statusKinds);
+    const folderApproval = conversations
+        .map((conversation) => chatProjectFolderContext.pendingApprovalByConversation.get(conversation.id))
+        .find(Boolean);
+    appendProjectTaskStatuses(label, statusKinds, { approval: folderApproval });
 
     button.appendChild(disclosure);
     button.appendChild(icon);
@@ -3070,6 +3142,7 @@ function appendChatProjectConversationItem(list, conversation, project) {
     const button = document.createElement('button');
     const isSelected = window.currentConversationId === conversation.id;
     const isRunning = chatProjectFolderContext.runningIds.has(conversation.id);
+    const isWaitingApproval = chatProjectFolderContext.pendingApprovalByConversation.has(conversation.id);
     const completed = chatProjectFolderContext.completedByConversation.get(conversation.id);
     const isUnread = !isRunning && isProjectConversationUnread(conversation.id);
     row.className = 'project-conversation-row' + (isSelected ? ' is-selected' : '');
@@ -3085,7 +3158,13 @@ function appendChatProjectConversationItem(list, conversation, project) {
     const label = document.createElement('span');
     label.className = 'project-conversation-label';
     label.appendChild(title);
-    if (isRunning || isUnread) appendProjectTaskStatuses(label, isRunning ? 'running' : 'unread');
+    const statusKinds = [];
+    if (isWaitingApproval) statusKinds.push('approval');
+    if (isRunning) statusKinds.push('running');
+    else if (isUnread) statusKinds.push('unread');
+    if (statusKinds.length) appendProjectTaskStatuses(label, statusKinds, {
+        approval: chatProjectFolderContext.pendingApprovalByConversation.get(conversation.id)
+    });
     button.appendChild(label);
 
     button.addEventListener('click', async () => {
@@ -3126,15 +3205,17 @@ function appendChatProjectConversationItem(list, conversation, project) {
 
 async function loadChatProjectFolderContext() {
     const conversationsParams = new URLSearchParams({ limit: '1000', offset: '0', sort_by: 'updated_at' });
-    const [conversationResponse, activeResponse, completedResponse] = await Promise.all([
+    const [conversationResponse, activeResponse, completedResponse, pendingResponse] = await Promise.all([
         apiFetch(`/api/conversations?${conversationsParams}`),
         apiFetch('/api/agent-loop/tasks'),
         apiFetch('/api/agent-loop/tasks/completed'),
+        apiFetch('/api/hitl/pending?page=1&pageSize=200'),
     ]);
     if (!conversationResponse.ok) throw new Error(tp('projects.loadProjectsFailed'));
     const conversationData = await conversationResponse.json();
     const activeData = activeResponse.ok ? await activeResponse.json() : { tasks: [] };
     const completedData = completedResponse.ok ? await completedResponse.json() : { tasks: [] };
+    const pendingData = pendingResponse.ok ? await pendingResponse.json() : { items: [] };
     const conversations = Array.isArray(conversationData)
         ? conversationData
         : (conversationData.conversations || conversationData.items || []);
@@ -3149,6 +3230,13 @@ async function loadChatProjectFolderContext() {
     (completedData.tasks || []).forEach((task) => {
         if (task?.conversationId && !chatProjectFolderContext.completedByConversation.has(task.conversationId)) {
             chatProjectFolderContext.completedByConversation.set(task.conversationId, task);
+        }
+    });
+    chatProjectFolderContext.pendingApprovalByConversation = new Map();
+    (pendingData.items || []).forEach((item) => {
+        const conversationId = String(item?.conversationId || '').trim();
+        if (conversationId && !chatProjectFolderContext.pendingApprovalByConversation.has(conversationId)) {
+            chatProjectFolderContext.pendingApprovalByConversation.set(conversationId, item);
         }
     });
     chatProjectFolderContext.ready = true;
@@ -3243,6 +3331,30 @@ function updateProjectFolderTaskStatuses(tasks) {
         renderChatProjectFolders(projectsCacheAll);
     }
     if (taskFinished) refreshChatProjectFolders();
+}
+
+function setProjectConversationApprovalStatus(conversationId, pending, details) {
+    const id = String(conversationId || '').trim();
+    if (!id) return;
+    if (pending) chatProjectFolderContext.pendingApprovalByConversation.set(id, details || { conversationId: id });
+    else chatProjectFolderContext.pendingApprovalByConversation.delete(id);
+    if (isProjectsCacheReady() && chatProjectFolderContext.ready) {
+        renderChatProjectFolders(projectsCacheAll);
+    }
+}
+
+window.setProjectConversationApprovalStatus = setProjectConversationApprovalStatus;
+
+if (!window._projectApprovalStatusEventsBound) {
+    window._projectApprovalStatusEventsBound = true;
+    window.addEventListener('hitl-interrupt', (event) => {
+        const details = event && event.detail ? event.detail : {};
+        setProjectConversationApprovalStatus(details.conversationId || window.currentConversationId || '', true, details);
+    });
+    window.addEventListener('hitl-resolved', (event) => {
+        const details = event && event.detail ? event.detail : {};
+        setProjectConversationApprovalStatus(details.conversationId || window.currentConversationId || '', false);
+    });
 }
 
 function appendChatProjectPanelItem(list, project, selectedId, onSelect, tFn) {

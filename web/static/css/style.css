@@ -44833,6 +44833,52 @@ html[data-theme="dark"] .project-conversation-preview-status.is-unread {
     background: #2563eb;
 }
 
+.project-task-status--approval {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    width: auto;
+    min-height: 22px;
+    padding: 2px 8px 4px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #dcfce7;
+    color: #16804a;
+    font-size: 0.72rem;
+    font-weight: 650;
+    line-height: 18px;
+    white-space: nowrap;
+}
+
+.project-approval-time {
+    font-size: 0.66rem;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.78;
+}
+
+.project-approval-progress {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    background: rgba(22, 128, 74, 0.14);
+}
+
+.project-approval-progress-value {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: currentColor;
+    transition: width 0.25s linear;
+}
+
+.project-task-status--approval.is-expired {
+    background: #fee2e2;
+    color: #b42318;
+}
+
 html[data-theme="dark"] .project-task-status--running {
     border-color: #60a5fa;
     border-top-color: rgba(96, 165, 250, 0.2);
@@ -44840,6 +44886,21 @@ html[data-theme="dark"] .project-task-status--running {
 
 html[data-theme="dark"] .project-task-status--unread {
     background: #60a5fa;
+}
+
+html[data-theme="dark"] .project-task-status--approval {
+    background: rgba(52, 211, 153, 0.16);
+    color: #6ee7b7;
+}
+
+html[data-theme="dark"] .project-task-status--approval.is-expired {
+    background: rgba(248, 113, 113, 0.16);
+    color: #fca5a5;
+}
+
+.project-conversation-preview-status.is-approval,
+html[data-theme="dark"] .project-conversation-preview-status.is-approval {
+    color: #22a06b;
 }
 
 @keyframes project-task-status-spin {
@@ -46030,6 +46091,218 @@ html[data-theme="dark"] .chat-composer-surface > .chat-session-settings-popover 
     line-height: 1.52;
 }
 
+.hitl-approval-heading {
+    margin: 8px 0 0 25px;
+}
+
+.hitl-approval-heading h3 {
+    margin: 3px 0 0;
+    color: var(--text-primary);
+    font-size: 0.94rem;
+    font-weight: 600;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.hitl-approval-eyebrow {
+    color: #22a06b;
+    font-size: 0.75rem;
+    font-weight: 650;
+}
+
+.hitl-approval-primary {
+    margin: 8px 0 0 25px;
+}
+
+.hitl-approval-primary code {
+    display: block;
+    max-height: 112px;
+    padding: 9px 11px;
+    overflow: auto;
+    border: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--bg-secondary) 84%, transparent);
+    color: var(--text-primary);
+    font-size: 0.78rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.hitl-approval-countdown {
+    margin: 10px 0 0 25px;
+}
+
+.hitl-approval-countdown--unlimited {
+    color: var(--text-muted);
+    font-size: 0.76rem;
+}
+
+.hitl-approval-countdown-copy {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--text-muted);
+    font-size: 0.76rem;
+}
+
+.hitl-approval-countdown-copy strong {
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+
+.hitl-approval-progress {
+    height: 3px;
+    margin-top: 6px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--border-color) 68%, transparent);
+}
+
+.hitl-approval-progress-value {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #2563eb, #60a5fa);
+    transition: width 0.25s linear, background-color 0.2s ease;
+}
+
+.hitl-approval-expired .hitl-approval-progress-value {
+    background: var(--error-color, #dc2626);
+}
+
+.hitl-approval-details {
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+}
+
+.hitl-approval-details + .hitl-approval-details {
+    margin-top: 6px;
+}
+
+.hitl-approval-details summary {
+    width: max-content;
+    max-width: 100%;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-weight: 520;
+}
+
+.hitl-approval-details pre,
+.hitl-approval-details .hitl-inline-edit,
+.hitl-approval-details .hitl-inline-comment {
+    width: 100%;
+    margin: 7px 0 0;
+    box-sizing: border-box;
+}
+
+.hitl-approval-details pre {
+    max-height: 190px;
+    padding: 10px;
+    overflow: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.75rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.hitl-inline-actions kbd {
+    margin-left: 5px;
+    padding: 1px 5px;
+    border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+    border-radius: 5px;
+    background: color-mix(in srgb, currentColor 6%, transparent);
+    color: inherit;
+    font: inherit;
+    font-size: 0.72em;
+    opacity: 0.76;
+}
+
+.chat-hitl-approval-dock[hidden] {
+    display: none !important;
+}
+
+.chat-input-container.has-hitl-approval .chat-composer-context,
+.chat-input-container.has-hitl-approval .chat-composer-surface {
+    display: none;
+}
+
+.chat-hitl-approval-dock {
+    position: relative;
+    z-index: 4;
+    display: block;
+    width: 100%;
+    min-height: 158px;
+    padding: 18px 20px 16px;
+    border: 1px solid rgba(15, 23, 42, 0.14);
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.985);
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.11), 0 2px 8px rgba(15, 23, 42, 0.05);
+    box-sizing: border-box;
+    outline: none;
+}
+
+.chat-hitl-approval-dock .hitl-codex-tool-row {
+    font-size: 0.92rem;
+}
+
+.chat-hitl-approval-dock .hitl-approval-heading,
+.chat-hitl-approval-dock .hitl-approval-primary,
+.chat-hitl-approval-dock .hitl-approval-countdown,
+.chat-hitl-approval-dock .hitl-inline-body,
+.chat-hitl-approval-dock .hitl-inline-actions {
+    margin-left: 26px;
+}
+
+.chat-hitl-approval-dock .hitl-approval-heading h3 {
+    max-width: 900px;
+    font-size: 1rem;
+}
+
+.chat-hitl-approval-dock .hitl-inline-body {
+    gap: 6px;
+    margin-top: 10px;
+    padding: 0;
+}
+
+.chat-hitl-approval-dock .hitl-inline-actions {
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+.chat-hitl-approval-dock .hitl-inline-status {
+    margin-right: auto;
+}
+
+.chat-hitl-approval-dock .hitl-inline-approve,
+.chat-hitl-approval-dock .hitl-inline-reject {
+    min-height: 38px;
+    padding: 8px 14px;
+    border-radius: 999px;
+}
+
+html[data-theme="dark"] .chat-hitl-approval-dock {
+    border-color: rgba(148, 163, 184, 0.24);
+    background: rgba(30, 30, 30, 0.985);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.38);
+}
+
+html[data-theme="dark"] .hitl-approval-primary code,
+html[data-theme="dark"] .hitl-approval-details pre {
+    border-color: rgba(148, 163, 184, 0.22);
+    background: rgba(15, 23, 42, 0.5);
+}
+
 .hitl-codex-diff {
     margin: 4px 0 4px 25px;
     color: var(--text-secondary);
@@ -46132,6 +46405,9 @@ html[data-theme="dark"] .hitl-inline-approval.hitl-inline-approval--merged {
     }
 
     .hitl-codex-explainer,
+    .hitl-approval-heading,
+    .hitl-approval-primary,
+    .hitl-approval-countdown,
     .hitl-tool-approval-summary .hitl-inline-body,
     .hitl-tool-approval-summary .hitl-inline-actions,
     .hitl-codex-diff {
@@ -46140,6 +46416,28 @@ html[data-theme="dark"] .hitl-inline-approval.hitl-inline-approval--merged {
 
     .hitl-tool-approval-summary .hitl-inline-actions {
         flex-wrap: wrap;
+    }
+
+    .chat-hitl-approval-dock {
+        padding: 16px;
+        border-radius: 18px;
+    }
+
+    .chat-hitl-approval-dock .hitl-approval-heading,
+    .chat-hitl-approval-dock .hitl-approval-primary,
+    .chat-hitl-approval-dock .hitl-approval-countdown,
+    .chat-hitl-approval-dock .hitl-inline-body,
+    .chat-hitl-approval-dock .hitl-inline-actions {
+        margin-left: 0;
+    }
+
+    .chat-hitl-approval-dock .hitl-inline-actions {
+        flex-wrap: wrap;
+    }
+
+    .chat-hitl-approval-dock .hitl-inline-status {
+        flex-basis: 100%;
+        min-height: 0;
     }
 }
 
