@@ -44863,7 +44863,7 @@ html[data-theme="dark"] .project-conversation-preview-status.is-unread {
     bottom: 0;
     left: 0;
     height: 2px;
-    background: rgba(22, 128, 74, 0.14);
+    background: color-mix(in srgb, currentColor 16%, transparent);
 }
 
 .project-approval-progress-value {
@@ -44884,22 +44884,22 @@ html[data-theme="dark"] .project-conversation-preview-status.is-unread {
     transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-.project-task-status--approval-summary.is-urgency-normal {
+.project-task-status--approval.is-urgency-normal {
     background: #dcfce7;
     color: #16804a;
 }
 
-.project-task-status--approval-summary.is-urgency-warning {
+.project-task-status--approval.is-urgency-warning {
     background: #fef9c3;
     color: #9a6700;
 }
 
-.project-task-status--approval-summary.is-urgency-urgent {
+.project-task-status--approval.is-urgency-urgent {
     background: #ffedd5;
     color: #c2410c;
 }
 
-.project-task-status--approval-summary.is-urgency-critical {
+.project-task-status--approval.is-urgency-critical {
     background: #fee2e2;
     color: #b42318;
 }
@@ -44923,22 +44923,22 @@ html[data-theme="dark"] .project-task-status--approval.is-expired {
     color: #fca5a5;
 }
 
-html[data-theme="dark"] .project-task-status--approval-summary.is-urgency-normal {
+html[data-theme="dark"] .project-task-status--approval.is-urgency-normal {
     background: rgba(52, 211, 153, 0.16);
     color: #6ee7b7;
 }
 
-html[data-theme="dark"] .project-task-status--approval-summary.is-urgency-warning {
+html[data-theme="dark"] .project-task-status--approval.is-urgency-warning {
     background: rgba(250, 204, 21, 0.17);
     color: #fde047;
 }
 
-html[data-theme="dark"] .project-task-status--approval-summary.is-urgency-urgent {
+html[data-theme="dark"] .project-task-status--approval.is-urgency-urgent {
     background: rgba(251, 146, 60, 0.18);
     color: #fdba74;
 }
 
-html[data-theme="dark"] .project-task-status--approval-summary.is-urgency-critical {
+html[data-theme="dark"] .project-task-status--approval.is-urgency-critical {
     background: rgba(248, 113, 113, 0.16);
     color: #fca5a5;
 }
@@ -46337,9 +46337,14 @@ html[data-theme="dark"] .chat-composer-surface > .chat-session-settings-popover 
 }
 
 html[data-theme="dark"] .chat-hitl-approval-dock {
-    border-color: rgba(148, 163, 184, 0.24);
-    background: rgba(30, 30, 30, 0.985);
-    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.38);
+    border-color: color-mix(in srgb, var(--border-color) 88%, transparent);
+    background: color-mix(in srgb, var(--bg-primary) 97%, transparent);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+}
+
+html[data-theme="dark"] .chat-hitl-approval-dock .hitl-inline-actions {
+    border-color: transparent !important;
+    background: transparent !important;
 }
 
 html[data-theme="dark"] .hitl-approval-primary code,

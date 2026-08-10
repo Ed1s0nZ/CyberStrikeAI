@@ -548,6 +548,7 @@
     "returnToLatest": "回到最新消息",
     "completedUnread": "已完成，尚未查看",
     "newConversationInProject": "在此项目中新建对话",
+    "newUnassignedConversation": "新建无项目对话",
     "conversationActions": "对话操作",
     "renameConversationPrompt": "请输入新标题：",
     "renameConversationTitle": "重命名对话",

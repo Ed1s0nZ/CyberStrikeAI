@@ -560,6 +560,7 @@
     "returnToLatest": "Jump to latest message",
     "completedUnread": "Completed, not viewed",
     "newConversationInProject": "Start a new conversation in this project",
+    "newUnassignedConversation": "Start a new conversation without a project",
     "conversationActions": "Conversation actions",
     "renameConversationPrompt": "Enter a new title:",
     "renameConversationTitle": "Rename conversation",

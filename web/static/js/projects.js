@@ -2543,6 +2543,7 @@ let chatProjectFolderSearchQuery = '';
 let chatProjectFolderRenderSeq = 0;
 const chatProjectFolderExpandedIds = new Set();
 let chatProjectFolderLastSelectionId = null;
+const CHAT_UNASSIGNED_PROJECT_FOLDER_ID = '__chat_unassigned_project__';
 const PROJECT_FOLDER_COMPLETION_SEEN_KEY = 'cyberstrike-project-folder-completion-seen';
 const chatProjectFolderContext = {
     ready: false,
@@ -2754,6 +2755,7 @@ function createProjectTaskStatus(kind, details, options) {
             bindProjectApprovalUrgency(status, details, label);
         } else {
             bindProjectApprovalProgress(status, details);
+            bindProjectApprovalUrgency(status, details, label);
         }
     }
     if (!isApprovalSummary) {
@@ -3125,14 +3127,19 @@ function hideProjectConversationPreview(immediate = false) {
 
 function appendChatProjectFolderItem(list, project, expandedIds, conversations) {
     const row = document.createElement('div');
-    const isExpanded = expandedIds.has(project.id);
+    const isUnassigned = project._isUnassigned === true;
+    const folderId = isUnassigned ? CHAT_UNASSIGNED_PROJECT_FOLDER_ID : project.id;
+    const isExpanded = expandedIds.has(folderId);
     const statusKinds = getProjectFolderStatuses(conversations);
-    row.className = 'project-folder-row' + (isExpanded ? ' is-expanded' : '');
+    row.className = 'project-folder-row'
+        + (isExpanded ? ' is-expanded' : '')
+        + (isUnassigned ? ' is-unassigned' : '');
 
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'project-folder-item';
-    button.dataset.projectId = project.id;
+    button.dataset.projectId = project.id || '';
+    button.dataset.folderId = folderId;
     button.setAttribute('aria-label', project.name || tp('common.untitled'));
     button.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
 
@@ -3175,55 +3182,60 @@ function appendChatProjectFolderItem(list, project, expandedIds, conversations) 
     button.appendChild(label);
     button.addEventListener('click', () => {
         if (isExpanded) {
-            chatProjectFolderExpandedIds.delete(project.id);
+            chatProjectFolderExpandedIds.delete(folderId);
         } else {
-            chatProjectFolderExpandedIds.add(project.id);
+            chatProjectFolderExpandedIds.add(folderId);
         }
         renderChatProjectFolders(projectsCacheAll);
     });
-    row.addEventListener('mouseenter', () => scheduleShowProjectFolderPreview(project, row, conversations));
-    row.addEventListener('mouseleave', scheduleHideProjectFolderPreview);
-    button.addEventListener('focus', () => scheduleShowProjectFolderPreview(project, row, conversations, true));
-    row.addEventListener('focusout', (event) => {
-        const preview = document.getElementById('project-folder-preview');
-        if (row.contains(event.relatedTarget) || preview?.contains(event.relatedTarget)) return;
-        scheduleHideProjectFolderPreview();
-    });
+    if (!isUnassigned) {
+        row.addEventListener('mouseenter', () => scheduleShowProjectFolderPreview(project, row, conversations));
+        row.addEventListener('mouseleave', scheduleHideProjectFolderPreview);
+        button.addEventListener('focus', () => scheduleShowProjectFolderPreview(project, row, conversations, true));
+        row.addEventListener('focusout', (event) => {
+            const preview = document.getElementById('project-folder-preview');
+            if (row.contains(event.relatedTarget) || preview?.contains(event.relatedTarget)) return;
+            scheduleHideProjectFolderPreview();
+        });
+    }
 
     const actions = document.createElement('div');
     actions.className = 'project-folder-actions';
 
-    const menuButton = document.createElement('button');
-    menuButton.type = 'button';
-    menuButton.className = 'project-folder-action project-folder-menu';
-    menuButton.setAttribute('aria-label', tp('projects.projectActions'));
-    menuButton.title = menuButton.getAttribute('aria-label');
-    menuButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>';
-    menuButton.addEventListener('click', (event) => {
-        showProjectListActionMenu(event, project.id, 'chat');
-    });
+    if (!isUnassigned) {
+        const menuButton = document.createElement('button');
+        menuButton.type = 'button';
+        menuButton.className = 'project-folder-action project-folder-menu';
+        menuButton.setAttribute('aria-label', tp('projects.projectActions'));
+        menuButton.title = menuButton.getAttribute('aria-label');
+        menuButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>';
+        menuButton.addEventListener('click', (event) => {
+            showProjectListActionMenu(event, project.id, 'chat');
+        });
+        actions.appendChild(menuButton);
+    }
 
     const newConversationButton = document.createElement('button');
     newConversationButton.type = 'button';
     newConversationButton.className = 'project-folder-action project-folder-new-conversation';
     newConversationButton.setAttribute(
         'aria-label',
-        pickerMessage(tp, 'chat.newConversationInProject', '在此项目中新建对话')
+        isUnassigned
+            ? pickerMessage(tp, 'chat.newUnassignedConversation', '新建无项目对话')
+            : pickerMessage(tp, 'chat.newConversationInProject', '在此项目中新建对话')
     );
     newConversationButton.title = newConversationButton.getAttribute('aria-label');
     newConversationButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
     newConversationButton.addEventListener('click', async (event) => {
         event.preventDefault();
         event.stopPropagation();
-        chatProjectFolderExpandedIds.add(project.id);
-        setActiveProjectId(project.id);
+        chatProjectFolderExpandedIds.add(folderId);
         if (typeof window.startNewConversation === 'function') {
-            await window.startNewConversation();
+            await window.startNewConversation({ projectId: isUnassigned ? '' : project.id });
         }
         renderChatProjectFolders(projectsCacheAll);
     });
 
-    actions.appendChild(menuButton);
     actions.appendChild(newConversationButton);
     row.appendChild(button);
     row.appendChild(actions);
@@ -3342,12 +3354,20 @@ function renderChatProjectFolders(projects) {
     hideProjectConversationPreview(true);
     const selectedId = resolveChatProjectSelection();
     if (chatProjectFolderLastSelectionId !== selectedId) {
-        if (selectedId) chatProjectFolderExpandedIds.add(selectedId);
+        chatProjectFolderExpandedIds.add(selectedId || CHAT_UNASSIGNED_PROJECT_FOLDER_ID);
         chatProjectFolderLastSelectionId = selectedId;
     }
     const filtered = filterActiveProjectsLocal(projects, chatProjectFolderSearchQuery);
+    const unassignedProject = {
+        id: '',
+        name: tp('projects.noProject'),
+        description: tp('projects.noProjectDescription'),
+        _isUnassigned: true,
+    };
+    const includeUnassigned = matchProjectSearchQuery(unassignedProject, chatProjectFolderSearchQuery);
+    const folders = includeUnassigned ? [unassignedProject, ...filtered] : filtered;
     list.innerHTML = '';
-    if (!filtered.length) {
+    if (!folders.length) {
         const empty = document.createElement('div');
         empty.className = 'project-folders-empty';
         empty.textContent = chatProjectFolderSearchQuery
@@ -3356,11 +3376,12 @@ function renderChatProjectFolders(projects) {
         list.appendChild(empty);
         return;
     }
-    filtered.forEach((project) => {
+    folders.forEach((project) => {
+        const folderId = project._isUnassigned ? CHAT_UNASSIGNED_PROJECT_FOLDER_ID : project.id;
         const conversations = chatProjectFolderContext.conversations
             .filter((conversation) => (conversation.projectId || conversation.project_id || '') === project.id);
         appendChatProjectFolderItem(list, project, chatProjectFolderExpandedIds, conversations);
-        if (chatProjectFolderExpandedIds.has(project.id)) {
+        if (chatProjectFolderExpandedIds.has(folderId)) {
             conversations.forEach((conversation) => appendChatProjectConversationItem(list, conversation, project));
         }
     });

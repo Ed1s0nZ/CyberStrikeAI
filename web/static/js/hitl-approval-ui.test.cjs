@@ -87,12 +87,39 @@ test('项目文件夹汇总待审批数量并按最早到期时间变色', () =>
 
 test('切换对话后主按钮只读取当前可见对话的运行状态', () => {
     assert.match(chat, /function getVisibleChatConversationId\(\)/);
+    assert.match(chat, /function shouldTreatLiveChatTaskAsCurrent\(/);
+    assert.match(chat, /function isLiveChatTaskVisible\(/);
     assert.match(chat, /if \(visibleConversationId\) return visibleConversationId/);
     assert.match(chat, /isConversationTaskRunning\(visibleConversationId\)/);
     assert.doesNotMatch(
         chat,
         /function getCurrentChatTaskConversationId\(\) \{[\s\S]{0,220}if \(live && live\.active && live\.conversationId\) \{[\s\S]{0,100}return String\(live\.conversationId\)/
     );
+    const visibilityFunctionSource = chat.match(
+        /function shouldTreatLiveChatTaskAsCurrent\(liveConversationId, visibleConversationId, hasVisibleProgress\) \{[\s\S]*?\n\}/
+    );
+    assert.ok(visibilityFunctionSource, '应提供可测试的当前任务隔离函数');
+    const isCurrent = vm.runInNewContext(`(${visibilityFunctionSource[0]})`);
+    assert.equal(isCurrent('running-conversation', '', true), false);
+    assert.equal(isCurrent('running-conversation', 'new-conversation', true), false);
+    assert.equal(isCurrent('running-conversation', 'running-conversation', false), true);
+    assert.equal(isCurrent('', '', true), true);
+    assert.equal(isCurrent('', '', false), false);
+});
+
+test('无项目对话使用独立虚拟文件夹且新任务默认解除项目绑定', () => {
+    assert.match(projects, /CHAT_UNASSIGNED_PROJECT_FOLDER_ID/);
+    assert.match(projects, /_isUnassigned: true/);
+    assert.match(projects, /\[unassignedProject, \.\.\.filtered\]/);
+    assert.match(projects, /window\.startNewConversation\(\{ projectId: isUnassigned \? '' : project\.id \}\)/);
+    assert.match(chat, /typeof setActiveProjectId === 'function'\) setActiveProjectId\(requestedProjectId\)/);
+    assert.equal(zh.chat.newUnassignedConversation, '新建无项目对话');
+    assert.equal(typeof en.chat.newUnassignedConversation, 'string');
+});
+
+test('单个对话的审批徽标随倒计时同步切换紧急颜色', () => {
+    assert.match(projects, /bindProjectApprovalProgress\(status, details\);\s*bindProjectApprovalUrgency\(status, details, label\);/);
+    assert.match(fs.readFileSync('web/static/css/style.css', 'utf8'), /\.project-task-status--approval\.is-urgency-critical/);
 });
 
 test('旧会话首次升级到五分钟默认审批时限，仍允许用户之后主动选择不限时', () => {

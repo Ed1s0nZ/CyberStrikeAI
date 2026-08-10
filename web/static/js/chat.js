@@ -1139,23 +1139,34 @@ function getVisibleChatConversationId() {
         : '';
 }
 
+function shouldTreatLiveChatTaskAsCurrent(liveConversationId, visibleConversationId, hasVisibleProgress) {
+    const liveId = String(liveConversationId || '').trim();
+    const visibleId = String(visibleConversationId || '').trim();
+    if (liveId) return !!visibleId && liveId === visibleId;
+    return hasVisibleProgress === true;
+}
+
+function isLiveChatTaskVisible(live, visibleConversationId) {
+    if (!live || !live.active) return false;
+    const progress = live.progressId ? document.getElementById(live.progressId) : null;
+    const hasVisibleProgress = !!(progress && progress.closest('#chat-messages'));
+    return shouldTreatLiveChatTaskAsCurrent(
+        live.conversationId,
+        visibleConversationId,
+        hasVisibleProgress
+    );
+}
+
 function getCurrentChatTaskConversationId() {
     const visibleConversationId = getVisibleChatConversationId();
     if (visibleConversationId) return visibleConversationId;
-    const live = window.__csAgentLiveStream;
-    return live && live.active && live.conversationId
-        ? String(live.conversationId)
-        : '';
+    return '';
 }
 
 function isCurrentChatTaskActive() {
     const live = window.__csAgentLiveStream;
     const visibleConversationId = getVisibleChatConversationId();
-    if (live && live.active) {
-        if (!live.conversationId || !visibleConversationId || String(live.conversationId) === visibleConversationId) {
-            return true;
-        }
-    }
+    if (isLiveChatTaskVisible(live, visibleConversationId)) return true;
     return !!visibleConversationId &&
         typeof isConversationTaskRunning === 'function' &&
         isConversationTaskRunning(visibleConversationId);
@@ -4715,7 +4726,10 @@ function copyDetailBlock(elementId, triggerBtn = null) {
 
 
 // 开始新对话
-async function startNewConversation() {
+async function startNewConversation(options = {}) {
+    const requestedProjectId = options && typeof options.projectId === 'string'
+        ? options.projectId.trim()
+        : '';
     // 如果当前在分组详情页面，先退出分组详情
     if (currentGroupId) {
         const groupDetailPage = document.getElementById('group-detail-page');
@@ -4734,15 +4748,13 @@ async function startNewConversation() {
     } catch (e) { /* ignore */ }
     updateChatPrimaryActionState();
     currentConversationGroupId = null; // 新对话不属于任何分组
-    if (typeof ensureDefaultActiveProjectForNewChat === 'function') {
-        try {
-            await ensureDefaultActiveProjectForNewChat();
-        } catch (e) { /* ignore */ }
-    }
+    // 顶部“新任务”默认不绑定项目；只有从项目文件夹内新建时才显式传入 projectId。
+    if (typeof setActiveProjectId === 'function') setActiveProjectId(requestedProjectId);
     if (typeof refreshChatProjectSelector === 'function') {
         await refreshChatProjectSelector();
     }
     document.getElementById('chat-messages').innerHTML = '';
+    updateChatPrimaryActionState();
     const readyMsgNew = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。';
     addMessage('assistant', readyMsgNew, null, null, null, { systemReadyMessage: true });
     addAttackChainButton(null);
