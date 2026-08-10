@@ -23,7 +23,7 @@
             }
         })();
     </script>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260720-2">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260810-1">
     <link rel="stylesheet" href="/static/css/c2.css">
     <link rel="stylesheet" href="/static/vendor/xterm.css">
     <script src="/static/js/router.js"></script>
@@ -889,10 +889,10 @@
                     <div class="chat-page-layout">
                         <!-- 历史对话侧边栏（可折叠，与主导航侧边栏类似） -->
                         <aside class="conversation-sidebar" id="conversation-sidebar">
-                            <!-- 头部一行：折叠与「新对话」并排，避免绝对定位重叠（flex 为最佳实践） -->
+                            <!-- 头部一行：折叠与「新任务」并排；任务底层复用会话数据 -->
                             <div class="sidebar-header conversation-sidebar-header">
                                 <button type="button" class="new-chat-btn" data-require-permission="chat:write" onclick="startNewConversation()">
-                                    <span>+</span> <span data-i18n="chat.newChat">新对话</span>
+                                    <span>+</span> <span data-i18n="chat.newTask">新任务</span>
                                 </button>
                                 <button type="button" class="conversation-sidebar-collapse-btn" onclick="toggleConversationSidebar()" data-i18n="chat.toggleConversationPanel" data-i18n-attr="title" data-i18n-skip-text="true" title="折叠/展开对话列表" aria-label="折叠/展开对话列表">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -901,13 +901,13 @@
                                 </button>
                             </div>
                             <div class="sidebar-content">
-                                <!-- 全局搜索 -->
+                                <!-- 项目搜索 -->
                                 <div class="conversation-search-box">
-                                    <input type="text" id="conversation-search-input" data-i18n="chat.searchHistory" data-i18n-attr="placeholder" placeholder="搜索历史记录..." 
-                                           oninput="handleConversationSearch(this.value)" 
-                                           onkeypress="if(event.key === 'Enter') handleConversationSearch(this.value)" />
+                                    <input type="text" id="conversation-search-input" data-i18n="projects.searchProjectsPlaceholder" data-i18n-attr="placeholder" placeholder="搜索项目…"
+                                           oninput="handleProjectFolderSearch(this.value)"
+                                           onkeypress="if(event.key === 'Enter') handleProjectFolderSearch(this.value)" />
                                     <button class="conversation-search-clear" id="conversation-search-clear" 
-                                            onclick="clearConversationSearch()" style="display: none;" data-i18n="common.clearSearch" data-i18n-attr="title" title="清除搜索">
+                                            onclick="clearProjectFolderSearch()" style="display: none;" data-i18n="common.clearSearch" data-i18n-attr="title" title="清除搜索">
                                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                                             <circle cx="8" cy="8" r="7" fill="currentColor" fill-opacity="0.2"/>
                                             <path d="M5.25 5.25l5.5 5.5M10.75 5.25l-5.5 5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -915,8 +915,16 @@
                                     </button>
                                 </div>
 
+                                <!-- 项目文件夹：复用对话底部项目选择器的真实项目数据 -->
+                                <section class="project-folders-section" aria-labelledby="project-folders-title">
+                                    <div class="section-header project-folders-header">
+                                        <span id="project-folders-title" class="section-title" data-i18n="chat.projectFolders">项目</span>
+                                    </div>
+                                    <div id="project-folders-list" class="project-folders-list"></div>
+                                </section>
+
                                 <!-- 按项目筛选对话 -->
-                                <div class="conversation-project-filter">
+                                <div class="conversation-project-filter" hidden>
                                     <label class="conversation-project-filter-label" for="conversation-project-filter" data-i18n="chat.filterByProject">按项目筛选</label>
                                     <select id="conversation-project-filter" class="conversation-project-filter-native" onchange="onConversationProjectFilterChange(this.value)" data-i18n="chat.filterByProject" data-i18n-attr="title" title="按项目筛选">
                                         <option value="" data-i18n="chat.filterAllProjects">全部项目</option>
@@ -938,10 +946,16 @@
                                 </div>
                                 
                                 <!-- 最近对话 -->
-                                <div class="recent-conversations-section">
-                                    <div class="section-header">
+                                <div class="recent-conversations-section is-collapsed" id="recent-conversations-section">
+                                    <button type="button" class="section-header recent-conversations-toggle" id="recent-conversations-toggle" onclick="toggleRecentConversations()" aria-expanded="false" aria-controls="recent-conversations-body" data-i18n="chat.toggleRecentConversations" data-i18n-attr="title,aria-label" data-i18n-skip-text="true" title="展开/折叠最近对话" aria-label="展开/折叠最近对话">
                                         <span class="section-title" data-i18n="chat.recentConversations">最近对话</span>
-                                        <div class="section-header-actions">
+                                        <span class="recent-conversations-toggle-meta">
+                                            <span id="recent-conversations-count" class="recent-conversations-count">0</span>
+                                            <svg class="recent-conversations-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                        </span>
+                                    </button>
+                                    <div id="recent-conversations-body" class="recent-conversations-body" hidden>
+                                        <div class="section-header-actions recent-conversations-actions">
                                             <div class="conversation-sort-dropdown" id="conversation-sort-dropdown">
                                                 <button type="button" class="conversation-sort-btn" id="conversation-sort-btn" onclick="toggleConversationSortMenu(event)" aria-haspopup="menu" aria-expanded="false" aria-controls="conversation-sort-menu" data-i18n="chat.sortConversations" data-i18n-attr="title" data-i18n-skip-text="true" title="排序">
                                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -984,8 +998,8 @@
                                                 </svg>
                                             </button>
                                         </div>
+                                        <div id="conversations-list" class="conversations-list"></div>
                                     </div>
-                                    <div id="conversations-list" class="conversations-list"></div>
                                 </div>
                             </div>
                             <div id="conversations-pagination" class="sidebar-list-pagination conversation-sidebar-pagination"></div>
@@ -6524,6 +6538,7 @@
             </div>
         </div>
     </div>
+
     <div id="fact-modal" class="modal-overlay projects-modal-overlay" style="display:none;" role="dialog" aria-modal="true" onclick="if(event.target===this)closeFactModal()">
         <div class="projects-modal-dialog projects-modal-dialog--wide" onclick="event.stopPropagation()">
             <div class="projects-modal-header">
@@ -6716,7 +6731,7 @@
     <script src="/static/js/dashboard.js"></script>
     <script src="/static/js/chat-scroll.js"></script>
     <script src="/static/js/monitor.js?v=20260723-1"></script>
-    <script src="/static/js/chat.js?v=20260724-1"></script>
+    <script src="/static/js/chat.js?v=20260810-1"></script>
     <script src="/static/js/hitl.js"></script>
     <script src="/static/js/settings.js?v=20260717-1"></script>
     <script src="/static/js/audit-datetime-picker.js"></script>
@@ -6728,7 +6743,7 @@
     <script src="/static/js/knowledge.js"></script>
     <script src="/static/js/skills.js"></script>
     <script src="/static/js/fact-graph.js"></script>
-    <script src="/static/js/projects.js?v=20260717-1"></script>
+    <script src="/static/js/projects.js?v=20260810-1"></script>
     <script src="/static/js/vulnerability.js?v=14"></script>
     <script src="/static/js/webshell.js"></script>
     <script src="/static/js/chat-files.js"></script>

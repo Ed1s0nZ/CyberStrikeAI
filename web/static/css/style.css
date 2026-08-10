@@ -44054,3 +44054,406 @@ html[data-theme="dark"] #project-panel-assets .projects-panel-pagination.paginat
     background: #0f172a !important;
     border-color: #223047 !important;
 }
+
+/* --------------------------------------------------------------------------
+   Project-centric conversation sidebar
+   The primary folder list reuses the real chat project selector data; groups
+   and recent conversations remain secondary navigation below it.
+   -------------------------------------------------------------------------- */
+.conversation-sidebar {
+    width: 320px;
+    background: #ffffff;
+}
+
+.conversation-sidebar-header {
+    padding: 14px;
+    background: #ffffff;
+}
+
+.conversation-sidebar .sidebar-content {
+    padding: 14px 14px 18px;
+}
+
+.conversation-sidebar .conversation-search-box {
+    margin: 8px 0 16px;
+}
+
+.conversation-sidebar .conversation-search-box input {
+    min-height: 42px;
+    padding-left: 36px;
+    border-color: #dfe3e8;
+    border-radius: 9px;
+    background: #ffffff;
+}
+
+.conversation-sidebar .conversation-search-box::before {
+    content: '';
+    position: absolute;
+    left: 12px;
+    width: 16px;
+    height: 16px;
+    z-index: 1;
+    pointer-events: none;
+    background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2377818f' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-4-4'/%3E%3C/svg%3E");
+}
+
+.conversation-sidebar .conversation-project-filter {
+    display: none !important;
+}
+
+.project-folders-section {
+    margin-bottom: 16px;
+    min-width: 0;
+}
+
+.project-folders-header {
+    min-height: 26px;
+    margin-bottom: 5px !important;
+}
+
+.project-folders-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.project-folder-row {
+    position: relative;
+    min-width: 0;
+}
+
+.project-folder-item {
+    position: relative;
+    width: 100%;
+    min-height: 40px;
+    display: grid;
+    grid-template-columns: 19px minmax(0, 1fr) 10px;
+    align-items: center;
+    padding: 7px 68px 7px 8px;
+    column-gap: 9px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: #303846;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.project-folder-actions {
+    position: absolute;
+    top: 50%;
+    right: 5px;
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%);
+    transition: opacity 0.14s ease;
+}
+
+.project-folder-row:hover .project-folder-actions,
+.project-folder-row:focus-within .project-folder-actions,
+.project-folder-row.is-expanded .project-folder-actions {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.project-folder-action,
+.project-conversation-menu {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: #59616d;
+    cursor: pointer;
+    transition: background 0.14s ease, color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.project-folder-action:hover,
+.project-folder-action:focus-visible,
+.project-conversation-menu:hover,
+.project-conversation-menu:focus-visible {
+    background: rgba(255, 255, 255, 0.86);
+    color: #1f2937;
+    box-shadow: 0 1px 2px rgba(21, 28, 38, 0.08);
+    outline: none;
+}
+
+.project-folder-item:hover {
+    background: #f1f3f6;
+}
+
+.project-folder-item:focus-visible {
+    outline: 2px solid rgba(37, 99, 235, 0.42);
+    outline-offset: -2px;
+}
+
+.project-folder-item:disabled {
+    cursor: wait;
+    opacity: 0.72;
+}
+
+.project-folder-icon {
+    width: 19px;
+    height: 19px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    color: #505965;
+}
+
+.project-folder-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.875rem;
+    font-weight: 520;
+    line-height: 1.35;
+}
+
+.project-conversation-row {
+    position: relative;
+    min-width: 0;
+}
+
+.project-conversation-item {
+    width: 100%;
+    min-height: 38px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 12px;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 38px 7px 36px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: #3f4650;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.project-conversation-menu {
+    position: absolute;
+    top: 50%;
+    right: 5px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%);
+}
+
+.project-conversation-row:hover .project-conversation-menu,
+.project-conversation-row:focus-within .project-conversation-menu,
+.project-conversation-row.is-selected .project-conversation-menu {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.project-conversation-item:hover {
+    background: #f3f4f5;
+}
+
+.project-conversation-item.is-selected {
+    background: #eef0f2;
+    box-shadow: inset 0 0 0 1px rgba(42, 48, 58, 0.035), 0 1px 2px rgba(21, 28, 38, 0.06);
+}
+
+.project-conversation-item:focus-visible {
+    outline: 2px solid rgba(37, 99, 235, 0.42);
+    outline-offset: -2px;
+}
+
+.project-conversation-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.85rem;
+    font-weight: 500;
+    line-height: 1.35;
+}
+
+.project-task-status {
+    width: 10px;
+    height: 10px;
+    display: inline-block;
+    justify-self: end;
+    border-radius: 50%;
+}
+
+.project-task-status--running {
+    border: 1.5px solid #777f89;
+    border-top-color: transparent;
+    animation: project-task-status-spin 0.8s linear infinite;
+}
+
+.project-task-status--unread {
+    background: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.08);
+}
+
+@keyframes project-task-status-spin {
+    to { transform: rotate(360deg); }
+}
+
+.project-folders-empty {
+    padding: 12px 8px;
+    color: #9aa1ad;
+    font-size: 0.8125rem;
+    text-align: center;
+}
+
+.conversation-sidebar .conversation-groups-section,
+.conversation-sidebar .recent-conversations-section {
+    margin: 0;
+    padding: 13px 0;
+    border-top: 1px solid #eceff3;
+}
+
+.conversation-sidebar .conversation-groups-section .section-header {
+    margin-bottom: 5px;
+}
+
+.conversation-sidebar .group-item {
+    min-height: 38px;
+    padding: 7px 8px;
+    border: 0;
+    border-radius: 8px;
+}
+
+.conversation-sidebar .group-item.active {
+    background: #edf4ff;
+}
+
+.recent-conversations-toggle {
+    width: 100%;
+    min-height: 30px;
+    margin: 0 !important;
+    padding: 0 8px !important;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.recent-conversations-toggle:hover {
+    background: #f3f4f6;
+}
+
+.recent-conversations-toggle-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    flex: 0 0 auto;
+    color: #7c8592;
+}
+
+.recent-conversations-count {
+    min-width: 1.5em;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.recent-conversations-chevron {
+    transition: transform 0.16s ease;
+}
+
+.recent-conversations-toggle[aria-expanded="true"] .recent-conversations-chevron {
+    transform: rotate(90deg);
+}
+
+.recent-conversations-body[hidden] {
+    display: none !important;
+}
+
+.conversation-sidebar-pagination[hidden] {
+    display: none !important;
+}
+
+.conversation-sidebar:has(.recent-conversations-section.is-collapsed) .conversation-sidebar-pagination {
+    display: none !important;
+}
+
+.recent-conversations-actions {
+    justify-content: flex-end;
+    min-height: 28px;
+    margin: 5px 5px 3px;
+}
+
+.recent-conversations-body .conversation-group-title {
+    padding-top: 7px;
+}
+
+.recent-conversations-body .conversation-item {
+    padding: 8px;
+}
+
+html[data-theme="dark"] .conversation-sidebar,
+html[data-theme="dark"] .conversation-sidebar-header {
+    background: var(--bg-primary);
+}
+
+html[data-theme="dark"] .conversation-sidebar .conversation-search-box input {
+    background: var(--bg-primary);
+    border-color: var(--border-color);
+}
+
+html[data-theme="dark"] .project-folder-item,
+html[data-theme="dark"] .project-conversation-item {
+    color: var(--text-primary);
+}
+
+html[data-theme="dark"] .project-folder-item:hover,
+html[data-theme="dark"] .project-conversation-item:hover,
+html[data-theme="dark"] .recent-conversations-toggle:hover {
+    background: var(--bg-tertiary);
+}
+
+html[data-theme="dark"] .project-folder-action:hover,
+html[data-theme="dark"] .project-folder-action:focus-visible,
+html[data-theme="dark"] .project-conversation-menu:hover,
+html[data-theme="dark"] .project-conversation-menu:focus-visible {
+    background: rgba(30, 41, 59, 0.92);
+    color: var(--text-primary);
+}
+
+html[data-theme="dark"] .project-conversation-item.is-selected {
+    background: rgba(148, 163, 184, 0.14);
+    color: var(--text-primary);
+    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.1), 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+html[data-theme="dark"] .conversation-sidebar .group-item.active {
+    background: rgba(59, 130, 246, 0.16);
+    color: #93c5fd;
+}
+
+html[data-theme="dark"] .conversation-sidebar .conversation-groups-section,
+html[data-theme="dark"] .conversation-sidebar .recent-conversations-section {
+    border-color: var(--border-color);
+}
+
+@media (max-width: 900px) {
+    .conversation-sidebar {
+        width: 260px;
+    }
+
+    .conversation-sidebar.collapsed {
+        width: 56px;
+    }
+}

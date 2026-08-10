@@ -60,6 +60,7 @@ let compositionEndTimer = null;
 
 // 输入框草稿保存相关
 const DRAFT_STORAGE_KEY = 'cyberstrike-chat-draft';
+const RECENT_CONVERSATIONS_EXPANDED_KEY = 'cyberstrike-chat-recent-conversations-expanded';
 let draftSaveTimer = null;
 const DRAFT_SAVE_DELAY = 500; // 500ms防抖延迟
 
@@ -4520,6 +4521,174 @@ function clearConversationSearch() {
     loadConversations('');
 }
 
+function conversationSidebarText(key, fallback) {
+    if (typeof window.t === 'function') {
+        const translated = window.t(key);
+        if (translated && translated !== key) return translated;
+    }
+    return fallback;
+}
+
+/**
+ * Go 进程会嵌入 index.html。开发时即使进程尚未重启，也通过新版静态 JS
+ * 将旧侧栏升级为项目文件夹结构；新模板已包含结构时该函数保持幂等。
+ */
+function ensureProjectSidebarStructure() {
+    const sidebar = document.getElementById('conversation-sidebar');
+    const sidebarContent = sidebar && sidebar.querySelector('.sidebar-content');
+    if (!sidebar || !sidebarContent) return;
+
+    const newTaskLabel = sidebar.querySelector('.new-chat-btn span:last-child');
+    if (newTaskLabel) {
+        newTaskLabel.setAttribute('data-i18n', 'chat.newTask');
+        newTaskLabel.textContent = conversationSidebarText('chat.newTask', '新任务');
+    }
+
+    const searchInput = document.getElementById('conversation-search-input');
+    if (searchInput) {
+        searchInput.setAttribute('data-i18n', 'projects.searchProjectsPlaceholder');
+        searchInput.setAttribute('data-i18n-attr', 'placeholder');
+        searchInput.setAttribute('oninput', 'handleProjectFolderSearch(this.value)');
+        searchInput.setAttribute('onkeypress', "if(event.key === 'Enter') handleProjectFolderSearch(this.value)");
+        searchInput.placeholder = conversationSidebarText('projects.searchProjectsPlaceholder', '搜索项目…');
+    }
+    const searchClear = document.getElementById('conversation-search-clear');
+    if (searchClear) searchClear.setAttribute('onclick', 'clearProjectFolderSearch()');
+
+    const projectFilter = sidebarContent.querySelector('.conversation-project-filter');
+    if (projectFilter) projectFilter.hidden = true;
+
+    let projectSection = sidebarContent.querySelector('.project-folders-section');
+    const legacyTaskSection = sidebarContent.querySelector('.task-folders-section');
+    if (!projectSection && legacyTaskSection) {
+        projectSection = legacyTaskSection;
+        projectSection.className = 'project-folders-section';
+        projectSection.setAttribute('aria-labelledby', 'project-folders-title');
+        const legacyHeader = projectSection.querySelector('.task-folders-header');
+        if (legacyHeader) legacyHeader.className = 'section-header project-folders-header';
+        const legacyTitle = projectSection.querySelector('#task-folders-title');
+        if (legacyTitle) {
+            legacyTitle.id = 'project-folders-title';
+            legacyTitle.setAttribute('data-i18n', 'chat.projectFolders');
+            legacyTitle.textContent = conversationSidebarText('chat.projectFolders', '项目');
+        }
+        const legacyList = projectSection.querySelector('#task-folders-list');
+        if (legacyList) {
+            legacyList.id = 'project-folders-list';
+            legacyList.className = 'project-folders-list';
+            legacyList.removeAttribute('role');
+            legacyList.innerHTML = '';
+        }
+    }
+    if (!projectSection) {
+        projectSection = document.createElement('section');
+        projectSection.className = 'project-folders-section';
+        projectSection.setAttribute('aria-labelledby', 'project-folders-title');
+        projectSection.innerHTML =
+            '<div class="section-header project-folders-header">' +
+                '<span id="project-folders-title" class="section-title" data-i18n="chat.projectFolders">项目</span>' +
+            '</div>' +
+            '<div id="project-folders-list" class="project-folders-list"></div>';
+        const searchBox = sidebarContent.querySelector('.conversation-search-box');
+        if (searchBox) searchBox.insertAdjacentElement('afterend', projectSection);
+        else sidebarContent.insertBefore(projectSection, sidebarContent.firstChild);
+    }
+
+    const recentSection = sidebarContent.querySelector('.recent-conversations-section');
+    if (recentSection) {
+        recentSection.id = 'recent-conversations-section';
+        recentSection.classList.add('is-collapsed');
+        let toggle = document.getElementById('recent-conversations-toggle');
+        let body = document.getElementById('recent-conversations-body');
+        if (!toggle) {
+            const oldHeader = recentSection.querySelector(':scope > .section-header');
+            const title = oldHeader && oldHeader.querySelector('.section-title');
+            const actions = oldHeader && oldHeader.querySelector('.section-header-actions');
+            const list = recentSection.querySelector('#conversations-list');
+
+            toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.id = 'recent-conversations-toggle';
+            toggle.className = 'section-header recent-conversations-toggle';
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.setAttribute('aria-controls', 'recent-conversations-body');
+            toggle.setAttribute('data-i18n', 'chat.toggleRecentConversations');
+            toggle.setAttribute('data-i18n-attr', 'title,aria-label');
+            toggle.setAttribute('data-i18n-skip-text', 'true');
+            toggle.title = conversationSidebarText('chat.toggleRecentConversations', '展开/折叠最近对话');
+            toggle.setAttribute('aria-label', toggle.title);
+            toggle.addEventListener('click', toggleRecentConversations);
+            if (title) toggle.appendChild(title);
+            else toggle.innerHTML = '<span class="section-title" data-i18n="chat.recentConversations">最近对话</span>';
+
+            const meta = document.createElement('span');
+            meta.className = 'recent-conversations-toggle-meta';
+            meta.innerHTML =
+                '<span id="recent-conversations-count" class="recent-conversations-count">0</span>' +
+                '<svg class="recent-conversations-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            toggle.appendChild(meta);
+
+            body = document.createElement('div');
+            body.id = 'recent-conversations-body';
+            body.className = 'recent-conversations-body';
+            body.hidden = true;
+            if (actions) {
+                actions.classList.add('recent-conversations-actions');
+                body.appendChild(actions);
+            }
+            if (list) body.appendChild(list);
+            if (oldHeader) oldHeader.remove();
+            recentSection.prepend(toggle);
+            recentSection.appendChild(body);
+        }
+    }
+
+    if (typeof window.applyTranslations === 'function') {
+        window.applyTranslations(sidebar);
+    }
+}
+
+function setRecentConversationsExpanded(expanded, options = {}) {
+    const section = document.getElementById('recent-conversations-section');
+    const toggle = document.getElementById('recent-conversations-toggle');
+    const body = document.getElementById('recent-conversations-body');
+    const pagination = document.getElementById('conversations-pagination');
+    const open = !!expanded;
+    if (section) section.classList.toggle('is-collapsed', !open);
+    if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (body) body.hidden = !open;
+    if (pagination) pagination.hidden = !open;
+    if (options.persist !== false) {
+        try {
+            localStorage.setItem(RECENT_CONVERSATIONS_EXPANDED_KEY, open ? '1' : '0');
+        } catch (e) { /* ignore */ }
+    }
+}
+
+function restoreRecentConversationsState() {
+    let expanded = false;
+    try {
+        expanded = localStorage.getItem(RECENT_CONVERSATIONS_EXPANDED_KEY) === '1';
+    } catch (e) { /* ignore */ }
+    setRecentConversationsExpanded(expanded, { persist: false });
+}
+
+function toggleRecentConversations() {
+    const toggle = document.getElementById('recent-conversations-toggle');
+    const expanded = toggle && toggle.getAttribute('aria-expanded') === 'true';
+    setRecentConversationsExpanded(!expanded);
+}
+
+function updateRecentConversationsCount(total) {
+    const count = document.getElementById('recent-conversations-count');
+    if (count) count.textContent = String(Math.max(0, Number(total) || 0));
+}
+
+if (typeof window !== 'undefined') {
+    window.toggleRecentConversations = toggleRecentConversations;
+    window.setRecentConversationsExpanded = setRecentConversationsExpanded;
+}
+
 function formatConversationTimestamp(dateObj, todayStart, yesterdayStart) {
     if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) {
         return '';
@@ -7210,6 +7379,7 @@ function exportAttackChain(format) {
 let currentGroupId = null; // 当前正在查看的分组详情页面
 let currentConversationGroupId = null; // 当前对话所属的分组ID（用于高亮显示）
 let contextMenuConversationId = null;
+let contextMenuConversationTitle = '';
 let contextMenuGroupId = null;
 let groupsCache = [];
 let conversationGroupMappingCache = {};
@@ -8036,7 +8206,8 @@ function renderConversationsPagination(visibleCount) {
 
     const totalPages = getConversationsTotalPages();
     const navDisabled = totalPages <= 1;
-    el.hidden = false;
+    const recentToggle = document.getElementById('recent-conversations-toggle');
+    el.hidden = !recentToggle || recentToggle.getAttribute('aria-expanded') !== 'true';
     const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
     const end = Math.min(page * pageSize, total);
     const tFn = typeof window.t === 'function' ? window.t.bind(window) : null;
@@ -8246,6 +8417,7 @@ async function loadConversationsWithGroups(searchQuery = '', options = {}) {
         if (!response.ok) {
             listContainer.innerHTML = emptyStateHtml;
             if (typeof window.applyTranslations === 'function') window.applyTranslations(listContainer);
+            updateRecentConversationsCount(0);
             renderConversationsPagination(0);
             return;
         }
@@ -8256,6 +8428,7 @@ async function loadConversationsWithGroups(searchQuery = '', options = {}) {
         const resolvedTotal = await resolveConversationsListTotal(convParams, parsed, pageSize, offset);
         if (isStaleConversationListLoad(loadSeq, intentPage, navigateGenAtStart, activePage)) return;
         conversationsPagination.total = resolvedTotal;
+        updateRecentConversationsCount(resolvedTotal);
 
         const pageCheck = reconcileConversationsPageAfterTotal(
             activePage, intentPage, parsed, pageSize, offset, resolvedTotal
@@ -8443,6 +8616,7 @@ async function loadConversationsWithGroups(searchQuery = '', options = {}) {
         if (listContainer) {
             listContainer.innerHTML = getConversationListEmptyHtml();
             if (typeof window.applyTranslations === 'function') window.applyTranslations(listContainer);
+            updateRecentConversationsCount(0);
             renderConversationsPagination(0);
         }
     }
@@ -8513,11 +8687,7 @@ function createConversationListItemWithMenu(conversation, isPinned) {
     const menuBtn = document.createElement('button');
     menuBtn.className = 'conversation-item-menu';
     menuBtn.innerHTML = '⋯';
-    menuBtn.onclick = (e) => {
-        e.stopPropagation();
-        contextMenuConversationId = conversation.id;
-        showConversationContextMenu(e);
-    };
+    menuBtn.onclick = (e) => openConversationContextMenuForId(e, conversation.id, conversation.title || '');
     item.appendChild(menuBtn);
 
     item.onclick = (e) => {
@@ -8530,6 +8700,14 @@ function createConversationListItemWithMenu(conversation, isPinned) {
     };
 
     return item;
+}
+
+function openConversationContextMenuForId(event, conversationId, conversationTitle = '') {
+    event.stopPropagation();
+    event.preventDefault();
+    contextMenuConversationId = conversationId;
+    contextMenuConversationTitle = conversationTitle;
+    return showConversationContextMenu(event);
 }
 
 // 显示对话上下文菜单
@@ -8821,16 +8999,92 @@ async function showGroupContextMenu(event, groupId) {
     }, 0);
 }
 
-// 重命名对话
-async function renameConversation() {
+let renameConversationTargetId = null;
+
+function ensureConversationRenameModal() {
+    let modal = document.getElementById('conversation-rename-modal');
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = 'conversation-rename-modal';
+    modal.className = 'modal-overlay projects-modal-overlay';
+    modal.style.display = 'none';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'conversation-rename-title');
+    modal.innerHTML = `
+        <div class="projects-modal-dialog">
+            <div class="projects-modal-header">
+                <div class="projects-modal-header-text">
+                    <div>
+                        <h3 id="conversation-rename-title" data-i18n="chat.renameConversationTitle">重命名对话</h3>
+                        <p class="projects-modal-subtitle" data-i18n="chat.renameConversationSubtitle">修改后会同步更新项目文件夹和最近对话中的名称</p>
+                    </div>
+                </div>
+                <button type="button" class="projects-modal-close" data-conversation-rename-close aria-label="关闭" data-i18n="common.close" data-i18n-attr="aria-label" data-i18n-skip-text="true">&times;</button>
+            </div>
+            <div class="projects-modal-body">
+                <div class="projects-form-field">
+                    <label for="conversation-rename-input" data-i18n="chat.conversationTitleLabel">对话名称</label>
+                    <input type="text" id="conversation-rename-input" class="form-input" maxlength="200" autocomplete="off" data-i18n="chat.conversationTitlePlaceholder" data-i18n-attr="placeholder" placeholder="请输入对话名称">
+                </div>
+            </div>
+            <div class="projects-modal-footer">
+                <button class="btn-secondary" type="button" data-conversation-rename-close data-i18n="common.cancel">取消</button>
+                <button class="btn-primary" type="button" id="conversation-rename-submit" data-i18n="contextMenu.rename">重命名</button>
+            </div>
+        </div>`;
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) closeConversationRenameModal();
+    });
+    modal.querySelectorAll('[data-conversation-rename-close]').forEach((button) => {
+        button.addEventListener('click', closeConversationRenameModal);
+    });
+    modal.querySelector('#conversation-rename-submit')?.addEventListener('click', saveConversationRename);
+    modal.querySelector('#conversation-rename-input')?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            saveConversationRename();
+        } else if (event.key === 'Escape') {
+            closeConversationRenameModal();
+        }
+    });
+    document.body.appendChild(modal);
+    if (typeof window.applyTranslations === 'function') window.applyTranslations(modal);
+    return modal;
+}
+
+// 打开应用内重命名弹窗，避免内置浏览器拦截 window.prompt。
+function renameConversation() {
     const convId = contextMenuConversationId;
     if (!convId) return;
 
-    const newTitle = prompt('请输入新标题:', '');
-    if (newTitle === null || !newTitle.trim()) {
-        closeContextMenu();
+    renameConversationTargetId = convId;
+    const currentTitle = contextMenuConversationTitle || '';
+    ensureConversationRenameModal();
+    const input = document.getElementById('conversation-rename-input');
+    if (input) input.value = currentTitle;
+    closeContextMenu();
+    openAppModal('conversation-rename-modal', { focusEl: input });
+    if (input) input.select();
+}
+
+function closeConversationRenameModal() {
+    renameConversationTargetId = null;
+    closeAppModal('conversation-rename-modal');
+}
+
+async function saveConversationRename() {
+    const convId = renameConversationTargetId;
+    const input = document.getElementById('conversation-rename-input');
+    const newTitle = (input?.value || '').trim();
+    if (!convId || !newTitle) {
+        input?.focus();
         return;
     }
+
+    const submitButton = document.getElementById('conversation-rename-submit');
+    if (submitButton) submitButton.disabled = true;
 
     try {
         const response = await apiFetch(`/api/conversations/${convId}`, {
@@ -8847,13 +9101,14 @@ async function renameConversation() {
         }
 
         // 更新前端显示
-        const item = document.querySelector(`[data-conversation-id="${convId}"]`);
-        if (item) {
-            const titleEl = item.querySelector('.conversation-title');
-            if (titleEl) {
-                titleEl.textContent = newTitle.trim();
-            }
-        }
+        document.querySelectorAll('[data-conversation-id]').forEach((item) => {
+            if (item.dataset.conversationId !== convId) return;
+            item.querySelectorAll('.conversation-title, .group-conversation-title, .project-conversation-title')
+                .forEach((titleEl) => {
+                    titleEl.textContent = newTitle.trim();
+                    titleEl.title = newTitle.trim();
+                });
+        });
 
         // 如果在分组详情页，也需要更新
         const groupItem = document.querySelector(`.group-conversation-item[data-conversation-id="${convId}"]`);
@@ -8870,15 +9125,19 @@ async function renameConversation() {
         }
 
         // 重新加载对话列表
-        loadConversationsWithGroups();
+        await loadConversationsWithGroups();
+        if (typeof window.refreshChatProjectFolders === 'function') {
+            await window.refreshChatProjectFolders();
+        }
+        closeConversationRenameModal();
     } catch (error) {
         console.error('重命名对话失败:', error);
         const failedLabel = typeof window.t === 'function' ? window.t('chat.renameFailed') : '重命名失败';
         const unknownErr = typeof window.t === 'function' ? window.t('createGroupModal.unknownError') : '未知错误';
         alert(failedLabel + ': ' + (error.message || unknownErr));
+    } finally {
+        if (submitButton) submitButton.disabled = false;
     }
-
-    closeContextMenu();
 }
 
 // 置顶对话
@@ -9565,6 +9824,7 @@ function closeContextMenu() {
     clearDownloadMarkdownSubmenuHideTimeout();
     submenuLoading = false;
     contextMenuConversationId = null;
+    contextMenuConversationTitle = '';
 }
 
 // 显示批量管理模态框
@@ -10752,11 +11012,7 @@ async function loadGroupConversations(groupId, searchQuery = '') {
                 const menuBtn = document.createElement('button');
                 menuBtn.className = 'conversation-item-menu';
                 menuBtn.innerHTML = '⋯';
-                menuBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    contextMenuConversationId = conv.id;
-                    showConversationContextMenu(e);
-                };
+                menuBtn.onclick = (e) => openConversationContextMenuForId(e, conv.id, fullConv.title || conv.title || '');
                 item.appendChild(menuBtn);
 
                 item.onclick = (e) => {
@@ -11157,7 +11413,14 @@ function clearGroupSearch() {
 
 // 初始化时加载分组
 document.addEventListener('DOMContentLoaded', async () => {
+    ensureProjectSidebarStructure();
     if (window.i18nReady) await window.i18nReady;
+    if (typeof window.applyTranslations === 'function') {
+        window.applyTranslations(document.getElementById('conversation-sidebar'));
+    }
+    // 任务栏不再暴露项目筛选，清除旧选择以免隐藏部分任务。
+    setConversationProjectFilter('');
+    restoreRecentConversationsState();
     updateConversationSortMenuUI();
     initConversationProjectCustomSelect();
     initConversationsPaginationEvents();
@@ -11227,6 +11490,10 @@ async function refreshAllProjectFilterSelects() {
 if (typeof window !== 'undefined') {
     window.loadConversation = loadConversation;
     window.startNewConversation = startNewConversation;
+    window.openConversationContextMenuForId = openConversationContextMenuForId;
+    window.renameConversation = renameConversation;
+    window.closeConversationRenameModal = closeConversationRenameModal;
+    window.saveConversationRename = saveConversationRename;
     window.refreshConversationProjectFilter = refreshConversationProjectFilter;
     window.refreshAllProjectFilterSelects = refreshAllProjectFilterSelects;
     window.onConversationProjectFilterChange = onConversationProjectFilterChange;

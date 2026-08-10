@@ -5066,6 +5066,9 @@ function renderActiveTasks(tasks) {
 
     const normalizedTasks = Array.isArray(tasks) ? tasks : [];
     conversationExecutionTracker.update(normalizedTasks);
+    if (typeof window.updateProjectFolderTaskStatuses === 'function') {
+        window.updateProjectFolderTaskStatuses(normalizedTasks);
+    }
     if (typeof updateAttackChainAvailability === 'function') {
         updateAttackChainAvailability();
     }
