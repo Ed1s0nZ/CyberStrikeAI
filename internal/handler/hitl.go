@@ -98,7 +98,8 @@ CREATE TABLE IF NOT EXISTS hitl_conversation_configs (
 	// On startup, cancel all orphaned pending interrupts from previous process.
 	// Their in-memory channels are gone, so they can never be resolved.
 	res, err := m.db.Exec(`UPDATE hitl_interrupts SET status='cancelled', decision='reject',
-		decision_comment='process restarted', decided_at=CURRENT_TIMESTAMP WHERE status='pending'`)
+		decision_comment='process restarted', decided_at=CURRENT_TIMESTAMP, decided_by='system'
+		WHERE status='pending'`)
 	if err != nil {
 		m.logger.Warn("failed to cancel orphaned HITL interrupts", zap.Error(err))
 	} else if n, _ := res.RowsAffected(); n > 0 {

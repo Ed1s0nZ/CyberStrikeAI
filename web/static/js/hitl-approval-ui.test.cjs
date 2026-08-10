@@ -128,7 +128,7 @@ test('单个对话的审批徽标随倒计时同步切换紧急颜色', () => {
 
 test('项目状态刷新复用单一计时器且切换对话不重复请求完整项目上下文', () => {
     assert.match(projects, /const projectApprovalTickerEntries = new Set\(\)/);
-    assert.match(projects, /if \(!changed\) return/);
+    assert.match(projects, /if \(!changed && !approvalChanged\) return/);
     assert.match(projects, /options\.reloadFolders !== false/);
     assert.match(chat, /refreshChatProjectSelector\(\{ reloadFolders: false, renderFolders: false \}\)/);
     assert.match(projects, /function selectChatProjectConversationItem/);
@@ -153,10 +153,23 @@ test('任务结束后对话内审批按钮会变灰并禁止继续操作', () =>
     assert.match(monitor, /function setHitlApprovalTaskAvailability/);
     assert.match(monitor, /conversationExecutionTracker\.ready && !conversationExecutionTracker\.isRunning\(id\)/);
     assert.match(monitor, /button\.disabled = true/);
+    assert.match(monitor, /function setHitlApprovalInterruptedVisualState/);
+    assert.match(monitor, /stopHitlApprovalCountdown\(panel\)/);
+    assert.match(monitor, /removeAttribute\('data-hitl-expires-at'\)/);
+    assert.match(monitor, /hitl\.interruptedApprovalCancelled/);
+    assert.match(monitor, /reconcileHitlApprovalStateWithActiveTasks\(normalizedTasks\)/);
     assert.match(monitor, /syncHitlApprovalTaskAvailability\(\)/);
     assert.match(fs.readFileSync('web/static/css/style.css', 'utf8'), /hitl-approval-task-closed/);
     assert.equal(zh.hitl.taskClosedApprovalUnavailable, '任务已结束，审批不可用');
+    assert.equal(zh.hitl.interruptedApprovalCancelled, '任务已中断，审批已取消');
     assert.equal(typeof en.hitl.taskClosedApprovalUnavailable, 'string');
+    assert.equal(typeof en.hitl.interruptedApprovalCancelled, 'string');
+});
+
+test('项目树只保留当前进程仍在运行任务的审批状态', () => {
+    assert.match(projects, /chatProjectFolderContext\.runningIds\.has\(conversationId\)/);
+    assert.match(projects, /pendingApprovalByConversation\.delete\(conversationId\)/);
+    assert.match(monitor, /conversationExecutionTracker\.ready && !conversationExecutionTracker\.isRunning\(conversationId\)/);
 });
 
 test('旧会话首次升级到五分钟默认审批时限，仍允许用户之后主动选择不限时', () => {

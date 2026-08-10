@@ -46090,6 +46090,10 @@ html[data-theme="dark"] .chat-composer-surface > .chat-session-settings-popover 
     color: var(--error-color, #c73b43);
 }
 
+.hitl-codex-state--interrupted {
+    color: var(--text-muted);
+}
+
 .hitl-codex-state-icon {
     display: inline-flex;
     align-items: center;
@@ -46170,6 +46174,19 @@ html[data-theme="dark"] .chat-composer-surface > .chat-session-settings-popover 
 .hitl-approval-countdown--unlimited {
     color: var(--text-muted);
     font-size: 0.76rem;
+}
+
+.hitl-approval-countdown--interrupted {
+    color: var(--text-muted);
+}
+
+.hitl-approval-countdown--interrupted .hitl-codex-state {
+    min-height: 24px;
+    font-size: 0.78rem;
+}
+
+.hitl-approval-interrupted .hitl-approval-eyebrow {
+    color: var(--text-muted);
 }
 
 .hitl-approval-countdown-copy {

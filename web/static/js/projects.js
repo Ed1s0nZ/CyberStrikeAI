@@ -3371,7 +3371,10 @@ async function loadChatProjectFolderContext() {
     chatProjectFolderContext.pendingApprovalByConversation = new Map();
     (pendingData.items || []).forEach((item) => {
         const conversationId = String(item?.conversationId || '').trim();
-        if (conversationId && !chatProjectFolderContext.pendingApprovalByConversation.has(conversationId)) {
+        // pending 审批必须属于当前进程仍在运行的任务；服务重启/取消后的旧记录
+        // 即使在并发窗口内被读到，也不能重新显示倒计时徽标。
+        if (conversationId && chatProjectFolderContext.runningIds.has(conversationId) &&
+            !chatProjectFolderContext.pendingApprovalByConversation.has(conversationId)) {
             chatProjectFolderContext.pendingApprovalByConversation.set(conversationId, item);
         }
     });
@@ -3471,8 +3474,14 @@ function updateProjectFolderTaskStatuses(tasks) {
             .filter(Boolean)
     );
     const taskFinished = [...previous].some((conversationId) => !next.has(conversationId));
+    let approvalChanged = false;
+    chatProjectFolderContext.pendingApprovalByConversation.forEach((_details, conversationId) => {
+        if (next.has(conversationId)) return;
+        chatProjectFolderContext.pendingApprovalByConversation.delete(conversationId);
+        approvalChanged = true;
+    });
     const changed = previous.size !== next.size || [...previous].some((conversationId) => !next.has(conversationId));
-    if (!changed) return;
+    if (!changed && !approvalChanged) return;
     chatProjectFolderContext.runningIds = next;
     if (isProjectsCacheReady() && chatProjectFolderContext.ready) {
         renderChatProjectFolders(projectsCacheAll);

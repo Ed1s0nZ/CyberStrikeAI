@@ -1046,6 +1046,57 @@ function isConversationTaskRunning(conversationId) {
     return conversationExecutionTracker.isRunning(conversationId);
 }
 
+function setHitlApprovalInterruptedVisualState(panel, interrupted) {
+    if (!panel || panel.classList.contains('hitl-inline-done')) return;
+    const eyebrow = panel.querySelector('.hitl-approval-eyebrow');
+    const countdown = panel.querySelector('.hitl-approval-countdown');
+    if (interrupted) {
+        stopHitlApprovalCountdown(panel);
+        panel.classList.add('hitl-approval-interrupted');
+        if (eyebrow && !Object.prototype.hasOwnProperty.call(eyebrow.dataset, 'taskAvailableText')) {
+            eyebrow.dataset.taskAvailableText = eyebrow.textContent || '';
+            eyebrow.textContent = hitlApprovalTranslate('hitl.taskInterrupted', '任务已中断');
+        }
+        if (countdown && !Object.prototype.hasOwnProperty.call(countdown.dataset, 'taskAvailableHtml')) {
+            countdown.dataset.taskAvailableHtml = countdown.innerHTML;
+            countdown.dataset.taskAvailableClass = countdown.className;
+            countdown.dataset.taskAvailableExpiresAt = countdown.dataset.hitlExpiresAt || '';
+            countdown.dataset.taskAvailableTimeout = countdown.dataset.hitlTimeout || '';
+            countdown.removeAttribute('data-hitl-expires-at');
+            countdown.removeAttribute('data-hitl-timeout');
+            countdown.className = 'hitl-approval-countdown hitl-approval-countdown--interrupted';
+            countdown.innerHTML = '<div class="hitl-codex-state hitl-codex-state--interrupted">' +
+                '<span class="hitl-codex-state-icon" aria-hidden="true">×</span>' +
+                '<strong>' + escapeHtml(hitlApprovalTranslate('hitl.interruptedApprovalCancelled', '任务已中断，审批已取消')) + '</strong>' +
+                '</div>';
+        }
+        return;
+    }
+    if (!panel.classList.contains('hitl-approval-interrupted')) return;
+    panel.classList.remove('hitl-approval-interrupted');
+    if (eyebrow && Object.prototype.hasOwnProperty.call(eyebrow.dataset, 'taskAvailableText')) {
+        eyebrow.textContent = eyebrow.dataset.taskAvailableText;
+        delete eyebrow.dataset.taskAvailableText;
+    }
+    if (countdown && Object.prototype.hasOwnProperty.call(countdown.dataset, 'taskAvailableHtml')) {
+        countdown.className = countdown.dataset.taskAvailableClass || 'hitl-approval-countdown';
+        countdown.innerHTML = countdown.dataset.taskAvailableHtml;
+        if (countdown.dataset.taskAvailableExpiresAt) {
+            countdown.dataset.hitlExpiresAt = countdown.dataset.taskAvailableExpiresAt;
+        }
+        if (countdown.dataset.taskAvailableTimeout) {
+            countdown.dataset.hitlTimeout = countdown.dataset.taskAvailableTimeout;
+        }
+        delete countdown.dataset.taskAvailableClass;
+        delete countdown.dataset.taskAvailableHtml;
+        delete countdown.dataset.taskAvailableExpiresAt;
+        delete countdown.dataset.taskAvailableTimeout;
+        if (panel.__hitlApprovalCountdownData) {
+            bindHitlApprovalCountdown(panel, panel.__hitlApprovalCountdownData);
+        }
+    }
+}
+
 function setHitlApprovalTaskAvailability(panel, conversationId) {
     if (!panel) return;
     const id = String(conversationId || panel.dataset.conversationId || '').trim();
@@ -1056,6 +1107,7 @@ function setHitlApprovalTaskAvailability(panel, conversationId) {
     );
     const status = panel.querySelector('.hitl-inline-status, .workflow-hitl-inline-status');
     panel.classList.toggle('hitl-approval-task-closed', taskClosed);
+    setHitlApprovalInterruptedVisualState(panel, taskClosed);
     buttons.forEach(function (button) {
         if (taskClosed) {
             if (!button.disabled) button.dataset.disabledByClosedTask = '1';
@@ -3560,6 +3612,8 @@ function stopHitlApprovalCountdown(panel) {
 function bindHitlApprovalCountdown(panel, data) {
     if (!panel) return;
     stopHitlApprovalCountdown(panel);
+    panel.__hitlApprovalCountdownData = data;
+    if (panel.classList.contains('hitl-approval-task-closed')) return;
     const timing = getHitlApprovalTiming(data);
     const countdown = panel.querySelector('.hitl-approval-countdown[data-hitl-expires-at]');
     if (!countdown || !timing.expiresAt || !timing.timeoutSeconds) return;
@@ -3768,7 +3822,8 @@ function buildInlineHitlApprovalHtml(data, opts) {
     const audit = reviewer === 'audit_agent' || String(data.status || '') === 'audit_running';
     const status = String(data.status || '').trim().toLowerCase();
     const timedOut = status === 'timeout' || String(data.decidedBy || '').trim().toLowerCase() === 'system' && /timeout|超时/i.test(String(data.comment || data.decisionMessage || ''));
-    const resolved = !!data.resolved || status === 'decided' || status === 'timeout' || data.decision === 'approve' || data.decision === 'reject';
+    const cancelled = status === 'cancelled';
+    const resolved = !!data.resolved || status === 'decided' || status === 'timeout' || cancelled || data.decision === 'approve' || data.decision === 'reject';
     const editedArgs = data.editedArgs || data.editedArguments;
     const hasEditedArgs = editedArgs && typeof editedArgs === 'object' && Object.keys(editedArgs).length > 0;
     const tr = hitlApprovalTranslate;
@@ -3777,6 +3832,19 @@ function buildInlineHitlApprovalHtml(data, opts) {
         ? '<div class="hitl-codex-tool-row">' + shield + '<span>' + escapeHtml(request.displayTool || toolName) + '</span></div>'
         : '';
     if (resolved) {
+        if (cancelled) {
+            const statusText = tr('hitl.interruptedApprovalCancelled', '任务已中断，审批已取消');
+            const comment = data.comment && data.comment !== 'process restarted' && data.comment !== 'task cancelled'
+                ? '<p class="hitl-codex-explainer">' + escapeHtml(data.comment) + '</p>'
+                : '';
+            return toolHeading + `
+                <div class="hitl-codex-state hitl-codex-state--interrupted">
+                    <span class="hitl-codex-state-icon" aria-hidden="true">×</span>
+                    <strong>${escapeHtml(statusText)}</strong>
+                </div>
+                ${comment}
+            `;
+        }
         const ok = !timedOut && data.decision !== 'reject';
         let statusText;
         if (timedOut) {
@@ -4399,7 +4467,12 @@ async function restoreHitlInlineForConversation(conversationId) {
         const resp = await apiFetch('/api/hitl/pending?conversationId=' + encodeURIComponent(conversationId) + '&status=pending&pageSize=50');
         if (!resp.ok) return;
         const data = await resp.json().catch(function () { return {}; });
-        const items = Array.isArray(data.items) ? data.items : [];
+        const rawItems = Array.isArray(data.items) ? data.items : [];
+        // 任务列表是当前进程的权威运行态。服务重启或任务取消后，即使审批查询
+        // 短暂读到旧 pending 记录，也不能重新挂载审批入口和倒计时。
+        const items = conversationExecutionTracker.ready && !conversationExecutionTracker.isRunning(conversationId)
+            ? []
+            : rawItems;
         if (typeof window.currentConversationId === 'string' && window.currentConversationId !== conversationId) return;
         clearChatHitlApprovalDock();
         const toHitlData = function (item) {
@@ -5654,6 +5727,7 @@ function renderActiveTasks(tasks) {
     const normalizedTasks = Array.isArray(tasks) ? tasks : [];
     conversationExecutionTracker.update(normalizedTasks);
     syncHitlApprovalTaskAvailability();
+    reconcileHitlApprovalStateWithActiveTasks(normalizedTasks);
     if (typeof window.updateChatPrimaryActionState === 'function') {
         window.updateChatPrimaryActionState();
     }
@@ -5749,6 +5823,27 @@ function renderActiveTasks(tasks) {
 
         bar.appendChild(item);
     });
+}
+
+function reconcileHitlApprovalStateWithActiveTasks(tasks) {
+    const activeIds = new Set(
+        (Array.isArray(tasks) ? tasks : [])
+            .filter((task) => task && task.conversationId && !TASK_FINAL_STATUSES.has(String(task.status || '').toLowerCase()))
+            .map((task) => String(task.conversationId))
+    );
+    hitlSidebarApprovalState.forEach(function (_data, conversationId) {
+        if (activeIds.has(String(conversationId))) return;
+        hitlSidebarApprovalState.delete(conversationId);
+        removeDirectHitlSidebarApproval(conversationId);
+        if (typeof window.setProjectConversationApprovalStatus === 'function') {
+            window.setProjectConversationApprovalStatus(conversationId, false);
+        }
+    });
+    const dock = document.getElementById('chat-hitl-approval-dock');
+    const dockConversationId = dock && String(dock.dataset.conversationId || '').trim();
+    if (dockConversationId && !activeIds.has(dockConversationId)) {
+        clearChatHitlApprovalDock();
+    }
 }
 
 function cancelActiveTask(conversationId) {

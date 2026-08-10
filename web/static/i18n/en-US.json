@@ -847,6 +847,8 @@
     "timeoutUnlimited": "No time limit",
     "expiredAutoRejected": "Approval timed out; rejecting automatically…",
     "taskClosedApprovalUnavailable": "Task ended; approval is unavailable",
+    "taskInterrupted": "Task interrupted",
+    "interruptedApprovalCancelled": "Task interrupted; approval cancelled",
     "expiredRejected": "Approval timed out and was rejected",
     "searchLabel": "Search",
     "searchPlaceholder": "Tool, conversation, payload, comment…",

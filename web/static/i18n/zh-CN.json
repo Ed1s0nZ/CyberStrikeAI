@@ -835,6 +835,8 @@
     "timeoutUnlimited": "不限时等待",
     "expiredAutoRejected": "审批已超时，正在自动拒绝…",
     "taskClosedApprovalUnavailable": "任务已结束，审批不可用",
+    "taskInterrupted": "任务已中断",
+    "interruptedApprovalCancelled": "任务已中断，审批已取消",
     "expiredRejected": "审批超时，已自动拒绝",
     "searchLabel": "搜索",
     "searchPlaceholder": "工具名、会话 ID、载荷、备注…",
