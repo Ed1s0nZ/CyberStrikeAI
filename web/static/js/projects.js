@@ -2622,14 +2622,39 @@ function createProjectTaskStatus(kind) {
     return status;
 }
 
-function getProjectFolderStatus(conversations) {
-    if (conversations.some((conversation) => chatProjectFolderContext.runningIds.has(conversation.id))) {
-        return 'running';
-    }
+function appendProjectTaskStatuses(container, kinds) {
+    const normalizedKinds = Array.from(new Set((Array.isArray(kinds) ? kinds : [kinds]).filter(Boolean)));
+    if (!container || !normalizedKinds.length) return;
+    const group = document.createElement('span');
+    group.className = 'project-task-status-group';
+    normalizedKinds.forEach((kind) => {
+        const status = createProjectTaskStatus(kind);
+        if (status) group.appendChild(status);
+    });
+    if (group.childElementCount) container.appendChild(group);
+}
+
+function getProjectFolderStatuses(conversations) {
+    const kinds = [];
     if (conversations.some((conversation) => isProjectConversationUnread(conversation.id))) {
-        return 'unread';
+        kinds.push('unread');
     }
-    return '';
+    if (conversations.some((conversation) => chatProjectFolderContext.runningIds.has(conversation.id))) {
+        kinds.push('running');
+    }
+    return kinds;
+}
+
+function projectFolderDisclosureMarkup(isExpanded) {
+    const path = isExpanded ? 'M3.5 5.5 7.5 9.5l4-4' : 'm5.5 3.5 4 4-4 4';
+    return `<svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="${path}" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
+function projectFolderIconMarkup(isExpanded) {
+    if (isExpanded) {
+        return '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3.5 9V7a2 2 0 0 1 2-2h4l2 2H18a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.25 10h15.4a1.5 1.5 0 0 1 1.46 1.84l-1.27 5.5A2.15 2.15 0 0 1 17.75 19H5.6a2.15 2.15 0 0 1-2.1-2.62l1.2-5.25A1.5 1.5 0 0 1 6.16 10" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    }
+    return '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3.5 7a2 2 0 0 1 2-2h4l2 2H18.5a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V7Z" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 }
 
 function clampProjectPreviewText(value, maxLength = 220) {
@@ -2950,7 +2975,7 @@ function hideProjectConversationPreview(immediate = false) {
 function appendChatProjectFolderItem(list, project, expandedIds, conversations) {
     const row = document.createElement('div');
     const isExpanded = expandedIds.has(project.id);
-    const statusKind = getProjectFolderStatus(conversations);
+    const statusKinds = getProjectFolderStatuses(conversations);
     row.className = 'project-folder-row' + (isExpanded ? ' is-expanded' : '');
 
     const button = document.createElement('button');
@@ -2960,20 +2985,29 @@ function appendChatProjectFolderItem(list, project, expandedIds, conversations) 
     button.setAttribute('aria-label', project.name || tp('common.untitled'));
     button.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
 
+    const disclosure = document.createElement('span');
+    disclosure.className = 'project-folder-disclosure';
+    disclosure.setAttribute('aria-hidden', 'true');
+    disclosure.innerHTML = projectFolderDisclosureMarkup(isExpanded);
+
     const icon = document.createElement('span');
-    icon.className = 'project-folder-icon';
+    icon.className = 'project-folder-icon' + (isExpanded ? ' is-open' : '');
     icon.setAttribute('aria-hidden', 'true');
-    icon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 6.5h6l2 2h10v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>';
+    icon.innerHTML = projectFolderIconMarkup(isExpanded);
 
     const title = document.createElement('span');
     title.className = 'project-folder-title';
     title.textContent = project.name || tp('common.untitled');
     title.title = title.textContent;
 
+    const label = document.createElement('span');
+    label.className = 'project-folder-label';
+    label.appendChild(title);
+    appendProjectTaskStatuses(label, statusKinds);
+
+    button.appendChild(disclosure);
     button.appendChild(icon);
-    button.appendChild(title);
-    const status = createProjectTaskStatus(statusKind);
-    if (status) button.appendChild(status);
+    button.appendChild(label);
     button.addEventListener('click', () => {
         if (isExpanded) {
             chatProjectFolderExpandedIds.delete(project.id);
@@ -3047,9 +3081,12 @@ function appendChatProjectConversationItem(list, conversation, project) {
     const title = document.createElement('span');
     title.className = 'project-conversation-title';
     title.textContent = conversation.title || pickerMessage(tp, 'projects.untitledConversation', '未命名对话');
-    button.appendChild(title);
-    const status = createProjectTaskStatus(isRunning ? 'running' : (isUnread ? 'unread' : ''));
-    if (status) button.appendChild(status);
+
+    const label = document.createElement('span');
+    label.className = 'project-conversation-label';
+    label.appendChild(title);
+    if (isRunning || isUnread) appendProjectTaskStatuses(label, isRunning ? 'running' : 'unread');
+    button.appendChild(label);
 
     button.addEventListener('click', async () => {
         if (typeof window.loadConversation === 'function') {
