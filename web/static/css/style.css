@@ -44879,6 +44879,31 @@ html[data-theme="dark"] .project-conversation-preview-status.is-unread {
     color: #b42318;
 }
 
+.project-task-status--approval-summary {
+    padding-bottom: 2px;
+    transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+.project-task-status--approval-summary.is-urgency-normal {
+    background: #dcfce7;
+    color: #16804a;
+}
+
+.project-task-status--approval-summary.is-urgency-warning {
+    background: #fef9c3;
+    color: #9a6700;
+}
+
+.project-task-status--approval-summary.is-urgency-urgent {
+    background: #ffedd5;
+    color: #c2410c;
+}
+
+.project-task-status--approval-summary.is-urgency-critical {
+    background: #fee2e2;
+    color: #b42318;
+}
+
 html[data-theme="dark"] .project-task-status--running {
     border-color: #60a5fa;
     border-top-color: rgba(96, 165, 250, 0.2);
@@ -44894,6 +44919,26 @@ html[data-theme="dark"] .project-task-status--approval {
 }
 
 html[data-theme="dark"] .project-task-status--approval.is-expired {
+    background: rgba(248, 113, 113, 0.16);
+    color: #fca5a5;
+}
+
+html[data-theme="dark"] .project-task-status--approval-summary.is-urgency-normal {
+    background: rgba(52, 211, 153, 0.16);
+    color: #6ee7b7;
+}
+
+html[data-theme="dark"] .project-task-status--approval-summary.is-urgency-warning {
+    background: rgba(250, 204, 21, 0.17);
+    color: #fde047;
+}
+
+html[data-theme="dark"] .project-task-status--approval-summary.is-urgency-urgent {
+    background: rgba(251, 146, 60, 0.18);
+    color: #fdba74;
+}
+
+html[data-theme="dark"] .project-task-status--approval-summary.is-urgency-critical {
     background: rgba(248, 113, 113, 0.16);
     color: #fca5a5;
 }

@@ -1,4 +1,5 @@
 const fs = require('node:fs');
+const vm = require('node:vm');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
@@ -59,6 +60,39 @@ test('项目对话列表能同时显示等待批准与运行状态', () => {
     assert.match(projects, /setInterval\(update, 250\)/);
     assert.match(monitor, /function renderDirectHitlSidebarApproval/);
     assert.match(monitor, /hitlSidebarApprovalSyncTimer = window\.setInterval/);
+});
+
+test('项目文件夹汇总待审批数量并按最早到期时间变色', () => {
+    assert.match(projects, /waitingApprovalCount/);
+    assert.match(projects, /aggregate: true, count: folderApprovals\.length/);
+    assert.match(projects, /currentExpiry < earliestExpiry/);
+    assert.match(projects, /PROJECT_APPROVAL_URGENCY_CLASSES/);
+    assert.match(projects, /remaining <= 60 \* 1000/);
+    assert.match(projects, /remaining <= 3 \* 60 \* 1000/);
+    assert.match(projects, /remaining <= 5 \* 60 \* 1000/);
+    assert.match(projects, /project-task-status--approval-summary/);
+    assert.equal(zh.hitl.waitingApprovalCount, '等待批准 {{count}}');
+    assert.equal(typeof en.hitl.waitingApprovalCount, 'string');
+    const urgencyFunctionSource = projects.match(
+        /function projectApprovalUrgencyLevel\(remainingMilliseconds, hasDeadline\) \{[\s\S]*?\n\}/
+    );
+    assert.ok(urgencyFunctionSource, '应提供可测试的审批紧急程度函数');
+    const urgencyLevel = vm.runInNewContext(`(${urgencyFunctionSource[0]})`);
+    assert.equal(urgencyLevel(6 * 60 * 1000, true), 'normal');
+    assert.equal(urgencyLevel(4 * 60 * 1000, true), 'warning');
+    assert.equal(urgencyLevel(2 * 60 * 1000, true), 'urgent');
+    assert.equal(urgencyLevel(30 * 1000, true), 'critical');
+    assert.equal(urgencyLevel(0, false), 'normal');
+});
+
+test('切换对话后主按钮只读取当前可见对话的运行状态', () => {
+    assert.match(chat, /function getVisibleChatConversationId\(\)/);
+    assert.match(chat, /if \(visibleConversationId\) return visibleConversationId/);
+    assert.match(chat, /isConversationTaskRunning\(visibleConversationId\)/);
+    assert.doesNotMatch(
+        chat,
+        /function getCurrentChatTaskConversationId\(\) \{[\s\S]{0,220}if \(live && live\.active && live\.conversationId\) \{[\s\S]{0,100}return String\(live\.conversationId\)/
+    );
 });
 
 test('旧会话首次升级到五分钟默认审批时限，仍允许用户之后主动选择不限时', () => {

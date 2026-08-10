@@ -1133,30 +1133,32 @@ function openChatSessionSettings(section, event) {
     }, 180);
 }
 
-function getCurrentChatTaskConversationId() {
-    const live = window.__csAgentLiveStream;
-    if (live && live.active && live.conversationId) {
-        return String(live.conversationId);
-    }
+function getVisibleChatConversationId() {
     return typeof currentConversationId === 'string' && currentConversationId.trim()
         ? currentConversationId.trim()
         : '';
 }
 
+function getCurrentChatTaskConversationId() {
+    const visibleConversationId = getVisibleChatConversationId();
+    if (visibleConversationId) return visibleConversationId;
+    const live = window.__csAgentLiveStream;
+    return live && live.active && live.conversationId
+        ? String(live.conversationId)
+        : '';
+}
+
 function isCurrentChatTaskActive() {
     const live = window.__csAgentLiveStream;
+    const visibleConversationId = getVisibleChatConversationId();
     if (live && live.active) {
-        const visibleConversationId = typeof currentConversationId === 'string'
-            ? currentConversationId.trim()
-            : '';
         if (!live.conversationId || !visibleConversationId || String(live.conversationId) === visibleConversationId) {
             return true;
         }
     }
-    const conversationId = getCurrentChatTaskConversationId();
-    return !!conversationId &&
+    return !!visibleConversationId &&
         typeof isConversationTaskRunning === 'function' &&
-        isConversationTaskRunning(conversationId);
+        isConversationTaskRunning(visibleConversationId);
 }
 
 function updateChatPrimaryActionState() {

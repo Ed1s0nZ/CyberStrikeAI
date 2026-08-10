@@ -2662,36 +2662,118 @@ function bindProjectApprovalProgress(status, details) {
     status._approvalProgressTimer = window.setInterval(update, 250);
 }
 
-function createProjectTaskStatus(kind, details) {
+const PROJECT_APPROVAL_URGENCY_CLASSES = [
+    'is-urgency-normal',
+    'is-urgency-warning',
+    'is-urgency-urgent',
+    'is-urgency-critical',
+];
+
+function projectApprovalUrgencyLevel(remainingMilliseconds, hasDeadline) {
+    if (!hasDeadline) return 'normal';
+    const remaining = Math.max(0, Number(remainingMilliseconds) || 0);
+    if (remaining <= 60 * 1000) return 'critical';
+    if (remaining <= 3 * 60 * 1000) return 'urgent';
+    if (remaining <= 5 * 60 * 1000) return 'warning';
+    return 'normal';
+}
+
+function getProjectApprovalUrgency(details) {
+    const timing = getProjectApprovalTiming(details);
+    if (!timing.timeoutSeconds || !timing.expiresAt) {
+        return {
+            level: 'normal',
+            label: pickerMessage(tp, 'hitl.approvalUrgencyUnlimited', '审批不限时'),
+            remaining: 0,
+        };
+    }
+    const remaining = Math.max(0, timing.expiresAt - Date.now());
+    const level = projectApprovalUrgencyLevel(remaining, true);
+    const urgencyLabels = {
+        critical: pickerMessage(tp, 'hitl.approvalUrgencyWithinOne', '最早审批将在 1 分钟内到期'),
+        urgent: pickerMessage(tp, 'hitl.approvalUrgencyOneToThree', '最早审批将在 1–3 分钟内到期'),
+        warning: pickerMessage(tp, 'hitl.approvalUrgencyThreeToFive', '最早审批将在 3–5 分钟内到期'),
+        normal: pickerMessage(tp, 'hitl.approvalUrgencyMoreThanFive', '最早审批将在 5 分钟后到期'),
+    };
+    return {
+        level,
+        label: urgencyLabels[level],
+        remaining,
+    };
+}
+
+function bindProjectApprovalUrgency(status, details, baseLabel) {
+    const timing = getProjectApprovalTiming(details);
+    const update = () => {
+        if (!status.isConnected && status._approvalUrgencyTimer) {
+            window.clearInterval(status._approvalUrgencyTimer);
+            status._approvalUrgencyTimer = 0;
+            return;
+        }
+        const urgency = getProjectApprovalUrgency(details);
+        status.classList.remove(...PROJECT_APPROVAL_URGENCY_CLASSES);
+        status.classList.add(`is-urgency-${urgency.level}`);
+        status.dataset.approvalUrgency = urgency.level;
+        status.setAttribute('aria-label', `${baseLabel}，${urgency.label}`);
+        status.title = `${baseLabel} · ${urgency.label}`;
+        if (timing.expiresAt && urgency.remaining <= 0 && status._approvalUrgencyTimer) {
+            window.clearInterval(status._approvalUrgencyTimer);
+            status._approvalUrgencyTimer = 0;
+        }
+    };
+    update();
+    if (timing.timeoutSeconds && timing.expiresAt) {
+        status._approvalUrgencyTimer = window.setInterval(update, 1000);
+    }
+}
+
+function createProjectTaskStatus(kind, details, options) {
     if (!kind) return null;
+    const config = options && typeof options === 'object' ? options : {};
+    const isApprovalSummary = kind === 'approval' && config.aggregate === true;
+    const approvalCount = Math.max(0, Math.floor(Number(config.count) || 0));
     const status = document.createElement('span');
     status.className = `project-task-status project-task-status--${kind}`;
-    const label = kind === 'approval'
+    const label = isApprovalSummary
+        ? tpFmt('hitl.waitingApprovalCount', `等待批准 ${approvalCount}`, { count: approvalCount })
+        : (kind === 'approval'
         ? pickerMessage(tp, 'hitl.waitingApprovalShort', '等待批准')
         : (kind === 'running'
             ? pickerMessage(tp, 'tasks.statusRunning', '运行中')
-            : pickerMessage(tp, 'chat.completedUnread', '已完成，尚未查看'));
+            : pickerMessage(tp, 'chat.completedUnread', '已完成，尚未查看')));
     if (kind === 'approval') {
         const timing = getProjectApprovalTiming(details);
         status.innerHTML = '<span class="project-approval-label"></span>' +
-            (timing.timeoutSeconds && timing.expiresAt
+            (!isApprovalSummary && timing.timeoutSeconds && timing.expiresAt
                 ? '<span class="project-approval-time"></span><span class="project-approval-progress"><span class="project-approval-progress-value"></span></span>'
                 : '');
         status.querySelector('.project-approval-label').textContent = label;
-        bindProjectApprovalProgress(status, details);
+        if (isApprovalSummary) {
+            status.classList.add('project-task-status--approval-summary');
+            status.dataset.approvalCount = String(approvalCount);
+            bindProjectApprovalUrgency(status, details, label);
+        } else {
+            bindProjectApprovalProgress(status, details);
+        }
     }
-    status.setAttribute('aria-label', label);
-    status.title = label;
+    if (!isApprovalSummary) {
+        status.setAttribute('aria-label', label);
+        status.title = label;
+    }
     return status;
 }
 
-function appendProjectTaskStatuses(container, kinds, detailsByKind) {
+function appendProjectTaskStatuses(container, kinds, detailsByKind, optionsByKind) {
     const normalizedKinds = Array.from(new Set((Array.isArray(kinds) ? kinds : [kinds]).filter(Boolean)));
     if (!container || !normalizedKinds.length) return;
     const group = document.createElement('span');
     group.className = 'project-task-status-group';
     normalizedKinds.forEach((kind) => {
-        const status = createProjectTaskStatus(kind, detailsByKind && detailsByKind[kind]);
+        const status = createProjectTaskStatus(
+            kind,
+            detailsByKind && detailsByKind[kind],
+            optionsByKind && optionsByKind[kind]
+        );
         if (status) group.appendChild(status);
     });
     if (group.childElementCount) container.appendChild(group);
@@ -3072,10 +3154,21 @@ function appendChatProjectFolderItem(list, project, expandedIds, conversations) 
     const label = document.createElement('span');
     label.className = 'project-folder-label';
     label.appendChild(title);
-    const folderApproval = conversations
+    const folderApprovals = conversations
         .map((conversation) => chatProjectFolderContext.pendingApprovalByConversation.get(conversation.id))
-        .find(Boolean);
-    appendProjectTaskStatuses(label, statusKinds, { approval: folderApproval });
+        .filter(Boolean);
+    const folderApproval = folderApprovals.reduce((earliest, approval) => {
+        if (!earliest) return approval;
+        const currentExpiry = getProjectApprovalTiming(approval).expiresAt || Number.POSITIVE_INFINITY;
+        const earliestExpiry = getProjectApprovalTiming(earliest).expiresAt || Number.POSITIVE_INFINITY;
+        return currentExpiry < earliestExpiry ? approval : earliest;
+    }, null);
+    appendProjectTaskStatuses(
+        label,
+        statusKinds,
+        { approval: folderApproval },
+        { approval: { aggregate: true, count: folderApprovals.length } }
+    );
 
     button.appendChild(disclosure);
     button.appendChild(icon);
