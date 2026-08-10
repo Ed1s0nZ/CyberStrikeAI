@@ -507,11 +507,11 @@ function getHitlConfigForConversation(conversationId) {
     try {
         const raw = localStorage.getItem(key);
         if (!raw) {
-            return getHitlLastGlobalConfig() || fallback;
+            return fallback;
         }
         const parsed = JSON.parse(raw);
         if (!parsed || typeof parsed !== 'object') {
-            return getHitlLastGlobalConfig() || fallback;
+            return fallback;
         }
         return {
             mode: normalizeHitlMode(parsed.mode),
@@ -520,7 +520,7 @@ function getHitlConfigForConversation(conversationId) {
             updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : ''
         };
     } catch (e) {
-        return getHitlLastGlobalConfig() || fallback;
+        return fallback;
     }
 }
 

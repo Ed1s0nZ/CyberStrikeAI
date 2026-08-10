@@ -241,16 +241,6 @@ function applyHitlDefaultReviewerFromServer(reviewer) {
     if (typeof window !== 'undefined') {
         window.csaiHitlDefaultReviewer = v;
     }
-    if (typeof window.saveHitlLastGlobalConfig === 'function' && typeof window.getHitlLastGlobalConfig === 'function') {
-        const gl = window.getHitlLastGlobalConfig();
-        const base = gl && typeof gl === 'object'
-            ? gl
-            : { mode: 'off', sensitiveTools: '', updatedAt: '' };
-        window.saveHitlLastGlobalConfig(Object.assign({}, base, {
-            reviewer: v,
-            updatedAt: new Date().toISOString()
-        }));
-    }
     return v;
 }
 
@@ -534,43 +524,25 @@ async function syncHitlConfigFromServer(conversationId) {
         const local = readHitlLocalStorageConv(conversationId);
         const localMode = local && local.mode ? hitlModeNormalize(local.mode) : 'off';
         if (localMode !== 'off') {
+            const localReviewer = hitlReviewerNormalize(local && local.reviewer);
             let localToolsStr = typeof local.sensitiveTools === 'string' ? local.sensitiveTools : '';
             localToolsStr = strip(globalWL, localToolsStr);
             merged = {
                 enabled: true,
                 mode: localMode,
+                reviewer: localReviewer,
                 sensitiveTools: localToolsStr.split(/[,\n\r]+/).map(function (s) { return s.trim(); }).filter(Boolean),
                 timeoutSeconds: normalizeHitlTimeoutSeconds(cfg.timeoutSeconds, 0)
             };
             saveHitlConversationConfig(conversationId, {
                 mode: localMode,
+                reviewer: localReviewer,
                 sensitiveTools: localToolsStr,
                 enabled: true,
                 timeoutSeconds: merged.timeoutSeconds
             }).catch(function (err) {
                 console.warn('HITL 会话配置同步到服务器失败（将仅保留本地 UI）:', err);
             });
-        } else {
-            const gl = typeof window.getHitlLastGlobalConfig === 'function' ? window.getHitlLastGlobalConfig() : null;
-            const glMode = gl && gl.mode ? hitlModeNormalize(gl.mode) : 'off';
-            if (glMode !== 'off') {
-                let glToolsStr = typeof gl.sensitiveTools === 'string' ? gl.sensitiveTools : '';
-                glToolsStr = strip(globalWL, glToolsStr);
-                merged = {
-                    enabled: true,
-                    mode: glMode,
-                    sensitiveTools: glToolsStr.split(/[,\n\r]+/).map(function (s) { return s.trim(); }).filter(Boolean),
-                    timeoutSeconds: normalizeHitlTimeoutSeconds(cfg.timeoutSeconds, 0)
-                };
-                saveHitlConversationConfig(conversationId, {
-                    mode: glMode,
-                    sensitiveTools: glToolsStr,
-                    enabled: true,
-                    timeoutSeconds: merged.timeoutSeconds
-                }).catch(function (err) {
-                    console.warn('HITL 会话配置同步到服务器失败（将仅保留本地 UI）:', err);
-                });
-            }
         }
     }
     const uiMode = hitlEffectiveEnabled(merged) ? hitlModeNormalize(merged.mode) : 'off';
@@ -590,7 +562,10 @@ async function syncHitlConfigFromServer(conversationId) {
             localStorage.setItem('chat_hitl_config_' + conversationId, JSON.stringify(normalizedCfg));
         } catch (e) {}
     }
-    if (typeof window.applyHitlConfigToUI === 'function') {
+    if (
+        getCurrentConversationIdForHitl() === conversationId &&
+        typeof window.applyHitlConfigToUI === 'function'
+    ) {
         window.applyHitlConfigToUI(normalizedCfg);
     }
     reconcileHitlUiState();
