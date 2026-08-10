@@ -45335,7 +45335,7 @@ html[data-theme="dark"] .chat-input-container {
 
 html[data-theme="dark"] .chat-composer-context {
     border-color: #263244;
-    background: #111827;
+    background: #172033;
     box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.15);
 }
 
@@ -45360,10 +45360,16 @@ html[data-theme="dark"] .chat-composer-meta-divider {
     background: rgba(148, 163, 184, 0.18);
 }
 
-html[data-theme="dark"] .chat-composer-surface.chat-input-primary-row,
-html[data-theme="dark"] .chat-input-container .chat-composer-surface .chat-input-with-files {
+html[data-theme="dark"] .chat-composer-surface.chat-input-primary-row {
     border-color: #2b374b !important;
     background: #0f172a !important;
+}
+
+/* Keep the rounded surface as the sole dark background painter. Rectangular
+   child backgrounds otherwise cover the color exposed by its top corners. */
+html[data-theme="dark"] .chat-input-container .chat-composer-surface .chat-input-with-files,
+html[data-theme="dark"] .chat-input-container .chat-composer-surface .chat-input-field {
+    background: transparent !important;
 }
 
 html[data-theme="dark"] .chat-input-container .chat-composer-surface .chat-input-field > #chat-input {
