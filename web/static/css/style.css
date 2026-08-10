@@ -45026,7 +45026,7 @@ html[data-theme="dark"] .conversation-sidebar .recent-conversations-section {
     display: flex;
     align-items: center;
     min-height: 52px;
-    margin: 0 0 -9px;
+    margin: 0 30px -9px;
     padding: 0 15px 9px;
     border: 1px solid rgba(15, 23, 42, 0.08);
     border-bottom: 0;
@@ -45400,6 +45400,8 @@ html[data-theme="dark"] .chat-session-shortcut {
 
     .chat-composer-context {
         min-height: 54px;
+        margin-right: 16px;
+        margin-left: 16px;
         padding-right: 8px;
         padding-left: 8px;
     }
@@ -45463,6 +45465,8 @@ html[data-theme="dark"] .chat-session-shortcut {
 
 @container chat-composer (max-width: 520px) {
     .chat-composer-context {
+        margin-right: 8px;
+        margin-left: 8px;
         padding-right: 7px;
         padding-left: 7px;
     }
