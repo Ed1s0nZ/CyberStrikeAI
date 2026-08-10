@@ -3,6 +3,7 @@ package database
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	"go.uber.org/zap"
 )
@@ -102,6 +103,32 @@ func TestProcessDetailsSummaryDoesNotReportPersistedOrphanAsRunning(t *testing.T
 	}
 	if len(summary.ToolExecutions) != 1 || summary.ToolExecutions[0].Status != "result_missing" {
 		t.Fatalf("tool executions = %#v, want result_missing", summary.ToolExecutions)
+	}
+}
+
+func TestProcessDetailsSummaryIncludesPersistedTurnTiming(t *testing.T) {
+	db, _, messageID := setupProcessDetailsSummaryTest(t)
+	startedAt := "2026-08-10T08:00:00Z"
+	completedAt := "2026-08-10T08:12:59Z"
+	if _, err := db.Exec(
+		"UPDATE messages SET content = ?, created_at = ?, updated_at = ? WHERE id = ?",
+		"done", startedAt, completedAt, messageID,
+	); err != nil {
+		t.Fatalf("update message timing: %v", err)
+	}
+
+	summary, err := db.GetProcessDetailsSummary(messageID)
+	if err != nil {
+		t.Fatalf("GetProcessDetailsSummary: %v", err)
+	}
+	if summary.Status != "completed" {
+		t.Fatalf("status = %q, want completed", summary.Status)
+	}
+	if summary.StartedAt == nil || summary.CompletedAt == nil {
+		t.Fatalf("timing missing: %#v", summary)
+	}
+	if want := int64((12*time.Minute + 59*time.Second) / time.Millisecond); summary.DurationMs != want {
+		t.Fatalf("durationMs = %d, want %d", summary.DurationMs, want)
 	}
 }
 

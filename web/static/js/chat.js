@@ -105,7 +105,7 @@ const HITL_MODE_OPTIONS = [HITL_MODE_OFF, HITL_MODE_APPROVAL, HITL_MODE_REVIEW_E
 // Agent orchestration/control tools are safe baseline exemptions for every
 // conversation. Keep this separate from config.tool_whitelist: the latter is
 // enforced globally by the backend and must not be copied into this field.
-const DEFAULT_HITL_SESSION_TOOL_WHITELIST = 'write_todos, transfer_to_agent, exit, TaskCreate, TaskGet, TaskUpdate, TaskList';
+const DEFAULT_HITL_SESSION_TOOL_WHITELIST = 'tool_search, skill, task, write_todos, transfer_to_agent, exit, TaskCreate, TaskGet, TaskUpdate, TaskList, upsert_project_fact, get_project_fact';
 let hitlApplyFeedbackTimer = null;
 let hitlAutoSaveTimer = null;
 const sessionSettingsSelects = new Map();
@@ -3051,6 +3051,9 @@ function syncProcessDetailButtonLabels(messageId, expanded) {
     document.querySelectorAll('#' + messageId + ' .process-detail-btn').forEach((btn) => {
         btn.innerHTML = '<span>' + label + '</span>';
     });
+    if (typeof window.syncAssistantTurnSummary === 'function') {
+        window.syncAssistantTurnSummary(document.getElementById(messageId));
+    }
 }
 
 /** 懒加载占位提示可点击，与工具栏「展开详情」行为一致 */
@@ -3418,6 +3421,14 @@ function renderProcessDetails(messageId, processDetails, options) {
         } else if (eventType === 'hitl_interrupt') {
             const hitlMsg = (detail.message && String(detail.message).trim()) ? String(detail.message).trim() : (typeof window.t === 'function' ? window.t('hitl.pendingTitle') : '待审批');
             itemTitle = agPx + '🧑‍⚖️ HITL · ' + hitlMsg;
+        } else if (eventType === 'hitl_audit_agent_started') {
+            itemTitle = agPx + '审计 Agent 正在审查';
+        } else if (eventType === 'hitl_audit_agent') {
+            itemTitle = agPx + '审计 Agent 已完成审查';
+        } else if (eventType === 'hitl_resumed') {
+            itemTitle = agPx + '审批已通过';
+        } else if (eventType === 'hitl_rejected') {
+            itemTitle = agPx + '审批已拒绝';
         } else if (eventType === 'progress') {
             itemTitle = typeof window.translateProgressMessage === 'function' ? window.translateProgressMessage(detail.message || '') : (detail.message || '');
         } else if (eventType === 'user_interrupt_continue') {
@@ -3426,6 +3437,28 @@ function renderProcessDetails(messageId, processDetails, options) {
                 : '⏸️ 用户中断并继续';
         }
         
+        if (eventType === 'hitl_interrupt' || eventType === 'hitl_audit_agent_started' ||
+            eventType === 'hitl_audit_agent' || eventType === 'hitl_resumed' || eventType === 'hitl_rejected') {
+            const hitlTarget = typeof findToolCallItemForHitl === 'function'
+                ? findToolCallItemForHitl(timeline, data)
+                : null;
+            if (hitlTarget && hitlTarget.id) {
+                if (eventType === 'hitl_interrupt' || eventType === 'hitl_audit_agent_started') {
+                    renderInlineHitlApproval(hitlTarget.id, Object.assign({}, data, {
+                        reviewer: eventType === 'hitl_audit_agent_started' ? 'audit_agent' : (data.reviewer || 'human'),
+                        status: eventType === 'hitl_audit_agent_started' ? 'audit_running' : (data.status || 'pending')
+                    }));
+                } else {
+                    const decision = eventType === 'hitl_rejected' || data.decision === 'reject' ? 'reject' : 'approve';
+                    resolveInlineHitlDecision(timeline, Object.assign({}, data, {
+                        reviewer: data.reviewer || data.decidedBy || (eventType === 'hitl_audit_agent' ? 'audit_agent' : 'human'),
+                        status: 'decided'
+                    }), decision, detail.message || '');
+                }
+                return;
+            }
+        }
+
         const timelineOpts = {
             title: itemTitle,
             message: detail.message || '',
@@ -3446,6 +3479,19 @@ function renderProcessDetails(messageId, processDetails, options) {
             timelineOpts.toolStatus = toolStatusByProcessDetailId.get(String(detail.id));
         }
         const itemId = addTimelineItem(timeline, eventType, timelineOpts);
+        if (itemId && (eventType === 'hitl_interrupt' || eventType === 'hitl_audit_agent_started')) {
+            renderInlineHitlApproval(itemId, Object.assign({}, data, {
+                reviewer: eventType === 'hitl_audit_agent_started' ? 'audit_agent' : (data.reviewer || 'human'),
+                status: eventType === 'hitl_audit_agent_started' ? 'audit_running' : (data.status || 'pending')
+            }));
+        } else if (itemId && (eventType === 'hitl_audit_agent' || eventType === 'hitl_resumed' || eventType === 'hitl_rejected')) {
+            renderInlineHitlApproval(itemId, Object.assign({}, data, {
+                resolved: true,
+                decision: eventType === 'hitl_rejected' || data.decision === 'reject' ? 'reject' : 'approve',
+                reviewer: data.reviewer || data.decidedBy || (eventType === 'hitl_audit_agent' ? 'audit_agent' : 'human'),
+                status: 'decided'
+            }));
+        }
         if (prependMode && itemId) {
             prependedIds.push(itemId);
         }
@@ -3535,6 +3581,14 @@ function prefetchProcessDetailsSummaryHint(messageId, messageElement) {
             const j = await res.json().catch(() => ({}));
             if (!res.ok || !j.summary) return;
             const s = j.summary;
+            if (typeof window.setAssistantTurnTiming === 'function') {
+                window.setAssistantTurnTiming(messageElement, {
+                    startedAt: s.startedAt,
+                    completedAt: s.completedAt,
+                    durationMs: s.durationMs,
+                    status: s.status || 'completed'
+                });
+            }
             const summaryMcpIds = Array.isArray(s.mcpExecutionIds) ? s.mcpExecutionIds : [];
             const summaryTools = Array.isArray(s.toolExecutions) ? s.toolExecutions : [];
             if (summaryTools.length > 0) {
@@ -3854,6 +3908,97 @@ function formatMcpToolsToggleLabel(count, expanded) {
     return count + '次工具执行';
 }
 
+function formatAssistantTurnDuration(durationMs) {
+    const totalSeconds = Math.max(0, Math.floor((Number(durationMs) || 0) / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    if (hours > 0) {
+        return typeof window.t === 'function'
+            ? window.t('chat.turnDurationHours', { hours: hours, minutes: minutes })
+            : hours + ' 小时 ' + minutes + ' 分钟';
+    }
+    if (minutes > 0) {
+        return typeof window.t === 'function'
+            ? window.t('chat.turnDurationMinutes', { minutes: minutes, seconds: seconds })
+            : minutes + ' 分钟 ' + seconds + ' 秒';
+    }
+    return typeof window.t === 'function'
+        ? window.t('chat.turnDurationSeconds', { seconds: seconds })
+        : seconds + ' 秒';
+}
+
+function assistantTurnTimestamp(value) {
+    if (value == null || value === '') return NaN;
+    const n = new Date(value).getTime();
+    return Number.isFinite(n) ? n : NaN;
+}
+
+function setAssistantTurnTiming(messageElementOrId, timing) {
+    const messageElement = typeof messageElementOrId === 'string'
+        ? document.getElementById(messageElementOrId)
+        : messageElementOrId;
+    if (!messageElement || !messageElement.dataset) return;
+    const value = timing || {};
+    if (value.startedAt) messageElement.dataset.turnStartedAt = String(value.startedAt);
+    if (value.completedAt) messageElement.dataset.turnCompletedAt = String(value.completedAt);
+    if (value.status) messageElement.dataset.turnStatus = String(value.status);
+    const explicitDuration = Number(value.durationMs);
+    if (Number.isFinite(explicitDuration) && explicitDuration >= 0) {
+        messageElement.dataset.turnDurationMs = String(Math.round(explicitDuration));
+    } else {
+        const startedAt = assistantTurnTimestamp(messageElement.dataset.turnStartedAt);
+        const completedAt = assistantTurnTimestamp(messageElement.dataset.turnCompletedAt);
+        if (Number.isFinite(startedAt) && Number.isFinite(completedAt) && completedAt >= startedAt) {
+            messageElement.dataset.turnDurationMs = String(completedAt - startedAt);
+        }
+    }
+    syncAssistantTurnSummary(messageElement);
+}
+
+function syncAssistantTurnSummary(messageElementOrId) {
+    const messageElement = typeof messageElementOrId === 'string'
+        ? document.getElementById(messageElementOrId)
+        : messageElementOrId;
+    if (!messageElement) return;
+    const label = messageElement.querySelector('.mcp-call-label.turn-process-summary');
+    if (!label) return;
+    const details = messageElement.querySelector('.process-details-container');
+    const timeline = details && details.querySelector('.progress-timeline');
+    const expanded = !!(timeline && timeline.classList.contains('expanded'));
+    const status = String(messageElement.dataset.turnStatus || 'completed');
+    let durationMs = Number(messageElement.dataset.turnDurationMs);
+    if (!Number.isFinite(durationMs) || durationMs < 0) {
+        const startedAt = assistantTurnTimestamp(messageElement.dataset.turnStartedAt);
+        const completedAt = status === 'running'
+            ? Date.now()
+            : assistantTurnTimestamp(messageElement.dataset.turnCompletedAt);
+        durationMs = Number.isFinite(startedAt) && Number.isFinite(completedAt)
+            ? Math.max(0, completedAt - startedAt)
+            : 0;
+    }
+    const duration = formatAssistantTurnDuration(durationMs);
+    const text = status === 'running'
+        ? (typeof window.t === 'function' ? window.t('chat.turnElapsedRunning', { duration: duration }) : '已处理 ' + duration)
+        : (typeof window.t === 'function' ? window.t('chat.turnElapsedComplete', { duration: duration }) : '耗时 ' + duration);
+    label.innerHTML = `
+        <span class="turn-process-leading">
+            <span class="turn-process-status-dot${status === 'running' ? ' is-running' : ''}" aria-hidden="true"></span>
+            <span class="turn-process-summary-text">${escapeHtml(text)}</span>
+        </span>
+        <svg class="turn-process-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7.5 5.5L12 10l-4.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    `;
+    label.classList.toggle('is-expanded', expanded);
+    label.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    label.setAttribute('aria-label', typeof window.t === 'function'
+        ? window.t('chat.turnProcessAria', { state: text })
+        : text + '，展开或收起执行过程');
+}
+
+window.setAssistantTurnTiming = setAssistantTurnTiming;
+window.syncAssistantTurnSummary = syncAssistantTurnSummary;
+window.formatAssistantTurnDuration = formatAssistantTurnDuration;
+
 /** 渗透测试区：工具栏（展开详情 | N次工具执行）+ 独立工具列表 + 迭代时间线 */
 function ensureMcpCallSectionChrome(messageElement, messageId) {
     const contentWrapper = messageElement && messageElement.querySelector('.message-content');
@@ -3863,18 +4008,26 @@ function ensureMcpCallSectionChrome(messageElement, messageId) {
     if (!mcpSection) {
         mcpSection = document.createElement('div');
         mcpSection.className = 'mcp-call-section';
-        const mcpLabel = document.createElement('div');
-        mcpLabel.className = 'mcp-call-label';
-        mcpLabel.textContent = '📋 ' + (typeof window.t === 'function' ? window.t('chat.penetrationTestDetail') : '任务执行详情');
+        const mcpLabel = document.createElement('button');
+        mcpLabel.type = 'button';
+        mcpLabel.className = 'mcp-call-label turn-process-summary';
+        mcpLabel.onclick = function (event) {
+            event.stopPropagation();
+            toggleProcessDetails(null, messageId || messageElement.id);
+        };
         mcpSection.appendChild(mcpLabel);
-        contentWrapper.appendChild(mcpSection);
-    } else {
-        const mcpLabel = mcpSection.querySelector('.mcp-call-label');
-        const labelText = '📋 ' + (typeof window.t === 'function' ? window.t('chat.penetrationTestDetail') : '任务执行详情');
-        if (mcpLabel && mcpLabel.textContent !== labelText) {
-            mcpLabel.textContent = labelText;
+        const resultBubble = contentWrapper.querySelector(':scope > .message-bubble');
+        contentWrapper.insertBefore(mcpSection, resultBubble || contentWrapper.firstChild);
+    } else if (mcpSection.parentNode === contentWrapper) {
+        const resultBubble = contentWrapper.querySelector(':scope > .message-bubble');
+        if (resultBubble && mcpSection.nextSibling !== resultBubble) {
+            contentWrapper.insertBefore(mcpSection, resultBubble);
         }
     }
+
+    messageElement.classList.add('assistant-turn-with-process');
+    const resultBubble = contentWrapper.querySelector(':scope > .message-bubble');
+    if (resultBubble) resultBubble.classList.add('assistant-final-result');
 
     let toolbar = mcpSection.querySelector('.mcp-call-toolbar');
     if (!toolbar) {
@@ -3904,6 +4057,7 @@ function ensureMcpCallSectionChrome(messageElement, messageId) {
         toolbar.appendChild(processDetailBtn);
     }
 
+    syncAssistantTurnSummary(messageElement);
     return { mcpSection, toolbar, toolList };
 }
 
@@ -5109,6 +5263,21 @@ async function loadConversation(conversationId) {
                     attachDeleteTurnButton(messageEl);
                 }
                 if (msg.role === 'assistant') {
+                    if (messageEl && typeof window.setAssistantTurnTiming === 'function') {
+                        const startedAt = msg && msg.createdAt ? msg.createdAt : null;
+                        const completedAt = msg && msg.updatedAt ? msg.updatedAt : startedAt;
+                        const startedMs = assistantTurnTimestamp(startedAt);
+                        const completedMs = assistantTurnTimestamp(completedAt);
+                        const isRunning = String(msg.content || '').trim() === '处理中...' || String(msg.content || '').trim() === 'Processing...';
+                        window.setAssistantTurnTiming(messageEl, {
+                            startedAt: startedAt,
+                            completedAt: isRunning ? null : completedAt,
+                            durationMs: (!isRunning && Number.isFinite(startedMs) && Number.isFinite(completedMs))
+                                ? Math.max(0, completedMs - startedMs)
+                                : undefined,
+                            status: isRunning ? 'running' : 'completed'
+                        });
+                    }
                     if (messageEl && msg.reasoningContent) {
                         setMessageReasoningContent(messageEl, msg.reasoningContent);
                     }
@@ -10595,9 +10764,6 @@ function refreshChatPanelI18n() {
                 }
             } catch (e) { /* ignore */ }
         });
-        messagesEl.querySelectorAll('.mcp-call-label').forEach(function (el) {
-            el.textContent = '\uD83D\uDCCB ' + t('chat.penetrationTestDetail');
-        });
         messagesEl.querySelectorAll('.process-detail-btn').forEach(function (btn) {
             const span = btn.querySelector('span');
             if (!span) return;
@@ -10618,10 +10784,16 @@ function refreshChatPanelI18n() {
             btn.setAttribute('aria-label', copyTitle);
         });
         messagesEl.querySelectorAll('.message.assistant').forEach(function (msgEl) {
+            if (typeof window.syncAssistantTurnSummary === 'function') {
+                window.syncAssistantTurnSummary(msgEl);
+            }
             if (typeof window.syncMcpToolsToggleButton === 'function') {
                 window.syncMcpToolsToggleButton(msgEl);
             }
         });
+        if (window.CyberStrikeChatScroll && typeof window.CyberStrikeChatScroll.refreshTurnRail === 'function') {
+            window.CyberStrikeChatScroll.refreshTurnRail();
+        }
     }
 
     if (isAppModalOpen('mcp-detail-modal')) {

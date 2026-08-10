@@ -1420,6 +1420,10 @@ type ProcessDetailsSummary struct {
 	ToolCount       int                           `json:"toolCount"`
 	ToolExecutions  []ProcessDetailsToolExecution `json:"toolExecutions,omitempty"`
 	MCPExecutionIDs []string                      `json:"mcpExecutionIds,omitempty"`
+	StartedAt       *time.Time                    `json:"startedAt,omitempty"`
+	CompletedAt     *time.Time                    `json:"completedAt,omitempty"`
+	DurationMs      int64                         `json:"durationMs"`
+	Status          string                        `json:"status,omitempty"`
 }
 
 type ProcessDetailsToolExecution struct {
@@ -1442,6 +1446,32 @@ func (db *DB) GetProcessDetailsSummary(messageID string) (*ProcessDetailsSummary
 	}
 
 	summary := &ProcessDetailsSummary{Total: total}
+	var messageCreatedAt, messageUpdatedAt sql.NullString
+	var messageContent string
+	if err := db.QueryRow(
+		"SELECT created_at, updated_at, content FROM messages WHERE id = ?",
+		messageID,
+	).Scan(&messageCreatedAt, &messageUpdatedAt, &messageContent); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("查询过程详情耗时失败: %w", err)
+	}
+	if messageCreatedAt.Valid {
+		if startedAt := parseDBTime(messageCreatedAt.String); !startedAt.IsZero() {
+			summary.StartedAt = &startedAt
+		}
+	}
+	if strings.TrimSpace(messageContent) == "处理中..." || strings.TrimSpace(messageContent) == "Processing..." {
+		summary.Status = "running"
+	} else {
+		summary.Status = "completed"
+		if messageUpdatedAt.Valid {
+			if completedAt := parseDBTime(messageUpdatedAt.String); !completedAt.IsZero() {
+				summary.CompletedAt = &completedAt
+			}
+		}
+		if summary.StartedAt != nil && summary.CompletedAt != nil && !summary.CompletedAt.Before(*summary.StartedAt) {
+			summary.DurationMs = summary.CompletedAt.Sub(*summary.StartedAt).Milliseconds()
+		}
+	}
 	if total == 0 {
 		return summary, nil
 	}

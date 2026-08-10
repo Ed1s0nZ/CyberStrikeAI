@@ -23,7 +23,7 @@
             }
         })();
     </script>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260810-9">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260810-16">
     <link rel="stylesheet" href="/static/css/c2.css">
     <link rel="stylesheet" href="/static/vendor/xterm.css">
     <script src="/static/js/router.js"></script>
@@ -1154,8 +1154,21 @@
                             </div>
                             <div id="active-tasks-bar" class="active-tasks-bar"></div>
                             <div id="chat-messages" class="chat-messages"></div>
-                            <button type="button" id="chat-scroll-to-bottom" class="chat-scroll-to-bottom" aria-label="回到底部" title="回到底部">
-                                <span class="chat-scroll-to-bottom-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+                            <nav id="chat-turn-rail" class="chat-turn-rail" aria-label="对话轮次导航" hidden>
+                                <div id="chat-turn-rail-markers" class="chat-turn-rail-markers"></div>
+                            </nav>
+                            <div id="chat-turn-rail-preview" class="chat-turn-rail-preview" role="tooltip" hidden>
+                                <div id="chat-turn-rail-preview-title" class="chat-turn-rail-preview-title"></div>
+                                <div id="chat-turn-rail-preview-summary" class="chat-turn-rail-preview-summary"></div>
+                            </div>
+                            <button type="button" id="chat-return-latest" class="chat-return-latest" hidden
+                                    data-i18n="chat.returnToLatest" data-i18n-attr="title,aria-label" data-i18n-skip-text="true"
+                                    title="回到最新消息" aria-label="回到最新消息">
+                                <span class="chat-return-latest-dots" aria-hidden="true">
+                                    <span class="chat-return-latest-dot"></span>
+                                    <span class="chat-return-latest-dot"></span>
+                                    <span class="chat-return-latest-dot"></span>
+                                </span>
                             </button>
                             <div id="chat-input-container" class="chat-input-container">
                                 <div class="chat-composer-context" aria-label="当前会话上下文">
@@ -6760,9 +6773,9 @@
     <script src="/static/js/assets.js?v=20260717-7"></script>
     <script src="/static/js/agents.js"></script>
     <script src="/static/js/dashboard.js"></script>
-    <script src="/static/js/chat-scroll.js?v=20260810-1"></script>
-    <script src="/static/js/monitor.js?v=20260810-1"></script>
-    <script src="/static/js/chat.js?v=20260810-8"></script>
+    <script src="/static/js/chat-scroll.js?v=20260810-5"></script>
+    <script src="/static/js/monitor.js?v=20260810-3"></script>
+    <script src="/static/js/chat.js?v=20260810-10"></script>
     <script src="/static/js/hitl.js?v=20260810-2"></script>
     <script src="/static/js/settings.js?v=20260717-1"></script>
     <script src="/static/js/audit-datetime-picker.js"></script>
@@ -6774,7 +6787,7 @@
     <script src="/static/js/knowledge.js"></script>
     <script src="/static/js/skills.js"></script>
     <script src="/static/js/fact-graph.js"></script>
-    <script src="/static/js/projects.js?v=20260810-1"></script>
+    <script src="/static/js/projects.js?v=20260810-3"></script>
     <script src="/static/js/vulnerability.js?v=14"></script>
     <script src="/static/js/webshell.js"></script>
     <script src="/static/js/chat-files.js"></script>

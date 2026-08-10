@@ -1261,13 +1261,62 @@ async function performHardCancelProgressTask(progressId) {
     }
 }
 
+const progressElapsedTimerById = new Map();
+
+function progressElapsedText(progressId) {
+    const el = document.getElementById(progressId);
+    const startedAt = el && el.dataset ? Number(el.dataset.turnStartedAtMs) : NaN;
+    const duration = typeof window.formatAssistantTurnDuration === 'function'
+        ? window.formatAssistantTurnDuration(Number.isFinite(startedAt) ? Date.now() - startedAt : 0)
+        : Math.max(0, Math.floor((Date.now() - (Number.isFinite(startedAt) ? startedAt : Date.now())) / 1000)) + ' 秒';
+    return typeof window.t === 'function'
+        ? window.t('chat.turnElapsedRunning', { duration: duration })
+        : '已处理 ' + duration;
+}
+
+function syncProgressElapsedSummary(progressId) {
+    const el = document.getElementById(progressId);
+    if (!el) return;
+    const title = el.querySelector('.progress-title');
+    if (title) title.textContent = progressElapsedText(progressId);
+    const timeline = document.getElementById(progressId + '-timeline');
+    const summary = el.querySelector('.progress-summary-toggle');
+    if (summary) {
+        const expanded = !!(timeline && timeline.classList.contains('expanded'));
+        summary.classList.toggle('is-expanded', expanded);
+        summary.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    }
+}
+
+function stopProgressElapsedClock(progressId) {
+    const timer = progressElapsedTimerById.get(progressId);
+    if (timer) clearInterval(timer);
+    progressElapsedTimerById.delete(progressId);
+}
+
+function startProgressElapsedClock(progressId) {
+    stopProgressElapsedClock(progressId);
+    syncProgressElapsedSummary(progressId);
+    progressElapsedTimerById.set(progressId, setInterval(function () {
+        if (!document.getElementById(progressId)) {
+            stopProgressElapsedClock(progressId);
+            return;
+        }
+        syncProgressElapsedSummary(progressId);
+    }, 1000));
+}
+
 function addProgressMessage() {
     const messagesDiv = document.getElementById('chat-messages');
     const messageDiv = document.createElement('div');
     messageCounter++;
     const id = 'progress-' + Date.now() + '-' + messageCounter;
     messageDiv.id = id;
-    messageDiv.className = 'message system progress-message';
+    messageDiv.className = 'message assistant progress-message';
+
+    if (typeof createMessageAvatar === 'function') {
+        messageDiv.appendChild(createMessageAvatar('assistant'));
+    }
     
     const contentWrapper = document.createElement('div');
     contentWrapper.className = 'message-content';
@@ -1279,12 +1328,19 @@ function addProgressMessage() {
     const collapseDetailText = typeof window.t === 'function' ? window.t('tasks.collapseDetail') : '收起详情';
     bubble.innerHTML = `
         <div class="progress-header">
-            <span class="progress-title">🔍 ${progressTitleText}</span>
+            <button type="button" class="turn-process-summary progress-summary-toggle is-expanded" aria-expanded="true" onclick="toggleProgressDetails('${id}')">
+                <span class="turn-process-leading">
+                    <span class="turn-process-status-dot is-running" aria-hidden="true"></span>
+                    <span class="progress-title"></span>
+                </span>
+                <svg class="turn-process-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7.5 5.5L12 10l-4.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
             <div class="progress-actions">
                 <button class="progress-stop" id="${id}-stop-btn" onclick="cancelProgressTask('${id}')">${stopTaskText}</button>
                 <button class="progress-toggle" onclick="toggleProgressDetails('${id}')">${collapseDetailText}</button>
             </div>
         </div>
+        <div class="progress-stage" aria-live="polite">${progressTitleText}</div>
         <div class="progress-timeline expanded" id="${id}-timeline"></div>
         <div class="progress-footer">
             <button type="button" class="progress-toggle progress-toggle-bottom" onclick="toggleProgressDetails('${id}')">${collapseDetailText}</button>
@@ -1294,6 +1350,8 @@ function addProgressMessage() {
     contentWrapper.appendChild(bubble);
     messageDiv.appendChild(contentWrapper);
     messageDiv.dataset.conversationId = currentConversationId || '';
+    messageDiv.dataset.turnStartedAtMs = String(Date.now());
+    messageDiv.dataset.turnStartedAt = new Date().toISOString();
     messagesDiv.appendChild(messageDiv);
     bubble.classList.add('is-streaming');
     const progressWasPinned = typeof window.captureScrollPinState === 'function'
@@ -1305,6 +1363,7 @@ function addProgressMessage() {
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
+    startProgressElapsedClock(id);
     return id;
 }
 
@@ -1324,6 +1383,7 @@ function toggleProgressDetails(progressId) {
         timeline.classList.add('expanded');
         toggleBtns.forEach((btn) => { btn.textContent = collapseT; });
     }
+    syncProgressElapsedSummary(progressId);
 }
 
 // 编排器开始输出最终回复时隐藏整条进度消息（过程已迁入助手气泡的「展开详情」，避免与进度卡重复）
@@ -1349,6 +1409,9 @@ function collapseAllProgressDetails(assistantMessageId, progressId) {
                     btn.innerHTML = '<span>' + (typeof window.t === 'function' ? window.t('chat.expandDetail') : '展开详情') + '</span>';
                 });
             }
+        }
+        if (typeof window.syncAssistantTurnSummary === 'function') {
+            window.syncAssistantTurnSummary(document.getElementById(assistantMessageId));
         }
     }
     
@@ -1390,6 +1453,14 @@ function getAssistantId() {
 // 将进度详情集成到工具调用区域（流式阶段助手消息不挂 mcp 条，结束时在此创建，避免图二整行 MCP 芯片样式）
 function integrateProgressToMCPSection(progressId, assistantMessageId, mcpExecutionIds) {
     const progressElement = document.getElementById(progressId);
+    const progressStartedAt = progressElement && progressElement.dataset
+        ? (progressElement.dataset.turnStartedAt || new Date(Number(progressElement.dataset.turnStartedAtMs) || Date.now()).toISOString())
+        : new Date().toISOString();
+    const progressStartedAtMs = progressElement && progressElement.dataset
+        ? Number(progressElement.dataset.turnStartedAtMs)
+        : Date.now();
+    const completedAt = new Date();
+    stopProgressElapsedClock(progressId);
 
     // 只 flush 终态标题/正文；完成后的详情回看统一走后端分页，不再复制实时 DOM 快照。
     flushAllPendingStreamPlainUpdates();
@@ -1415,6 +1486,14 @@ function integrateProgressToMCPSection(progressId, assistantMessageId, mcpExecut
     // 查找或创建 MCP 区域（工具栏 + 工具列表 + 迭代时间线）
     if (typeof window.ensureMcpCallSectionChrome === 'function') {
         window.ensureMcpCallSectionChrome(assistantElement, assistantMessageId);
+    }
+    if (typeof window.setAssistantTurnTiming === 'function') {
+        window.setAssistantTurnTiming(assistantElement, {
+            startedAt: progressStartedAt,
+            completedAt: completedAt.toISOString(),
+            durationMs: Math.max(0, completedAt.getTime() - (Number.isFinite(progressStartedAtMs) ? progressStartedAtMs : completedAt.getTime())),
+            status: 'completed'
+        });
     }
     const mcpSection = assistantElement.querySelector('.mcp-call-section');
     if (!mcpSection) {
@@ -1514,32 +1593,6 @@ function disconnectProcessDetailsAutoLoader(detailsContainer) {
     }
 }
 
-function scrollProcessDetailsToLatest(assistantMessageId, smooth) {
-    const detailsContainer = document.getElementById('process-details-' + assistantMessageId);
-    if (!detailsContainer) return;
-    const timeline = detailsContainer.querySelector('.progress-timeline');
-    if (!timeline) return;
-    const behavior = smooth === false ? 'auto' : 'smooth';
-    if (timeline.scrollHeight > timeline.clientHeight + 2) {
-        timeline.scrollTo({ top: timeline.scrollHeight, behavior: behavior });
-        return;
-    }
-    const items = timeline.querySelectorAll('.timeline-item');
-    if (!items.length) return;
-    const lastItem = items[items.length - 1];
-    lastItem.scrollIntoView({ behavior: behavior, block: 'nearest' });
-}
-
-function updateProcessDetailsJumpLatestVisibility(detailsContainer) {
-    if (!detailsContainer) return;
-    const btn = detailsContainer.querySelector('.process-details-jump-latest');
-    const timeline = detailsContainer.querySelector('.progress-timeline');
-    if (!btn || !timeline) return;
-    const hasUnloadedNewer = detailsContainer.dataset.hasNext === '1';
-    const awayFromTimelineBottom = timeline.scrollHeight - timeline.clientHeight - timeline.scrollTop > 120;
-    btn.classList.toggle('visible', hasUnloadedNewer || awayFromTimelineBottom);
-}
-
 async function requestProcessDetailsAutoPage(assistantMessageId, backendMessageId, direction, sentinel) {
     const detailsContainer = document.getElementById('process-details-' + assistantMessageId);
     if (!detailsContainer || !sentinel) return;
@@ -1606,34 +1659,6 @@ function updateProcessDetailsPaginationButtons(assistantMessageId, backendMessag
         timeline.appendChild(bottomSentinel);
     }
 
-    let jumpBtn = detailsContainer.querySelector('.process-details-jump-latest');
-    if (!jumpBtn) {
-        jumpBtn = document.createElement('button');
-        jumpBtn.type = 'button';
-        jumpBtn.className = 'process-details-jump-latest';
-        jumpBtn.textContent = typeof window.t === 'function' ? window.t('chat.backToLatestProgress') : '↓ 回到最新进度';
-        detailsContainer.appendChild(jumpBtn);
-    }
-    jumpBtn.onclick = async function () {
-        if (detailsContainer.dataset.hasNext === '1') {
-            await loadProcessDetailsPaginated(assistantMessageId, backendMessageId, {
-                autoLoadAll: false,
-                initialLatest: true
-            });
-        }
-        requestAnimationFrame(function () {
-            scrollProcessDetailsToLatest(assistantMessageId, true);
-            updateProcessDetailsJumpLatestVisibility(detailsContainer);
-        });
-    };
-
-    if (timeline.dataset.continuousScrollBound !== '1') {
-        timeline.dataset.continuousScrollBound = '1';
-        timeline.addEventListener('scroll', function () {
-            updateProcessDetailsJumpLatestVisibility(detailsContainer);
-        }, { passive: true });
-    }
-
     if (typeof IntersectionObserver === 'function' && (topSentinel || bottomSentinel)) {
         const root = document.getElementById('chat-messages') || null;
         const observer = new IntersectionObserver(function (entries) {
@@ -1664,7 +1689,6 @@ function updateProcessDetailsPaginationButtons(assistantMessageId, backendMessag
             };
         }
     }
-    updateProcessDetailsJumpLatestVisibility(detailsContainer);
 }
 
 /**
@@ -1913,6 +1937,9 @@ function toggleProcessDetails(progressId, assistantMessageId) {
         setExpanded(!timeline.classList.contains('expanded'));
     } else if (timeline) {
         setExpanded(!timeline.classList.contains('expanded'));
+    }
+    if (typeof window.syncAssistantTurnSummary === 'function') {
+        window.syncAssistantTurnSummary(document.getElementById(assistantMessageId));
     }
     
     // 滚动到展开的详情位置（流式且用户上滑阅读时不抢主列表滚动）
@@ -2561,6 +2588,42 @@ function handleStreamEvent(event, progressElement, progressId,
             });
             break;
 
+        case 'hitl_audit_agent_started': {
+            const auditData = Object.assign({}, event.data || {}, {
+                reviewer: 'audit_agent',
+                status: 'audit_running'
+            });
+            const auditTargetItem = findToolCallItemForHitl(timeline, auditData);
+            if (auditTargetItem && auditTargetItem.id) {
+                renderInlineHitlApproval(auditTargetItem.id, auditData);
+            } else {
+                const auditItemId = addTimelineItem(timeline, 'hitl_audit_agent_started', {
+                    title: '审计 Agent 正在审查',
+                    message: event.message,
+                    data: auditData
+                });
+                renderInlineHitlApproval(auditItemId, auditData);
+            }
+            break;
+        }
+        case 'hitl_audit_agent': {
+            const auditDecisionData = Object.assign({}, event.data || {}, {
+                reviewer: 'audit_agent',
+                decidedBy: 'audit_agent',
+                status: 'decided'
+            });
+            const auditDecision = auditDecisionData.decision === 'reject' ? 'reject' : 'approve';
+            if (!resolveInlineHitlDecision(timeline, auditDecisionData, auditDecision, event.message)) {
+                const auditTargetItem = findToolCallItemForHitl(timeline, auditDecisionData);
+                if (auditTargetItem && auditTargetItem.id) {
+                    renderInlineHitlApproval(auditTargetItem.id, Object.assign({}, auditDecisionData, {
+                        resolved: true,
+                        decision: auditDecision
+                    }));
+                }
+            }
+            break;
+        }
         case 'hitl_interrupt':
             const hitlTargetItem = findToolCallItemForHitl(timeline, event.data || {});
             if (hitlTargetItem && hitlTargetItem.id) {
@@ -2884,7 +2947,7 @@ function handleStreamEvent(event, progressElement, progressId,
         }
             
         case 'progress':
-            const progressTitle = document.querySelector(`#${progressId} .progress-title`);
+            const progressTitle = document.querySelector(`#${progressId} .progress-stage`);
             if (progressTitle) {
                 // 保存原文，语言切换时可用 translateProgressMessage 重新套当前语言
                 const progressEl = document.getElementById(progressId);
@@ -2897,11 +2960,12 @@ function handleStreamEvent(event, progressElement, progressId,
                     }
                 }
                 const progressMsg = translateProgressMessage(event.message, event.data);
-                progressTitle.textContent = '🔍 ' + progressMsg;
+                progressTitle.textContent = progressMsg;
             }
             break;
         
         case 'cancelled':
+            stopProgressElapsedClock(progressId);
             const taskCancelledText = typeof window.t === 'function' ? window.t('chat.taskCancelled') : '任务已取消';
             if (timeline) {
                 addTimelineItem(timeline, 'cancelled', {
@@ -2910,7 +2974,7 @@ function handleStreamEvent(event, progressElement, progressId,
                     data: event.data
                 });
             }
-            const cancelTitle = document.querySelector(`#${progressId} .progress-title`);
+            const cancelTitle = document.querySelector(`#${progressId} .progress-stage`);
             if (cancelTitle) {
                 cancelTitle.textContent = '⛔ ' + taskCancelledText;
             }
@@ -3154,6 +3218,7 @@ function handleStreamEvent(event, progressElement, progressId,
             break;
             
         case 'error':
+            stopProgressElapsedClock(progressId);
             // 显示错误
             if (timeline) {
                 addTimelineItem(timeline, 'error', {
@@ -3164,7 +3229,7 @@ function handleStreamEvent(event, progressElement, progressId,
             }
             
             // 更新进度标题为错误状态
-            const errorTitle = document.querySelector(`#${progressId} .progress-title`);
+            const errorTitle = document.querySelector(`#${progressId} .progress-stage`);
             if (errorTitle) {
                 errorTitle.textContent = '❌ ' + (typeof window.t === 'function' ? window.t('chat.executionFailed') : '执行失败');
             }
@@ -3209,7 +3274,7 @@ function handleStreamEvent(event, progressElement, progressId,
             
         case 'done':
             if (event.data && event.data.workflowStatus === 'awaiting_hitl') {
-                const waitingTitle = document.querySelector(`#${progressId} .progress-title`);
+                const waitingTitle = document.querySelector(`#${progressId} .progress-stage`);
                 if (waitingTitle) {
                     waitingTitle.textContent = '⏸️ ' + (typeof window.t === 'function' ? window.t('chat.workflowAwaitingApproval') : '工作流等待审批');
                 }
@@ -3218,6 +3283,7 @@ function handleStreamEvent(event, progressElement, progressId,
                 }
                 break;
             }
+            stopProgressElapsedClock(progressId);
             // 清理流式输出状态
             responseStreamStateByProgressId.delete(progressId);
             mainIterationStateByProgressId.delete(String(progressId));
@@ -3234,7 +3300,7 @@ function handleStreamEvent(event, progressElement, progressId,
                 clearCsTaskReplay();
             }
             // 完成，更新进度标题（如果进度消息还存在）
-            const doneTitle = document.querySelector(`#${progressId} .progress-title`);
+            const doneTitle = document.querySelector(`#${progressId} .progress-stage`);
             if (doneTitle) {
                 doneTitle.textContent = '✅ ' + (typeof window.t === 'function' ? window.t('chat.penetrationTestComplete') : '渗透测试完成');
             }
@@ -3288,6 +3354,37 @@ function handleStreamEvent(event, progressElement, progressId,
     scrollChatMessagesToBottomIfPinned(streamScrollWasPinned);
 }
 
+function renderToolCallApprovalSummary(item, data) {
+    if (!item || !data || !data.interruptId) return;
+    let panel = item.querySelector(':scope > .hitl-inline-approval.hitl-tool-approval-summary');
+    if (!panel) {
+        panel = document.createElement('div');
+        panel.className = 'hitl-inline-approval hitl-tool-approval-summary';
+        const header = item.querySelector(':scope > .timeline-item-header');
+        if (header && header.nextSibling) {
+            item.insertBefore(panel, header.nextSibling);
+        } else {
+            item.appendChild(panel);
+        }
+    }
+    const payload = data.payload && typeof data.payload === 'object' ? data.payload : {};
+    const mode = String(data.mode || 'approval').trim().toLowerCase();
+    const allowEdit = mode === 'review_edit';
+    const argsObj = payload.argumentsObj && typeof payload.argumentsObj === 'object'
+        ? payload.argumentsObj
+        : {};
+    panel.innerHTML = buildInlineHitlApprovalHtml(data, {
+        toolName: '',
+        mode: mode,
+        allowEdit: allowEdit,
+        argsJSON: JSON.stringify(argsObj, null, 2)
+    });
+    panel.classList.toggle('hitl-inline-done', !!data.resolved || String(data.status || '') === 'decided');
+    if (!data.resolved && String(data.reviewer || data.decidedBy || '') !== 'audit_agent' && String(data.status || '') !== 'audit_running') {
+        bindInlineHitlApproval(panel, data, { allowEdit: allowEdit });
+    }
+}
+
 function renderInlineHitlApproval(itemId, data) {
     const item = document.getElementById(itemId);
     if (!item || !data || !data.interruptId) return;
@@ -3304,7 +3401,8 @@ function renderInlineHitlApproval(itemId, data) {
             existingContent.remove();
             item.classList.remove('tool-call-detail-expanded');
         }
-        renderToolCallDetailContent(item);
+        renderToolCallApprovalSummary(item, data);
+        updateToolDetailToggleLabel(item);
         return;
     }
     let contentEl = item.querySelector('.timeline-item-content');
@@ -3361,6 +3459,9 @@ function resolveInlineHitlDecision(timeline, data, decision, message) {
             resolved: true,
             decision: decision,
             decisionMessage: message || '',
+            reviewer: data.reviewer || data.decidedBy || (state.hitlData && (state.hitlData.reviewer || state.hitlData.decidedBy)) || 'human',
+            decidedBy: data.decidedBy || (state.hitlData && state.hitlData.decidedBy) || '',
+            status: 'decided',
             comment: data.comment || (state.hitlData && state.hitlData.comment) || '',
             editedArgs: data.editedArgs || data.editedArguments || (state.hitlData && (state.hitlData.editedArgs || state.hitlData.editedArguments)) || null
         });
@@ -3376,13 +3477,20 @@ function resolveInlineHitlDecision(timeline, data, decision, message) {
             content.remove();
             item.classList.remove('tool-call-detail-expanded');
         }
-        renderToolCallDetailContent(item);
+        renderToolCallApprovalSummary(item, state.hitlData);
+        updateToolDetailToggleLabel(item);
         return true;
     }
 
     const panel = item.querySelector('.hitl-inline-approval');
     if (panel) {
-        markInlineHitlDecision(panel, decision, message || '');
+        panel.classList.add('hitl-inline-done');
+        panel.innerHTML = buildInlineHitlApprovalHtml(Object.assign({}, data, {
+            resolved: true,
+            decision: decision,
+            decisionMessage: message || '',
+            status: 'decided'
+        }), { toolName: data.toolName || '' });
         return true;
     }
     return false;
@@ -3414,54 +3522,96 @@ function buildInlineHitlApprovalHtml(data, opts) {
     const hasToolNameOverride = opts && Object.prototype.hasOwnProperty.call(opts, 'toolName');
     const toolName = hasToolNameOverride ? String(opts.toolName || '') : (data.toolName || '-');
     const mode = opts && opts.mode ? opts.mode : String(data.mode || 'approval').trim().toLowerCase();
-    const modeLabel = opts && opts.modeLabel ? opts.modeLabel : (mode === 'review_edit' ? '审查编辑' : '审批模式');
     const allowEdit = opts && opts.allowEdit === true;
     const argsJSON = opts && opts.argsJSON ? opts.argsJSON : '';
-    const toolBadge = toolName
-        ? '<span class="hitl-tool-badge">' + escapeHtml(toolName) + '</span>'
+    const reviewer = String(data.reviewer || data.decidedBy || '').trim().toLowerCase();
+    const audit = reviewer === 'audit_agent' || String(data.status || '') === 'audit_running';
+    const resolved = !!data.resolved || String(data.status || '') === 'decided' || data.decision === 'approve' || data.decision === 'reject';
+    const editedArgs = data.editedArgs || data.editedArguments;
+    const hasEditedArgs = editedArgs && typeof editedArgs === 'object' && Object.keys(editedArgs).length > 0;
+    const tr = function (key, fallback, vars) {
+        if (typeof window.t !== 'function') return fallback;
+        const value = window.t(key, vars);
+        return value && value !== key ? value : fallback;
+    };
+    const shield = '<svg class="hitl-codex-shield" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 2.2l6 2.5v4.5c0 3.8-2.35 6.55-6 8.6-3.65-2.05-6-4.8-6-8.6V4.7l6-2.5z" stroke="currentColor" stroke-width="1.45" stroke-linejoin="round"/><path d="M7.5 10l1.55 1.55L12.8 7.8" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    const toolHeading = toolName
+        ? '<div class="hitl-codex-tool-row">' + shield + '<span>' + escapeHtml(toolName) + '</span></div>'
         : '';
-    if (data && data.resolved) {
-        const ok = data.decision === 'approve';
-        const text = data.decisionMessage || (ok ? '已通过，继续执行' : '已拒绝');
-        const comment = data.comment ? '<span class="hitl-inline-decision-comment">' + escapeHtml(data.comment) + '</span>' : '';
-        return `
-            <div class="hitl-inline-decision hitl-inline-decision--${ok ? 'approve' : 'reject'}">
-                <span class="hitl-inline-decision-dot" aria-hidden="true"></span>
-                <strong>${escapeHtml(ok ? '审批通过' : '审批拒绝')}</strong>
-                <span>${escapeHtml(text)}</span>
-                ${comment}
+    if (resolved) {
+        const ok = data.decision !== 'reject';
+        let statusText;
+        if (audit) {
+            statusText = ok
+                ? (hasEditedArgs ? tr('hitl.auditEditedApproved', '审计 Agent 已修改参数并批准') : tr('hitl.auditApproved', '审计 Agent 已批准'))
+                : tr('hitl.auditRejected', '审计 Agent 已拒绝');
+        } else {
+            statusText = ok
+                ? (hasEditedArgs ? tr('hitl.humanEditedApproved', '已修改参数并允许') : tr('hitl.humanApproved', '已允许一次'))
+                : tr('hitl.humanRejected', '人工审批已拒绝');
+        }
+        const comment = data.comment
+            ? '<p class="hitl-codex-explainer">' + escapeHtml(data.comment) + '</p>'
+            : '';
+        const diff = hasEditedArgs
+            ? '<details class="hitl-codex-diff"><summary>' + escapeHtml(tr('hitl.viewEditedArgs', '查看修改后的参数')) + '</summary><pre>' + escapeHtml(JSON.stringify(editedArgs, null, 2)) + '</pre></details>'
+            : '';
+        return toolHeading + `
+            <div class="hitl-codex-state hitl-codex-state--${ok ? 'approved' : 'rejected'}">
+                <span class="hitl-codex-state-icon" aria-hidden="true">${ok ? '✓' : '×'}</span>
+                <strong>${escapeHtml(statusText)}</strong>
             </div>
+            ${comment}
+            ${diff}
         `;
     }
+    if (audit) {
+        const auditStatus = mode === 'review_edit'
+            ? tr('hitl.auditReviewEditing', '自动审查并校正中')
+            : tr('hitl.auditReviewing', '自动审核中');
+        const explanation = tr('hitl.auditReviewExplanation', '经过谨慎提示的审查智能体正在审查此请求，通过后才会执行。');
+        return toolHeading + `
+            <div class="hitl-codex-state hitl-codex-state--running">
+                <span class="hitl-codex-spinner" aria-hidden="true"></span>
+                <strong>${escapeHtml(auditStatus)}</strong>
+            </div>
+            <p class="hitl-codex-explainer">${escapeHtml(explanation)}</p>
+        `;
+    }
+    const pendingStatus = allowEdit
+        ? tr('hitl.waitingHumanReview', '等待人工审查')
+        : tr('hitl.waitingHumanApproval', '等待人工审批');
+    const explanation = allowEdit
+        ? tr('hitl.humanReviewExplanation', '请审查并可修改参数，保存后才会执行。')
+        : tr('hitl.humanApprovalExplanation', '此工具调用需要你的确认，通过后才会执行。');
+    const rejectLabel = tr('hitl.reject', '拒绝');
+    const approveLabel = allowEdit
+        ? tr('hitl.saveEditedAndAllow', '保存修改并允许')
+        : tr('hitl.allowOnce', '允许一次');
     return `
-        <div class="hitl-inline-header">
-            <div class="hitl-inline-title">
-                <span class="hitl-inline-icon" aria-hidden="true">!</span>
-                <span>待审批</span>
-            </div>
-            <div class="hitl-inline-badges">
-                ${toolBadge}
-                <span class="hitl-mode-tag hitl-mode-tag--${escapeHtml(mode || 'approval')}">${escapeHtml(modeLabel)}</span>
-            </div>
+        ${toolHeading}
+        <div class="hitl-codex-state hitl-codex-state--pending">
+            ${shield}
+            <strong>${escapeHtml(pendingStatus)}</strong>
         </div>
+        <p class="hitl-codex-explainer">${escapeHtml(explanation)}</p>
         <div class="hitl-inline-body">
-            <div class="hitl-input-help hitl-inline-summary">确认上方参数后决定是否继续执行。</div>
             ${allowEdit
                 ? `<label class="hitl-inline-field">
-                       <span class="hitl-context-label">参数覆盖（JSON，可选）</span>
+                       <span class="hitl-context-label">${escapeHtml(tr('hitl.reviewArgs', '审查参数（JSON）'))}</span>
                        <textarea class="hitl-edit-args hitl-inline-edit" placeholder='{"command":"ls -la"}'>${escapeHtml(argsJSON === '{}' ? '' : argsJSON)}</textarea>
                    </label>`
                 : ''
             }
             <label class="hitl-inline-field">
-                <span class="hitl-context-label">备注（可选）</span>
-                <input class="hitl-config-input hitl-inline-comment" type="text" placeholder="例如：允许只读命令">
+                <span class="hitl-context-label">${escapeHtml(tr('hitl.commentOptional', '备注（可选）'))}</span>
+                <input class="hitl-config-input hitl-inline-comment" type="text" placeholder="${escapeHtml(tr('hitl.commentPlaceholder', '例如：仅允许只读操作'))}">
             </label>
         </div>
         <div class="hitl-pending-actions hitl-inline-actions">
             <div class="hitl-input-help hitl-inline-status" aria-live="polite"></div>
-            <button class="btn-secondary hitl-inline-reject">拒绝</button>
-            <button class="btn-primary hitl-inline-approve">通过</button>
+            <button class="btn-secondary hitl-inline-reject">${escapeHtml(rejectLabel)}</button>
+            <button class="btn-primary hitl-inline-approve">${escapeHtml(approveLabel)}</button>
         </div>
     `;
 }
@@ -3531,6 +3681,8 @@ function bindInlineHitlApproval(panel, data, opts) {
                     resolved: true,
                     decision: decision,
                     decisionMessage: msg,
+                    reviewer: 'human',
+                    status: 'decided',
                     comment: comment,
                     editedArgs: editedArgs
                 });
@@ -3541,9 +3693,10 @@ function bindInlineHitlApproval(panel, data, opts) {
                 }
                 state.pending = decision === 'approve';
                 setToolCallDetailState(toolItem, state);
+                renderToolCallApprovalSummary(toolItem, state.hitlData);
+            } else {
+                markInlineHitlDecision(panel, decision, msg);
             }
-            statusEl.textContent = msg;
-            markInlineHitlDecision(panel, decision, msg);
             panel.classList.add('hitl-inline-done');
         } catch (e) {
             statusEl.textContent = '提交失败：' + (e && e.message ? e.message : 'unknown error');
@@ -3560,11 +3713,11 @@ function markInlineHitlDecision(panel, decision, message) {
     const ok = decision === 'approve';
     panel.classList.add('hitl-inline-done');
     panel.innerHTML = `
-        <div class="hitl-inline-decision hitl-inline-decision--${ok ? 'approve' : 'reject'}">
-            <span class="hitl-inline-decision-dot" aria-hidden="true"></span>
-            <strong>${escapeHtml(ok ? '审批通过' : '审批拒绝')}</strong>
-            <span>${escapeHtml(message || (ok ? '已通过，继续执行' : '已拒绝'))}</span>
+        <div class="hitl-codex-state hitl-codex-state--${ok ? 'approved' : 'rejected'}">
+            <span class="hitl-codex-state-icon" aria-hidden="true">${ok ? '✓' : '×'}</span>
+            <strong>${escapeHtml(ok ? '已允许一次' : '人工审批已拒绝')}</strong>
         </div>
+        ${message ? '<p class="hitl-codex-explainer">' + escapeHtml(message) + '</p>' : ''}
     `;
 }
 
@@ -3808,6 +3961,9 @@ function expandProcessDetailsTimeline(assistantMessageId) {
         document.querySelectorAll('#' + hitlEscapeAttrSelector(assistantMessageId) + ' .process-detail-btn').forEach(function (btn) {
             btn.innerHTML = '<span>' + collapseT + '</span>';
         });
+    }
+    if (typeof window.syncAssistantTurnSummary === 'function') {
+        window.syncAssistantTurnSummary(document.getElementById(assistantMessageId));
     }
     setTimeout(function () {
         if (window.CyberStrikeChatScroll && typeof window.CyberStrikeChatScroll.scrollIntoViewIfFollowing === 'function') {
@@ -4388,33 +4544,10 @@ async function renderToolCallDetailContent(item) {
         hitlEditedArgsLabel +
         '<pre class="tool-args">' + escapeHtml(JSON.stringify(args, null, 2)) + '</pre>' +
         '</div>';
-    let hitlBlock = '';
-    if (state.hitlData && state.hitlData.interruptId) {
-        const hitlPayload = state.hitlData.payload && typeof state.hitlData.payload === 'object' ? state.hitlData.payload : {};
-        let hitlMode = String(state.hitlData.mode || '').trim().toLowerCase();
-        if (hitlMode === 'feedback' || hitlMode === 'followup') hitlMode = 'approval';
-        const hitlAllowEdit = hitlMode === 'review_edit';
-        const hitlArgsObj = hitlPayload.argumentsObj && typeof hitlPayload.argumentsObj === 'object' ? hitlPayload.argumentsObj : args;
-        hitlBlock = '<div class="hitl-inline-approval hitl-inline-approval--merged">' +
-            buildInlineHitlApprovalHtml(state.hitlData, {
-                toolName: '',
-                mode: hitlMode,
-                modeLabel: hitlMode === 'review_edit' ? '审查编辑' : '审批模式',
-                allowEdit: hitlAllowEdit,
-                argsJSON: JSON.stringify(hitlArgsObj || {}, null, 2)
-            }) +
-            '</div>';
-    }
-    content.innerHTML = '<div class="tool-details">' + argsBlock + resultBlock + hitlBlock + '</div>';
+    content.innerHTML = '<div class="tool-details">' + argsBlock + resultBlock + '</div>';
     item.appendChild(content);
     item.classList.add('tool-call-detail-expanded');
     updateToolDetailToggleLabel(item);
-    const hitlPanel = content.querySelector('.hitl-inline-approval');
-    if (hitlPanel && state.hitlData) {
-        let bindMode = String(state.hitlData.mode || '').trim().toLowerCase();
-        if (bindMode === 'feedback' || bindMode === 'followup') bindMode = 'approval';
-        bindInlineHitlApproval(hitlPanel, state.hitlData, { allowEdit: bindMode === 'review_edit' });
-    }
 }
 
 if (typeof document !== 'undefined' && !document.__cyberStrikeToolCallDetailToggleBound) {
@@ -4832,7 +4965,7 @@ function addTimelineItem(timeline, type, options) {
             item.title = typeof window.t === 'function' ? window.t('timeline.resultMissing') : '结果记录缺失';
         }
     }
-    if (type === 'hitl_interrupt' && options.data && options.data.interruptId != null && String(options.data.interruptId).trim() !== '') {
+    if ((type === 'hitl_interrupt' || type === 'hitl_audit_agent_started' || type === 'hitl_audit_agent' || type === 'hitl_resumed' || type === 'hitl_rejected') && options.data && options.data.interruptId != null && String(options.data.interruptId).trim() !== '') {
         item.dataset.hitlInterruptId = String(options.data.interruptId).trim();
     }
     if (type === 'workflow_hitl_waiting' && options.data) {
@@ -7447,8 +7580,8 @@ function refreshProgressAndTimelineI18n() {
     });
     document.querySelectorAll('.progress-message').forEach(function (msgEl) {
         const raw = msgEl.dataset.progressRawMessage;
-        const titleEl = msgEl.querySelector('.progress-title');
-        if (titleEl && raw) {
+        const stageEl = msgEl.querySelector('.progress-stage');
+        if (stageEl && raw) {
             let pdata = null;
             if (msgEl.dataset.progressRawData) {
                 try {
@@ -7457,13 +7590,9 @@ function refreshProgressAndTimelineI18n() {
                     pdata = null;
                 }
             }
-            titleEl.textContent = '\uD83D\uDD0D ' + translateProgressMessage(raw, pdata);
+            stageEl.textContent = translateProgressMessage(raw, pdata);
         }
-    });
-    // 转换后的详情区顶栏「任务执行详情」：仅刷新不在 .progress-message 内的 progress 标题
-    document.querySelectorAll('.progress-container .progress-header .progress-title').forEach(function (titleEl) {
-        if (titleEl.closest('.progress-message')) return;
-        titleEl.textContent = '\uD83D\uDCCB ' + _t('chat.penetrationTestDetail');
+        if (msgEl.id) syncProgressElapsedSummary(msgEl.id);
     });
 
     // 时间线项：按类型重算标题，并重绘时间戳
@@ -7567,6 +7696,9 @@ function refreshProgressAndTimelineI18n() {
     });
 
     document.querySelectorAll('#chat-messages .message.assistant').forEach(function (msgEl) {
+        if (typeof window.syncAssistantTurnSummary === 'function') {
+            window.syncAssistantTurnSummary(msgEl);
+        }
         if (typeof window.syncMcpToolsToggleButton === 'function') {
             window.syncMcpToolsToggleButton(msgEl);
         }

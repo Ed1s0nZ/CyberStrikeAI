@@ -2550,6 +2550,14 @@ const chatProjectFolderContext = {
     runningIds: new Set(),
     completedByConversation: new Map(),
 };
+const PROJECT_FOLDER_PREVIEW_OPEN_DELAY_MS = 160;
+const PROJECT_FOLDER_PREVIEW_CLOSE_DELAY_MS = 120;
+let projectFolderPreviewOpenTimer = null;
+let projectFolderPreviewCloseTimer = null;
+let projectFolderPreviewAnchor = null;
+let projectConversationPreviewOpenTimer = null;
+let projectConversationPreviewCloseTimer = null;
+let projectConversationPreviewAnchor = null;
 
 function readProjectFolderCompletionSeen() {
     try {
@@ -2569,6 +2577,28 @@ function markProjectConversationViewed(conversationId, completedAt) {
     try {
         localStorage.setItem(PROJECT_FOLDER_COMPLETION_SEEN_KEY, JSON.stringify(seen));
     } catch (e) { /* ignore */ }
+}
+
+function markCurrentProjectConversationViewed() {
+    const conversationId = String(window.currentConversationId || '').trim();
+    if (!conversationId || !isProjectConversationUnread(conversationId)) return false;
+    const completed = chatProjectFolderContext.completedByConversation.get(conversationId);
+    markProjectConversationViewed(conversationId, completed?.completedAt);
+    if (isProjectsCacheReady() && chatProjectFolderContext.ready) {
+        renderChatProjectFolders(projectsCacheAll);
+    }
+    return true;
+}
+
+function initProjectConversationReadTracking() {
+    if (window._projectConversationReadTrackingInited) return;
+    const chatContainer = document.querySelector('#page-chat .chat-container');
+    if (!chatContainer) return;
+    window._projectConversationReadTrackingInited = true;
+    const markViewed = () => markCurrentProjectConversationViewed();
+    chatContainer.addEventListener('pointerdown', markViewed, { passive: true });
+    chatContainer.addEventListener('focusin', markViewed);
+    document.getElementById('chat-input')?.addEventListener('input', markViewed);
 }
 
 function isProjectConversationUnread(conversationId) {
@@ -2602,9 +2632,325 @@ function getProjectFolderStatus(conversations) {
     return '';
 }
 
-function appendChatProjectFolderItem(list, project, expandedIds, statusKind) {
+function clampProjectPreviewText(value, maxLength = 220) {
+    const text = String(value || '').replace(/\s+/g, ' ').trim();
+    return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+}
+
+function getProjectScopePreview(project) {
+    const raw = String(project?.scope_json || project?.scopeJson || '').trim();
+    if (!raw) return '';
+    try {
+        const parsed = JSON.parse(raw);
+        const values = [];
+        const appendValue = (value) => {
+            if (typeof value === 'string' || typeof value === 'number') {
+                const text = String(value).trim();
+                if (text) values.push(text);
+            } else if (Array.isArray(value)) {
+                value.slice(0, 4).forEach(appendValue);
+            }
+        };
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            ['targets', 'target', 'domains', 'ips', 'urls', 'scope'].forEach((key) => appendValue(parsed[key]));
+            if (!values.length) appendValue(parsed.notes);
+        } else {
+            appendValue(parsed);
+        }
+        return clampProjectPreviewText(values.slice(0, 4).join(' · '));
+    } catch (e) {
+        return clampProjectPreviewText(raw);
+    }
+}
+
+function ensureProjectFolderPreview() {
+    let preview = document.getElementById('project-folder-preview');
+    if (preview) return preview;
+
+    preview = document.createElement('div');
+    preview.id = 'project-folder-preview';
+    preview.className = 'project-folder-preview';
+    preview.hidden = true;
+    preview.setAttribute('role', 'dialog');
+    preview.setAttribute('aria-label', pickerMessage(tp, 'chat.projectPreviewLabel', '项目信息'));
+    preview.innerHTML = `
+        <div class="project-folder-preview-header">
+            <span class="project-folder-preview-icon" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 6.5h6l2 2h10v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+            </span>
+            <span class="project-folder-preview-title"></span>
+        </div>
+        <div class="project-folder-preview-stats">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 12a8.5 8.5 0 0 1-9 8.48A8.5 8.5 0 1 1 20.48 11H21v5l-2-2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span></span>
+        </div>
+        <div class="project-folder-preview-details">
+            <div class="project-folder-preview-detail project-folder-preview-description">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/><path d="M12 11v5M12 8h.01" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+                <span></span>
+            </div>
+            <div class="project-folder-preview-detail project-folder-preview-scope">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                <span></span>
+            </div>
+        </div>
+        <button type="button" class="project-folder-preview-edit" data-require-permission="project:write">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" stroke="currentColor" stroke-width="1.7"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.95 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3v-4h.08A1.7 1.7 0 0 0 4.6 8.95a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 8.95 4.6 1.7 1.7 0 0 0 10 3.08V3h4v.08a1.7 1.7 0 0 0 1.03 1.55 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.14.61.69 1.04 1.32 1.04H21v4h-.28A1.7 1.7 0 0 0 19.4 15Z" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span></span>
+        </button>
+    `;
+    document.body.appendChild(preview);
+
+    preview.addEventListener('mouseenter', () => {
+        clearTimeout(projectFolderPreviewCloseTimer);
+    });
+    preview.addEventListener('mouseleave', scheduleHideProjectFolderPreview);
+    preview.querySelector('.project-folder-preview-edit')?.addEventListener('click', () => {
+        const projectId = preview.dataset.projectId || '';
+        hideProjectFolderPreview(true);
+        if (projectId) showEditProjectModal(projectId, { fromChatSidebar: true });
+    });
+    window.addEventListener('resize', () => hideProjectFolderPreview(true));
+    window.addEventListener('scroll', () => hideProjectFolderPreview(true), true);
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !preview.hidden) hideProjectFolderPreview(true);
+    });
+    return preview;
+}
+
+function positionProjectFolderPreview(preview, row) {
+    if (!preview || !row?.isConnected) return;
+    const anchorRect = row.getBoundingClientRect();
+    const previewRect = preview.getBoundingClientRect();
+    const gap = 10;
+    const edge = 12;
+    let left = anchorRect.right + gap;
+    if (left + previewRect.width > window.innerWidth - edge) {
+        left = Math.max(edge, anchorRect.left - previewRect.width - gap);
+    }
+    const top = Math.min(
+        Math.max(edge, anchorRect.top - 10),
+        Math.max(edge, window.innerHeight - previewRect.height - edge)
+    );
+    preview.style.left = `${Math.round(left)}px`;
+    preview.style.top = `${Math.round(top)}px`;
+}
+
+function showProjectFolderPreview(project, row, conversations) {
+    if (!project || !row?.isConnected || window.matchMedia('(max-width: 900px), (hover: none)').matches) return;
+    hideProjectConversationPreview(true);
+    const preview = ensureProjectFolderPreview();
+    clearTimeout(projectFolderPreviewCloseTimer);
+    if (projectFolderPreviewAnchor && projectFolderPreviewAnchor !== row) {
+        projectFolderPreviewAnchor.querySelector('.project-folder-item')?.removeAttribute('aria-controls');
+    }
+    projectFolderPreviewAnchor = row;
+    const title = project.name || tp('common.untitled');
+    const total = conversations.length;
+    const active = conversations.filter((conversation) => chatProjectFolderContext.runningIds.has(conversation.id)).length;
+    const fallbackStats = `${total} 个任务 · ${active} 个已开启`;
+    const description = clampProjectPreviewText(project.description)
+        || pickerMessage(tp, 'chat.projectPreviewNoDescription', '暂无项目说明');
+    const scope = getProjectScopePreview(project);
+
+    preview.dataset.projectId = project.id;
+    preview.querySelector('.project-folder-preview-title').textContent = title;
+    preview.querySelector('.project-folder-preview-stats span').textContent = tpFmt(
+        'chat.projectPreviewStats',
+        fallbackStats,
+        { total, active }
+    );
+    const descriptionRow = preview.querySelector('.project-folder-preview-description');
+    descriptionRow.querySelector('span').textContent = description;
+    descriptionRow.classList.toggle('is-empty', !String(project.description || '').trim());
+    const scopeRow = preview.querySelector('.project-folder-preview-scope');
+    scopeRow.hidden = !scope;
+    scopeRow.querySelector('span').textContent = scope
+        ? tpFmt('chat.projectPreviewScope', `测试范围：${scope}`, { scope })
+        : '';
+    preview.querySelector('.project-folder-preview-edit span').textContent = tpFmt(
+        'chat.projectPreviewEdit',
+        '编辑项目'
+    );
+    preview.hidden = false;
+    row.querySelector('.project-folder-item')?.setAttribute('aria-controls', preview.id);
+    positionProjectFolderPreview(preview, row);
+    if (typeof applyRBACToUI === 'function') applyRBACToUI(preview);
+}
+
+function scheduleShowProjectFolderPreview(project, row, conversations, immediate = false) {
+    clearTimeout(projectFolderPreviewOpenTimer);
+    clearTimeout(projectFolderPreviewCloseTimer);
+    projectFolderPreviewOpenTimer = setTimeout(
+        () => showProjectFolderPreview(project, row, conversations),
+        immediate ? 0 : PROJECT_FOLDER_PREVIEW_OPEN_DELAY_MS
+    );
+}
+
+function hideProjectFolderPreview(immediate = false) {
+    clearTimeout(projectFolderPreviewOpenTimer);
+    clearTimeout(projectFolderPreviewCloseTimer);
+    const close = () => {
+        const preview = document.getElementById('project-folder-preview');
+        if (preview) preview.hidden = true;
+        projectFolderPreviewAnchor?.querySelector('.project-folder-item')?.removeAttribute('aria-controls');
+        projectFolderPreviewAnchor = null;
+    };
+    if (immediate) close();
+    else projectFolderPreviewCloseTimer = setTimeout(close, PROJECT_FOLDER_PREVIEW_CLOSE_DELAY_MS);
+}
+
+function scheduleHideProjectFolderPreview() {
+    hideProjectFolderPreview(false);
+}
+
+function formatProjectConversationPreviewAge(value) {
+    const timestamp = Date.parse(value || '');
+    if (!Number.isFinite(timestamp)) return '';
+    const elapsedMs = Math.max(0, Date.now() - timestamp);
+    const minutes = Math.floor(elapsedMs / 60000);
+    if (minutes < 1) return pickerMessage(tp, 'chat.conversationPreviewJustNow', '刚刚');
+    if (minutes < 60) {
+        return tpFmt('chat.conversationPreviewMinutes', `${minutes} 分`, { count: minutes });
+    }
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return tpFmt('chat.conversationPreviewHours', `${hours} 小时`, { count: hours });
+    const days = Math.floor(hours / 24);
+    if (days < 7) return tpFmt('chat.conversationPreviewDays', `${days} 天`, { count: days });
+    return new Intl.DateTimeFormat(document.documentElement.lang || undefined, {
+        month: 'numeric',
+        day: 'numeric',
+    }).format(new Date(timestamp));
+}
+
+function getProjectConversationModeLabel(conversation) {
+    const mode = String(conversation?.agentMode || conversation?.agent_mode || '').trim().toLowerCase();
+    const labels = {
+        eino_single: ['chat.agentModeEinoSingle', 'Eino 单代理（ADK）'],
+        deep: ['chat.agentModeDeep', 'Deep（DeepAgent）'],
+        plan_execute: ['chat.agentModePlanExecuteLabel', 'Plan-Execute'],
+        supervisor: ['chat.agentModeSupervisorLabel', 'Supervisor（专家路由）'],
+    };
+    if (labels[mode]) return tpFmt(labels[mode][0], labels[mode][1]);
+    return clampProjectPreviewText(
+        conversation?.roleName || conversation?.role_name || pickerMessage(tp, 'chat.conversationPreviewDefaultMode', '默认'),
+        80
+    );
+}
+
+function ensureProjectConversationPreview() {
+    let preview = document.getElementById('project-conversation-preview');
+    if (preview) return preview;
+    preview = document.createElement('div');
+    preview.id = 'project-conversation-preview';
+    preview.className = 'project-conversation-preview';
+    preview.hidden = true;
+    preview.setAttribute('role', 'tooltip');
+    preview.innerHTML = `
+        <div class="project-conversation-preview-header">
+            <span class="project-conversation-preview-title"></span>
+            <span class="project-conversation-preview-age"></span>
+        </div>
+        <div class="project-conversation-preview-meta">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 6.5h6l2 2h10v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+            <span class="project-conversation-preview-project"></span>
+        </div>
+        <div class="project-conversation-preview-meta">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="6" cy="5" r="2" stroke="currentColor" stroke-width="1.7"/><circle cx="6" cy="19" r="2" stroke="currentColor" stroke-width="1.7"/><circle cx="18" cy="9" r="2" stroke="currentColor" stroke-width="1.7"/><path d="M6 7v10M8 15c5 0 3-6 8-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            <span class="project-conversation-preview-mode"></span>
+            <span class="project-conversation-preview-separator" aria-hidden="true">·</span>
+            <span class="project-conversation-preview-status"></span>
+        </div>
+    `;
+    document.body.appendChild(preview);
+    window.addEventListener('resize', () => hideProjectConversationPreview(true));
+    window.addEventListener('scroll', () => hideProjectConversationPreview(true), true);
+    return preview;
+}
+
+function positionProjectConversationPreview(preview, row) {
+    if (!preview || !row?.isConnected) return;
+    const anchorRect = row.getBoundingClientRect();
+    const previewRect = preview.getBoundingClientRect();
+    const gap = 10;
+    const edge = 12;
+    let left = anchorRect.right + gap;
+    if (left + previewRect.width > window.innerWidth - edge) {
+        left = Math.max(edge, anchorRect.left - previewRect.width - gap);
+    }
+    const top = Math.min(
+        Math.max(edge, anchorRect.top - 8),
+        Math.max(edge, window.innerHeight - previewRect.height - edge)
+    );
+    preview.style.left = `${Math.round(left)}px`;
+    preview.style.top = `${Math.round(top)}px`;
+}
+
+function showProjectConversationPreview(conversation, project, row) {
+    if (!conversation || !row?.isConnected || window.matchMedia('(max-width: 900px), (hover: none)').matches) return;
+    hideProjectFolderPreview(true);
+    const preview = ensureProjectConversationPreview();
+    clearTimeout(projectConversationPreviewCloseTimer);
+    if (projectConversationPreviewAnchor && projectConversationPreviewAnchor !== row) {
+        projectConversationPreviewAnchor.querySelector('.project-conversation-item')?.removeAttribute('aria-describedby');
+    }
+    projectConversationPreviewAnchor = row;
+    const isRunning = chatProjectFolderContext.runningIds.has(conversation.id);
+    const completed = chatProjectFolderContext.completedByConversation.get(conversation.id);
+    const isUnread = !isRunning && isProjectConversationUnread(conversation.id);
+    const status = isRunning
+        ? pickerMessage(tp, 'tasks.statusRunning', '执行中')
+        : (isUnread
+            ? pickerMessage(tp, 'chat.conversationPreviewUnread', '有未读更新')
+            : (completed
+                ? pickerMessage(tp, 'chat.conversationPreviewViewed', '已查看')
+                : pickerMessage(tp, 'chat.conversationPreviewConversation', '对话')));
+    const statusEl = preview.querySelector('.project-conversation-preview-status');
+
+    preview.querySelector('.project-conversation-preview-title').textContent = conversation.title
+        || pickerMessage(tp, 'projects.untitledConversation', '未命名对话');
+    const ageEl = preview.querySelector('.project-conversation-preview-age');
+    ageEl.textContent = formatProjectConversationPreviewAge(
+        conversation.updatedAt || conversation.updated_at || conversation.createdAt || conversation.created_at
+    );
+    ageEl.hidden = !ageEl.textContent;
+    preview.querySelector('.project-conversation-preview-project').textContent = project?.name
+        || pickerMessage(tp, 'chat.conversationPreviewNoProject', '未绑定项目');
+    preview.querySelector('.project-conversation-preview-mode').textContent = getProjectConversationModeLabel(conversation);
+    statusEl.textContent = status;
+    statusEl.className = 'project-conversation-preview-status'
+        + (isRunning ? ' is-running' : (isUnread ? ' is-unread' : ''));
+    preview.hidden = false;
+    row.querySelector('.project-conversation-item')?.setAttribute('aria-describedby', preview.id);
+    positionProjectConversationPreview(preview, row);
+}
+
+function scheduleShowProjectConversationPreview(conversation, project, row, immediate = false) {
+    clearTimeout(projectConversationPreviewOpenTimer);
+    clearTimeout(projectConversationPreviewCloseTimer);
+    projectConversationPreviewOpenTimer = setTimeout(
+        () => showProjectConversationPreview(conversation, project, row),
+        immediate ? 0 : PROJECT_FOLDER_PREVIEW_OPEN_DELAY_MS
+    );
+}
+
+function hideProjectConversationPreview(immediate = false) {
+    clearTimeout(projectConversationPreviewOpenTimer);
+    clearTimeout(projectConversationPreviewCloseTimer);
+    const close = () => {
+        const preview = document.getElementById('project-conversation-preview');
+        if (preview) preview.hidden = true;
+        projectConversationPreviewAnchor?.querySelector('.project-conversation-item')?.removeAttribute('aria-describedby');
+        projectConversationPreviewAnchor = null;
+    };
+    if (immediate) close();
+    else projectConversationPreviewCloseTimer = setTimeout(close, PROJECT_FOLDER_PREVIEW_CLOSE_DELAY_MS);
+}
+
+function appendChatProjectFolderItem(list, project, expandedIds, conversations) {
     const row = document.createElement('div');
     const isExpanded = expandedIds.has(project.id);
+    const statusKind = getProjectFolderStatus(conversations);
     row.className = 'project-folder-row' + (isExpanded ? ' is-expanded' : '');
 
     const button = document.createElement('button');
@@ -2635,6 +2981,14 @@ function appendChatProjectFolderItem(list, project, expandedIds, statusKind) {
             chatProjectFolderExpandedIds.add(project.id);
         }
         renderChatProjectFolders(projectsCacheAll);
+    });
+    row.addEventListener('mouseenter', () => scheduleShowProjectFolderPreview(project, row, conversations));
+    row.addEventListener('mouseleave', scheduleHideProjectFolderPreview);
+    button.addEventListener('focus', () => scheduleShowProjectFolderPreview(project, row, conversations, true));
+    row.addEventListener('focusout', (event) => {
+        const preview = document.getElementById('project-folder-preview');
+        if (row.contains(event.relatedTarget) || preview?.contains(event.relatedTarget)) return;
+        scheduleHideProjectFolderPreview();
     });
 
     const actions = document.createElement('div');
@@ -2677,7 +3031,7 @@ function appendChatProjectFolderItem(list, project, expandedIds, statusKind) {
     list.appendChild(row);
 }
 
-function appendChatProjectConversationItem(list, conversation) {
+function appendChatProjectConversationItem(list, conversation, project) {
     const row = document.createElement('div');
     const button = document.createElement('button');
     const isSelected = window.currentConversationId === conversation.id;
@@ -2693,7 +3047,6 @@ function appendChatProjectConversationItem(list, conversation) {
     const title = document.createElement('span');
     title.className = 'project-conversation-title';
     title.textContent = conversation.title || pickerMessage(tp, 'projects.untitledConversation', '未命名对话');
-    title.title = title.textContent;
     button.appendChild(title);
     const status = createProjectTaskStatus(isRunning ? 'running' : (isUnread ? 'unread' : ''));
     if (status) button.appendChild(status);
@@ -2706,6 +3059,13 @@ function appendChatProjectConversationItem(list, conversation) {
             markProjectConversationViewed(conversation.id, completed.completedAt);
             renderChatProjectFolders(projectsCacheAll);
         }
+    });
+    row.addEventListener('mouseenter', () => scheduleShowProjectConversationPreview(conversation, project, row));
+    row.addEventListener('mouseleave', () => hideProjectConversationPreview(false));
+    button.addEventListener('focus', () => scheduleShowProjectConversationPreview(conversation, project, row, true));
+    row.addEventListener('focusout', (event) => {
+        if (row.contains(event.relatedTarget)) return;
+        hideProjectConversationPreview(false);
     });
     const menuButton = document.createElement('button');
     menuButton.type = 'button';
@@ -2760,6 +3120,8 @@ async function loadChatProjectFolderContext() {
 function renderChatProjectFolders(projects) {
     const list = document.getElementById('project-folders-list');
     if (!list) return;
+    hideProjectFolderPreview(true);
+    hideProjectConversationPreview(true);
     const selectedId = resolveChatProjectSelection();
     if (chatProjectFolderLastSelectionId !== selectedId) {
         if (selectedId) chatProjectFolderExpandedIds.add(selectedId);
@@ -2779,9 +3141,9 @@ function renderChatProjectFolders(projects) {
     filtered.forEach((project) => {
         const conversations = chatProjectFolderContext.conversations
             .filter((conversation) => (conversation.projectId || conversation.project_id || '') === project.id);
-        appendChatProjectFolderItem(list, project, chatProjectFolderExpandedIds, getProjectFolderStatus(conversations));
+        appendChatProjectFolderItem(list, project, chatProjectFolderExpandedIds, conversations);
         if (chatProjectFolderExpandedIds.has(project.id)) {
-            conversations.forEach((conversation) => appendChatProjectConversationItem(list, conversation));
+            conversations.forEach((conversation) => appendChatProjectConversationItem(list, conversation, project));
         }
     });
 }
@@ -3173,12 +3535,14 @@ function initProjectGraphFooterWheelScroll() {
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         initChatProjectSelector();
+        initProjectConversationReadTracking();
         initProjectListActionMenu();
         initProjectGraphFooterWheelScroll();
         refreshProjectsFilterSelects();
     });
 } else {
     initChatProjectSelector();
+    initProjectConversationReadTracking();
     initProjectListActionMenu();
     initProjectGraphFooterWheelScroll();
     refreshProjectsFilterSelects();
@@ -3219,6 +3583,7 @@ window.refreshChatProjectFolders = refreshChatProjectFolders;
 window.handleProjectFolderSearch = handleProjectFolderSearch;
 window.clearProjectFolderSearch = clearProjectFolderSearch;
 window.updateProjectFolderTaskStatuses = updateProjectFolderTaskStatuses;
+window.markCurrentProjectConversationViewed = markCurrentProjectConversationViewed;
 window.prefetchProjectsForChat = prefetchProjectsForChat;
 window.ensureDefaultActiveProjectForNewChat = ensureDefaultActiveProjectForNewChat;
 window.getActiveProjectId = getActiveProjectId;

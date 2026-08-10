@@ -477,60 +477,86 @@ func (h *AgentHandler) waitHITLApproval(runCtx context.Context, cancelRun contex
 		h.logger.Warn("创建 HITL 中断失败", zap.Error(err))
 		return nil, err
 	}
+	emitHITL := func(eventType, message string, eventData map[string]interface{}) {
+		clientData := enrichProgressEventData(eventData, conversationID, assistantMessageID)
+		if sendEventFunc != nil {
+			sendEventFunc(eventType, message, clientData)
+		}
+		if strings.TrimSpace(assistantMessageID) != "" && h.db != nil {
+			if err := h.db.AddProcessDetail(assistantMessageID, conversationID, eventType, message, clientData); err != nil {
+				h.logger.Warn("保存 HITL 过程详情失败", zap.Error(err), zap.String("eventType", eventType))
+			}
+		}
+	}
 
 	if cfg.Reviewer == "audit_agent" {
+		emitHITL("hitl_audit_agent_started", "审计 Agent 正在审查此请求", map[string]interface{}{
+			"conversationId": conversationID,
+			"interruptId":    p.InterruptID,
+			"toolName":       toolName,
+			"toolCallId":     toolCallID,
+			"mode":           cfg.Mode,
+			"reviewer":       "audit_agent",
+			"status":         "audit_running",
+			"payload":        payload,
+		})
 		ad := h.auditAgentReview(runCtx, cfg.Mode, toolName, payload)
 		now := time.Now()
 		_, _ = h.db.Exec(`UPDATE hitl_interrupts SET status='decided', decision=?, decision_comment=?, decided_at=?, decided_by='audit_agent' WHERE id=?`,
 			ad.Decision, ad.Comment, now, p.InterruptID)
-		if sendEventFunc != nil {
-			sendEventFunc("hitl_audit_agent", "审计 Agent 已裁决", map[string]interface{}{
+		emitHITL("hitl_audit_agent", "审计 Agent 已裁决", map[string]interface{}{
+			"conversationId": conversationID,
+			"interruptId":    p.InterruptID,
+			"toolName":       toolName,
+			"toolCallId":     toolCallID,
+			"mode":           cfg.Mode,
+			"status":         "decided",
+			"decision":       ad.Decision,
+			"comment":        ad.Comment,
+			"editedArgs":     ad.EditedArguments,
+			"decidedBy":      "audit_agent",
+			"reviewer":       "audit_agent",
+		})
+		if ad.Decision == "reject" {
+			emitHITL("hitl_rejected", "审计 Agent 拒绝本次工具调用", map[string]interface{}{
 				"conversationId": conversationID,
 				"interruptId":    p.InterruptID,
 				"toolName":       toolName,
+				"toolCallId":     toolCallID,
 				"mode":           cfg.Mode,
-				"decision":       ad.Decision,
+				"decision":       "reject",
 				"comment":        ad.Comment,
-				"editedArgs":     ad.EditedArguments,
 				"decidedBy":      "audit_agent",
+				"reviewer":       "audit_agent",
 			})
-		}
-		if ad.Decision == "reject" {
-			if sendEventFunc != nil {
-				sendEventFunc("hitl_rejected", "审计 Agent 拒绝本次工具调用", map[string]interface{}{
-					"conversationId": conversationID,
-					"interruptId":    p.InterruptID,
-					"toolName":       toolName,
-					"comment":        ad.Comment,
-					"decidedBy":      "audit_agent",
-				})
-			}
 			return &ad, nil
 		}
-		if sendEventFunc != nil {
-			sendEventFunc("hitl_resumed", "审计 Agent 已通过，继续执行", map[string]interface{}{
-				"conversationId": conversationID,
-				"interruptId":    p.InterruptID,
-				"toolName":       toolName,
-				"comment":        ad.Comment,
-				"editedArgs":     ad.EditedArguments,
-				"decidedBy":      "audit_agent",
-			})
-		}
+		emitHITL("hitl_resumed", "审计 Agent 已通过，继续执行", map[string]interface{}{
+			"conversationId": conversationID,
+			"interruptId":    p.InterruptID,
+			"toolName":       toolName,
+			"toolCallId":     toolCallID,
+			"mode":           cfg.Mode,
+			"decision":       "approve",
+			"comment":        ad.Comment,
+			"editedArgs":     ad.EditedArguments,
+			"decidedBy":      "audit_agent",
+			"reviewer":       "audit_agent",
+		})
 		h.hitlManager.TrackApprovedHitlExecution(p.InterruptID, conversationID, toolName, toolCallID)
 		return &ad, nil
 	}
 
-	if sendEventFunc != nil {
-		sendEventFunc("hitl_interrupt", "命中人机协同审批", map[string]interface{}{
-			"conversationId": conversationID,
-			"interruptId":    p.InterruptID,
-			"mode":           cfg.Mode,
-			"toolName":       toolName,
-			"toolCallId":     toolCallID,
-			"payload":        payload,
-		})
-	}
+	emitHITL("hitl_interrupt", "命中人机协同审批", map[string]interface{}{
+		"conversationId": conversationID,
+		"interruptId":    p.InterruptID,
+		"mode":           cfg.Mode,
+		"toolName":       toolName,
+		"toolCallId":     toolCallID,
+		"reviewer":       "human",
+		"status":         "pending",
+		"payload":        payload,
+	})
 	d, waitErr := h.hitlManager.waitDecision(runCtx, p, cfg.Timeout)
 	if waitErr != nil {
 		if cancelRun != nil && (errors.Is(waitErr, context.Canceled) || errors.Is(waitErr, context.DeadlineExceeded)) {
@@ -553,25 +579,29 @@ func (h *AgentHandler) waitHITLApproval(runCtx context.Context, cancelRun contex
 		if strings.Contains(strings.ToLower(strings.TrimSpace(d.Comment)), "timeout") {
 			rejectMsg = "审批超时，安全起见已自动拒绝，模型将基于反馈继续迭代"
 		}
-		if sendEventFunc != nil {
-			sendEventFunc("hitl_rejected", rejectMsg, map[string]interface{}{
-				"conversationId": conversationID,
-				"interruptId":    p.InterruptID,
-				"toolName":       toolName,
-				"comment":        d.Comment,
-			})
-		}
-		return &d, nil
-	}
-	if sendEventFunc != nil {
-		sendEventFunc("hitl_resumed", "人工确认通过，继续执行", map[string]interface{}{
+		emitHITL("hitl_rejected", rejectMsg, map[string]interface{}{
 			"conversationId": conversationID,
 			"interruptId":    p.InterruptID,
 			"toolName":       toolName,
+			"toolCallId":     toolCallID,
+			"mode":           cfg.Mode,
+			"decision":       "reject",
 			"comment":        d.Comment,
-			"editedArgs":     d.EditedArguments,
+			"reviewer":       "human",
 		})
+		return &d, nil
 	}
+	emitHITL("hitl_resumed", "人工确认通过，继续执行", map[string]interface{}{
+		"conversationId": conversationID,
+		"interruptId":    p.InterruptID,
+		"toolName":       toolName,
+		"toolCallId":     toolCallID,
+		"mode":           cfg.Mode,
+		"decision":       "approve",
+		"comment":        d.Comment,
+		"editedArgs":     d.EditedArguments,
+		"reviewer":       "human",
+	})
 	h.hitlManager.TrackApprovedHitlExecution(p.InterruptID, conversationID, toolName, toolCallID)
 	return &d, nil
 }
