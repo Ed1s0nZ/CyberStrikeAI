@@ -1,6 +1,7 @@
 package security
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -42,7 +43,18 @@ func TestRedirectBackgroundJobStdio_skipsAndAnd(t *testing.T) {
 }
 
 func TestPrepareShellCommandForExecute(t *testing.T) {
-	out := PrepareShellCommandForExecute("java -jar x & echo hi")
+	cmd := "java -jar x & echo hi"
+	out := PrepareShellCommandForExecute(cmd)
+	if runtime.GOOS == "windows" {
+		// Windows 分支必须原样返回，不得再注入 bash 语法（跨平台注入修复目标）
+		if out != cmd {
+			t.Fatalf("windows branch must return command unchanged, got %q", out)
+		}
+		if strings.Contains(out, "exec </dev/null") || strings.Contains(out, "GIT_PAGER=cat") || strings.Contains(out, "export ") {
+			t.Fatalf("windows branch must not inject unix syntax: %q", out)
+		}
+		return
+	}
 	if !strings.Contains(out, "exec </dev/null") {
 		t.Fatalf("missing stdin redirect: %q", out)
 	}

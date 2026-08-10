@@ -3,6 +3,7 @@ package security
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -15,7 +16,22 @@ import (
 // Predefined errors for authentication operations.
 var (
 	ErrInvalidPassword = errors.New("invalid password")
+	// ErrAccountLocked 连续登录失败触发账号临时锁定（见 maxLoginFailures / loginLockDuration）。
+	ErrAccountLocked = errors.New("account locked due to too many failed login attempts")
 )
+
+// 登录失败锁定：连续 maxLoginFailures 次失败锁定该账号 loginLockDuration。
+// 内存实现（重启清零），用于抵御慢速暴力破解；与 /api/auth/login 的 IP 限流互补。
+const (
+	maxLoginFailures = 5
+	loginLockDuration = 15 * time.Minute
+)
+
+// loginAttempt 记录某账号的连续失败次数与锁定起始时间。
+type loginAttempt struct {
+	count    int
+	lockedAt time.Time
+}
 
 // Session represents an authenticated user session.
 type Session struct {
@@ -37,6 +53,8 @@ type AuthManager struct {
 
 	mu       sync.RWMutex
 	sessions map[string]Session
+	// loginFails 登录失败计数与锁定状态（key 为小写用户名）
+	loginFails map[string]*loginAttempt
 }
 
 // NewAuthManager creates a new AuthManager instance.
@@ -48,6 +66,7 @@ func NewAuthManager(sessionDurationHours int) *AuthManager {
 	return &AuthManager{
 		sessionDuration: time.Duration(sessionDurationHours) * time.Hour,
 		sessions:        make(map[string]Session),
+		loginFails:      make(map[string]*loginAttempt),
 	}
 }
 
@@ -87,14 +106,64 @@ func (a *AuthManager) AttachRBACStore(db *database.DB) (generatedAdminPassword s
 
 // Authenticate validates the password and creates a new session.
 func (a *AuthManager) Authenticate(username, password string) (string, time.Time, error) {
+	username = strings.TrimSpace(strings.ToLower(username))
+	if username == "" {
+		username = "admin"
+	}
+	if locked, until := a.isLoginLocked(username); locked {
+		return "", time.Time{}, fmt.Errorf("%w (until %s)", ErrAccountLocked, until.Format(time.RFC3339))
+	}
 	session, err := a.authenticateSession(username, password)
 	if err != nil {
+		a.recordLoginFailure(username)
 		return "", time.Time{}, err
 	}
+	a.clearLoginFailures(username)
 	a.mu.Lock()
 	a.sessions[session.Token] = session
 	a.mu.Unlock()
 	return session.Token, session.ExpiresAt, nil
+}
+
+// isLoginLocked 返回账号是否处于锁定期（命中时返回解锁时间）。
+func (a *AuthManager) isLoginLocked(username string) (bool, time.Time) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	at, ok := a.loginFails[username]
+	if !ok || at.count < maxLoginFailures {
+		return false, time.Time{}
+	}
+	if time.Since(at.lockedAt) >= loginLockDuration {
+		return false, time.Time{}
+	}
+	return true, at.lockedAt.Add(loginLockDuration)
+}
+
+// recordLoginFailure 记录一次登录失败；达到阈值时进入锁定。
+func (a *AuthManager) recordLoginFailure(username string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	at, ok := a.loginFails[username]
+	if !ok {
+		a.loginFails[username] = &loginAttempt{count: 1}
+		return
+	}
+	if !at.lockedAt.IsZero() && time.Since(at.lockedAt) >= loginLockDuration {
+		at.count = 1
+		at.lockedAt = time.Time{}
+		return
+	}
+	at.count++
+	if at.count >= maxLoginFailures {
+		at.lockedAt = time.Now()
+	}
+}
+
+// clearLoginFailures 登录成功后清除失败计数。
+func (a *AuthManager) clearLoginFailures(username string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	delete(a.loginFails, username)
 }
 
 func (a *AuthManager) authenticateSession(username, password string) (Session, error) {

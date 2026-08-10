@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -57,6 +58,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	token, expiresAt, err := h.manager.Authenticate(req.Username, req.Password)
 	if err != nil {
+		if errors.Is(err, security.ErrAccountLocked) {
+			// 连续失败触发账号锁定（见 auth_manager.go maxLoginFailures / loginLockDuration）
+			c.JSON(http.StatusLocked, gin.H{"error": "登录失败次数过多，账号已临时锁定（15 分钟）"})
+			return
+		}
 		if h.audit != nil {
 			h.audit.Record(c, audit.Entry{
 				Level:    "warn",

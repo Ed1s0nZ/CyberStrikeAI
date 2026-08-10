@@ -1,6 +1,7 @@
 name: "nmap"
 command: "nmap"
 # 默认：TCP 连接扫描 + 版本检测 + 默认 NSE 脚本（无 root 也可用）
+
 args: ["-sT", "-sV", "-sC"]
 enabled: true
 short_description: "网络扫描：端口/服务/脚本；可选时序、自定义 NSE、OS 检测（需 root）"

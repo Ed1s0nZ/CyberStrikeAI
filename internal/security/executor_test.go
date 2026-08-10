@@ -56,9 +56,13 @@ func TestExecuteSystemCommand_BackgroundDoesNotBlockOnChildStdout(t *testing.T) 
 	// ReadString('\n') 会阻塞到子进程退出。后台包装须将子进程标准流与 PID 行分离。
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()
+	shell, _, bgCmd := shellExecPair(
+		`(sh -c 'printf x; sleep 120')`,
+		`Start-Job -ScriptBlock { Write-Host -NoNewline x; Start-Sleep -Seconds 120 }`,
+	)
 	args := map[string]interface{}{
-		"command": `(sh -c 'printf x; sleep 120') &`,
-		"shell":   "sh",
+		"command": bgCmd + " &",
+		"shell":   shell,
 	}
 	res, err := executor.executeSystemCommand(ctx, args)
 	if err != nil {
@@ -75,15 +79,24 @@ func TestExecuteSystemCommand_BackgroundDoesNotBlockOnChildStdout(t *testing.T) 
 
 func TestExecToolSoftWaitExposesPartialOutput(t *testing.T) {
 	executor, server := setupTestExecutor(t)
-	server.ConfigureToolWaitTimeoutSeconds(1)
+	waitTimeout := 1
+	if runtime.GOOS == "windows" {
+		// PowerShell 5.1 句柄重定向下启动约 1.8s 才有首行输出，1s 软等待窗口内拿不到 partial output
+		waitTimeout = 4
+	}
+	server.ConfigureToolWaitTimeoutSeconds(waitTimeout)
 	mcp.RegisterExecutionControlTools(server, nil)
 	server.RegisterTool(mcp.Tool{Name: "exec", InputSchema: map[string]interface{}{"type": "object"}}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
 		return executor.ExecuteTool(ctx, "exec", args)
 	})
 
+	shell, _, cmd := shellExecPair(
+		`for i in 1 2 3 4; do echo partial-$i; sleep 0.3; done; sleep 5`,
+		`for ($i=1; $i -le 4; $i++) { Write-Output "partial-$i"; Start-Sleep -Milliseconds 300 }; Start-Sleep -Seconds 5`,
+	)
 	result, executionID, err := server.CallTool(context.Background(), "exec", map[string]interface{}{
-		"command": "for i in 1 2 3 4; do echo partial-$i; sleep 0.3; done; sleep 5",
-		"shell":   "sh",
+		"command": cmd,
+		"shell":   shell,
 	})
 	if err != nil {
 		t.Fatalf("CallTool exec: %v", err)
@@ -112,9 +125,13 @@ func TestExecToolSoftWaitExposesPartialOutput(t *testing.T) {
 
 func TestExecuteSystemCommand_FailureFormat(t *testing.T) {
 	executor, _ := setupTestExecutor(t)
+	shell, _, cmd := shellExecPair(
+		`echo fail-msg >&2; exit 7`,
+		`[Console]::Error.Write('fail-msg'); exit 7`,
+	)
 	res, err := executor.executeSystemCommand(context.Background(), map[string]interface{}{
-		"command": "echo fail-msg >&2; exit 7",
-		"shell":   "sh",
+		"command": cmd,
+		"shell":   shell,
 	})
 	if err != nil {
 		t.Fatalf("executeSystemCommand: %v", err)
@@ -137,9 +154,13 @@ func TestExecuteSystemCommand_OutputIsSourceLimited(t *testing.T) {
 	executor.SetToolOutputMaxBytes(200)
 	executor.SetToolOutputSpillRoot(spillRoot)
 	ctx := mcp.WithMCPConversationID(context.Background(), "exec-spill")
+	shell, _, cmd := shellExecPair(
+		`i=0; while [ $i -lt 2000 ]; do printf 0123456789; i=$((i+1)); done`,
+		`Write-Output ('0123456789' * 2000)`,
+	)
 	res, err := executor.executeSystemCommand(ctx, map[string]interface{}{
-		"command": "i=0; while [ $i -lt 2000 ]; do printf 0123456789; i=$((i+1)); done",
-		"shell":   "sh",
+		"command": cmd,
+		"shell":   shell,
 	})
 	if err != nil {
 		t.Fatalf("executeSystemCommand: %v", err)
@@ -169,9 +190,13 @@ func TestExecuteSystemCommand_StreamingOutputIsSourceLimited(t *testing.T) {
 		streamed.WriteString(chunk)
 	}))
 	ctx = mcp.WithMCPConversationID(ctx, "exec-stream-spill")
+	shell, _, cmd := shellExecPair(
+		`i=0; while [ $i -lt 2000 ]; do printf abcdefghij; i=$((i+1)); done`,
+		`Write-Output ('abcdefghij' * 2000)`,
+	)
 	res, err := executor.executeSystemCommand(ctx, map[string]interface{}{
-		"command": "i=0; while [ $i -lt 2000 ]; do printf abcdefghij; i=$((i+1)); done",
-		"shell":   "sh",
+		"command": cmd,
+		"shell":   shell,
 	})
 	if err != nil {
 		t.Fatalf("executeSystemCommand: %v", err)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -18,15 +19,23 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-// prependPythonUnbufferedEnv 为 /bin/sh -c 注入 PYTHONUNBUFFERED=1。
+// prependPythonUnbufferedEnv 为命令注入 PYTHONUNBUFFERED=1（平台感知）。
 // eino-ext local 对流式 stdout 使用 bufio 按「行」推送；python3 写管道时默认块缓冲，print 长期留在用户态缓冲，
 // 管道里收不到换行，表现为长时间无输出直至超时或退出。若命令里已出现 PYTHONUNBUFFERED 则不再覆盖。
+// Windows（PowerShell）使用 $env: 前缀语法；Unix（/bin/sh）使用 export 前缀语法，避免跨平台 ParserError。
 func prependPythonUnbufferedEnv(shellCommand string) string {
+	return prependPythonUnbufferedEnvImpl(shellCommand, runtime.GOOS == "windows")
+}
+
+func prependPythonUnbufferedEnvImpl(shellCommand string, isWindows bool) string {
 	if strings.TrimSpace(shellCommand) == "" {
 		return shellCommand
 	}
 	if strings.Contains(strings.ToUpper(shellCommand), "PYTHONUNBUFFERED") {
 		return shellCommand
+	}
+	if isWindows {
+		return "$env:PYTHONUNBUFFERED='1'; " + shellCommand
 	}
 	return "export PYTHONUNBUFFERED=1\n" + shellCommand
 }

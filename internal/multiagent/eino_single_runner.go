@@ -89,7 +89,7 @@ func RunEinoSingleChatModelAgent(
 		return nil, err
 	}
 
-	mainToolsForCfg, mainOrchestratorPre, singleToolSearchActive, err := prependEinoMiddlewares(ctx, &ma.EinoMiddleware, einoMWMain, mainTools, einoLoc, skillsRoot, conversationID, projectID, logger)
+	mainToolsForCfg, mainOrchestratorPre, singleToolSearchActive, mainDynToolNames, err := prependEinoMiddlewares(ctx, &ma.EinoMiddleware, einoMWMain, mainTools, einoLoc, skillsRoot, conversationID, projectID, logger)
 	if err != nil {
 		return nil, fmt.Errorf("eino single eino 中间件: %w", err)
 	}
@@ -158,6 +158,7 @@ func RunEinoSingleChatModelAgent(
 		conversationID:   conversationID,
 		trace:            modelFacingTrace,
 		middlewareConfig: &ma.EinoMiddleware,
+		dynamicToolNames: toolNameSet(mainDynToolNames),
 	})
 
 	maxIter := agentMaxIterations(appCfg)

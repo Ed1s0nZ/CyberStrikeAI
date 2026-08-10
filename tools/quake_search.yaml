@@ -1,5 +1,5 @@
 name: "quake_search"
-command: "python3"
+command: "python"
 args:
   - "-c"
   - |
@@ -212,7 +212,7 @@ args:
         }
         print(json.dumps(error_result, ensure_ascii=False, indent=2))
         sys.exit(1)
-enabled: false
+enabled: true
 short_description: "Quake网络空间搜索接口，支持自定义query、size、fields"
 description: |
   Quake（360 网络空间测绘）资产搜索工具，调用 Quake API v3 实时检索互联网资产。

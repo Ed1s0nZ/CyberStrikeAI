@@ -6,11 +6,42 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/cloudwego/eino/adk/filesystem"
 	"github.com/cloudwego/eino/schema"
 )
+
+// getSystemShell returns the shell binary and argument to execute a command string.
+func getSystemShell() (string, string) {
+	if runtime.GOOS == "windows" {
+		return "powershell.exe", "-Command"
+	}
+	return "/bin/sh", "-c"
+}
+
+// resolveShellArg 根据用户显式指定的 shell 名，返回平台对应的 (可执行文件, 参数)。
+// Windows 下 cmd 使用 /c、PowerShell 使用 -Command，其余视为 bash 类使用 -c；Unix 下统一使用 -c。
+func resolveShellArg(shell string) (string, string) {
+	name := strings.ToLower(strings.TrimSpace(shell))
+	if runtime.GOOS == "windows" {
+		switch name {
+		case "cmd", "cmd.exe":
+			return "cmd.exe", "/c"
+		case "powershell", "powershell.exe":
+			return "powershell.exe", "-Command"
+		case "pwsh", "pwsh.exe":
+			return "pwsh.exe", "-Command"
+		case "bash", "sh", "zsh", "dash":
+			return name, "-c"
+		default:
+			return shell, "-c"
+		}
+	}
+	return shell, "-c"
+}
 
 // ConfigureShellCmdForAgentExecute 与 exec 工具一致：非交互 stdin、pager/TERM 环境、独立进程组。
 func ConfigureShellCmdForAgentExecute(cmd *exec.Cmd) {
@@ -61,7 +92,8 @@ func runShellInBackground(ctx context.Context, command string, w *schema.StreamW
 	defer w.Close()
 
 	command = PrepareShellCommandForExecute(command)
-	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", command)
+	shell, shellArg := getSystemShell()
+	cmd := exec.CommandContext(ctx, shell, shellArg, command)
 	applyDefaultTerminalEnv(cmd)
 	attachNonInteractiveStdin(cmd)
 	stdout, err := cmd.StdoutPipe()
@@ -121,7 +153,8 @@ func streamShellForeground(ctx context.Context, command string, w *schema.Stream
 	defer w.Close()
 
 	command = PrepareShellCommandForExecute(command)
-	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", command)
+	shell, shellArg := getSystemShell()
+	cmd := exec.CommandContext(ctx, shell, shellArg, command)
 	applyDefaultTerminalEnv(cmd)
 	attachNonInteractiveStdin(cmd)
 

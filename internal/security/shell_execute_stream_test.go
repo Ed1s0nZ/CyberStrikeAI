@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -81,8 +82,23 @@ func TestEinoStreamingShell_SudoFailsFast(t *testing.T) {
 func TestEinoStreamingShell_StderrWhileStdoutBlocks(t *testing.T) {
 	shell := NewEinoStreamingShell()
 	// 模拟 sudo：stderr 先有输出，stdout 侧进程仍挂起；旧 eino local 在首包 stderr 前不会向流写任何内容。
-	cmd := PrepareNonInteractiveShellCommand(`echo "password prompt" >&2; sleep 30`)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	// Windows 无 sh：PrepareNonInteractiveShellCommand 的 sh 语法会触发解析错误，直接写原生 stderr 即可
+	// （streamShellForeground 内部按 GOOS 分支处理，Windows 下原样执行 PowerShell 命令）。
+	var cmd string
+	if runtime.GOOS == "windows" {
+		cmd = `[Console]::Error.WriteLine('password prompt'); Start-Sleep -Seconds 30`
+	} else {
+		cmd = PrepareNonInteractiveShellCommand(`echo "password prompt" >&2; sleep 30`)
+	}
+	ctxTimeout := 2 * time.Second
+	promptDeadline := 1500 * time.Millisecond
+	if runtime.GOOS == "windows" {
+		// PowerShell 5.1 句柄重定向下启动约 1.7s（满载更慢），放宽窗口；语义不变：
+		// stderr 必须先于 stdout EOF 到达，否则旧 bug（等到 EOF 才转发）仍会触发 contains 检查失败
+		ctxTimeout = 6 * time.Second
+		promptDeadline = 4 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 
 	sr, err := shell.ExecuteStreaming(ctx, &filesystem.ExecuteRequest{Command: cmd})
@@ -108,7 +124,7 @@ func TestEinoStreamingShell_StderrWhileStdoutBlocks(t *testing.T) {
 			}
 		}
 	}
-	if time.Since(start) > 1500*time.Millisecond {
+	if time.Since(start) > promptDeadline {
 		t.Fatalf("expected stderr promptly, took %v output=%q", time.Since(start), got.String())
 	}
 	if !strings.Contains(got.String(), "password prompt") {

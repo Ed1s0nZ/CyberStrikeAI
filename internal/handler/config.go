@@ -359,7 +359,7 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 		ToolSearchAlwaysVisibleTools:               append([]string(nil), h.config.MultiAgent.EinoMiddleware.ToolSearchAlwaysVisibleTools...),
 		ToolSearchAlwaysVisibleEffectiveTools: mergeToolNameLists(
 			h.config.MultiAgent.EinoMiddleware.ToolSearchAlwaysVisibleTools,
-			builtin.GetAllBuiltinTools(),
+			builtin.GetCoreBuiltinTools(),
 		),
 	}
 

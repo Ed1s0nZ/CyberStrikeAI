@@ -58,7 +58,7 @@ func (db *DB) SaveToolExecution(exec *mcp.ToolExecution) error {
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-	_, err = db.Exec(query,
+	_, err = db.RetryExec("SaveToolExecution", query,
 		exec.ID,
 		exec.ToolName,
 		string(argsJSON),
@@ -95,7 +95,7 @@ func (db *DB) UpdateToolExecutionResult(id string, result *mcp.ToolResult) error
 	if err != nil {
 		return err
 	}
-	_, err = db.Exec(`UPDATE tool_executions SET result = ? WHERE id = ?`, string(resultBytes), id)
+	_, err = db.RetryExec("UpdateToolResult", `UPDATE tool_executions SET result = ? WHERE id = ?`, string(resultBytes), id)
 	if err != nil {
 		db.logger.Warn("更新工具执行结果失败", zap.Error(err), zap.String("executionId", id))
 	}
@@ -971,7 +971,7 @@ func (db *DB) UpdateToolStats(toolName string, totalCalls, successCalls, failedC
 			updated_at = ?
 	`
 
-	_, err := db.Exec(query,
+	_, err := db.RetryExec("UpdateToolStats", query,
 		toolName, totalCalls, successCalls, failedCalls, lastCallTimeSQL, time.Now(),
 		totalCalls, successCalls, failedCalls, lastCallTimeSQL, time.Now(),
 	)

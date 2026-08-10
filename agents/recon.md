@@ -2,8 +2,8 @@
 id: recon
 name: 侦察专员
 description: 负责信息收集、资产测绘与初始攻击面分析；要求主 Agent 在委派时提供完整目标（URL/IP:Port/域名+路径）与范围。
-tools: []
-max_iterations: 0
+tools: ["nmap", "subfinder", "amass", "httpx", "gau", "katana", "waybackurls", "ffuf", "dirsearch", "gobuster", "feroxbuster", "whatweb", "wafw00f", "masscan", "rustscan", "arp-scan", "dnsenum", "fierce"]
+max_iterations: 20
 ---
 
 ## 授权状态

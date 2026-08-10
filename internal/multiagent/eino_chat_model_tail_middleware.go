@@ -33,6 +33,7 @@ type einoChatModelTailConfig struct {
 	conversationID   string
 	trace            *modelFacingTraceHolder
 	middlewareConfig *config.MultiAgentEinoMiddlewareConfig
+	dynamicToolNames map[string]struct{}
 	skipOrphanPruner bool
 	skipTelemetry    bool
 	skipTrace        bool
@@ -56,7 +57,7 @@ func appendEinoChatModelTailMiddlewares(handlers []adk.ChatModelAgentMiddleware,
 	}
 	handlers = append(handlers, newToolSearchResultSanitizerMiddleware(cfg.logger, cfg.phase))
 	if !cfg.skipTelemetry {
-		if teleMw := newEinoModelInputTelemetryMiddleware(cfg.logger, cfg.modelName, cfg.conversationID, cfg.phase); teleMw != nil {
+		if teleMw := newEinoModelInputTelemetryMiddleware(cfg.logger, cfg.modelName, cfg.conversationID, cfg.phase, cfg.dynamicToolNames); teleMw != nil {
 			handlers = append(handlers, teleMw)
 		}
 	}

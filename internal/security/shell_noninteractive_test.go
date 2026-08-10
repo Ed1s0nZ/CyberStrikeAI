@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -80,14 +81,26 @@ func TestNonInteractiveStdinReadExitsQuickly(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "sh", "-c", PrepareNonInteractiveShellCommand(`read x; echo "x=<$x>"`))
+	// Unix 走 sh + exec </dev/null 包装；Windows 无 sh，靠 Go 层 attachNonInteractiveStdin（NUL）关闭 stdin，
+	// PowerShell [Console]::In.ReadLine() 读到 EOF 立即返回 $null，与 Unix read 语义一致。
+	shell, arg, cmdStr := shellExecPair(
+		PrepareNonInteractiveShellCommand(`read x; echo "x=<$x>"`),
+		`$x = [Console]::In.ReadLine(); Write-Output "x=<$x>"`,
+	)
+	cmd := exec.CommandContext(ctx, shell, arg, cmdStr)
 	attachNonInteractiveStdin(cmd)
 
 	start := time.Now()
 	out, err := cmd.CombinedOutput()
 	elapsed := time.Since(start)
-	if elapsed > 2*time.Second {
-		t.Fatalf("read with closed stdin took %v, want <2s", elapsed)
+	limit := 2 * time.Second
+	if runtime.GOOS == "windows" {
+		// PowerShell 5.1 句柄重定向下启动约 1.8s（满载更慢），与 Unix 的亚秒级基准不同；
+		// 若 stdin 未关闭，ReadLine 会阻塞到 ctx 超时（5s），测试仍能捕获该回归
+		limit = 4 * time.Second
+	}
+	if elapsed > limit {
+		t.Fatalf("read with closed stdin took %v, want <%v", elapsed, limit)
 	}
 	if err != nil {
 		t.Fatalf("unexpected error: %v output=%q", err, out)
@@ -109,7 +122,11 @@ func TestNonInteractiveStdinReadBlocksWithoutRedirect(t *testing.T) {
 	defer r.Close()
 	// 保持 w 打开且不写数据，模拟「等待用户输入」
 
-	cmd := exec.Command("sh", "-c", `read x; echo done`)
+	shell, arg, cmdStr := shellExecPair(
+		`read x; echo done`,
+		`[Console]::In.ReadLine() | Out-Null; Write-Output done`,
+	)
+	cmd := exec.Command(shell, arg, cmdStr)
 	cmd.Stdin = r
 
 	done := make(chan error, 1)

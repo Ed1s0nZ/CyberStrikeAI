@@ -898,7 +898,7 @@ func setupRoutes(
 
 	// 认证相关路由
 	authRoutes := api.Group("/auth")
-	loginRL := security.NewRateLimiter(10, 1*time.Minute)
+	loginRL := security.NewRateLimiter(5, 1*time.Minute) // 登录限流: 5 次/分/IP（配合账号级失败锁定）
 	{
 		authRoutes.POST("/login", security.RateLimitMiddleware(loginRL), authHandler.Login)
 		authRoutes.POST("/logout", security.AuthMiddleware(authManager), authHandler.Logout)

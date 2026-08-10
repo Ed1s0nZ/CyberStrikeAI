@@ -1,6 +1,6 @@
 name: "fscan"
 command: "fscan"
-enabled: false
+enabled: true
 short_description: "内网综合扫描工具，支持存活探测、端口扫描、服务识别、爆破、POC检测"
 description: |
   Fscan是一款内网综合扫描工具，支持主机发现、端口扫描、服务识别、

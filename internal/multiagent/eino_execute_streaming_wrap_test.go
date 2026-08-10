@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -61,9 +62,19 @@ func TestEinoStreamingShellWrap_PreparesNonInteractiveCommand(t *testing.T) {
 			t.Fatalf("recv: %v", rerr)
 		}
 	}
-	if !strings.Contains(inner.lastCommand, "PYTHONUNBUFFERED=1") {
-		t.Fatalf("missing python unbuffer in inner command: %q", inner.lastCommand)
+	if runtime.GOOS == "windows" {
+		if !strings.Contains(inner.lastCommand, "$env:PYTHONUNBUFFERED='1'") {
+			t.Fatalf("missing powershell unbuffer prefix in inner command: %q", inner.lastCommand)
+		}
+		if strings.Contains(inner.lastCommand, "export PYTHONUNBUFFERED") {
+			t.Fatalf("unix export syntax leaked into windows command: %q", inner.lastCommand)
+		}
+	} else {
+		if !strings.Contains(inner.lastCommand, "export PYTHONUNBUFFERED=1") {
+			t.Fatalf("missing sh unbuffer prefix in inner command: %q", inner.lastCommand)
+		}
 	}
+
 }
 
 func TestEinoStreamingShellWrap_NoOutputTimeout(t *testing.T) {
@@ -427,5 +438,44 @@ func TestEinoStreamingShellWrap_NonTimeoutRecvErrStillHard(t *testing.T) {
 	_, rerr := sr.Recv()
 	if rerr == nil || errors.Is(rerr, io.EOF) {
 		t.Fatal("expected hard stream error for non-timeout failure")
+	}
+}
+
+func TestPrependPythonUnbufferedEnvImpl_PlatformAware(t *testing.T) {
+	// Windows 分支：必须用 PowerShell $env: 语法，绝不能混入 bash export
+	win := prependPythonUnbufferedEnvImpl("python3 app.py", true)
+	if !strings.HasPrefix(win, "$env:PYTHONUNBUFFERED='1'; ") {
+		t.Fatalf("windows branch: expected $env: prefix, got %q", win)
+	}
+	if strings.Contains(win, "export PYTHONUNBUFFERED") {
+		t.Fatalf("windows branch must not contain bash export syntax: %q", win)
+	}
+	if !strings.Contains(win, "python3 app.py") {
+		t.Fatalf("windows branch lost original command: %q", win)
+	}
+
+	// Unix 分支：保持 export 语法
+	unix := prependPythonUnbufferedEnvImpl("python3 app.py", false)
+	if !strings.HasPrefix(unix, "export PYTHONUNBUFFERED=1\n") {
+		t.Fatalf("unix branch: expected export prefix, got %q", unix)
+	}
+	if !strings.Contains(unix, "python3 app.py") {
+		t.Fatalf("unix branch lost original command: %q", unix)
+	}
+
+	// 空命令：原样返回，不注入
+	if got := prependPythonUnbufferedEnvImpl("", true); got != "" {
+		t.Fatalf("empty command should pass through, got %q", got)
+	}
+	if got := prependPythonUnbufferedEnvImpl("   ", false); strings.TrimSpace(got) != "" {
+		t.Fatalf("blank command should pass through, got %q", got)
+	}
+
+	// 已含 PYTHONUNBUFFERED：不重复注入（两种平台）
+	if got := prependPythonUnbufferedEnvImpl("PYTHONUNBUFFERED=1 python3 app.py", true); strings.Contains(got, "$env:PYTHONUNBUFFERED") {
+		t.Fatalf("should not re-inject when already set (win): %q", got)
+	}
+	if got := prependPythonUnbufferedEnvImpl("echo $PYTHONUNBUFFERED", false); strings.Contains(got, "export PYTHONUNBUFFERED") {
+		t.Fatalf("should not re-inject when already referenced (unix): %q", got)
 	}
 }
