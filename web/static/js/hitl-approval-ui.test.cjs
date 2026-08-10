@@ -148,6 +148,28 @@ test('运行中对话切换会取消旧事件流并仅恢复最新一页过程�
     assert.match(monitor, /autoLoadAll: false/);
 });
 
+test('多对话并发时释放隐藏主流且旧请求不能覆盖新对话状态', () => {
+    assert.match(chat, /function ownsLiveChatStream\(liveStream\)/);
+    assert.match(chat, /function clearLiveChatStreamIfOwned\(liveStream\)/);
+    assert.match(chat, /function detachLiveChatStreamForNavigation\(nextConversationId, force = false\)/);
+    assert.match(chat, /liveStream\.detached = true;[\s\S]{0,240}controller\.abort\(\)/);
+    assert.match(chat, /const requestAbortController = new AbortController\(\)/);
+    assert.match(chat, /signal: requestAbortController\.signal/);
+    assert.match(chat, /if \(!ownsLiveChatStream\(liveStreamState\) \|\| liveStreamState\.detached\)/);
+    assert.match(chat, /const clearedOwnedStream = clearLiveChatStreamIfOwned\(liveStreamState\)/);
+    assert.match(chat, /detachLiveChatStreamForNavigation\(conversationId\)/);
+    assert.match(chat, /detachLiveChatStreamForNavigation\('', true\)/);
+    assert.match(chat, /window\.clearChatHitlApprovalDock\(\)/);
+    assert.match(monitor, /if \(conversationId && conversationId !== currentId\) return false/);
+    assert.match(monitor, /function scrollProcessDetailsToLatest\(assistantMessageId, smooth = true\)/);
+    assert.match(monitor, /timeline\.scrollTop = targetTop/);
+    assert.match(chat, /let loadConversationAbortController = null/);
+    assert.match(chat, /cancelPendingConversationLoad\(\);[\s\S]{0,220}const conversationLoadController = new AbortController\(\)/);
+    assert.match(chat, /signal: conversationLoadController\.signal/);
+    assert.match(template, /monitor\.js\?v=20260811-9/);
+    assert.match(template, /chat\.js\?v=20260811-18/);
+});
+
 test('任务结束后对话内审批按钮会变灰并禁止继续操作', () => {
     assert.match(monitor, /ready: false/);
     assert.match(monitor, /function setHitlApprovalTaskAvailability/);

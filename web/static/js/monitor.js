@@ -1783,6 +1783,21 @@ function updateProcessDetailsPaginationButtons(assistantMessageId, backendMessag
     }
 }
 
+function scrollProcessDetailsToLatest(assistantMessageId, smooth = true) {
+    const container = document.getElementById('process-details-' + assistantMessageId);
+    const timeline = container && container.querySelector('.progress-timeline');
+    if (!timeline) return false;
+    const targetTop = Math.max(0, timeline.scrollHeight - timeline.clientHeight);
+    if (smooth && typeof timeline.scrollTo === 'function') {
+        timeline.scrollTo({ top: targetTop, behavior: 'smooth' });
+    } else {
+        timeline.scrollTop = targetTop;
+    }
+    return true;
+}
+
+window.scrollProcessDetailsToLatest = scrollProcessDetailsToLatest;
+
 /**
  * 分页加载过程详情并增量渲染。默认全量加载供恢复流程使用；
  * 用户手动展开时由任务状态选择首个历史页或最新页，滚动到边界后自动加载相邻页。
@@ -4062,7 +4077,9 @@ function renderChatHitlApprovalDock(data) {
     if (!dock || !data || !data.interruptId) return false;
     const conversationId = String(data.conversationId || '').trim();
     const currentId = String(window.currentConversationId || '').trim();
-    if (conversationId && currentId && conversationId !== currentId) return false;
+    // 新任务尚未绑定会话 ID 时不能让其他运行中对话的迟到审批覆盖输入框。
+    // 有明确会话 ID 的审批面板只允许显示在同一个当前对话中。
+    if (conversationId && conversationId !== currentId) return false;
     const reviewer = String(data.reviewer || data.decidedBy || '').trim().toLowerCase();
     if (reviewer === 'audit_agent' || String(data.status || '').trim().toLowerCase() === 'audit_running') return false;
     let mode = String(data.mode || 'approval').trim().toLowerCase();

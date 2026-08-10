@@ -1,5 +1,6 @@
 let currentConversationId = null;
 let loadConversationRequestSeq = 0;
+let loadConversationAbortController = null;
 
 /**
  * 轻量会话 LRU 缓存。
@@ -1146,6 +1147,53 @@ function shouldTreatLiveChatTaskAsCurrent(liveConversationId, visibleConversatio
     return hasVisibleProgress === true;
 }
 
+function ownsLiveChatStream(liveStream) {
+    return !!liveStream && window.__csAgentLiveStream === liveStream;
+}
+
+function clearLiveChatStreamIfOwned(liveStream) {
+    if (!ownsLiveChatStream(liveStream)) return false;
+    liveStream.active = false;
+    window.__csAgentLiveStream = { active: false, conversationId: null, progressId: null };
+    updateChatPrimaryActionState();
+    return true;
+}
+
+/**
+ * 离开正在读取主 POST 流的对话时，只断开浏览器侧响应流，不停止后端任务。
+ * 后端任务使用 detachedAgentContext，仍会继续运行；重新进入该对话时由
+ * task-events 镜像流接管。这样同时运行多个对话也只占用一个前台长连接，
+ * 不会耗尽浏览器对同一主机的连接槽位而卡住普通 GET/POST 请求。
+ */
+function detachLiveChatStreamForNavigation(nextConversationId, force = false) {
+    const liveStream = window.__csAgentLiveStream;
+    if (!liveStream || !liveStream.active) return false;
+    const liveConversationId = String(liveStream.conversationId || '').trim();
+    const nextId = String(nextConversationId || '').trim();
+    if (!force && liveConversationId && liveConversationId === nextId) return false;
+    if (!force && !liveConversationId && !nextId) return false;
+
+    liveStream.detached = true;
+    liveStream.active = false;
+    const controller = liveStream.abortController;
+    if (controller && !controller.signal.aborted) {
+        controller.abort();
+    }
+    if (ownsLiveChatStream(liveStream)) {
+        updateChatPrimaryActionState();
+    }
+    return true;
+}
+
+function cancelPendingConversationLoad() {
+    if (!loadConversationAbortController) return false;
+    if (!loadConversationAbortController.signal.aborted) {
+        loadConversationAbortController.abort();
+    }
+    loadConversationAbortController = null;
+    return true;
+}
+
 function isLiveChatTaskVisible(live, visibleConversationId) {
     if (!live || !live.active) return false;
     const progress = live.progressId ? document.getElementById(live.progressId) : null;
@@ -1656,11 +1704,15 @@ async function sendMessage() {
     }
     const progressElement = document.getElementById(progressId);
     registerProgressTask(progressId, streamConversationId);
-    window.__csAgentLiveStream = {
+    const requestAbortController = new AbortController();
+    const liveStreamState = {
         active: true,
         conversationId: streamConversationId || null,
-        progressId: progressId
+        progressId: progressId,
+        abortController: requestAbortController,
+        detached: false
     };
+    window.__csAgentLiveStream = liveStreamState;
     updateChatPrimaryActionState();
     loadActiveTasks();
     let assistantMessageId = null;
@@ -1681,13 +1733,14 @@ async function sendMessage() {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(body),
+            signal: requestAbortController.signal,
         });
         
         if (!response.ok) {
             throw new Error('请求失败: ' + response.status);
         }
 
-        window.__csAgentLiveStream.conversationId = streamConversationId || null;
+        liveStreamState.conversationId = streamConversationId || null;
         try {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
@@ -1707,7 +1760,14 @@ async function sendMessage() {
                     }
                     if (!streamConversationId && eventData.type === 'conversation') {
                         streamConversationId = eventConvId;
+                        liveStreamState.conversationId = eventConvId;
                         justBoundConversation = true;
+                        // 旧请求可能在用户切换对话后才收到 conversation 事件。
+                        // 只完成本地任务绑定，不允许它重新抢占当前对话或新的主流状态。
+                        if (!ownsLiveChatStream(liveStreamState) || liveStreamState.detached) {
+                            updateProgressConversation(progressId, eventConvId);
+                            return;
+                        }
                     }
                 }
                 if (!justBoundConversation && !isStreamStillVisibleForRequest()) {
@@ -1756,9 +1816,14 @@ async function sendMessage() {
                 }
                 const convId = streamConversationId || (body && body.conversationId) || null;
                 let attached = false;
-                if (convId && typeof window.attachRunningTaskEventStream === 'function') {
-                    window.__csAgentLiveStream = { active: false, conversationId: null, progressId: null };
-                    updateChatPrimaryActionState();
+                if (
+                    convId &&
+                    ownsLiveChatStream(liveStreamState) &&
+                    !liveStreamState.detached &&
+                    isStreamStillVisibleForRequest() &&
+                    typeof window.attachRunningTaskEventStream === 'function'
+                ) {
+                    clearLiveChatStreamIfOwned(liveStreamState);
                     attached = await window.attachRunningTaskEventStream(convId).catch(() => false);
                 }
                 if (!attached && isStreamStillVisibleForRequest()) {
@@ -1769,9 +1834,8 @@ async function sendMessage() {
                 }
             }
         } finally {
-            window.__csAgentLiveStream = { active: false, conversationId: null, progressId: null };
-            updateChatPrimaryActionState();
-            if (window.CyberStrikeChatScroll) {
+            const clearedOwnedStream = clearLiveChatStreamIfOwned(liveStreamState);
+            if (clearedOwnedStream && !liveStreamState.detached && window.CyberStrikeChatScroll) {
                 window.CyberStrikeChatScroll.onStreamEnd();
             }
         }
@@ -1785,9 +1849,8 @@ async function sendMessage() {
         }
         
     } catch (error) {
-        window.__csAgentLiveStream = { active: false, conversationId: null, progressId: null };
-        updateChatPrimaryActionState();
-        if (!isStreamStillVisibleForRequest()) {
+        clearLiveChatStreamIfOwned(liveStreamState);
+        if (liveStreamState.detached || !isStreamStillVisibleForRequest()) {
             if (typeof loadActiveTasks === 'function') {
                 loadActiveTasks();
             }
@@ -4730,6 +4793,14 @@ async function startNewConversation(options = {}) {
     const requestedProjectId = options && typeof options.projectId === 'string'
         ? options.projectId.trim()
         : '';
+    cancelPendingConversationLoad();
+    detachLiveChatStreamForNavigation('', true);
+    if (typeof window.cancelRunningTaskEventStream === 'function') {
+        window.cancelRunningTaskEventStream('');
+    }
+    if (typeof window.clearChatHitlApprovalDock === 'function') {
+        window.clearChatHitlApprovalDock();
+    }
     // 如果当前在分组详情页面，先退出分组详情
     if (currentGroupId) {
         const groupDetailPage = document.getElementById('group-detail-page');
@@ -5145,6 +5216,10 @@ async function prefetchLastAssistantProcessDetails() {
 async function loadConversation(conversationId) {
     const seq = ++loadConversationRequestSeq;
     const previousConversationId = currentConversationId;
+    cancelPendingConversationLoad();
+    detachLiveChatStreamForNavigation(conversationId);
+    const conversationLoadController = new AbortController();
+    loadConversationAbortController = conversationLoadController;
     if (typeof window.selectChatProjectConversationItem === 'function') {
         window.selectChatProjectConversationItem(conversationId);
     }
@@ -5159,9 +5234,12 @@ async function loadConversation(conversationId) {
         let conversation = null;
         let response = null;
         try {
-            response = await apiFetch(`/api/conversations/${conversationId}?include_process_details=0`);
+            response = await apiFetch(`/api/conversations/${conversationId}?include_process_details=0`, {
+                signal: conversationLoadController.signal
+            });
             conversation = await response.json();
         } catch (fetchError) {
+            if (fetchError && fetchError.name === 'AbortError') return;
             if (!cachedConversation) throw fetchError;
             console.warn('加载最新对话失败，使用本地缓存:', fetchError);
             conversation = cachedConversation;
@@ -5434,11 +5512,16 @@ async function loadConversation(conversationId) {
             });
         }
     } catch (error) {
+        if (error && error.name === 'AbortError') return;
         if (seq === loadConversationRequestSeq && typeof window.selectChatProjectConversationItem === 'function') {
             window.selectChatProjectConversationItem(previousConversationId);
         }
         console.error('加载对话失败:', error);
         showChatToast('加载对话失败: ' + (error && error.message ? error.message : String(error)), 'error');
+    } finally {
+        if (loadConversationAbortController === conversationLoadController) {
+            loadConversationAbortController = null;
+        }
     }
 }
 
