@@ -18297,7 +18297,8 @@ tr.mcp-stats-tool-row[data-tool-name]:focus-visible {
     flex-shrink: 0;
 }
 
-.group-item:hover .group-item-menu {
+.group-item:hover .group-item-menu,
+.group-item:focus-within .group-item-menu {
     opacity: 1;
 }
 
@@ -44444,6 +44445,15 @@ html[data-theme="dark"] #project-panel-assets .projects-panel-pagination.paginat
     font-size: 0.875rem;
     font-weight: 520;
     line-height: 1.35;
+}
+
+.project-folder-pinned {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    color: var(--accent-color);
+    font-size: 0.72rem;
+    line-height: 1;
 }
 
 .project-folder-preview {

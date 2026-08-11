@@ -23,7 +23,7 @@
             }
         })();
     </script>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260811-31">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260811-32">
     <link rel="stylesheet" href="/static/css/c2.css">
     <link rel="stylesheet" href="/static/vendor/xterm.css">
     <script src="/static/js/router.js"></script>
@@ -6104,6 +6104,9 @@
         <div id="projects-list-menu-edit" class="context-menu-item" data-require-permission="project:write" onclick="editProjectFromListMenu()">
             <span id="projects-list-menu-edit-text"></span>
         </div>
+        <div id="projects-list-menu-pin" class="context-menu-item" data-require-permission="project:write" onclick="toggleProjectPinnedFromListMenu()">
+            <span id="projects-list-menu-pin-text"></span>
+        </div>
         <div id="projects-list-menu-archive" class="context-menu-item" data-require-permission="project:write" onclick="toggleProjectArchiveFromListMenu()">
             <span id="projects-list-menu-archive-text"></span>
         </div>
@@ -6822,7 +6825,7 @@
     <script src="/static/js/dashboard.js"></script>
     <script src="/static/js/chat-scroll.js?v=20260811-1"></script>
     <script src="/static/js/monitor.js?v=20260811-11"></script>
-    <script src="/static/js/chat.js?v=20260811-22"></script>
+    <script src="/static/js/chat.js?v=20260811-24"></script>
     <script src="/static/js/hitl.js?v=20260810-3"></script>
     <script src="/static/js/settings.js?v=20260717-1"></script>
     <script src="/static/js/audit-datetime-picker.js"></script>
@@ -6834,7 +6837,7 @@
     <script src="/static/js/knowledge.js"></script>
     <script src="/static/js/skills.js"></script>
     <script src="/static/js/fact-graph.js"></script>
-    <script src="/static/js/projects.js?v=20260811-13"></script>
+    <script src="/static/js/projects.js?v=20260811-15"></script>
     <script src="/static/js/vulnerability.js?v=14"></script>
     <script src="/static/js/webshell.js"></script>
     <script src="/static/js/chat-files.js"></script>

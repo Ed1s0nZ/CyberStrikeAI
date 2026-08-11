@@ -6105,6 +6105,12 @@ async function deleteConversation(conversationId, skipConfirm = false) {
         invalidateConversationLiteCache(conversationId);
         // 同时从待保留映射中移除
         delete pendingGroupMappings[conversationId];
+
+        // 先同步所有侧栏的本地状态，再执行网络刷新。项目文件夹使用独立的
+        // conversation cache；如果只刷新“最近对话”，删除项会一直残留到整页刷新。
+        try {
+            document.dispatchEvent(new CustomEvent('conversation-deleted', { detail: { conversationId } }));
+        } catch (e) { /* ignore */ }
         
         // 如果当前在分组详情页面，重新加载分组对话
         if (currentGroupId) {
@@ -6125,10 +6131,6 @@ async function deleteConversation(conversationId, skipConfirm = false) {
             applyBatchConversationFilters();
         }
 
-        // 通知其他模块（如 WebShell AI 助手）同步删除，保持列表一致
-        try {
-            document.dispatchEvent(new CustomEvent('conversation-deleted', { detail: { conversationId } }));
-        } catch (e) { /* ignore */ }
     } catch (error) {
         console.error('删除对话失败:', error);
         alert('删除对话失败: ' + error.message);
@@ -9310,8 +9312,11 @@ async function loadGroups() {
             groupItem.appendChild(content);
 
             const menuBtn = document.createElement('button');
+            menuBtn.type = 'button';
             menuBtn.className = 'group-item-menu';
             menuBtn.innerHTML = '⋯';
+            menuBtn.title = typeof window.t === 'function' ? window.t('common.actions') : '操作';
+            menuBtn.setAttribute('aria-label', menuBtn.title);
             menuBtn.onclick = (e) => {
                 e.stopPropagation();
                 showGroupContextMenu(e, group.id);
@@ -10104,10 +10109,30 @@ async function saveConversationRename() {
     }
 }
 
+async function assertConversationActionResponse(response, fallbackMessage) {
+    if (response && response.ok) return response;
+    let payload = {};
+    try {
+        payload = response ? await response.json() : {};
+    } catch (e) { /* ignore */ }
+    throw new Error(payload.error || payload.message || fallbackMessage);
+}
+
+function notifyConversationPinnedChanged(conversationId, pinned) {
+    try {
+        document.dispatchEvent(new CustomEvent('conversation-pinned-changed', {
+            detail: { conversationId, pinned: !!pinned }
+        }));
+    } catch (e) { /* ignore */ }
+}
+
 // 置顶对话
 async function pinConversation() {
     const convId = contextMenuConversationId;
     if (!convId) return;
+
+    // 点击后立即收起菜单，避免网络请求期间看起来“没有反应”。
+    closeContextMenu();
 
     try {
         // 检查对话是否真的在当前分组中
@@ -10120,6 +10145,7 @@ async function pinConversation() {
         if (isInCurrentGroup) {
             // 获取当前对话在分组中的置顶状态
             const response = await apiFetch(`/api/groups/${currentGroupId}/conversations`);
+            await assertConversationActionResponse(response, '获取分组对话失败');
             const groupConvs = await response.json();
             const conv = groupConvs.find(c => c.id === convId);
             
@@ -10128,31 +10154,37 @@ async function pinConversation() {
             const newPinned = !currentPinned;
 
             // 更新分组内置顶状态
-            await apiFetch(`/api/groups/${currentGroupId}/conversations/${convId}/pinned`, {
+            const updateResponse = await apiFetch(`/api/groups/${currentGroupId}/conversations/${convId}/pinned`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ pinned: newPinned }),
             });
+            await assertConversationActionResponse(updateResponse, '更新分组内置顶状态失败');
 
             // 重新加载分组对话
-            loadGroupConversations(currentGroupId);
+            await loadGroupConversations(currentGroupId);
         } else {
             // 不在分组详情页面，或者对话不在当前分组中，使用全局置顶
             const response = await apiFetch(`/api/conversations/${convId}`);
+            await assertConversationActionResponse(response, '获取对话失败');
             const conv = await response.json();
             const newPinned = !conv.pinned;
 
             // 更新全局置顶状态
-            await apiFetch(`/api/conversations/${convId}/pinned`, {
+            const updateResponse = await apiFetch(`/api/conversations/${convId}/pinned`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ pinned: newPinned }),
             });
+            await assertConversationActionResponse(updateResponse, '更新置顶状态失败');
 
+            // 项目文件夹侧栏与“最近对话”使用不同缓存；先发事件做即时更新，
+            // projects.js 再后台拉取服务端数据校准。
+            notifyConversationPinnedChanged(convId, newPinned);
             loadConversationsWithGroups();
         }
     } catch (error) {
@@ -10160,7 +10192,6 @@ async function pinConversation() {
         alert('置顶失败: ' + (error.message || '未知错误'));
     }
 
-    closeContextMenu();
 }
 
 // 显示移动到分组子菜单
@@ -12083,46 +12114,61 @@ async function editGroup() {
     }
 }
 
-// 删除分组
-async function deleteGroup() {
-    if (typeof requirePermission === 'function' && !requirePermission('group:delete')) return;
-    if (!currentGroupId) return;
+function removeConversationGroupFromLocalState(groupId) {
+    groupsCache = groupsCache.filter(group => group.id !== groupId);
+    Object.keys(conversationGroupMappingCache).forEach(convId => {
+        if (conversationGroupMappingCache[convId] === groupId) {
+            delete conversationGroupMappingCache[convId];
+        }
+    });
+    document.querySelectorAll('.group-item[data-group-id]').forEach(item => {
+        if (item.dataset.groupId === groupId) item.remove();
+    });
+}
+
+async function deleteConversationGroupById(groupId, options = {}) {
+    if (typeof requirePermission === 'function' && !requirePermission('group:delete')) {
+        if (options.closeContextMenu) closeGroupContextMenu();
+        return;
+    }
+    if (!groupId) return;
 
     const deleteConfirmMsg = typeof window.t === 'function' ? window.t('chat.deleteGroupConfirm') : '确定要删除此分组吗？分组中的对话不会被删除，但会从分组中移除。';
     if (!confirm(deleteConfirmMsg)) {
+        if (options.closeContextMenu) closeGroupContextMenu();
         return;
     }
 
     try {
-        await apiFetch(`/api/groups/${currentGroupId}`, {
+        const deleteResponse = await apiFetch(`/api/groups/${groupId}`, {
             method: 'DELETE',
         });
+        await assertConversationActionResponse(deleteResponse, '删除分组失败');
 
-        // 更新缓存
-        groupsCache = groupsCache.filter(g => g.id !== currentGroupId);
-        Object.keys(conversationGroupMappingCache).forEach(convId => {
-            if (conversationGroupMappingCache[convId] === currentGroupId) {
-                delete conversationGroupMappingCache[convId];
-            }
-        });
+        // 删除成功后先同步本地界面，再做服务端列表校准。
+        removeConversationGroupFromLocalState(groupId);
+        if (currentGroupId === groupId) exitGroupDetail();
 
         // 如果"移动到分组"子菜单是打开的，刷新它
         const submenu = document.getElementById('move-to-group-submenu');
+        await loadGroups();
         if (submenu && submenu.style.display !== 'none') {
-            // 子菜单是打开的，重新加载分组列表并刷新子菜单
-            await loadGroups();
             await showMoveToGroupSubmenu();
-        } else {
-            exitGroupDetail();
-            await loadGroups();
         }
-        
+
         // 刷新对话列表，确保之前被分组的对话能立即显示
         await loadConversationsWithGroups();
     } catch (error) {
         console.error('删除分组失败:', error);
         alert('删除失败: ' + (error.message || '未知错误'));
+    } finally {
+        if (options.closeContextMenu) closeGroupContextMenu();
     }
+}
+
+// 删除当前分组详情中的分组
+async function deleteGroup() {
+    await deleteConversationGroupById(currentGroupId);
 }
 
 // 从上下文菜单重命名分组
@@ -12244,51 +12290,9 @@ async function pinGroupFromContext() {
 
 // 从上下文菜单删除分组
 async function deleteGroupFromContext() {
-    if (typeof requirePermission === 'function' && !requirePermission('group:delete')) return;
     const groupId = contextMenuGroupId;
     if (!groupId) return;
-
-    const deleteConfirmMsg = typeof window.t === 'function' ? window.t('chat.deleteGroupConfirm') : '确定要删除此分组吗？分组中的对话不会被删除，但会从分组中移除。';
-    if (!confirm(deleteConfirmMsg)) {
-        closeGroupContextMenu();
-        return;
-    }
-
-    try {
-        await apiFetch(`/api/groups/${groupId}`, {
-            method: 'DELETE',
-        });
-
-        // 更新缓存
-        groupsCache = groupsCache.filter(g => g.id !== groupId);
-        Object.keys(conversationGroupMappingCache).forEach(convId => {
-            if (conversationGroupMappingCache[convId] === groupId) {
-                delete conversationGroupMappingCache[convId];
-            }
-        });
-
-        // 如果"移动到分组"子菜单是打开的，刷新它
-        const submenu = document.getElementById('move-to-group-submenu');
-        if (submenu && submenu.style.display !== 'none') {
-            // 子菜单是打开的，重新加载分组列表并刷新子菜单
-            await loadGroups();
-            await showMoveToGroupSubmenu();
-        } else {
-            // 如果当前在分组详情页，退出详情页
-            if (currentGroupId === groupId) {
-                exitGroupDetail();
-            }
-            await loadGroups();
-        }
-        
-        // 刷新对话列表，确保之前被分组的对话能立即显示
-        await loadConversationsWithGroups();
-    } catch (error) {
-        console.error('删除分组失败:', error);
-        alert('删除失败: ' + (error.message || '未知错误'));
-    }
-
-    closeGroupContextMenu();
+    await deleteConversationGroupById(groupId, { closeContextMenu: true });
 }
 
 // 关闭分组上下文菜单
@@ -12442,6 +12446,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.addEventListener('conversation-deleted', (e) => {
         const id = e.detail && e.detail.conversationId;
         if (!id) return;
+        // API 已确认删除后立即移除可见列表项，网络刷新只负责校准分页和计数。
+        document.querySelectorAll('.conversation-item[data-conversation-id], .group-conversation-item[data-conversation-id]')
+            .forEach((item) => {
+                if (item.dataset.conversationId === id) item.remove();
+            });
         if (id === currentConversationId) {
             currentConversationId = null;
             try {

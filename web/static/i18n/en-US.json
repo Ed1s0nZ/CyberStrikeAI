@@ -508,6 +508,8 @@
     "settingsIntroTitle": "Project settings",
     "settingsIntroHint": "Configure project metadata and Agent authorization boundary; takes effect immediately for bound conversations after saving.",
     "pinProject": "Pin project (show first in list)",
+    "pinProjectAction": "Pin project",
+    "unpinProjectAction": "Unpin project",
     "pinFact": "Pin fact (prioritize in list and blackboard index)",
     "editDescriptionPlaceholder": "Client/task notes, contacts, collaboration…",
     "scopeTitle": "Test scope",

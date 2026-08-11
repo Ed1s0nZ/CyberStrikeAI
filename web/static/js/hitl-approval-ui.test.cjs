@@ -207,8 +207,8 @@ test('多对话并发时释放隐藏主流且旧请求不能覆盖新对话状�
     assert.match(chat, /signal: conversationLoadController\.signal/);
     assert.match(template, /monitor\.js\?v=20260811-11/);
     assert.match(template, /chat-scroll\.js\?v=20260811-1/);
-    assert.match(template, /chat\.js\?v=20260811-22/);
-    assert.match(template, /style\.css\?v=20260811-31/);
+    assert.match(template, /chat\.js\?v=20260811-24/);
+    assert.match(template, /style\.css\?v=20260811-32/);
 });
 
 test('任务结束后对话内审批按钮会变灰并禁止继续操作', () => {
@@ -247,7 +247,7 @@ test('审批状态主动轮询并在服务不可用时立即关闭旧审批', ()
     assert.match(monitor, /renderActiveTasks\(\[\]\);[\s\S]{0,260}hitlPendingInterruptTracker\.update\(\[\]\)/);
     assert.match(projects, /function syncProjectConversationApprovalStatuses\(items\)/);
     assert.match(projects, /window\.syncProjectConversationApprovalStatuses/);
-    assert.match(template, /projects\.js\?v=20260811-13/);
+    assert.match(template, /projects\.js\?v=20260811-15/);
 });
 
 test('旧会话首次升级到五分钟默认审批时限，仍允许用户之后主动选择不限时', () => {

@@ -496,6 +496,8 @@
     "settingsIntroTitle": "项目设置",
     "settingsIntroHint": "配置项目元数据与 Agent 授权边界，保存后即时生效于绑定对话。",
     "pinProject": "置顶项目（列表优先显示）",
+    "pinProjectAction": "置顶项目",
+    "unpinProjectAction": "取消置顶",
     "pinFact": "置顶事实（列表与黑板索引优先）",
     "editDescriptionPlaceholder": "客户/任务备注、协作说明、联系人…",
     "scopeTitle": "测试范围",
