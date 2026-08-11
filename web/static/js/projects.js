@@ -3389,13 +3389,25 @@ async function loadChatProjectFolderContext() {
     chatProjectFolderContext.ready = true;
 }
 
+function resolveChatProjectFolderSelection() {
+    const conversationId = String(window.currentConversationId || '').trim();
+    if (!conversationId) return resolveChatProjectSelection();
+    if (!chatProjectFolderContext.ready) return null;
+
+    const conversation = chatProjectFolderContext.conversations.find(
+        (item) => String(item?.id || '').trim() === conversationId
+    );
+    if (!conversation) return null;
+    return String(conversation.projectId || conversation.project_id || '').trim();
+}
+
 function renderChatProjectFolders(projects) {
     const list = document.getElementById('project-folders-list');
     if (!list) return;
     hideProjectFolderPreview(true);
     hideProjectConversationPreview(true);
-    const selectedId = resolveChatProjectSelection();
-    if (chatProjectFolderLastSelectionId !== selectedId) {
+    const selectedId = resolveChatProjectFolderSelection();
+    if (selectedId !== null && chatProjectFolderLastSelectionId !== selectedId) {
         chatProjectFolderExpandedIds.add(selectedId || CHAT_UNASSIGNED_PROJECT_FOLDER_ID);
         chatProjectFolderLastSelectionId = selectedId;
     }

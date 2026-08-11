@@ -46,3 +46,14 @@ test('项目标题提供受权限保护的新建项目入口', () => {
     assert.match(source, /window\._projectModalFromChatSidebar = true/);
     assert.match(rbac, /showNewProjectModalFromChatSidebar: 'project:write'/);
 });
+
+test('对话项目归属尚未加载时不会误展开无项目', () => {
+    const resolver = functionSource(projects, 'resolveChatProjectFolderSelection', 'renderChatProjectFolders');
+    const render = functionSource(projects, 'renderChatProjectFolders', 'refreshChatProjectFolders');
+
+    assert.match(resolver, /if \(!chatProjectFolderContext\.ready\) return null/);
+    assert.match(resolver, /if \(!conversation\) return null/);
+    assert.match(resolver, /conversation\.projectId \|\| conversation\.project_id \|\| ''/);
+    assert.match(render, /const selectedId = resolveChatProjectFolderSelection\(\)/);
+    assert.match(render, /selectedId !== null && chatProjectFolderLastSelectionId !== selectedId/);
+});
