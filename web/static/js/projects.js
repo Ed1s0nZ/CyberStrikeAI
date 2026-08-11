@@ -2759,9 +2759,13 @@ function createProjectTaskStatus(kind, details, options) {
                 : '');
         status.querySelector('.project-approval-label').textContent = label;
         if (isApprovalSummary) {
-            status.classList.add('project-task-status--approval-summary');
+            // 项目文件夹只汇总待审批数量，始终使用绿色；
+            // 紧急程度仅属于具体对话，避免多个审批让项目颜色来回跳变。
+            status.classList.add('project-task-status--approval-summary', 'is-urgency-normal');
             status.dataset.approvalCount = String(approvalCount);
-            bindProjectApprovalUrgency(status, details, label);
+            status.dataset.approvalUrgency = 'normal';
+            status.setAttribute('aria-label', label);
+            status.title = label;
         } else {
             bindProjectApprovalProgress(status, details);
             bindProjectApprovalUrgency(status, details, label);
@@ -3176,16 +3180,10 @@ function appendChatProjectFolderItem(list, project, expandedIds, conversations) 
     const folderApprovals = conversations
         .map((conversation) => chatProjectFolderContext.pendingApprovalByConversation.get(conversation.id))
         .filter(Boolean);
-    const folderApproval = folderApprovals.reduce((earliest, approval) => {
-        if (!earliest) return approval;
-        const currentExpiry = getProjectApprovalTiming(approval).expiresAt || Number.POSITIVE_INFINITY;
-        const earliestExpiry = getProjectApprovalTiming(earliest).expiresAt || Number.POSITIVE_INFINITY;
-        return currentExpiry < earliestExpiry ? approval : earliest;
-    }, null);
     const folderStatusGroup = appendProjectTaskStatuses(
         label,
         statusKinds,
-        { approval: folderApproval },
+        { approval: null },
         { approval: { aggregate: true, count: folderApprovals.length } }
     );
     if (folderStatusGroup) folderStatusGroup.classList.add('project-task-status-group--folder');

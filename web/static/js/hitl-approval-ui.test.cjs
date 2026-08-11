@@ -63,10 +63,13 @@ test('项目对话列表能同时显示等待批准与运行状态', () => {
     assert.match(monitor, /hitlSidebarApprovalSyncTimer = window\.setInterval/);
 });
 
-test('项目文件夹汇总待审批数量并按最早到期时间使用绿黄红三档变色', () => {
+test('项目文件夹汇总始终为绿色且只有具体对话按剩余时间变色', () => {
     assert.match(projects, /waitingApprovalCount/);
     assert.match(projects, /aggregate: true, count: folderApprovals\.length/);
-    assert.match(projects, /currentExpiry < earliestExpiry/);
+    assert.match(projects, /project-task-status--approval-summary', 'is-urgency-normal'/);
+    assert.match(projects, /status\.dataset\.approvalUrgency = 'normal'/);
+    assert.match(projects, /if \(isApprovalSummary\)[\s\S]{0,520}else \{[\s\S]{0,160}bindProjectApprovalUrgency\(status, details, label\)/);
+    assert.doesNotMatch(projects, /currentExpiry < earliestExpiry/);
     assert.match(projects, /PROJECT_APPROVAL_URGENCY_CLASSES/);
     assert.match(projects, /remaining <= 60 \* 1000/);
     assert.match(projects, /remaining <= 3 \* 60 \* 1000/);
@@ -206,7 +209,7 @@ test('审批状态主动轮询并在服务不可用时立即关闭旧审批', ()
     assert.match(monitor, /renderActiveTasks\(\[\]\);[\s\S]{0,260}hitlPendingInterruptTracker\.update\(\[\]\)/);
     assert.match(projects, /function syncProjectConversationApprovalStatuses\(items\)/);
     assert.match(projects, /window\.syncProjectConversationApprovalStatuses/);
-    assert.match(template, /projects\.js\?v=20260811-12/);
+    assert.match(template, /projects\.js\?v=20260811-13/);
 });
 
 test('旧会话首次升级到五分钟默认审批时限，仍允许用户之后主动选择不限时', () => {
