@@ -396,10 +396,24 @@
         button.classList.toggle('has-pending-new', shouldShow && hasPendingNewBelow);
     }
 
-    function onReturnLatestClick() {
+    function isolateReturnLatestPointerEvent(event) {
+        if (!event) return;
+        // 该按钮会在点击后立即隐藏。阻止指针事件继续冒泡，避免长历史对话中
+        // 按钮隐藏与底部审批卡片重排发生在同一帧时产生点击穿透。
+        event.stopPropagation();
+    }
+
+    function onReturnLatestClick(event) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
         forceScrollChatToBottom(true);
         const button = getReturnLatestButton();
-        if (button) button.hidden = true;
+        if (button) {
+            button.hidden = true;
+            button.blur();
+        }
     }
 
     function canAutoScrollNow(wasPinnedBeforeDomUpdate) {
@@ -573,6 +587,8 @@
 
         const returnLatestButton = getReturnLatestButton();
         if (returnLatestButton) {
+            returnLatestButton.addEventListener('pointerdown', isolateReturnLatestPointerEvent);
+            returnLatestButton.addEventListener('pointerup', isolateReturnLatestPointerEvent);
             returnLatestButton.addEventListener('click', onReturnLatestClick);
         }
 

@@ -4089,8 +4089,31 @@ function bindInlineHitlApproval(panel, data, opts) {
         }
     };
 
-    approveBtn.onclick = function () { submit('approve'); };
-    rejectBtn.onclick = function () { submit('reject'); };
+    const bindExplicitHitlAction = function (button, decision) {
+        let pointerArmed = false;
+        button.addEventListener('pointerdown', function (event) {
+            pointerArmed = event.isPrimary !== false && (event.button == null || event.button === 0);
+        });
+        button.addEventListener('pointercancel', function () {
+            pointerArmed = false;
+        });
+        button.onclick = function (event) {
+            const pointerClick = !!event && Number(event.detail || 0) > 0;
+            const explicitlyPressed = pointerArmed;
+            pointerArmed = false;
+            // 鼠标/触摸点击必须从审批按钮自身开始；键盘 Enter/Escape 的 detail 为 0，仍可正常使用。
+            // 这可以拦截滚动定位按钮隐藏后被浏览器重新定向到底部审批按钮的合成 click。
+            if (pointerClick && !explicitlyPressed) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
+            submit(decision);
+        };
+    };
+
+    bindExplicitHitlAction(approveBtn, 'approve');
+    bindExplicitHitlAction(rejectBtn, 'reject');
     if (panel.classList.contains('chat-hitl-approval-dock')) {
         panel.onkeydown = function (event) {
             const tag = event.target && event.target.tagName ? event.target.tagName.toLowerCase() : '';

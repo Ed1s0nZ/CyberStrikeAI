@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const monitor = fs.readFileSync('web/static/js/monitor.js', 'utf8');
+const chatScroll = fs.readFileSync('web/static/js/chat-scroll.js', 'utf8');
 const projects = fs.readFileSync('web/static/js/projects.js', 'utf8');
 const chat = fs.readFileSync('web/static/js/chat.js', 'utf8');
 const template = fs.readFileSync('web/templates/index.html', 'utf8');
@@ -61,6 +62,16 @@ test('人工批准不要求输入备注，审查编辑仅发送真正修改过�
     assert.doesNotMatch(monitor, /!commentInput \|\| !statusEl/);
     assert.match(monitor, /JSON\.stringify\(editedArgs\) === JSON\.stringify\(originalArgs\)/);
     assert.match(monitor, /editedArgs = null/);
+});
+
+test('长历史对话的回到最新按钮不会把滚动点击穿透到审批操作', () => {
+    assert.match(chatScroll, /function isolateReturnLatestPointerEvent\(event\)/);
+    assert.match(chatScroll, /returnLatestButton\.addEventListener\('pointerdown', isolateReturnLatestPointerEvent\)/);
+    assert.match(chatScroll, /function onReturnLatestClick\(event\)[\s\S]{0,260}event\.preventDefault\(\)[\s\S]{0,180}event\.stopPropagation\(\)/);
+    assert.match(monitor, /const bindExplicitHitlAction = function \(button, decision\)/);
+    assert.match(monitor, /button\.addEventListener\('pointerdown'[\s\S]{0,900}pointerClick && !explicitlyPressed/);
+    assert.match(monitor, /bindExplicitHitlAction\(approveBtn, 'approve'\)/);
+    assert.match(monitor, /bindExplicitHitlAction\(rejectBtn, 'reject'\)/);
 });
 
 test('倒计时由服务端时间驱动，到期时只锁定界面并等待服务端拒绝', () => {
@@ -194,7 +205,8 @@ test('多对话并发时释放隐藏主流且旧请求不能覆盖新对话状�
     assert.match(chat, /let loadConversationAbortController = null/);
     assert.match(chat, /cancelPendingConversationLoad\(\);[\s\S]{0,220}const conversationLoadController = new AbortController\(\)/);
     assert.match(chat, /signal: conversationLoadController\.signal/);
-    assert.match(template, /monitor\.js\?v=20260811-10/);
+    assert.match(template, /monitor\.js\?v=20260811-11/);
+    assert.match(template, /chat-scroll\.js\?v=20260811-1/);
     assert.match(template, /chat\.js\?v=20260811-22/);
     assert.match(template, /style\.css\?v=20260811-31/);
 });
