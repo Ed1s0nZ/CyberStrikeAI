@@ -3499,7 +3499,32 @@ function setProjectConversationApprovalStatus(conversationId, pending, details) 
     }
 }
 
+function syncProjectConversationApprovalStatuses(items) {
+    const next = new Map();
+    (Array.isArray(items) ? items : []).forEach((details) => {
+        const id = String(details && details.conversationId || '').trim();
+        if (id && chatProjectFolderContext.runningIds.has(id) && !next.has(id)) {
+            next.set(id, details);
+        }
+    });
+    let changed = next.size !== chatProjectFolderContext.pendingApprovalByConversation.size;
+    if (!changed) {
+        next.forEach((details, id) => {
+            const previous = chatProjectFolderContext.pendingApprovalByConversation.get(id);
+            const previousInterruptId = String(previous && (previous.interruptId || previous.id) || '');
+            const nextInterruptId = String(details && (details.interruptId || details.id) || '');
+            if (!previous || previousInterruptId !== nextInterruptId) changed = true;
+        });
+    }
+    if (!changed) return;
+    chatProjectFolderContext.pendingApprovalByConversation = next;
+    if (isProjectsCacheReady() && chatProjectFolderContext.ready) {
+        renderChatProjectFolders(projectsCacheAll);
+    }
+}
+
 window.setProjectConversationApprovalStatus = setProjectConversationApprovalStatus;
+window.syncProjectConversationApprovalStatuses = syncProjectConversationApprovalStatuses;
 
 if (!window._projectApprovalStatusEventsBound) {
     window._projectApprovalStatusEventsBound = true;

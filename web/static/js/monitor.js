@@ -2,9 +2,10 @@ const progressTaskState = new Map();
 /** @type {{ progressId: string, conversationId: string } | null} */
 let userInterruptModalPending = null;
 let activeTaskInterval = null;
-const ACTIVE_TASK_REFRESH_INTERVAL = 10000; // 10秒检查一次
+const ACTIVE_TASK_REFRESH_INTERVAL = 2000; // 运行态与审批态需要及时自刷新
 const TASK_FINAL_STATUSES = new Set(['failed', 'timeout', 'cancelled', 'completed']);
 const hitlInterruptToolItemMap = new Map();
+let activeTasksLoadPromise = null;
 
 /**
  * 主对话 POST 流仍在读取时，禁止再挂 task-events 补流，否则同一事件会画两遍（与 HITL 是否开启无关）。
@@ -1042,6 +1043,39 @@ const conversationExecutionTracker = {
     }
 };
 
+const hitlPendingInterruptTracker = {
+    pendingById: new Map(),
+    ready: false,
+    update(items = []) {
+        this.pendingById.clear();
+        items.forEach(item => this.add(item));
+        this.ready = true;
+    },
+    replaceConversation(conversationId, items = []) {
+        const id = String(conversationId || '').trim();
+        if (id) {
+            this.pendingById.forEach((item, interruptId) => {
+                if (String(item && item.conversationId || '').trim() === id) {
+                    this.pendingById.delete(interruptId);
+                }
+            });
+        }
+        items.forEach(item => this.add(item));
+        this.ready = true;
+    },
+    add(item) {
+        const interruptId = String(item && (item.interruptId || item.id) || '').trim();
+        if (!interruptId) return;
+        this.pendingById.set(interruptId, item);
+    },
+    remove(interruptId) {
+        this.pendingById.delete(String(interruptId || '').trim());
+    },
+    has(interruptId) {
+        return !!interruptId && this.pendingById.has(String(interruptId));
+    }
+};
+
 function isConversationTaskRunning(conversationId) {
     return conversationExecutionTracker.isRunning(conversationId);
 }
@@ -1101,15 +1135,21 @@ function setHitlApprovalTaskAvailability(panel, conversationId) {
     if (!panel) return;
     const id = String(conversationId || panel.dataset.conversationId || '').trim();
     if (id) panel.dataset.conversationId = id;
+    const interruptId = String(panel.dataset.hitlInterruptId || '').trim();
     const taskClosed = !!id && conversationExecutionTracker.ready && !conversationExecutionTracker.isRunning(id);
+    // 同一对话可能在服务重启后又启动了新任务，不能因此重新激活旧审批。
+    // 具体审批 ID 已不在 pending 列表时，倒计时和按钮必须保持关闭。
+    const interruptClosed = !!interruptId && hitlPendingInterruptTracker.ready &&
+        !hitlPendingInterruptTracker.has(interruptId);
+    const approvalClosed = taskClosed || interruptClosed;
     const buttons = panel.querySelectorAll(
         '.hitl-inline-approve, .hitl-inline-reject, .workflow-hitl-inline-approve, .workflow-hitl-inline-reject'
     );
     const status = panel.querySelector('.hitl-inline-status, .workflow-hitl-inline-status');
-    panel.classList.toggle('hitl-approval-task-closed', taskClosed);
-    setHitlApprovalInterruptedVisualState(panel, taskClosed);
+    panel.classList.toggle('hitl-approval-task-closed', approvalClosed);
+    setHitlApprovalInterruptedVisualState(panel, approvalClosed);
     buttons.forEach(function (button) {
-        if (taskClosed) {
+        if (approvalClosed) {
             if (!button.disabled) button.dataset.disabledByClosedTask = '1';
             button.disabled = true;
         } else if (button.dataset.disabledByClosedTask === '1') {
@@ -1118,7 +1158,7 @@ function setHitlApprovalTaskAvailability(panel, conversationId) {
         }
     });
     if (!status) return;
-    if (taskClosed) {
+    if (approvalClosed) {
         if (!Object.prototype.hasOwnProperty.call(status.dataset, 'taskAvailableText')) {
             status.dataset.taskAvailableText = status.textContent || '';
         }
@@ -2336,6 +2376,9 @@ function handleStreamEvent(event, progressElement, progressId,
                     } else if (typeof loadConversations === 'function') {
                         loadConversations();
                     }
+                    if (typeof window.refreshChatProjectFolders === 'function') {
+                        window.refreshChatProjectFolders();
+                    }
                 }, 200);
             }
             break;
@@ -2738,6 +2781,8 @@ function handleStreamEvent(event, progressElement, progressId,
             break;
         }
         case 'hitl_interrupt': {
+            hitlPendingInterruptTracker.add(event.data || {});
+            hitlPendingInterruptTracker.ready = true;
             const hitlTargetItem = findToolCallItemForHitl(timeline, event.data || {});
             if (hitlTargetItem && hitlTargetItem.id) {
                 renderInlineHitlApproval(hitlTargetItem.id, event.data || {});
@@ -2757,6 +2802,8 @@ function handleStreamEvent(event, progressElement, progressId,
             break;
         }
         case 'hitl_resumed': {
+            hitlPendingInterruptTracker.remove(event.data && event.data.interruptId);
+            hitlPendingInterruptTracker.ready = true;
             if (!resolveInlineHitlDecision(timeline, event.data || {}, 'approve', event.message)) {
                 addTimelineItem(timeline, 'progress', {
                     title: '✅ HITL',
@@ -2772,6 +2819,8 @@ function handleStreamEvent(event, progressElement, progressId,
             break;
         }
         case 'hitl_rejected': {
+            hitlPendingInterruptTracker.remove(event.data && event.data.interruptId);
+            hitlPendingInterruptTracker.ready = true;
             if (!resolveInlineHitlDecision(timeline, event.data || {}, 'reject', event.message)) {
                 addTimelineItem(timeline, 'error', {
                     title: '⛔ HITL',
@@ -4192,6 +4241,63 @@ function updateHitlApprovalSidebar(data, pending) {
     }
 }
 
+function syncHitlApprovalSidebarState(items) {
+    const nextByConversation = new Map();
+    (Array.isArray(items) ? items : []).forEach(function (item) {
+        const conversationId = String(item && item.conversationId || '').trim();
+        if (conversationId && !nextByConversation.has(conversationId)) {
+            nextByConversation.set(conversationId, item);
+        }
+    });
+    hitlSidebarApprovalState.forEach(function (_item, conversationId) {
+        if (!nextByConversation.has(conversationId)) {
+            hitlSidebarApprovalState.delete(conversationId);
+            removeDirectHitlSidebarApproval(conversationId);
+        }
+    });
+    nextByConversation.forEach(function (item, conversationId) {
+        hitlSidebarApprovalState.set(conversationId, item);
+    });
+    syncDirectHitlSidebarApprovals();
+    if (hitlSidebarApprovalState.size && !hitlSidebarApprovalSyncTimer) {
+        hitlSidebarApprovalSyncTimer = window.setInterval(syncDirectHitlSidebarApprovals, 500);
+    }
+}
+
+function reconcilePendingHitlState(rawItems) {
+    const activeItems = (Array.isArray(rawItems) ? rawItems : [])
+        .map(function (item) { return hitlPendingItemToData(item); })
+        .filter(function (item) {
+            return item && conversationExecutionTracker.isRunning(item.conversationId);
+        });
+    hitlPendingInterruptTracker.update(activeItems);
+    syncHitlApprovalTaskAvailability();
+    syncHitlApprovalSidebarState(activeItems);
+    if (typeof window.syncProjectConversationApprovalStatuses === 'function') {
+        window.syncProjectConversationApprovalStatuses(activeItems);
+    }
+
+    const currentId = String(window.currentConversationId || '').trim();
+    const currentPending = activeItems.find(function (item) {
+        return item.conversationId === currentId;
+    });
+    const dock = document.getElementById('chat-hitl-approval-dock');
+    const dockInterruptId = dock && String(dock.dataset.hitlInterruptId || '').trim();
+    if (!currentPending) {
+        if (dockInterruptId) clearChatHitlApprovalDock();
+        return;
+    }
+
+    if (!dockInterruptId || dockInterruptId !== currentPending.interruptId || dock.hidden) {
+        renderChatHitlApprovalDock(currentPending);
+    }
+    const inlineSelector = '.hitl-inline-approval[data-hitl-interrupt-id="' +
+        hitlEscapeAttrSelector(currentPending.interruptId) + '"]';
+    if (!document.querySelector(inlineSelector)) {
+        restoreHitlInlineForConversation(currentId);
+    }
+}
+
 window.renderChatHitlApprovalDock = renderChatHitlApprovalDock;
 window.clearChatHitlApprovalDock = clearChatHitlApprovalDock;
 
@@ -4472,14 +4578,46 @@ function findLastAssistantMessageElInChat() {
     return null;
 }
 
+function hitlPendingItemToData(item, fallbackConversationId) {
+    if (!item) return null;
+    let payloadObj = item.payload && typeof item.payload === 'object' ? item.payload : {};
+    if (typeof item.payload === 'string') {
+        try {
+            payloadObj = JSON.parse(item.payload || '{}');
+        } catch (e) {
+            payloadObj = {};
+        }
+    }
+    const timing = payloadObj.hitlApproval && typeof payloadObj.hitlApproval === 'object'
+        ? payloadObj.hitlApproval
+        : {};
+    return {
+        interruptId: String(item.interruptId || item.id || '').trim(),
+        mode: item.mode,
+        toolName: item.toolName,
+        toolCallId: item.toolCallId,
+        payload: payloadObj,
+        conversationId: String(item.conversationId || fallbackConversationId || '').trim(),
+        createdAt: timing.createdAt || item.createdAt,
+        timeoutSeconds: timing.timeoutSeconds,
+        expiresAt: timing.expiresAt,
+        reviewer: item.reviewer || item.decidedBy || 'human',
+        status: item.status || 'pending'
+    };
+}
+
+const hitlInlineRestoreInFlight = new Set();
+
 /**
  * 刷新或切换会话后：根据待审批记录恢复时间线里的内联审批入口，并展开详情区。
  */
 async function restoreHitlInlineForConversation(conversationId) {
     if (!conversationId || typeof apiFetch !== 'function') return;
+    if (hitlInlineRestoreInFlight.has(conversationId)) return;
     if (typeof window.currentConversationId === 'string' && window.currentConversationId !== conversationId) {
         return;
     }
+    hitlInlineRestoreInFlight.add(conversationId);
     try {
         const resp = await apiFetch('/api/hitl/pending?conversationId=' + encodeURIComponent(conversationId) + '&status=pending&pageSize=50');
         if (!resp.ok) return;
@@ -4492,32 +4630,13 @@ async function restoreHitlInlineForConversation(conversationId) {
             : rawItems;
         if (typeof window.currentConversationId === 'string' && window.currentConversationId !== conversationId) return;
         clearChatHitlApprovalDock();
-        const toHitlData = function (item) {
-            let payloadObj = {};
-            try {
-                payloadObj = JSON.parse(String(item.payload || '{}'));
-            } catch (e) {
-                payloadObj = {};
-            }
-            const timing = payloadObj.hitlApproval && typeof payloadObj.hitlApproval === 'object'
-                ? payloadObj.hitlApproval
-                : {};
-            return {
-                interruptId: item.id,
-                mode: item.mode,
-                toolName: item.toolName,
-                toolCallId: item.toolCallId,
-                payload: payloadObj,
-                conversationId: item.conversationId || conversationId,
-                createdAt: timing.createdAt || item.createdAt,
-                timeoutSeconds: timing.timeoutSeconds,
-                expiresAt: timing.expiresAt,
-                reviewer: 'human',
-                status: 'pending'
-            };
-        };
+        const normalizedItems = items.map(function (item) {
+            return hitlPendingItemToData(item, conversationId);
+        }).filter(Boolean);
+        hitlPendingInterruptTracker.replaceConversation(conversationId, normalizedItems);
+        syncHitlApprovalTaskAvailability();
         if (items.length > 0) {
-            const newestPending = toHitlData(items[0]);
+            const newestPending = normalizedItems[0];
             renderChatHitlApprovalDock(newestPending);
             updateHitlApprovalSidebar(newestPending, true);
         } else {
@@ -4561,7 +4680,7 @@ async function restoreHitlInlineForConversation(conversationId) {
                 }
             }
             expandProcessDetailsTimeline(clientMsgId);
-            const hitlData = toHitlData(item);
+            const hitlData = hitlPendingItemToData(item);
             let hitlItemEl = null;
             if (item.toolCallId) {
                 hitlItemEl = detailsContainer.querySelector('[data-tool-call-id="' + hitlEscapeAttrSelector(String(item.toolCallId)) + '"]');
@@ -4591,6 +4710,8 @@ async function restoreHitlInlineForConversation(conversationId) {
         }
     } catch (e) {
         console.error('restoreHitlInlineForConversation failed', e);
+    } finally {
+        hitlInlineRestoreInFlight.delete(conversationId);
     }
 }
 
@@ -5694,25 +5815,47 @@ function addTimelineItem(timeline, type, options) {
 }
 
 // 加载活跃任务列表
-async function loadActiveTasks(showErrors = false) {
+function loadActiveTasks(showErrors = false) {
+    if (activeTasksLoadPromise) return activeTasksLoadPromise;
     const bar = document.getElementById('active-tasks-bar');
-    try {
-        const response = await apiFetch('/api/agent-loop/tasks');
-        const result = await response.json().catch(() => ({}));
+    activeTasksLoadPromise = (async function () {
+        try {
+            const [response, pendingResponse] = await Promise.all([
+                apiFetch('/api/agent-loop/tasks'),
+                apiFetch('/api/hitl/pending?page=1&pageSize=200').catch(function () { return null; })
+            ]);
+            const result = await response.json().catch(() => ({}));
 
-        if (!response.ok) {
-            throw new Error(result.error || (typeof window.t === 'function' ? window.t('tasks.loadActiveTasksFailed') : '获取活跃任务失败'));
-        }
+            if (!response.ok) {
+                throw new Error(result.error || (typeof window.t === 'function' ? window.t('tasks.loadActiveTasksFailed') : '获取活跃任务失败'));
+            }
 
-        renderActiveTasks(result.tasks || []);
-    } catch (error) {
-        console.error('获取活跃任务失败:', error);
-        if (showErrors && bar) {
-            bar.style.display = 'block';
-            const cannotGetStatus = typeof window.t === 'function' ? window.t('tasks.cannotGetTaskStatus') : '无法获取任务状态：';
-            bar.innerHTML = `<div class="active-task-error">${escapeHtml(cannotGetStatus)}${escapeHtml(error.message)}</div>`;
+            renderActiveTasks(result.tasks || []);
+            if (pendingResponse && pendingResponse.ok) {
+                const pendingResult = await pendingResponse.json().catch(function () { return {}; });
+                reconcilePendingHitlState(pendingResult.items || []);
+            }
+        } catch (error) {
+            // 服务停止、重启或登录失效时，旧进程任务不可能仍可审批。
+            // 立即清空本地运行/审批缓存，防止倒计时和按钮继续保持可用。
+            renderActiveTasks([]);
+            hitlPendingInterruptTracker.update([]);
+            syncHitlApprovalTaskAvailability();
+            syncHitlApprovalSidebarState([]);
+            if (typeof window.syncProjectConversationApprovalStatuses === 'function') {
+                window.syncProjectConversationApprovalStatuses([]);
+            }
+            console.error('获取活跃任务失败:', error);
+            if (showErrors && bar) {
+                bar.style.display = 'block';
+                const cannotGetStatus = typeof window.t === 'function' ? window.t('tasks.cannotGetTaskStatus') : '无法获取任务状态：';
+                bar.innerHTML = `<div class="active-task-error">${escapeHtml(cannotGetStatus)}${escapeHtml(error.message)}</div>`;
+            }
         }
-    }
+    })().finally(function () {
+        activeTasksLoadPromise = null;
+    });
+    return activeTasksLoadPromise;
 }
 
 function getActiveTaskDisplayName(task) {
