@@ -33,29 +33,30 @@ func TestHitlRejectToolResult_otherToolKeepsLegacyText(t *testing.T) {
 	}
 }
 
-func TestMergeHitlExemptMetaTools_includesToolSearch(t *testing.T) {
+func TestMergeHitlExemptMetaTools_includesBuiltInExemptTools(t *testing.T) {
 	merged := MergeHitlExemptMetaTools([]string{"read_file"})
-	found := false
+	foundToolSearch := false
 	for _, name := range merged {
 		if IsToolSearchTool(name) {
-			found = true
+			foundToolSearch = true
 			break
 		}
 	}
-	if !found {
+	if !foundToolSearch {
 		t.Fatalf("tool_search missing from %v", merged)
 	}
-	foundProjectFactTools := map[string]bool{
+	foundBuiltInTools := map[string]bool{
+		"write_file":          false,
 		"upsert_project_fact": false,
 		"get_project_fact":    false,
 	}
 	for _, name := range merged {
 		normalized := strings.ToLower(strings.TrimSpace(name))
-		if _, ok := foundProjectFactTools[normalized]; ok {
-			foundProjectFactTools[normalized] = true
+		if _, ok := foundBuiltInTools[normalized]; ok {
+			foundBuiltInTools[normalized] = true
 		}
 	}
-	for name, found := range foundProjectFactTools {
+	for name, found := range foundBuiltInTools {
 		if !found {
 			t.Fatalf("%s missing from %v", name, merged)
 		}
