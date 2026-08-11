@@ -2010,6 +2010,14 @@ function showNewProjectModalFromChat() {
     showNewProjectModal();
 }
 
+/** 从对话侧栏新建项目，保持当前对话的项目绑定不变。 */
+function showNewProjectModalFromChatSidebar() {
+    if (!requireProjectWrite()) return;
+    window._projectModalFromChat = false;
+    window._projectModalFromChatSidebar = true;
+    showNewProjectModal();
+}
+
 async function saveProjectModal() {
     if (!requireProjectWrite()) return;
     const name = document.getElementById('project-modal-name').value.trim().slice(0, PROJECT_NAME_MAX_LENGTH);
@@ -2930,6 +2938,7 @@ function showProjectFolderPreview(project, row, conversations) {
     if (!project || !row?.isConnected || window.matchMedia('(max-width: 900px), (hover: none)').matches) return;
     hideProjectConversationPreview(true);
     const preview = ensureProjectFolderPreview();
+    const isUnassigned = project._isUnassigned === true;
     clearTimeout(projectFolderPreviewCloseTimer);
     if (projectFolderPreviewAnchor && projectFolderPreviewAnchor !== row) {
         projectFolderPreviewAnchor.querySelector('.project-folder-item')?.removeAttribute('aria-controls');
@@ -2943,7 +2952,8 @@ function showProjectFolderPreview(project, row, conversations) {
         || pickerMessage(tp, 'chat.projectPreviewNoDescription', '暂无项目说明');
     const scope = getProjectScopePreview(project);
 
-    preview.dataset.projectId = project.id;
+    preview.dataset.projectId = project.id || '';
+    preview.classList.toggle('is-unassigned', isUnassigned);
     preview.querySelector('.project-folder-preview-title').textContent = title;
     preview.querySelector('.project-folder-preview-stats span').textContent = tpFmt(
         'chat.projectPreviewStats',
@@ -2954,11 +2964,13 @@ function showProjectFolderPreview(project, row, conversations) {
     descriptionRow.querySelector('span').textContent = description;
     descriptionRow.classList.toggle('is-empty', !String(project.description || '').trim());
     const scopeRow = preview.querySelector('.project-folder-preview-scope');
-    scopeRow.hidden = !scope;
+    scopeRow.hidden = isUnassigned || !scope;
     scopeRow.querySelector('span').textContent = scope
         ? tpFmt('chat.projectPreviewScope', `测试范围：${scope}`, { scope })
         : '';
-    preview.querySelector('.project-folder-preview-edit span').textContent = tpFmt(
+    const editButton = preview.querySelector('.project-folder-preview-edit');
+    editButton.hidden = isUnassigned;
+    editButton.querySelector('span').textContent = tpFmt(
         'chat.projectPreviewEdit',
         '编辑项目'
     );
@@ -3199,16 +3211,14 @@ function appendChatProjectFolderItem(list, project, expandedIds, conversations) 
         }
         renderChatProjectFolders(projectsCacheAll);
     });
-    if (!isUnassigned) {
-        row.addEventListener('mouseenter', () => scheduleShowProjectFolderPreview(project, row, conversations));
-        row.addEventListener('mouseleave', scheduleHideProjectFolderPreview);
-        button.addEventListener('focus', () => scheduleShowProjectFolderPreview(project, row, conversations, true));
-        row.addEventListener('focusout', (event) => {
-            const preview = document.getElementById('project-folder-preview');
-            if (row.contains(event.relatedTarget) || preview?.contains(event.relatedTarget)) return;
-            scheduleHideProjectFolderPreview();
-        });
-    }
+    row.addEventListener('mouseenter', () => scheduleShowProjectFolderPreview(project, row, conversations));
+    row.addEventListener('mouseleave', scheduleHideProjectFolderPreview);
+    button.addEventListener('focus', () => scheduleShowProjectFolderPreview(project, row, conversations, true));
+    row.addEventListener('focusout', (event) => {
+        const preview = document.getElementById('project-folder-preview');
+        if (row.contains(event.relatedTarget) || preview?.contains(event.relatedTarget)) return;
+        scheduleHideProjectFolderPreview();
+    });
 
     const actions = document.createElement('div');
     actions.className = 'project-folder-actions';
@@ -3884,6 +3894,7 @@ window.initProjectsPage = initProjectsPage;
 window.showNewProjectModal = showNewProjectModal;
 window.showEditProjectModal = showEditProjectModal;
 window.showNewProjectModalFromChat = showNewProjectModalFromChat;
+window.showNewProjectModalFromChatSidebar = showNewProjectModalFromChatSidebar;
 window.saveProjectModal = saveProjectModal;
 window.closeProjectModal = closeProjectModal;
 window.selectProject = selectProject;

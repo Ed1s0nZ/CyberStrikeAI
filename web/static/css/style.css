@@ -44572,6 +44572,15 @@ html[data-theme="dark"] #project-panel-assets .projects-panel-pagination.paginat
     transition: background 0.14s ease, color 0.14s ease;
 }
 
+.project-folder-preview-edit[hidden],
+.project-folder-preview.is-unassigned .project-folder-preview-edit {
+    display: none !important;
+}
+
+.project-folder-preview.is-unassigned .project-folder-preview-details {
+    border-bottom: 0;
+}
+
 .project-folder-preview-edit svg {
     width: 16px;
     height: 16px;

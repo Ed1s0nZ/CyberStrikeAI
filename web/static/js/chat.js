@@ -5491,11 +5491,30 @@ function ensureProjectSidebarStructure() {
         projectSection.innerHTML =
             '<div class="section-header project-folders-header">' +
                 '<span id="project-folders-title" class="section-title" data-i18n="chat.projectFolders">项目</span>' +
+                '<button type="button" class="add-group-btn project-folders-add-btn" data-require-permission="project:write" onclick="showNewProjectModalFromChatSidebar()" data-i18n="projects.newProject" data-i18n-attr="title,aria-label" data-i18n-skip-text="true" title="新建项目" aria-label="新建项目">' +
+                    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+                '</button>' +
             '</div>' +
             '<div id="project-folders-list" class="project-folders-list"></div>';
         const searchBox = sidebarContent.querySelector('.conversation-search-box');
         if (searchBox) searchBox.insertAdjacentElement('afterend', projectSection);
         else sidebarContent.insertBefore(projectSection, sidebarContent.firstChild);
+    }
+
+    const projectHeader = projectSection.querySelector('.project-folders-header');
+    if (projectHeader && !projectHeader.querySelector('.project-folders-add-btn')) {
+        const addProjectButton = document.createElement('button');
+        addProjectButton.type = 'button';
+        addProjectButton.className = 'add-group-btn project-folders-add-btn';
+        addProjectButton.dataset.requirePermission = 'project:write';
+        addProjectButton.setAttribute('onclick', 'showNewProjectModalFromChatSidebar()');
+        addProjectButton.setAttribute('data-i18n', 'projects.newProject');
+        addProjectButton.setAttribute('data-i18n-attr', 'title,aria-label');
+        addProjectButton.setAttribute('data-i18n-skip-text', 'true');
+        addProjectButton.title = conversationSidebarText('projects.newProject', '新建项目');
+        addProjectButton.setAttribute('aria-label', addProjectButton.title);
+        addProjectButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        projectHeader.appendChild(addProjectButton);
     }
 
     const recentSection = sidebarContent.querySelector('.recent-conversations-section');
