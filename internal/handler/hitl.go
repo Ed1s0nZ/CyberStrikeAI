@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS hitl_interrupts (
     tool_call_id TEXT,
     payload TEXT,
     status TEXT NOT NULL,
+    reviewer TEXT NOT NULL DEFAULT 'human',
     decision TEXT,
     decision_comment TEXT,
     created_at DATETIME NOT NULL,
@@ -235,13 +236,14 @@ func (m *HITLManager) NeedsToolApproval(conversationID, toolName string) bool {
 	return need
 }
 
-func (m *HITLManager) CreatePendingInterrupt(conversationID, assistantMessageID, mode, toolName, toolCallID, payload string) (*pendingInterrupt, error) {
+func (m *HITLManager) CreatePendingInterrupt(conversationID, assistantMessageID, mode, toolName, toolCallID, payload, reviewer string) (*pendingInterrupt, error) {
 	now := time.Now()
 	id := "hitl_" + strings.ReplaceAll(uuid.New().String(), "-", "")
+	reviewer = normalizeHitlReviewer(reviewer)
 	if _, err := m.db.Exec(`INSERT INTO hitl_interrupts
-		(id, conversation_id, message_id, mode, tool_name, tool_call_id, payload, status, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
-		id, conversationID, assistantMessageID, mode, toolName, toolCallID, payload, now); err != nil {
+		(id, conversation_id, message_id, mode, tool_name, tool_call_id, payload, status, reviewer, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+		id, conversationID, assistantMessageID, mode, toolName, toolCallID, payload, reviewer, now); err != nil {
 		return nil, err
 	}
 	// 刷新页面后侧栏依赖 DB 配置；若仅内存 Activate 未落库，会导致「有待审批却显示关闭」
@@ -254,9 +256,12 @@ func (m *HITLManager) CreatePendingInterrupt(conversationID, assistantMessageID,
 		ToolCallID:     toolCallID,
 		decideCh:       make(chan hitlDecision, 1),
 	}
-	m.mu.Lock()
-	m.pending[id] = p
-	m.mu.Unlock()
+	// Agent 审查不会等待人工决策，也不应进入人工审批的内存待办队列。
+	if reviewer != "audit_agent" {
+		m.mu.Lock()
+		m.pending[id] = p
+		m.mu.Unlock()
+	}
 	return p, nil
 }
 
@@ -485,7 +490,7 @@ func (h *AgentHandler) waitHITLApproval(runCtx context.Context, cancelRun contex
 		"expiresAt":      approvalExpiresAt,
 	}
 	payloadRaw, _ := json.Marshal(payload)
-	p, err := h.hitlManager.CreatePendingInterrupt(conversationID, assistantMessageID, cfg.Mode, toolName, toolCallID, string(payloadRaw))
+	p, err := h.hitlManager.CreatePendingInterrupt(conversationID, assistantMessageID, cfg.Mode, toolName, toolCallID, string(payloadRaw), cfg.Reviewer)
 	if err != nil {
 		h.logger.Warn("创建 HITL 中断失败", zap.Error(err))
 		return nil, err

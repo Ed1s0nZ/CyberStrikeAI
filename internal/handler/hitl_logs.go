@@ -39,11 +39,14 @@ func normalizeHitlDecidedBy(v string) string {
 
 func (m *HITLManager) migrateHitlSchemaColumns() {
 	_, _ = m.db.Exec(`ALTER TABLE hitl_interrupts ADD COLUMN decided_by TEXT NOT NULL DEFAULT 'human'`)
+	_, _ = m.db.Exec(`ALTER TABLE hitl_interrupts ADD COLUMN reviewer TEXT NOT NULL DEFAULT 'human'`)
+	_, _ = m.db.Exec(`UPDATE hitl_interrupts SET reviewer='audit_agent'
+		WHERE COALESCE(decided_by, '') IN ('audit_agent', 'agent', 'ai')`)
 	_, _ = m.db.Exec(`ALTER TABLE hitl_conversation_configs ADD COLUMN reviewer TEXT NOT NULL DEFAULT 'human'`)
 }
 
 func hitlInterruptRowToMap(
-	id, cid, mode, toolName, toolCallID, payload, rowStatus, decidedBy string,
+	id, cid, mode, toolName, toolCallID, payload, rowStatus, reviewer, decidedBy string,
 	messageID sql.NullString,
 	decision, comment sql.NullString,
 	createdAt time.Time,
@@ -62,6 +65,7 @@ func hitlInterruptRowToMap(
 		"toolCallId":     toolCallID,
 		"payload":        payload,
 		"status":         rowStatus,
+		"reviewer":       reviewer,
 		"decision":       decision.String,
 		"comment":        comment.String,
 		"decidedBy":      decidedBy,
@@ -77,7 +81,7 @@ func hitlInterruptRowToMap(
 
 func (h *AgentHandler) buildHitlListQuery(logs bool) (string, []interface{}) {
 	where, args := h.buildHitlLogsWhere(logs)
-	q := `SELECT id, conversation_id, message_id, mode, tool_name, tool_call_id, payload, status, decision, decision_comment, COALESCE(decided_by,'human'), created_at, decided_at FROM hitl_interrupts` + where
+	q := `SELECT id, conversation_id, message_id, mode, tool_name, tool_call_id, payload, status, COALESCE(reviewer,'human'), decision, decision_comment, COALESCE(decided_by,'human'), created_at, decided_at FROM hitl_interrupts` + where
 	return q, args
 }
 
@@ -87,7 +91,9 @@ func (h *AgentHandler) buildHitlLogsWhere(logs bool) (string, []interface{}) {
 	if logs {
 		q += " AND status != 'pending'"
 	} else {
-		q += " AND status = 'pending'"
+		// 该接口只返回真正等待用户操作的人工审批。Agent 审查即使正在运行，
+		// 也不应触发弹窗、倒计时或项目待审批计数。
+		q += " AND status = 'pending' AND COALESCE(reviewer,'human') = 'human'"
 	}
 	return q, args
 }
@@ -131,15 +137,15 @@ func (h *AgentHandler) appendHitlListFilters(q string, args []interface{}, c *gi
 func (h *AgentHandler) scanHitlInterruptRows(rows *sql.Rows) ([]map[string]interface{}, error) {
 	items := make([]map[string]interface{}, 0)
 	for rows.Next() {
-		var id, cid, mode, toolName, toolCallID, payload, rowStatus, decidedBy string
+		var id, cid, mode, toolName, toolCallID, payload, rowStatus, reviewer, decidedBy string
 		var messageID sql.NullString
 		var decision, comment sql.NullString
 		var createdAt time.Time
 		var decidedAt sql.NullTime
-		if err := rows.Scan(&id, &cid, &messageID, &mode, &toolName, &toolCallID, &payload, &rowStatus, &decision, &comment, &decidedBy, &createdAt, &decidedAt); err != nil {
+		if err := rows.Scan(&id, &cid, &messageID, &mode, &toolName, &toolCallID, &payload, &rowStatus, &reviewer, &decision, &comment, &decidedBy, &createdAt, &decidedAt); err != nil {
 			continue
 		}
-		items = append(items, hitlInterruptRowToMap(id, cid, mode, toolName, toolCallID, payload, rowStatus, decidedBy, messageID, decision, comment, createdAt, decidedAt))
+		items = append(items, hitlInterruptRowToMap(id, cid, mode, toolName, toolCallID, payload, rowStatus, reviewer, decidedBy, messageID, decision, comment, createdAt, decidedAt))
 	}
 	return items, nil
 }
@@ -252,13 +258,13 @@ func (h *AgentHandler) GetHITLLog(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "id is required"})
 		return
 	}
-	q := `SELECT id, conversation_id, message_id, mode, tool_name, tool_call_id, payload, status, decision, decision_comment, COALESCE(decided_by,'human'), created_at, decided_at FROM hitl_interrupts WHERE id = ?`
-	var rowID, cid, mode, toolName, toolCallID, payload, rowStatus, decidedBy string
+	q := `SELECT id, conversation_id, message_id, mode, tool_name, tool_call_id, payload, status, COALESCE(reviewer,'human'), decision, decision_comment, COALESCE(decided_by,'human'), created_at, decided_at FROM hitl_interrupts WHERE id = ?`
+	var rowID, cid, mode, toolName, toolCallID, payload, rowStatus, reviewer, decidedBy string
 	var messageID sql.NullString
 	var decision, comment sql.NullString
 	var createdAt time.Time
 	var decidedAt sql.NullTime
-	err := h.db.QueryRow(q, id).Scan(&rowID, &cid, &messageID, &mode, &toolName, &toolCallID, &payload, &rowStatus, &decision, &comment, &decidedBy, &createdAt, &decidedAt)
+	err := h.db.QueryRow(q, id).Scan(&rowID, &cid, &messageID, &mode, &toolName, &toolCallID, &payload, &rowStatus, &reviewer, &decision, &comment, &decidedBy, &createdAt, &decidedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 		return
@@ -271,7 +277,7 @@ func (h *AgentHandler) GetHITLLog(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问该资源"})
 		return
 	}
-	c.JSON(http.StatusOK, hitlInterruptRowToMap(rowID, cid, mode, toolName, toolCallID, payload, rowStatus, decidedBy, messageID, decision, comment, createdAt, decidedAt))
+	c.JSON(http.StatusOK, hitlInterruptRowToMap(rowID, cid, mode, toolName, toolCallID, payload, rowStatus, reviewer, decidedBy, messageID, decision, comment, createdAt, decidedAt))
 }
 
 func (h *AgentHandler) filterAllowedHitlInterruptIDs(c *gin.Context, ids []string) ([]string, error) {

@@ -25,6 +25,7 @@
     let turnRailSignature = '';
     let activeTurnIndex = -1;
     let turnRailObserver = null;
+    let turnPreviewHideTimer = 0;
 
     function getChatMessagesEl() {
         return document.getElementById('chat-messages');
@@ -115,11 +116,24 @@
     }
 
     function hideTurnPreview() {
+        if (turnPreviewHideTimer) {
+            window.clearTimeout(turnPreviewHideTimer);
+            turnPreviewHideTimer = 0;
+        }
         const preview = document.getElementById('chat-turn-rail-preview');
         if (preview) preview.hidden = true;
     }
 
+    function scheduleHideTurnPreview() {
+        if (turnPreviewHideTimer) window.clearTimeout(turnPreviewHideTimer);
+        turnPreviewHideTimer = window.setTimeout(hideTurnPreview, 160);
+    }
+
     function showTurnPreview(marker, index) {
+        if (turnPreviewHideTimer) {
+            window.clearTimeout(turnPreviewHideTimer);
+            turnPreviewHideTimer = 0;
+        }
         const preview = document.getElementById('chat-turn-rail-preview');
         const title = document.getElementById('chat-turn-rail-preview-title');
         const summary = document.getElementById('chat-turn-rail-preview-summary');
@@ -245,7 +259,7 @@
             marker.addEventListener('mouseenter', function () {
                 showTurnPreview(marker, index);
             });
-            marker.addEventListener('mouseleave', hideTurnPreview);
+            marker.addEventListener('mouseleave', scheduleHideTurnPreview);
             marker.addEventListener('keydown', function (event) {
                 if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
                     event.preventDefault();
@@ -590,6 +604,17 @@
             returnLatestButton.addEventListener('pointerdown', isolateReturnLatestPointerEvent);
             returnLatestButton.addEventListener('pointerup', isolateReturnLatestPointerEvent);
             returnLatestButton.addEventListener('click', onReturnLatestClick);
+        }
+
+        const turnPreview = document.getElementById('chat-turn-rail-preview');
+        if (turnPreview) {
+            turnPreview.addEventListener('mouseenter', function () {
+                if (turnPreviewHideTimer) {
+                    window.clearTimeout(turnPreviewHideTimer);
+                    turnPreviewHideTimer = 0;
+                }
+            });
+            turnPreview.addEventListener('mouseleave', scheduleHideTurnPreview);
         }
 
         if (typeof MutationObserver === 'function') {

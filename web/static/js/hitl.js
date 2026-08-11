@@ -840,7 +840,11 @@ async function refreshHitlPending() {
             throw new Error('request failed');
         }
         const data = await resp.json();
-        const items = Array.isArray(data.items) ? data.items : [];
+        const rawItems = Array.isArray(data.items) ? data.items : [];
+        const items = rawItems.filter(function (item) {
+            return hitlReviewerNormalize(item && (item.reviewer || item.decidedBy || item.decided_by)) !== 'audit_agent' &&
+                String(item && item.status || '').trim().toLowerCase() !== 'audit_running';
+        });
         let workflowRuns = [];
         try {
             const wfResp = await hitlApiFetch('/api/workflows/runs/pending', { credentials: 'same-origin' });
@@ -861,7 +865,8 @@ async function refreshHitlPending() {
                 return conv.indexOf(searchQ) >= 0 || wfId.indexOf(searchQ) >= 0 || runId.indexOf(searchQ) >= 0 || label.indexOf(searchQ) >= 0;
             });
         }
-        hitlPendingTotal = (typeof data.total === 'number' ? data.total : items.length) + workflowRuns.length;
+        const hiddenAgentItems = rawItems.length - items.length;
+        hitlPendingTotal = Math.max(0, (typeof data.total === 'number' ? data.total : rawItems.length) - hiddenAgentItems) + workflowRuns.length;
         const maxPage = Math.max(1, Math.ceil(hitlPendingTotal / hitlPendingPageSize));
         if (hitlPendingPage > maxPage) {
             hitlPendingPage = maxPage;

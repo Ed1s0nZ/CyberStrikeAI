@@ -3434,7 +3434,7 @@ async function loadChatProjectFolderContext() {
         }
     });
     chatProjectFolderContext.pendingApprovalByConversation = new Map();
-    (pendingData.items || []).forEach((item) => {
+    (pendingData.items || []).filter(isHumanProjectPendingApproval).forEach((item) => {
         const conversationId = String(item?.conversationId || '').trim();
         // pending 审批必须属于当前进程仍在运行的任务；服务重启/取消后的旧记录
         // 即使在并发窗口内被读到，也不能重新显示倒计时徽标。
@@ -3445,6 +3445,13 @@ async function loadChatProjectFolderContext() {
     });
     chatProjectFolderContext.ready = true;
     return true;
+}
+
+function isHumanProjectPendingApproval(item) {
+    if (!item) return false;
+    const reviewer = String(item.reviewer || item.decidedBy || item.decided_by || '').trim().toLowerCase();
+    const status = String(item.status || '').trim().toLowerCase();
+    return reviewer !== 'audit_agent' && reviewer !== 'agent' && reviewer !== 'ai' && status !== 'audit_running';
 }
 
 function getProjectConversationSortTime(conversation) {
@@ -3629,7 +3636,7 @@ function updateProjectFolderTaskStatuses(tasks) {
 function setProjectConversationApprovalStatus(conversationId, pending, details) {
     const id = String(conversationId || '').trim();
     if (!id) return;
-    if (pending) chatProjectFolderContext.pendingApprovalByConversation.set(id, details || { conversationId: id });
+    if (pending && isHumanProjectPendingApproval(details || {})) chatProjectFolderContext.pendingApprovalByConversation.set(id, details || { conversationId: id });
     else chatProjectFolderContext.pendingApprovalByConversation.delete(id);
     if (isProjectsCacheReady() && chatProjectFolderContext.ready) {
         renderChatProjectFolders(projectsCacheAll);
@@ -3639,6 +3646,7 @@ function setProjectConversationApprovalStatus(conversationId, pending, details) 
 function syncProjectConversationApprovalStatuses(items) {
     const next = new Map();
     (Array.isArray(items) ? items : []).forEach((details) => {
+        if (!isHumanProjectPendingApproval(details)) return;
         const id = String(details && details.conversationId || '').trim();
         if (id && chatProjectFolderContext.runningIds.has(id) && !next.has(id)) {
             next.set(id, details);

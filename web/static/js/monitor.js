@@ -3595,19 +3595,16 @@ function describeHitlApprovalRequest(data) {
     let primary = '';
     let kind = 'generic';
     if (isBrowser) {
-        displayTool = 'Browser';
         kind = 'browser';
         question = url
             ? hitlApprovalTemplate('hitl.requestVisitUrl', '允许 CyberStrikeAI 访问 {{url}}？', { url: url })
             : hitlApprovalTranslate('hitl.requestBrowser', '允许 CyberStrikeAI 使用浏览器？');
         primary = url;
     } else if (isCommand) {
-        displayTool = hitlApprovalTranslate('hitl.toolTerminal', 'Terminal');
         kind = 'command';
         question = hitlApprovalTranslate('hitl.requestCommand', '允许 CyberStrikeAI 执行这条命令？');
         primary = command;
     } else if (isFile) {
-        displayTool = hitlApprovalTranslate('hitl.toolFiles', 'Files');
         kind = 'file';
         question = path
             ? hitlApprovalTemplate('hitl.requestFile', '允许 CyberStrikeAI 修改 {{path}}？', { path: path })
@@ -3623,6 +3620,13 @@ function describeHitlApprovalRequest(data) {
         args: args,
         argsJSON: JSON.stringify(args, null, 2)
     };
+}
+
+function isAgentReviewedHitl(data) {
+    if (!data) return false;
+    const reviewer = String(data.reviewer || data.decidedBy || data.decided_by || '').trim().toLowerCase();
+    const status = String(data.status || '').trim().toLowerCase();
+    return reviewer === 'audit_agent' || reviewer === 'agent' || reviewer === 'ai' || status === 'audit_running';
 }
 
 function getHitlApprovalTiming(data) {
@@ -3730,7 +3734,7 @@ function renderToolCallApprovalSummary(item, data) {
     panel.dataset.hitlInterruptId = String(data.interruptId);
     panel.dataset.conversationId = String(data.conversationId || window.currentConversationId || '').trim();
     panel.classList.toggle('hitl-inline-done', !!data.resolved || String(data.status || '') === 'decided');
-    if (!data.resolved && String(data.reviewer || data.decidedBy || '') !== 'audit_agent' && String(data.status || '') !== 'audit_running') {
+    if (!data.resolved && !isAgentReviewedHitl(data)) {
         bindInlineHitlApproval(panel, data, { allowEdit: allowEdit });
         bindHitlApprovalCountdown(panel, data);
         setHitlApprovalTaskAvailability(panel, panel.dataset.conversationId);
@@ -3792,9 +3796,11 @@ function renderInlineHitlApproval(itemId, data) {
         argsJSON: argsJSON
     });
     contentEl.appendChild(panel);
-    bindInlineHitlApproval(panel, data, { allowEdit: allowEdit });
-    bindHitlApprovalCountdown(panel, data);
-    setHitlApprovalTaskAvailability(panel, panel.dataset.conversationId);
+    if (!isAgentReviewedHitl(data)) {
+        bindInlineHitlApproval(panel, data, { allowEdit: allowEdit });
+        bindHitlApprovalCountdown(panel, data);
+        setHitlApprovalTaskAvailability(panel, panel.dataset.conversationId);
+    }
 }
 
 function resolveInlineHitlDecision(timeline, data, decision, message) {
@@ -4152,8 +4158,7 @@ function renderChatHitlApprovalDock(data) {
     // 新任务尚未绑定会话 ID 时不能让其他运行中对话的迟到审批覆盖输入框。
     // 有明确会话 ID 的审批面板只允许显示在同一个当前对话中。
     if (conversationId && conversationId !== currentId) return false;
-    const reviewer = String(data.reviewer || data.decidedBy || '').trim().toLowerCase();
-    if (reviewer === 'audit_agent' || String(data.status || '').trim().toLowerCase() === 'audit_running') return false;
+    if (isAgentReviewedHitl(data)) return false;
     let mode = String(data.mode || 'approval').trim().toLowerCase();
     if (mode === 'feedback' || mode === 'followup') mode = 'approval';
     const allowEdit = mode === 'review_edit';
@@ -4248,6 +4253,7 @@ function syncDirectHitlSidebarApprovals() {
 function updateHitlApprovalSidebar(data, pending) {
     const conversationId = String((data && data.conversationId) || window.currentConversationId || '').trim();
     if (!conversationId) return;
+    if (pending && isAgentReviewedHitl(data)) return;
     if (pending) {
         hitlSidebarApprovalState.set(conversationId, data || { conversationId: conversationId });
         renderDirectHitlSidebarApproval(conversationId, data || {});
@@ -4267,6 +4273,7 @@ function updateHitlApprovalSidebar(data, pending) {
 function syncHitlApprovalSidebarState(items) {
     const nextByConversation = new Map();
     (Array.isArray(items) ? items : []).forEach(function (item) {
+        if (isAgentReviewedHitl(item)) return;
         const conversationId = String(item && item.conversationId || '').trim();
         if (conversationId && !nextByConversation.has(conversationId)) {
             nextByConversation.set(conversationId, item);
@@ -4291,7 +4298,7 @@ function reconcilePendingHitlState(rawItems) {
     const activeItems = (Array.isArray(rawItems) ? rawItems : [])
         .map(function (item) { return hitlPendingItemToData(item); })
         .filter(function (item) {
-            return item && conversationExecutionTracker.isRunning(item.conversationId);
+            return item && !isAgentReviewedHitl(item) && conversationExecutionTracker.isRunning(item.conversationId);
         });
     hitlPendingInterruptTracker.update(activeItems);
     syncHitlApprovalTaskAvailability();
@@ -4645,7 +4652,9 @@ async function restoreHitlInlineForConversation(conversationId) {
         const resp = await apiFetch('/api/hitl/pending?conversationId=' + encodeURIComponent(conversationId) + '&status=pending&pageSize=50');
         if (!resp.ok) return;
         const data = await resp.json().catch(function () { return {}; });
-        const rawItems = Array.isArray(data.items) ? data.items : [];
+        const rawItems = (Array.isArray(data.items) ? data.items : []).filter(function (item) {
+            return !isAgentReviewedHitl(item);
+        });
         // 任务列表是当前进程的权威运行态。服务重启或任务取消后，即使审批查询
         // 短暂读到旧 pending 记录，也不能重新挂载审批入口和倒计时。
         const items = conversationExecutionTracker.ready && !conversationExecutionTracker.isRunning(conversationId)
@@ -5818,6 +5827,18 @@ function addTimelineItem(timeline, type, options) {
     }
 
     item.innerHTML = content;
+    if (type === 'iteration') {
+        const scope = options.data && options.data.einoScope != null
+            ? String(options.data.einoScope).trim()
+            : '';
+        // 主代理每次重新进入模型才形成一轮；子代理的步骤保留普通时间线样式，
+        // 避免把同一轮中的专家调用误显示成新的主迭代分组。
+        if (scope !== 'sub') {
+            item.classList.add('timeline-iteration-divider');
+            item.setAttribute('role', 'separator');
+            item.setAttribute('aria-label', String(options.title || ''));
+        }
+    }
     if (item.classList.contains('tool-detail-collapsible')) {
         updateToolDetailToggleLabel(item);
     }

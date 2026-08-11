@@ -3,6 +3,7 @@ package handler
 import (
 	"database/sql"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"cyberstrike-ai/internal/database"
@@ -46,5 +47,57 @@ func TestEnsureSchemaCancelsPendingInterruptsAfterRestart(t *testing.T) {
 	}
 	if !decidedAt.Valid {
 		t.Fatal("decided_at should be set after restart reconciliation")
+	}
+}
+
+func TestAuditAgentInterruptIsNotHumanPendingWork(t *testing.T) {
+	db, err := database.NewDB(filepath.Join(t.TempDir(), "hitl-reviewer.db"), zap.NewNop())
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	manager := NewHITLManager(db, zap.NewNop())
+	if err := manager.EnsureSchema(); err != nil {
+		t.Fatalf("ensure schema: %v", err)
+	}
+
+	audit, err := manager.CreatePendingInterrupt("conversation-audit", "message-audit", "review_edit", "exec", "call-audit", `{}`, "audit_agent")
+	if err != nil {
+		t.Fatalf("create audit interrupt: %v", err)
+	}
+	human, err := manager.CreatePendingInterrupt("conversation-human", "message-human", "approval", "exec", "call-human", `{}`, "human")
+	if err != nil {
+		t.Fatalf("create human interrupt: %v", err)
+	}
+
+	manager.mu.RLock()
+	_, auditWaitsForHuman := manager.pending[audit.InterruptID]
+	_, humanWaitsForHuman := manager.pending[human.InterruptID]
+	manager.mu.RUnlock()
+	if auditWaitsForHuman {
+		t.Fatal("audit-agent interrupt must not enter the human pending queue")
+	}
+	if !humanWaitsForHuman {
+		t.Fatal("human interrupt should enter the human pending queue")
+	}
+
+	query, args := (&AgentHandler{}).buildHitlListQuery(false)
+	if len(args) != 0 {
+		t.Fatalf("unexpected pending query args: %v", args)
+	}
+	if !strings.Contains(query, "COALESCE(reviewer,'human') = 'human'") {
+		t.Fatalf("pending query must filter out audit-agent work: %s", query)
+	}
+	rows, err := db.Query(query)
+	if err != nil {
+		t.Fatalf("query human pending interrupts: %v", err)
+	}
+	defer rows.Close()
+	items, err := (&AgentHandler{}).scanHitlInterruptRows(rows)
+	if err != nil {
+		t.Fatalf("scan human pending interrupts: %v", err)
+	}
+	if len(items) != 1 || items[0]["id"] != human.InterruptID || items[0]["reviewer"] != "human" {
+		t.Fatalf("unexpected human pending result: %#v", items)
 	}
 }

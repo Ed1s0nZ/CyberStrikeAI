@@ -3455,7 +3455,7 @@ html[data-theme="dark"] .new-chat-btn:focus-visible {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 8px;
+    gap: 0;
     max-height: min(48vh, 336px);
     padding: 10px 8px;
     overflow-y: auto;
@@ -3470,19 +3470,31 @@ html[data-theme="dark"] .new-chat-btn:focus-visible {
 
 .chat-turn-rail-marker {
     display: block;
-    width: 12px;
-    height: 3px;
-    min-height: 3px;
+    position: relative;
+    width: 36px;
+    height: 11px;
+    min-height: 11px;
     padding: 0;
     border: 0;
+    background: transparent;
+    cursor: pointer;
+}
+
+.chat-turn-rail-marker::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 12px;
+    height: 3px;
     border-radius: 999px;
     background: #c7cbd1;
-    cursor: pointer;
+    transform: translateY(-50%);
     transform-origin: left center;
     transition: width 0.16s ease, background-color 0.16s ease, opacity 0.16s ease;
 }
 
-.chat-turn-rail-marker:hover {
+.chat-turn-rail-marker:hover::before {
     width: 22px;
     background: #7c828b;
 }
@@ -3492,17 +3504,17 @@ html[data-theme="dark"] .new-chat-btn:focus-visible {
     outline-offset: 3px;
 }
 
-.chat-turn-rail-marker.is-active {
+.chat-turn-rail-marker.is-active::before {
     width: 12px;
     background: #20242a;
 }
 
-.chat-turn-rail-marker.is-active:hover {
+.chat-turn-rail-marker.is-active:hover::before {
     width: 22px;
     background: #20242a;
 }
 
-.chat-turn-rail-marker.has-pending-new:last-child {
+.chat-turn-rail-marker.has-pending-new:last-child::before {
     background: var(--primary-color, #2563eb);
     animation: chat-turn-marker-pulse 1.2s ease-in-out infinite;
 }
@@ -3523,7 +3535,7 @@ html[data-theme="dark"] .new-chat-btn:focus-visible {
     color: #20242a;
     box-shadow: 0 14px 38px rgba(15, 23, 42, 0.13);
     backdrop-filter: blur(14px);
-    pointer-events: none;
+    pointer-events: auto;
 }
 
 .chat-turn-rail-preview[hidden] {
@@ -3630,11 +3642,11 @@ html[data-theme="dark"] .new-chat-btn:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .chat-turn-rail-marker {
+    .chat-turn-rail-marker::before {
         transition: none;
     }
 
-    .chat-turn-rail-marker.has-pending-new:last-child {
+    .chat-turn-rail-marker.has-pending-new:last-child::before {
         animation: none;
     }
 
@@ -36300,15 +36312,15 @@ html[data-theme="dark"] .progress-container.completed {
     border-color: #263244;
 }
 
-html[data-theme="dark"] .chat-turn-rail-marker {
+html[data-theme="dark"] .chat-turn-rail-marker::before {
     background: #505866;
 }
 
-html[data-theme="dark"] .chat-turn-rail-marker:hover {
+html[data-theme="dark"] .chat-turn-rail-marker:hover::before {
     background: #a0a8b5;
 }
 
-html[data-theme="dark"] .chat-turn-rail-marker.is-active {
+html[data-theme="dark"] .chat-turn-rail-marker.is-active::before {
     background: #f4f7fb;
 }
 
@@ -46266,6 +46278,59 @@ html[data-theme="dark"] .chat-composer-surface > .chat-session-settings-popover 
 .message.progress-message .timeline-item-iteration .timeline-item-title {
     color: var(--text-primary);
     font-weight: 600;
+}
+
+/* 主代理轮次是一次新的“模型决策 → 工具结果 → 继续决策”边界。
+ * 用轻量横线把长执行过程分组；子代理步骤仍沿用普通时间线节点。 */
+.message.assistant-turn-with-process .timeline-item-iteration.timeline-iteration-divider,
+.message.progress-message .timeline-item-iteration.timeline-iteration-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 10px;
+    padding-top: 12px !important;
+    padding-bottom: 8px !important;
+    overflow: visible;
+    content-visibility: visible;
+}
+
+.message.assistant-turn-with-process .timeline-item-iteration.timeline-iteration-divider::after,
+.message.progress-message .timeline-item-iteration.timeline-iteration-divider::after {
+    content: "";
+    flex: 1 1 48px;
+    min-width: 28px;
+    height: 1px;
+    background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--border-color) 88%, transparent),
+        color-mix(in srgb, var(--border-color) 20%, transparent)
+    );
+}
+
+.message.assistant-turn-with-process .timeline-item-iteration.timeline-iteration-divider .timeline-item-header,
+.message.progress-message .timeline-item-iteration.timeline-iteration-divider .timeline-item-header {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: calc(100% - 40px);
+}
+
+.message.assistant-turn-with-process .timeline-item-iteration.timeline-iteration-divider .timeline-item-title,
+.message.progress-message .timeline-item-iteration.timeline-iteration-divider .timeline-item-title {
+    letter-spacing: 0.01em;
+}
+
+@media (max-width: 768px) {
+    .message.assistant-turn-with-process .timeline-item-iteration.timeline-iteration-divider,
+    .message.progress-message .timeline-item-iteration.timeline-iteration-divider {
+        gap: 8px;
+        margin-top: 7px;
+    }
+
+    .message.assistant-turn-with-process .timeline-item-iteration.timeline-iteration-divider::after,
+    .message.progress-message .timeline-item-iteration.timeline-iteration-divider::after {
+        flex-basis: 24px;
+        min-width: 16px;
+    }
 }
 
 .message.assistant-turn-with-process .timeline-item-content,
