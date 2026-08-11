@@ -2736,8 +2736,11 @@ function handleChatInputKeydown(event) {
         }
     }
 
-    // Enter keeps the textarea's native newline behavior. Sending is
-    // intentionally limited to the visible arrow button.
+    // Enter 直接发送；Shift+Enter 保留 textarea 原生换行行为。
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        void sendMessage();
+    }
 }
 
 function updateMentionStateFromInput(textarea) {
@@ -4194,7 +4197,7 @@ function removeMessage(id) {
     }
 }
 
-// 输入框事件绑定（Enter 换行 / @提及）
+// 输入框事件绑定（Enter 发送、Shift+Enter 换行 / @提及）
 const chatInput = document.getElementById('chat-input');
 if (chatInput) {
     chatInput.addEventListener('keydown', handleChatInputKeydown);
