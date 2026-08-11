@@ -3530,7 +3530,11 @@ function renderChatProjectFolders(projects) {
         _isUnassigned: true,
     };
     const includeUnassigned = matchProjectSearchQuery(unassignedProject, chatProjectFolderSearchQuery);
-    const folders = includeUnassigned ? [unassignedProject, ...filtered] : filtered;
+    const pinnedProjects = filtered.filter((project) => !!project.pinned);
+    const regularProjects = filtered.filter((project) => !project.pinned);
+    const folders = includeUnassigned
+        ? [...pinnedProjects, unassignedProject, ...regularProjects]
+        : filtered;
     list.innerHTML = '';
     if (!folders.length) {
         const empty = document.createElement('div');

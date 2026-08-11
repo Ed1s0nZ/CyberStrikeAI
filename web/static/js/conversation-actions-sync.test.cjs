@@ -55,6 +55,12 @@ test('项目文件夹菜单可以置顶并立即更新排序', () => {
     assert.match(toggleSource, /updateCachedProjectPinnedState\(projectId, nextPinned\)/);
     assert.match(folderSource, /if \(!isUnassigned && project\.pinned\)/);
     assert.match(folderSource, /project-folder-pinned/);
+    assert.match(projects, /\[\.\.\.pinnedProjects, unassignedProject, \.\.\.regularProjects\]/);
+});
+
+test('对话侧栏不再显示对话分组区域', () => {
+    assert.doesNotMatch(template, /class="conversation-groups-section"/);
+    assert.doesNotMatch(template, /id="conversation-groups-list"/);
 });
 
 test('删除对话分组检查接口结果并先清理本地状态', () => {

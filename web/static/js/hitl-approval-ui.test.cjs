@@ -153,7 +153,7 @@ test('切换对话后主按钮只读取当前可见对话的运行状态', () =>
 test('无项目对话使用独立虚拟文件夹且新任务默认解除项目绑定', () => {
     assert.match(projects, /CHAT_UNASSIGNED_PROJECT_FOLDER_ID/);
     assert.match(projects, /_isUnassigned: true/);
-    assert.match(projects, /\[unassignedProject, \.\.\.filtered\]/);
+    assert.match(projects, /\[\.\.\.pinnedProjects, unassignedProject, \.\.\.regularProjects\]/);
     assert.match(projects, /window\.startNewConversation\(\{ projectId: isUnassigned \? '' : project\.id \}\)/);
     assert.match(chat, /typeof setActiveProjectId === 'function'\) setActiveProjectId\(requestedProjectId\)/);
     assert.equal(zh.chat.newUnassignedConversation, '新建无项目对话');
@@ -247,7 +247,7 @@ test('审批状态主动轮询并在服务不可用时立即关闭旧审批', ()
     assert.match(monitor, /renderActiveTasks\(\[\]\);[\s\S]{0,260}hitlPendingInterruptTracker\.update\(\[\]\)/);
     assert.match(projects, /function syncProjectConversationApprovalStatuses\(items\)/);
     assert.match(projects, /window\.syncProjectConversationApprovalStatuses/);
-    assert.match(template, /projects\.js\?v=20260811-15/);
+    assert.match(template, /projects\.js\?v=20260811-16/);
 });
 
 test('旧会话首次升级到五分钟默认审批时限，仍允许用户之后主动选择不限时', () => {
