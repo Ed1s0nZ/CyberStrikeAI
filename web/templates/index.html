@@ -23,7 +23,7 @@
             }
         })();
     </script>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260811-30">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260811-31">
     <link rel="stylesheet" href="/static/css/c2.css">
     <link rel="stylesheet" href="/static/vendor/xterm.css">
     <script src="/static/js/router.js"></script>
@@ -1330,13 +1330,44 @@
                                         </button>
                                     </div>
                                     <div class="chat-composer-footer-trailing">
-                                        <button type="button" id="chat-model-shortcut" class="chat-session-shortcut chat-session-meta" onclick="openChatSessionSettings('ai', event)" data-i18n="chat.modelSettingsAria" data-i18n-attr="aria-label,title" data-i18n-skip-text="true" aria-label="打开 AI 通道设置" title="打开 AI 通道设置">
-                                            <span id="chat-model-shortcut-text">默认通道</span>
-                                        </button>
-                                        <span class="chat-composer-meta-divider" aria-hidden="true"></span>
-                                        <button type="button" id="chat-reasoning-shortcut" class="chat-session-shortcut chat-session-meta" onclick="openChatSessionSettings('reasoning', event)" data-i18n="chat.sessionSettingsAria" data-i18n-attr="aria-label,title" data-i18n-skip-text="true" aria-label="打开会话设置" title="打开会话设置">
-                                            <span id="chat-reasoning-shortcut-text">系统</span>
-                                        </button>
+                                        <div id="chat-model-shortcut-wrap" class="chat-model-shortcut-wrap">
+                                            <button type="button" id="chat-model-shortcut" class="chat-session-shortcut chat-session-meta" onclick="openChatSystemModelPicker(event)" data-i18n="chat.modelSettingsAria" data-i18n-attr="aria-label,title" data-i18n-skip-text="true" aria-label="选择模型与推理强度" title="选择模型与推理强度" aria-haspopup="dialog" aria-expanded="false" aria-controls="chat-system-model-menu">
+                                                <span id="chat-model-shortcut-text">默认通道</span>
+                                                <span id="chat-model-shortcut-effort" class="chat-model-shortcut-effort">不指定</span>
+                                                <svg class="chat-system-model-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                    <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                                                </svg>
+                                            </button>
+                                            <div id="chat-system-model-menu" class="chat-system-model-menu" role="dialog" aria-label="模型与推理强度" hidden>
+                                                <div id="chat-system-model-main" class="chat-system-model-main">
+                                                    <button type="button" class="chat-system-model-setting-row" onclick="openChatSystemModelView('model', event)">
+                                                        <span class="chat-system-model-setting-label" data-i18n="chat.systemModelField">模型</span>
+                                                        <span class="chat-system-model-setting-value">
+                                                            <span id="chat-system-model-current-value">默认通道</span>
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                                        </span>
+                                                    </button>
+                                                    <button type="button" class="chat-system-model-setting-row" onclick="openChatSystemModelView('effort', event)">
+                                                        <span class="chat-system-model-setting-label" data-i18n="chat.reasoningEffortLabel">推理强度</span>
+                                                        <span class="chat-system-model-setting-value">
+                                                            <span id="chat-system-model-effort-value">不指定</span>
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                                        </span>
+                                                    </button>
+                                                    <span id="chat-system-model-status" class="chat-system-model-status chat-system-model-status-live" aria-live="polite"></span>
+                                                </div>
+                                                <div id="chat-system-model-subview" class="chat-system-model-subview" hidden>
+                                                    <div class="chat-system-model-menu-header">
+                                                        <button type="button" class="chat-system-model-back" onclick="openChatSystemModelView('main', event)" aria-label="返回">
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                                        </button>
+                                                        <strong id="chat-system-model-subview-title">模型</strong>
+                                                        <span id="chat-system-model-subview-status" class="chat-system-model-status"></span>
+                                                    </div>
+                                                    <div id="chat-system-model-list" class="chat-system-model-list" role="listbox" aria-label="选项列表"></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                         <button type="button" class="send-btn" id="chat-send-btn" data-require-permission="chat:write" onclick="sendMessage()" data-i18n="chat.send" data-i18n-attr="aria-label,title" data-i18n-skip-text="true" aria-label="发送" title="发送">
                                             <span class="send-btn-label" data-i18n="chat.send">发送</span>
                                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -6786,7 +6817,7 @@
     <script src="/static/js/dashboard.js"></script>
     <script src="/static/js/chat-scroll.js?v=20260810-5"></script>
     <script src="/static/js/monitor.js?v=20260811-10"></script>
-    <script src="/static/js/chat.js?v=20260811-18"></script>
+    <script src="/static/js/chat.js?v=20260811-22"></script>
     <script src="/static/js/hitl.js?v=20260810-3"></script>
     <script src="/static/js/settings.js?v=20260717-1"></script>
     <script src="/static/js/audit-datetime-picker.js"></script>

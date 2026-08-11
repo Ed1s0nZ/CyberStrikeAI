@@ -20,6 +20,31 @@ test('输入区提供独立审批入口并暴露可配置等待时限', () => {
     assert.match(chat, /body\.hitl = \{[\s\S]*?timeoutSeconds: normalizeHitlTimeoutForChat\(hitlCfg\.timeoutSeconds/);
 });
 
+test('输入框可直接保存系统模型和系统推理强度且审批模型只出现在审计 Agent 入口', () => {
+    assert.match(chat, /function currentSystemModelLabel\(\)/);
+    assert.match(chat, /chatDefaultAIChannel \? chatAIChannels\[chatDefaultAIChannel\]/);
+    assert.match(chat, /function currentHitlAuditModelLabel\(\)/);
+    assert.match(chat, /const label = currentSystemModelLabel\(\)/);
+    assert.doesNotMatch(chat, /const label = data\.model \|\| currentChatModelLabel\(\)/);
+    assert.match(chat, /const approvalModel = auditAgent \? currentHitlAuditModelLabel\(\) : ''/);
+    assert.match(chat, /hitlAuditModel\.model\.trim\(\)/);
+    assert.match(template, /id="chat-model-shortcut"[^>]+onclick="openChatSystemModelPicker\(event\)"/);
+    assert.match(template, /id="chat-system-model-menu"[^>]+hidden/);
+    assert.doesNotMatch(template, /id="chat-reasoning-shortcut"/);
+    assert.match(template, /openChatSystemModelView\('model', event\)[\s\S]{0,1200}openChatSystemModelView\('effort', event\)/);
+    assert.match(chat, /function renderChatReasoningEffortOptions\(\)/);
+    assert.match(chat, /function currentSystemReasoningEffort\(\)[\s\S]{0,500}reasoning\.effort/);
+    assert.match(chat, /case 'low': return 'low'[\s\S]{0,300}case 'max': return 'max'/);
+    assert.match(chat, /chatTranslate\('chat\.reasoningEffortUnset', '不指定'\)/);
+    assert.match(chat, /function selectChatReasoningEffort\(effort\)[\s\S]{0,2400}reasoning: \{ \.\.\.\(state\.channel\.reasoning \|\| \{\}\), effort: chosen \}/);
+    assert.match(chat, /function selectChatReasoningEffort\(effort\)[\s\S]{0,4200}body: JSON\.stringify\(\{ ai: state\.ai \}\)[\s\S]{0,900}apiFetch\('\/api\/config\/apply'/);
+    assert.match(chat, /function openChatSystemModelPicker\(event\)[\s\S]{0,4200}apiFetch\('\/api\/config\/list-models'/);
+    assert.match(chat, /function selectChatSystemModel\(model\)[\s\S]{0,2600}method: 'PUT'[\s\S]{0,900}apiFetch\('\/api\/config\/apply'/);
+    assert.match(chat, /body: JSON\.stringify\(\{ ai: state\.ai \}\)/);
+    assert.equal(zh.chat.modelSettingsAria, '选择模型与推理强度');
+    assert.equal(en.chat.modelSettingsAria, 'Choose model and reasoning effort');
+});
+
 test('审批请求按浏览器、命令、文件和通用工具动态描述', () => {
     assert.match(monitor, /function hitlApprovalTemplate/);
     assert.match(monitor, /hitlApprovalTranslate\(key, fallback\)/);
@@ -170,7 +195,8 @@ test('多对话并发时释放隐藏主流且旧请求不能覆盖新对话状�
     assert.match(chat, /cancelPendingConversationLoad\(\);[\s\S]{0,220}const conversationLoadController = new AbortController\(\)/);
     assert.match(chat, /signal: conversationLoadController\.signal/);
     assert.match(template, /monitor\.js\?v=20260811-10/);
-    assert.match(template, /chat\.js\?v=20260811-18/);
+    assert.match(template, /chat\.js\?v=20260811-22/);
+    assert.match(template, /style\.css\?v=20260811-31/);
 });
 
 test('任务结束后对话内审批按钮会变灰并禁止继续操作', () => {
