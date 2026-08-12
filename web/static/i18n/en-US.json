@@ -545,6 +545,7 @@
     "toggleConversationPanel": "Collapse/expand conversation list",
     "searchHistory": "Search history...",
     "projectFolders": "Projects",
+    "projectFoldersLoadMoreRemaining": "Load more, {{count}} projects remaining",
     "projectPreviewLabel": "Project information",
     "projectPreviewStats": "{{total}} tasks · {{active}} open",
     "projectPreviewNoDescription": "No project description",

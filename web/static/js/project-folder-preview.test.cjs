@@ -71,6 +71,44 @@ test('项目按展开状态切换 Codex 风格的打开和关闭文件夹', () =
     assert.match(folder, /icon\.innerHTML = projectFolderIconMarkup\(isExpanded\);/);
 });
 
+test('项目名仅在界面按 12 个 Unicode 字符省略并保留完整悬浮信息', () => {
+    const formatterSource = functionSource(chat, 'formatProjectNameForDisplay', 'applyProjectNameDisplay');
+    const formatter = new Function(
+        'PROJECT_NAME_DISPLAY_MAX_CHARACTERS',
+        `${formatterSource}; return formatProjectNameForDisplay;`
+    )(12);
+    const folder = functionSource(projects, 'appendChatProjectFolderItem', 'appendChatProjectConversationItem');
+    const picker = functionSource(projects, 'appendChatProjectPanelItem', 'appendChatProjectPanelMessage');
+    const button = functionSource(projects, 'updateChatProjectButtonLabel', 'renderChatProjectPanel');
+
+    assert.equal(formatter('十二字符以内'), '十二字符以内');
+    assert.equal(formatter('这是一个非常非常长的项目名称'), '这是一个非常非常长的项目…');
+    assert.equal(formatter('😀😀😀😀😀😀😀😀😀😀😀😀😀'), '😀😀😀😀😀😀😀😀😀😀😀😀…');
+    assert.match(chat, /const PROJECT_NAME_DISPLAY_MAX_CHARACTERS = 12/);
+    assert.match(folder, /applyProjectNameDisplay\(title, project\.name/);
+    assert.match(projects, /applyProjectNameDisplay\(titleEl, text\)/);
+    assert.match(picker, /title="\$\{escapeAttr\(fullName\)\}"/);
+    assert.match(picker, /setAttribute\('aria-label', fullName\)/);
+    assert.match(button, /applyProjectNameDisplay/);
+    assert.match(styles, /\.project-selector-wrapper \.role-selector-text\s*\{[\s\S]*?max-width: 13em/);
+});
+
+test('项目文件夹首批显示 6 个并通过加载更多按批追加', () => {
+    const loadMore = functionSource(projects, 'loadMoreChatProjectFolders', 'renderChatProjectFolders');
+    const render = functionSource(projects, 'renderChatProjectFolders', 'refreshChatProjectFolders');
+    const search = functionSource(projects, 'handleProjectFolderSearch', 'clearProjectFolderSearch');
+
+    assert.match(projects, /const CHAT_PROJECT_FOLDER_PAGE_SIZE = 6/);
+    assert.match(loadMore, /chatProjectFolderVisibleCount \+= CHAT_PROJECT_FOLDER_PAGE_SIZE/);
+    assert.match(render, /const visibleFolders = folders\.slice\(0, chatProjectFolderVisibleCount\)/);
+    assert.match(render, /appendChatProjectFoldersLoadMore\(list, folders\.length - visibleFolders\.length\)/);
+    assert.match(render, /chatProjectFolderVisibleCount = selectedIndex \+ 1/);
+    assert.match(search, /renderChatProjectFolders\(projectsCacheAll\)/);
+    assert.match(styles, /\.project-folders-load-more\s*\{/);
+    assert.match(zh, /"projectFoldersLoadMoreRemaining": "加载更多，剩余 \{\{count\}\} 个项目"/);
+    assert.match(en, /"projectFoldersLoadMoreRemaining": "Load more, \{\{count\}\} projects remaining"/);
+});
+
 test('对话悬浮预览显示本地年月日时分', () => {
     const age = functionSource(projects, 'formatProjectConversationPreviewAge', 'getProjectConversationModeLabel');
 

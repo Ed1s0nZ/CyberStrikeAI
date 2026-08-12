@@ -533,6 +533,7 @@
     "toggleConversationPanel": "折叠/展开对话列表",
     "searchHistory": "搜索历史记录...",
     "projectFolders": "项目",
+    "projectFoldersLoadMoreRemaining": "加载更多，剩余 {{count}} 个项目",
     "projectPreviewLabel": "项目信息",
     "projectPreviewStats": "{{total}} 个任务 · {{active}} 个已开启",
     "projectPreviewNoDescription": "暂无项目说明",

@@ -28,6 +28,9 @@ function setCurrentConversationIdFromStream(cid) {
     currentConversationId = cid;
     try {
         window.currentConversationId = cid;
+        if (typeof window.syncChatConversationHash === 'function') {
+            window.syncChatConversationHash(cid);
+        }
     } catch (e) { /* ignore */ }
 }
 
@@ -1003,6 +1006,11 @@ function updateAssistantBubbleContent(assistantMessageId, content, renderMarkdow
     if (copyBtn) copyBtn.remove();
 
     const newContent = content == null ? '' : String(content);
+    const normalizedContent = newContent.trim();
+    if (normalizedContent !== '处理中...' && normalizedContent !== 'Processing...') {
+        assistantElement.classList.remove('assistant-placeholder-content');
+        bubble.hidden = false;
+    }
     const html = renderMarkdown
         ? formatAssistantMarkdownContent(newContent)
         : escapeHtmlLocal(newContent).replace(/\n/g, '<br>');
@@ -1526,12 +1534,16 @@ function hideProgressMessageForFinalReply(progressId) {
 }
 
 // 折叠所有进度详情
-function collapseAllProgressDetails(assistantMessageId, progressId) {
+function collapseAllProgressDetails(assistantMessageId, progressId, options) {
+    const forceCollapse = !!(options && options.force);
     // 折叠集成到MCP区域的详情
     if (assistantMessageId) {
         const detailsId = 'process-details-' + assistantMessageId;
         const detailsContainer = document.getElementById(detailsId);
-        if (detailsContainer && detailsContainer.dataset.userExpanded !== '1') {
+        if (detailsContainer && (forceCollapse || detailsContainer.dataset.userExpanded !== '1')) {
+            if (forceCollapse) {
+                delete detailsContainer.dataset.userExpanded;
+            }
             const timeline = detailsContainer.querySelector('.progress-timeline');
             if (timeline) {
                 timeline.classList.remove('expanded');
@@ -4872,6 +4884,12 @@ async function attachRunningTaskEventStream(conversationId) {
             // 若用户期间没有主动上滑，完成补页后重新精确粘底；主动浏览历史时不抢滚动。
             if (
                 window.CyberStrikeChatScroll &&
+                typeof window.CyberStrikeChatScroll.settleToBottomIfFollowing === 'function' &&
+                (typeof window.captureScrollPinState !== 'function' || window.captureScrollPinState())
+            ) {
+                window.CyberStrikeChatScroll.settleToBottomIfFollowing(12);
+            } else if (
+                window.CyberStrikeChatScroll &&
                 typeof window.CyberStrikeChatScroll.forceScrollToBottom === 'function' &&
                 (typeof window.captureScrollPinState !== 'function' || window.captureScrollPinState())
             ) {
@@ -4945,7 +4963,6 @@ async function attachRunningTaskEventStream(conversationId) {
             if (typeof loadActiveTasks === 'function') loadActiveTasks();
             if (replaySawDone && typeof window.loadConversation === 'function' && window.currentConversationId === conversationId) {
                 const replayTimeline = document.getElementById('process-details-' + asEl.id + '-timeline');
-                const keepExpanded = !!(replayTimeline && replayTimeline.classList.contains('expanded'));
                 const keepFollowingFinalRender = typeof window.captureScrollPinState === 'function'
                     ? window.captureScrollPinState()
                     : true;
@@ -4953,14 +4970,20 @@ async function attachRunningTaskEventStream(conversationId) {
                 // loadConversation 使用轻量消息接口，会把详情重新置为懒加载状态；
                 // 任务终态再从 DB 全量对账一次，补回订阅建立期间可能错过的事件。
                 await refreshLastAssistantProcessDetails(conversationId);
-                if (keepExpanded) {
-                    const finalAssistant = findLastAssistantMessageElInChat();
-                    if (finalAssistant && finalAssistant.id) {
-                        expandProcessDetailsTimeline(finalAssistant.id);
-                    }
+                // 补流完成即回到终态摘要；刷新期间为展示实时迭代而自动展开的详情
+                // 不应继续保持展开。用户之后仍可通过“展开详情”手动查看。
+                const finalAssistant = findLastAssistantMessageElInChat();
+                if (finalAssistant && finalAssistant.id) {
+                    collapseAllProgressDetails(finalAssistant.id, progressId, { force: true });
                 }
                 // 最终消息和详情重绘都会增高 DOM；仅当用户之前仍在跟随时重新粘底。
                 if (
+                    keepFollowingFinalRender &&
+                    window.CyberStrikeChatScroll &&
+                    typeof window.CyberStrikeChatScroll.settleToBottomIfFollowing === 'function'
+                ) {
+                    window.CyberStrikeChatScroll.settleToBottomIfFollowing(18);
+                } else if (
                     keepFollowingFinalRender &&
                     window.CyberStrikeChatScroll &&
                     typeof window.CyberStrikeChatScroll.forceScrollToBottom === 'function'

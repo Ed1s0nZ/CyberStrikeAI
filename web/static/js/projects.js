@@ -891,6 +891,8 @@ function renderProjectsSidebar() {
         return;
     }
     el.innerHTML = list.map((p) => {
+        const fullName = p.name || tp('common.untitled');
+        const displayName = window.formatProjectNameForDisplay(fullName);
         const active = p.id === currentProjectId ? ' is-active' : '';
         const archived = p.status === 'archived' ? ' is-archived' : '';
         const badges = [
@@ -899,7 +901,7 @@ function renderProjectsSidebar() {
         ].join('');
         return `<div class="projects-list-item${active}${archived}" data-id="${escapeAttr(p.id)}" onclick="selectProject(${escapeJsStringAttr(p.id)})">
             <div class="projects-list-item-body">
-                <div class="projects-list-item-name">${escapeHtml(p.name)}${badges}</div>
+                <div class="projects-list-item-name" title="${escapeAttr(fullName)}">${escapeHtml(displayName)}${badges}</div>
                 <div class="projects-list-item-meta">${formatProjectTime(p.updated_at)}</div>
             </div>
             <button type="button" class="projects-list-item-menu" title="${escapeHtml(tp('projects.projectActions'))}" aria-label="${escapeHtml(tp('projects.projectActions'))}" onclick="showProjectListActionMenu(event, ${escapeJsStringAttr(p.id)})">⋯</button>
@@ -919,8 +921,7 @@ function renderProjectDetailTitle(name) {
     const titleEl = document.getElementById('projects-detail-title');
     if (!titleEl) return;
     const text = (name || '').trim() || tp('projects.defaultProjectName');
-    titleEl.textContent = text;
-    titleEl.title = text;
+    window.applyProjectNameDisplay(titleEl, text);
 }
 
 function renderProjectDetailDesc(desc) {
@@ -2588,6 +2589,9 @@ const projectPickerPanelState = {
 let chatProjectFolderSearchQuery = '';
 let chatProjectFolderRenderSeq = 0;
 let chatProjectFolderContextLoadSeq = 0;
+const CHAT_PROJECT_FOLDER_PAGE_SIZE = 6;
+let chatProjectFolderVisibleCount = CHAT_PROJECT_FOLDER_PAGE_SIZE;
+let chatProjectFolderLastQuery = '';
 const chatProjectFolderExpandedIds = new Set();
 let chatProjectFolderLastSelectionId = null;
 const CHAT_UNASSIGNED_PROJECT_FOLDER_ID = '__chat_unassigned_project__';
@@ -3223,8 +3227,7 @@ function appendChatProjectFolderItem(list, project, expandedIds, conversations) 
 
     const title = document.createElement('span');
     title.className = 'project-folder-title';
-    title.textContent = project.name || tp('common.untitled');
-    title.title = title.textContent;
+    window.applyProjectNameDisplay(title, project.name, tp('common.untitled'));
 
     const label = document.createElement('span');
     label.className = 'project-folder-label';
@@ -3520,6 +3523,31 @@ function resolveChatProjectFolderSelection() {
     return String(conversation.projectId || conversation.project_id || '').trim();
 }
 
+function appendChatProjectFoldersLoadMore(list, remainingCount) {
+    if (!list || remainingCount <= 0) return;
+    const button = document.createElement('button');
+    const label = pickerMessage(tp, 'common.loadMore', '加载更多');
+    button.type = 'button';
+    button.className = 'project-folders-load-more';
+    button.setAttribute('aria-label', tpFmt(
+        'chat.projectFoldersLoadMoreRemaining',
+        `${label}，剩余 ${remainingCount} 个项目`,
+        { count: remainingCount }
+    ));
+    button.innerHTML = `<span>${escapeHtml(label)}</span><span class="project-folders-load-more-count">${remainingCount}</span>`;
+    button.addEventListener('click', loadMoreChatProjectFolders);
+    list.appendChild(button);
+}
+
+function loadMoreChatProjectFolders() {
+    chatProjectFolderVisibleCount += CHAT_PROJECT_FOLDER_PAGE_SIZE;
+    if (isProjectsCacheReady() && chatProjectFolderContext.ready) {
+        renderChatProjectFolders(projectsCacheAll);
+    } else {
+        refreshChatProjectFolders();
+    }
+}
+
 function renderChatProjectFolders(projects) {
     const list = document.getElementById('project-folders-list');
     if (!list) return;
@@ -3543,6 +3571,23 @@ function renderChatProjectFolders(projects) {
     const folders = includeUnassigned
         ? [...pinnedProjects, unassignedProject, ...regularProjects]
         : filtered;
+    const queryKey = chatProjectFolderSearchQuery.toLocaleLowerCase();
+    if (queryKey !== chatProjectFolderLastQuery) {
+        chatProjectFolderLastQuery = queryKey;
+        chatProjectFolderVisibleCount = CHAT_PROJECT_FOLDER_PAGE_SIZE;
+    }
+    const selectedFolderId = selectedId === null
+        ? null
+        : (selectedId || CHAT_UNASSIGNED_PROJECT_FOLDER_ID);
+    if (selectedFolderId !== null) {
+        const selectedIndex = folders.findIndex((project) => (
+            project._isUnassigned ? CHAT_UNASSIGNED_PROJECT_FOLDER_ID : project.id
+        ) === selectedFolderId);
+        if (selectedIndex >= chatProjectFolderVisibleCount) {
+            chatProjectFolderVisibleCount = selectedIndex + 1;
+        }
+    }
+    const visibleFolders = folders.slice(0, chatProjectFolderVisibleCount);
     list.innerHTML = '';
     if (!folders.length) {
         const empty = document.createElement('div');
@@ -3553,7 +3598,7 @@ function renderChatProjectFolders(projects) {
         list.appendChild(empty);
         return;
     }
-    folders.forEach((project) => {
+    visibleFolders.forEach((project) => {
         const folderId = project._isUnassigned ? CHAT_UNASSIGNED_PROJECT_FOLDER_ID : project.id;
         const conversations = sortProjectFolderConversations(
             chatProjectFolderContext.conversations
@@ -3564,6 +3609,7 @@ function renderChatProjectFolders(projects) {
             conversations.forEach((conversation) => appendChatProjectConversationItem(list, conversation, project));
         }
     });
+    appendChatProjectFoldersLoadMore(list, folders.length - visibleFolders.length);
 }
 
 async function refreshChatProjectFolders() {
@@ -3708,16 +3754,19 @@ function appendChatProjectPanelItem(list, project, selectedId, onSelect, tFn) {
     const desc = isNone
         ? (project.description || '')
         : fullDesc.slice(0, 80);
+    const fullName = project.name || t('common.untitled');
+    const displayName = window.formatProjectNameForDisplay(fullName);
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'role-selection-item-main' + (isSelected ? ' selected' : '');
     btn.setAttribute('role', 'option');
+    btn.setAttribute('aria-label', fullName);
     btn.setAttribute('data-selection-detail', fullDesc);
     btn.onclick = () => onSelect(project.id || '');
     btn.innerHTML = `
         <div class="role-selection-item-icon-main">${isNone ? '—' : '📁'}</div>
         <div class="role-selection-item-content-main">
-            <div class="role-selection-item-name-main">${escapeHtml(project.name || t('common.untitled'))}</div>
+            <div class="role-selection-item-name-main" title="${escapeAttr(fullName)}">${escapeHtml(displayName)}</div>
             <div class="role-selection-item-description-main">${escapeHtml(desc)}</div>
         </div>
         ${isSelected ? '<div class="role-selection-checkmark-main">✓</div>' : ''}
@@ -3865,7 +3914,10 @@ function updateChatProjectButtonLabel() {
     const textEl = document.getElementById('chat-project-text');
     if (!textEl) return;
     const id = resolveChatProjectSelection();
-    textEl.textContent = id && projectNameById[id] ? projectNameById[id] : tp('projects.noProject');
+    window.applyProjectNameDisplay(
+        textEl,
+        id && projectNameById[id] ? projectNameById[id] : tp('projects.noProject')
+    );
     if (typeof window.refreshChatWelcomeEmptyState === 'function') {
         window.refreshChatWelcomeEmptyState();
     }
@@ -4081,6 +4133,7 @@ window.loadChatProjectPanelList = loadChatProjectPanelList;
 window.refreshChatProjectFolders = refreshChatProjectFolders;
 window.handleProjectFolderSearch = handleProjectFolderSearch;
 window.clearProjectFolderSearch = clearProjectFolderSearch;
+window.loadMoreChatProjectFolders = loadMoreChatProjectFolders;
 window.updateProjectFolderTaskStatuses = updateProjectFolderTaskStatuses;
 window.markCurrentProjectConversationViewed = markCurrentProjectConversationViewed;
 window.prefetchProjectsForChat = prefetchProjectsForChat;

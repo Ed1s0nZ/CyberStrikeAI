@@ -1,4 +1,15 @@
 let currentConversationId = null;
+
+/** Persist the visible chat in the URL so a reload can restore and reconnect it. */
+function syncChatConversationHash(conversationId) {
+    const normalizedConversationId = String(conversationId || '').trim();
+    if (!normalizedConversationId || window.location.hash.split('?')[0] !== '#chat') return;
+    const targetHash = '#chat?conversation=' + encodeURIComponent(normalizedConversationId);
+    if (window.location.hash !== targetHash) {
+        window.history.replaceState(null, '', targetHash);
+    }
+}
+window.syncChatConversationHash = syncChatConversationHash;
 let loadConversationRequestSeq = 0;
 let loadConversationAbortController = null;
 
@@ -3147,8 +3158,31 @@ function wrapTablesInBubble(bubble) {
     });
 }
 
+const PROJECT_NAME_DISPLAY_MAX_CHARACTERS = 12;
+
+/** 仅限制项目名的界面展示，不修改实际保存的名称。 */
+function formatProjectNameForDisplay(value) {
+    const fullName = String(value == null ? '' : value);
+    const characters = Array.from(fullName);
+    if (characters.length <= PROJECT_NAME_DISPLAY_MAX_CHARACTERS) return fullName;
+    return `${characters.slice(0, PROJECT_NAME_DISPLAY_MAX_CHARACTERS).join('')}…`;
+}
+
+function applyProjectNameDisplay(element, value, fallback = '') {
+    if (!element) return '';
+    const fullName = String(value || fallback || '');
+    element.textContent = formatProjectNameForDisplay(fullName);
+    element.dataset.fullName = fullName;
+    element.title = fullName;
+    return fullName;
+}
+
+window.formatProjectNameForDisplay = formatProjectNameForDisplay;
+window.applyProjectNameDisplay = applyProjectNameDisplay;
+
 function getChatWelcomeProjectName() {
-    const projectText = document.getElementById('chat-project-text')?.textContent?.trim();
+    const projectElement = document.getElementById('chat-project-text');
+    const projectText = (projectElement?.dataset?.fullName || projectElement?.textContent || '').trim();
     return projectText || (typeof window.t === 'function' ? window.t('projects.noProject') : '无项目');
 }
 
@@ -3184,7 +3218,7 @@ function updateChatWelcomeTitle(title) {
             : ' 项目中测试什么？';
         const projectName = document.createElement('span');
         projectName.className = 'chat-welcome-project-name';
-        projectName.textContent = project;
+        applyProjectNameDisplay(projectName, project);
         title.replaceChildren(document.createTextNode(prefix), projectName, document.createTextNode(suffix));
     }
 
@@ -3291,6 +3325,13 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
     }
     
     bubble.innerHTML = formattedContent;
+
+    // 刷新恢复运行中会话时，后端正文可能仍是持久化占位值“处理中...”。
+    // 保留消息节点供迭代详情和最终回复复用，但不要把占位值显示成助手正文。
+    if (role === 'assistant' && options && options.hideAssistantPlaceholder) {
+        messageDiv.classList.add('assistant-placeholder-content');
+        bubble.hidden = true;
+    }
     
     if (typeof window.csMarkdownSanitize !== 'undefined') {
         window.csMarkdownSanitize.stripSuspiciousImages(bubble);
@@ -5767,6 +5808,12 @@ async function prefetchLastAssistantProcessDetails() {
 }
 
 async function loadConversation(conversationId) {
+    // Keep the visible conversation addressable across a full page refresh.
+    // Sidebar/project entries call loadConversation directly (rather than the
+    // router helper), so without this synchronization #chat loses the active
+    // conversation and reload falls back to the welcome screen instead of
+    // reconnecting the running task event stream.
+    syncChatConversationHash(conversationId);
     const seq = ++loadConversationRequestSeq;
     const previousConversationId = currentConversationId;
     cancelPendingConversationLoad();
@@ -5937,7 +5984,16 @@ async function loadConversation(conversationId) {
                 // - assistant: 如果后端提供 updatedAt（任务完成时写回），优先用它，避免占位消息“任务开始时间”误导
                 const msgTime = (msg && msg.role === 'assistant' && msg.updatedAt) ? msg.updatedAt : (msg ? msg.createdAt : null);
                 const mcpIds = (msg.mcpExecutionIds && Array.isArray(msg.mcpExecutionIds)) ? msg.mcpExecutionIds : [];
-                const addOpts = (msg.role === 'assistant' && mcpIds.length > 0) ? { deferMcpButtons: true } : null;
+                const assistantContent = String(msg && msg.content != null ? msg.content : '').trim();
+                const isAssistantPlaceholder = msg.role === 'assistant' && (
+                    assistantContent === '处理中...' || assistantContent === 'Processing...'
+                );
+                const addOpts = (msg.role === 'assistant' && (mcpIds.length > 0 || isAssistantPlaceholder))
+                    ? {
+                        deferMcpButtons: mcpIds.length > 0,
+                        hideAssistantPlaceholder: isAssistantPlaceholder
+                    }
+                    : null;
                 const messageId = addMessage(msg.role, displayContent, mcpIds, null, msgTime, addOpts);
                 const messageEl = document.getElementById(messageId);
                 if (messageEl && msg && msg.id) {

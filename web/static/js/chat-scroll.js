@@ -15,6 +15,7 @@
     /** @type {'following' | 'detached'} */
     let scrollMode = 'following';
     let scrollFollowRaf = 0;
+    let scrollSettleGeneration = 0;
     /** 用户脱离跟随后，下方是否有未读的新输出（不按 SSE 次数计） */
     let hasPendingNewBelow = false;
     let listenersBound = false;
@@ -457,6 +458,33 @@
         scrollFollowRaf = requestAnimationFrame(scrollChatToBottomInstant);
     }
 
+    /**
+     * 长详情恢复/终态对账会跨多个 requestAnimationFrame 分批增高 DOM。
+     * 单次滚底可能早于最后一批节点；在仍处于 following 时连续若干帧校准，
+     * 用户一旦主动上滑进入 detached，后续帧立即停止，避免抢回阅读位置。
+     */
+    function settleChatToBottomIfFollowing(frameCount) {
+        const frames = Number.isFinite(Number(frameCount))
+            ? Math.max(1, Math.min(30, Math.floor(Number(frameCount))))
+            : 12;
+        const generation = ++scrollSettleGeneration;
+
+        function settleFrame(remaining) {
+            if (generation !== scrollSettleGeneration) return;
+            if (scrollMode !== 'following' || Date.now() < detachLockUntil) return;
+            scrollChatToBottomInstant();
+            if (remaining > 1) {
+                requestAnimationFrame(function () {
+                    settleFrame(remaining - 1);
+                });
+            }
+        }
+
+        requestAnimationFrame(function () {
+            settleFrame(frames);
+        });
+    }
+
     /** @param {boolean} wasPinned DOM 更新前是否应跟随（由 captureScrollPinState 传入） */
     function scrollChatMessagesToBottomIfPinned(wasPinned) {
         scheduleChatScrollToBottomIfFollowing(wasPinned);
@@ -701,6 +729,7 @@
         captureScrollPinState: captureScrollPinState,
         scheduleScroll: scheduleChatScrollToBottomIfFollowing,
         scrollIfPinned: scrollChatMessagesToBottomIfPinned,
+        settleToBottomIfFollowing: settleChatToBottomIfFollowing,
         forceScrollToBottom: forceScrollChatToBottom,
         applyMessageScroll: applyMessageScrollOption,
         scrollIntoViewIfFollowing: scrollElementIntoViewIfFollowing,

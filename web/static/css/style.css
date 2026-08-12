@@ -35712,7 +35712,7 @@ body.app-modal-open {
 }
 /* 对话区项目选择器（与角色/代理模式共用 role-selector-*） */
 .project-selector-wrapper .role-selector-text {
-    max-width: 108px;
+    max-width: 13em;
     min-width: 0;
     flex-shrink: 1;
     overflow: hidden;
@@ -36569,8 +36569,11 @@ html[data-theme="dark"] .message-copy-btn:active {
 }
 
 html[data-theme="dark"] .message.user .message-bubble {
-    background: #24272d;
-    color: var(--text-primary);
+    background: #1b2638;
+    color: #e8eef8;
+    border-color: rgba(96, 165, 250, 0.18);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.025) inset,
+        0 8px 24px rgba(2, 6, 23, 0.16);
 }
 
 html[data-theme="dark"] .message.system .message-bubble,
@@ -44314,6 +44317,44 @@ html[data-theme="dark"] #project-panel-assets .projects-panel-pagination.paginat
     min-width: 0;
 }
 
+.project-folders-load-more {
+    width: calc(100% - 12px);
+    min-height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    margin: 5px 6px 1px;
+    padding: 6px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #657080;
+    font: inherit;
+    font-size: 0.8125rem;
+    font-weight: 560;
+    cursor: pointer;
+    transition: background 0.14s ease, color 0.14s ease;
+}
+
+.project-folders-load-more:hover,
+.project-folders-load-more:focus-visible {
+    background: #f1f3f5;
+    color: #273142;
+    outline: none;
+}
+
+.project-folders-load-more-count {
+    min-width: 20px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: #e8ebef;
+    color: #697382;
+    font-size: 0.6875rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.35;
+}
+
 .project-folder-row {
     position: relative;
     min-width: 0;
@@ -44946,6 +44987,21 @@ html[data-theme="dark"] .project-task-status--approval.is-urgency-critical {
 .project-conversation-preview-status.is-approval,
 html[data-theme="dark"] .project-conversation-preview-status.is-approval {
     color: #22a06b;
+}
+
+html[data-theme="dark"] .project-folders-load-more {
+    color: #94a3b8;
+}
+
+html[data-theme="dark"] .project-folders-load-more:hover,
+html[data-theme="dark"] .project-folders-load-more:focus-visible {
+    background: rgba(148, 163, 184, 0.1);
+    color: #d7dee9;
+}
+
+html[data-theme="dark"] .project-folders-load-more-count {
+    background: rgba(148, 163, 184, 0.14);
+    color: #aeb9c9;
 }
 
 @keyframes project-task-status-spin {
