@@ -285,7 +285,7 @@ test('审批状态主动轮询并在服务不可用时立即关闭旧审批', ()
     assert.match(monitor, /renderActiveTasks\(\[\]\);[\s\S]{0,260}hitlPendingInterruptTracker\.update\(\[\]\)/);
     assert.match(projects, /function syncProjectConversationApprovalStatuses\(items\)/);
     assert.match(projects, /window\.syncProjectConversationApprovalStatuses/);
-    assert.match(template, /projects\.js\?v=20260812-3/);
+    assert.match(template, /projects\.js\?v=20260812-4/);
 });
 
 test('旧会话首次升级到五分钟默认审批时限，仍允许用户之后主动选择不限时', () => {

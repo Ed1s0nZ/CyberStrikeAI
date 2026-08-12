@@ -71,11 +71,16 @@ test('项目按展开状态切换 Codex 风格的打开和关闭文件夹', () =
     assert.match(folder, /icon\.innerHTML = projectFolderIconMarkup\(isExpanded\);/);
 });
 
-test('对话悬浮预览使用完整的中文分钟单位', () => {
+test('对话悬浮预览显示本地年月日时分', () => {
     const age = functionSource(projects, 'formatProjectConversationPreviewAge', 'getProjectConversationModeLabel');
 
-    assert.match(age, /`\$\{minutes\} 分钟`/);
-    assert.match(zh, /"conversationPreviewMinutes": "\{\{count\}\} 分钟"/);
-    assert.doesNotMatch(zh, /"conversationPreviewMinutes": "\{\{count\}\} 分"/);
-    assert.match(en, /"conversationPreviewMinutes": "\{\{count\}\} min"/);
+    assert.match(age, /date\.getFullYear\(\)/);
+    assert.match(age, /date\.getMonth\(\) \+ 1/);
+    assert.match(age, /date\.getDate\(\)/);
+    assert.match(age, /date\.getHours\(\)/);
+    assert.match(age, /date\.getMinutes\(\)/);
+    assert.match(age, /chat\.conversationPreviewDateTime/);
+    assert.doesNotMatch(age, /elapsedMs|conversationPreviewDays|conversationPreviewHours/);
+    assert.match(zh, /"conversationPreviewDateTime": "\{\{year\}\}年\{\{month\}\}月\{\{day\}\}日 \{\{hour\}\}:\{\{minute\}\}"/);
+    assert.match(en, /"conversationPreviewDateTime": "\{\{year\}\}-\{\{month\}\}-\{\{day\}\} \{\{hour\}\}:\{\{minute\}\}"/);
 });

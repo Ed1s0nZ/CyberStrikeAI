@@ -3049,20 +3049,20 @@ function scheduleHideProjectFolderPreview() {
 function formatProjectConversationPreviewAge(value) {
     const timestamp = Date.parse(value || '');
     if (!Number.isFinite(timestamp)) return '';
-    const elapsedMs = Math.max(0, Date.now() - timestamp);
-    const minutes = Math.floor(elapsedMs / 60000);
-    if (minutes < 1) return pickerMessage(tp, 'chat.conversationPreviewJustNow', '刚刚');
-    if (minutes < 60) {
-        return tpFmt('chat.conversationPreviewMinutes', `${minutes} 分钟`, { count: minutes });
-    }
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return tpFmt('chat.conversationPreviewHours', `${hours} 小时`, { count: hours });
-    const days = Math.floor(hours / 24);
-    if (days < 7) return tpFmt('chat.conversationPreviewDays', `${days} 天`, { count: days });
-    return new Intl.DateTimeFormat(document.documentElement.lang || undefined, {
-        month: 'numeric',
-        day: 'numeric',
-    }).format(new Date(timestamp));
+    const date = new Date(timestamp);
+    const pad = (part) => String(part).padStart(2, '0');
+    const parts = {
+        year: String(date.getFullYear()),
+        month: pad(date.getMonth() + 1),
+        day: pad(date.getDate()),
+        hour: pad(date.getHours()),
+        minute: pad(date.getMinutes()),
+    };
+    return tpFmt(
+        'chat.conversationPreviewDateTime',
+        `${parts.year}年${parts.month}月${parts.day}日 ${parts.hour}:${parts.minute}`,
+        parts
+    );
 }
 
 function getProjectConversationModeLabel(conversation) {

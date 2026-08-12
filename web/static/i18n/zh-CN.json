@@ -542,6 +542,7 @@
     "conversationPreviewMinutes": "{{count}} 分钟",
     "conversationPreviewHours": "{{count}} 小时",
     "conversationPreviewDays": "{{count}} 天",
+    "conversationPreviewDateTime": "{{year}}年{{month}}月{{day}}日 {{hour}}:{{minute}}",
     "conversationPreviewNoProject": "未绑定项目",
     "conversationPreviewDefaultMode": "默认",
     "conversationPreviewUnread": "有未读更新",
