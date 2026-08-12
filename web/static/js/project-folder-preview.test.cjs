@@ -7,6 +7,8 @@ const styles = fs.readFileSync('web/static/css/style.css', 'utf8');
 const chat = fs.readFileSync('web/static/js/chat.js', 'utf8');
 const html = fs.readFileSync('web/templates/index.html', 'utf8');
 const rbac = fs.readFileSync('web/static/js/rbac-guards.js', 'utf8');
+const zh = fs.readFileSync('web/static/i18n/zh-CN.json', 'utf8');
+const en = fs.readFileSync('web/static/i18n/en-US.json', 'utf8');
 
 function functionSource(source, name, nextName) {
     const start = source.indexOf(`function ${name}(`);
@@ -56,4 +58,24 @@ test('对话项目归属尚未加载时不会误展开无项目', () => {
     assert.match(resolver, /conversation\.projectId \|\| conversation\.project_id \|\| ''/);
     assert.match(render, /const selectedId = resolveChatProjectFolderSelection\(\)/);
     assert.match(render, /selectedId !== null && chatProjectFolderLastSelectionId !== selectedId/);
+});
+
+test('项目按展开状态切换 Codex 风格的打开和关闭文件夹', () => {
+    const icon = functionSource(projects, 'projectFolderIconMarkup', 'clampProjectPreviewText');
+    const folder = functionSource(projects, 'appendChatProjectFolderItem', 'appendChatProjectConversationItem');
+
+    assert.match(icon, /const path = isExpanded/);
+    assert.match(icon, /M3\.5 18V6\.5/);
+    assert.match(icon, /M3\.5 7a2 2 0 0 1 2-2h4l2 2/);
+    assert.match(folder, /icon\.className = 'project-folder-icon';/);
+    assert.match(folder, /icon\.innerHTML = projectFolderIconMarkup\(isExpanded\);/);
+});
+
+test('对话悬浮预览使用完整的中文分钟单位', () => {
+    const age = functionSource(projects, 'formatProjectConversationPreviewAge', 'getProjectConversationModeLabel');
+
+    assert.match(age, /`\$\{minutes\} 分钟`/);
+    assert.match(zh, /"conversationPreviewMinutes": "\{\{count\}\} 分钟"/);
+    assert.doesNotMatch(zh, /"conversationPreviewMinutes": "\{\{count\}\} 分"/);
+    assert.match(en, /"conversationPreviewMinutes": "\{\{count\}\} min"/);
 });

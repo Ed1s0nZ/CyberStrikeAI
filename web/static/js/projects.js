@@ -2863,10 +2863,11 @@ function projectFolderDisclosureMarkup(isExpanded) {
 }
 
 function projectFolderIconMarkup(isExpanded) {
-    if (isExpanded) {
-        return '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3.5 9V7a2 2 0 0 1 2-2h4l2 2H18a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.25 10h15.4a1.5 1.5 0 0 1 1.46 1.84l-1.27 5.5A2.15 2.15 0 0 1 17.75 19H5.6a2.15 2.15 0 0 1-2.1-2.62l1.2-5.25A1.5 1.5 0 0 1 6.16 10" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    }
-    return '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3.5 7a2 2 0 0 1 2-2h4l2 2H18.5a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V7Z" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    // Codex 风格：折叠时为闭合文件夹，展开时露出向前翻开的文件夹盖。
+    const path = isExpanded
+        ? 'M3.5 18V6.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v1.25M3.5 18l1.75-6.25A2 2 0 0 1 7.18 10.3H20.5l-2 7.7H3.5Z'
+        : 'M3.5 7a2 2 0 0 1 2-2h4l2 2H18.5a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V7Zm0 2.5h17';
+    return `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="${path}" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
 
 function clampProjectPreviewText(value, maxLength = 220) {
@@ -3052,7 +3053,7 @@ function formatProjectConversationPreviewAge(value) {
     const minutes = Math.floor(elapsedMs / 60000);
     if (minutes < 1) return pickerMessage(tp, 'chat.conversationPreviewJustNow', '刚刚');
     if (minutes < 60) {
-        return tpFmt('chat.conversationPreviewMinutes', `${minutes} 分`, { count: minutes });
+        return tpFmt('chat.conversationPreviewMinutes', `${minutes} 分钟`, { count: minutes });
     }
     const hours = Math.floor(minutes / 60);
     if (hours < 24) return tpFmt('chat.conversationPreviewHours', `${hours} 小时`, { count: hours });
@@ -3216,7 +3217,7 @@ function appendChatProjectFolderItem(list, project, expandedIds, conversations) 
     disclosure.innerHTML = projectFolderDisclosureMarkup(isExpanded);
 
     const icon = document.createElement('span');
-    icon.className = 'project-folder-icon' + (isExpanded ? ' is-open' : '');
+    icon.className = 'project-folder-icon';
     icon.setAttribute('aria-hidden', 'true');
     icon.innerHTML = projectFolderIconMarkup(isExpanded);
 
@@ -3865,6 +3866,9 @@ function updateChatProjectButtonLabel() {
     if (!textEl) return;
     const id = resolveChatProjectSelection();
     textEl.textContent = id && projectNameById[id] ? projectNameById[id] : tp('projects.noProject');
+    if (typeof window.refreshChatWelcomeEmptyState === 'function') {
+        window.refreshChatWelcomeEmptyState();
+    }
 }
 
 async function renderChatProjectPanel() {

@@ -3111,8 +3111,7 @@ function initializeChatUI() {
 
     const messagesDiv = document.getElementById('chat-messages');
     if (messagesDiv && messagesDiv.childElementCount === 0) {
-        const readyMsg = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。';
-        addMessage('assistant', readyMsg, null, null, null, { systemReadyMessage: true });
+        renderChatWelcomeEmptyState();
     }
 
     addAttackChainButton(currentConversationId);
@@ -3148,12 +3147,73 @@ function wrapTablesInBubble(bubble) {
     });
 }
 
-/**
- * 将「系统已就绪」类文案按当前语言重新渲染进气泡（与 addMessage 助手分支一致的安全处理）
- */
+function getChatWelcomeProjectName() {
+    const projectText = document.getElementById('chat-project-text')?.textContent?.trim();
+    return projectText || (typeof window.t === 'function' ? window.t('projects.noProject') : '无项目');
+}
+
+function getChatWelcomeText() {
+    const project = getChatWelcomeProjectName();
+    const noProject = typeof window.t === 'function' ? window.t('projects.noProject') : '无项目';
+    if (!project || project === noProject) {
+        return typeof window.t === 'function'
+            ? window.t('chat.noProjectWelcomeMessage')
+            : '当前无项目，请输入您的测试需求，系统将自动执行相应的安全测试。';
+    }
+    return typeof window.t === 'function'
+        ? window.t('chat.projectWelcomeMessage', { project })
+        : `当前${project}项目，请输入您的测试需求，系统将自动执行相应的安全测试。`;
+}
+
+function updateChatWelcomeTitle(title) {
+    if (!title) return;
+    const project = getChatWelcomeProjectName();
+    const noProject = typeof window.t === 'function' ? window.t('projects.noProject') : '无项目';
+    const subtitle = title.parentElement?.querySelector('.chat-welcome-empty-state-subtitle');
+
+    if (project === noProject) {
+        title.textContent = typeof window.t === 'function'
+            ? window.t('chat.noProjectWelcomeTitle')
+            : '要测试什么？';
+    } else {
+        const prefix = typeof window.t === 'function'
+            ? window.t('chat.projectWelcomeTitlePrefix')
+            : '要在 ';
+        const suffix = typeof window.t === 'function'
+            ? window.t('chat.projectWelcomeTitleSuffix')
+            : ' 项目中测试什么？';
+        const projectName = document.createElement('span');
+        projectName.className = 'chat-welcome-project-name';
+        projectName.textContent = project;
+        title.replaceChildren(document.createTextNode(prefix), projectName, document.createTextNode(suffix));
+    }
+
+    if (subtitle) {
+        subtitle.textContent = typeof window.t === 'function'
+            ? window.t('chat.welcomeSubtitle')
+            : '请输入您的测试需求，系统将自动执行相应的安全测试。';
+    }
+}
+
+function renderChatWelcomeEmptyState() {
+    const messagesDiv = document.getElementById('chat-messages');
+    if (!messagesDiv) return null;
+    messagesDiv.querySelectorAll('.chat-welcome-empty-state').forEach((node) => node.remove());
+    const state = document.createElement('div');
+    state.className = 'chat-welcome-empty-state';
+    state.setAttribute('role', 'status');
+    state.setAttribute('aria-live', 'polite');
+    state.innerHTML = '<p class="chat-welcome-empty-state-title"></p><p class="chat-welcome-empty-state-subtitle"></p>';
+    updateChatWelcomeTitle(state.querySelector('.chat-welcome-empty-state-title'));
+    messagesDiv.appendChild(state);
+    return state;
+}
+
+/** 更新新对话欢迎空状态，并兼容刷新旧版本遗留的系统就绪消息。 */
 function refreshSystemReadyMessageBubbles() {
-    if (typeof window.t !== 'function') return;
-    const text = window.t('chat.systemReadyMessage');
+    const text = getChatWelcomeText();
+    const welcome = document.querySelector('.chat-welcome-empty-state-title');
+    if (welcome) updateChatWelcomeTitle(welcome);
     const escapeHtmlLocal = (s) => {
         if (!s) return '';
         const div = document.createElement('div');
@@ -3175,29 +3235,7 @@ function refreshSystemReadyMessageBubbles() {
         bubble.innerHTML = formattedContent;
         if (typeof wrapTablesInBubble === 'function') wrapTablesInBubble(bubble);
         messageDiv.dataset.originalContent = text;
-        const copyBtnNew = document.createElement('button');
-        copyBtnNew.className = 'message-copy-btn';
-        copyBtnNew.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg><span>' + window.t('common.copy') + '</span>';
-        copyBtnNew.title = window.t('chat.copyMessageTitle');
-        copyBtnNew.onclick = function (e) {
-            e.stopPropagation();
-            copyMessageToClipboard(messageDiv, this);
-        };
-        bubble.appendChild(copyBtnNew);
     });
-}
-
-function createMessageAvatar(role) {
-    const avatar = document.createElement('div');
-    avatar.className = 'message-avatar';
-    if (role === 'user') {
-        avatar.innerHTML = '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    } else if (role === 'assistant') {
-        avatar.innerHTML = '<img src="/static/logo.png" alt="" class="message-avatar-img">';
-    } else {
-        avatar.textContent = 'S';
-    }
-    return avatar;
 }
 
 // 添加消息（options.systemReadyMessage 为 true 时，语言切换会刷新该条文案）
@@ -3209,9 +3247,8 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
     messageDiv.id = id;
     messageDiv.className = 'message ' + role;
     
-    // 创建头像
-    messageDiv.appendChild(createMessageAvatar(role));
-    
+    messagesDiv.querySelector('.chat-welcome-empty-state')?.remove();
+
     // 创建消息内容容器
     const contentWrapper = document.createElement('div');
     contentWrapper.className = 'message-content';
@@ -4500,6 +4537,27 @@ function assistantTurnTimestamp(value) {
     return Number.isFinite(n) ? n : NaN;
 }
 
+let assistantTurnElapsedTimer = null;
+
+function syncRunningAssistantTurnSummaries() {
+    const runningTurns = document.querySelectorAll('#chat-messages .message.assistant[data-turn-status="running"]');
+    runningTurns.forEach((messageElement) => syncAssistantTurnSummary(messageElement));
+    if (runningTurns.length === 0 && assistantTurnElapsedTimer) {
+        clearInterval(assistantTurnElapsedTimer);
+        assistantTurnElapsedTimer = null;
+    }
+}
+
+function syncAssistantTurnElapsedClock() {
+    const hasRunningTurn = !!document.querySelector('#chat-messages .message.assistant[data-turn-status="running"]');
+    if (hasRunningTurn && !assistantTurnElapsedTimer) {
+        assistantTurnElapsedTimer = setInterval(syncRunningAssistantTurnSummaries, 1000);
+    } else if (!hasRunningTurn && assistantTurnElapsedTimer) {
+        clearInterval(assistantTurnElapsedTimer);
+        assistantTurnElapsedTimer = null;
+    }
+}
+
 function setAssistantTurnTiming(messageElementOrId, timing) {
     const messageElement = typeof messageElementOrId === 'string'
         ? document.getElementById(messageElementOrId)
@@ -4509,17 +4567,26 @@ function setAssistantTurnTiming(messageElementOrId, timing) {
     if (value.startedAt) messageElement.dataset.turnStartedAt = String(value.startedAt);
     if (value.completedAt) messageElement.dataset.turnCompletedAt = String(value.completedAt);
     if (value.status) messageElement.dataset.turnStatus = String(value.status);
-    const explicitDuration = Number(value.durationMs);
-    if (Number.isFinite(explicitDuration) && explicitDuration >= 0) {
-        messageElement.dataset.turnDurationMs = String(Math.round(explicitDuration));
+    const status = String(messageElement.dataset.turnStatus || 'completed');
+    if (status === 'running') {
+        // 摘要接口对运行中任务返回 durationMs=0。刷新页面时不能把这个快照
+        // 当作固定耗时保存，否则后续渲染会一直显示“已处理 0 秒”。
+        delete messageElement.dataset.turnDurationMs;
+        delete messageElement.dataset.turnCompletedAt;
     } else {
+        const explicitDuration = Number(value.durationMs);
+        if (Number.isFinite(explicitDuration) && explicitDuration >= 0) {
+            messageElement.dataset.turnDurationMs = String(Math.round(explicitDuration));
+        }
         const startedAt = assistantTurnTimestamp(messageElement.dataset.turnStartedAt);
         const completedAt = assistantTurnTimestamp(messageElement.dataset.turnCompletedAt);
-        if (Number.isFinite(startedAt) && Number.isFinite(completedAt) && completedAt >= startedAt) {
+        if ((!Number.isFinite(explicitDuration) || explicitDuration < 0) &&
+            Number.isFinite(startedAt) && Number.isFinite(completedAt) && completedAt >= startedAt) {
             messageElement.dataset.turnDurationMs = String(completedAt - startedAt);
         }
     }
     syncAssistantTurnSummary(messageElement);
+    syncAssistantTurnElapsedClock();
 }
 
 function syncAssistantTurnSummary(messageElementOrId) {
@@ -5253,9 +5320,14 @@ function copyDetailBlock(elementId, triggerBtn = null) {
 
 // 开始新对话
 async function startNewConversation(options = {}) {
-    const requestedProjectId = options && typeof options.projectId === 'string'
-        ? options.projectId.trim()
-        : '';
+    const hasExplicitProjectId = !!options
+        && Object.prototype.hasOwnProperty.call(options, 'projectId');
+    const inheritedProjectId = typeof resolveChatProjectSelection === 'function'
+        ? resolveChatProjectSelection()
+        : (window._loadedConversationProjectId || '');
+    const requestedProjectId = hasExplicitProjectId
+        ? String(options.projectId || '').trim()
+        : String(inheritedProjectId || '').trim();
     cancelPendingConversationLoad();
     detachLiveChatStreamForNavigation('', true);
     if (typeof window.cancelRunningTaskEventStream === 'function') {
@@ -5282,15 +5354,14 @@ async function startNewConversation(options = {}) {
     } catch (e) { /* ignore */ }
     updateChatPrimaryActionState();
     currentConversationGroupId = null; // 新对话不属于任何分组
-    // 顶部“新任务”默认不绑定项目；只有从项目文件夹内新建时才显式传入 projectId。
+    // 顶部“新任务”继承当前文件夹；文件夹内的“+”仍可显式指定（包括无项目）。
     if (typeof setActiveProjectId === 'function') setActiveProjectId(requestedProjectId);
     if (typeof refreshChatProjectSelector === 'function') {
         await refreshChatProjectSelector();
     }
     document.getElementById('chat-messages').innerHTML = '';
     updateChatPrimaryActionState();
-    const readyMsgNew = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。';
-    addMessage('assistant', readyMsgNew, null, null, null, { systemReadyMessage: true });
+    renderChatWelcomeEmptyState();
     addAttackChainButton(null);
     updateActiveConversation();
     // 刷新分组列表，清除分组高亮
@@ -5957,8 +6028,7 @@ async function loadConversation(conversationId) {
                 await window.restoreHitlInlineForConversation(conversationId);
             }
         } else {
-            const readyMsgEmpty = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。';
-            addMessage('assistant', readyMsgEmpty, null, null, null, { systemReadyMessage: true, scroll: 'force' });
+            renderChatWelcomeEmptyState();
             if (window.CyberStrikeChatScroll) {
                 window.CyberStrikeChatScroll.forceScrollToBottom(false);
             } else {
@@ -6098,8 +6168,7 @@ async function deleteConversation(conversationId, skipConfirm = false) {
                 window.currentConversationId = '';
             } catch (e) { /* ignore */ }
             document.getElementById('chat-messages').innerHTML = '';
-            const readyMsgLoad = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。';
-            addMessage('assistant', readyMsgLoad, null, null, null, { systemReadyMessage: true });
+            renderChatWelcomeEmptyState();
             addAttackChainButton(null);
         }
         
@@ -12461,8 +12530,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             } catch (e) { /* ignore */ }
             const messagesDiv = document.getElementById('chat-messages');
             if (messagesDiv) messagesDiv.innerHTML = '';
-            const readyMsg = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。';
-            addMessage('assistant', readyMsg, null, null, null, { systemReadyMessage: true });
+            renderChatWelcomeEmptyState();
             addAttackChainButton(null);
         }
         if (typeof loadConversationsWithGroups === 'function') {
@@ -12482,6 +12550,7 @@ async function refreshAllProjectFilterSelects() {
 if (typeof window !== 'undefined') {
     window.loadConversation = loadConversation;
     window.startNewConversation = startNewConversation;
+    window.refreshChatWelcomeEmptyState = refreshSystemReadyMessageBubbles;
     window.openConversationContextMenuForId = openConversationContextMenuForId;
     window.renameConversation = renameConversation;
     window.closeConversationRenameModal = closeConversationRenameModal;

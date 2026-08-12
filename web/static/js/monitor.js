@@ -1446,10 +1446,8 @@ function addProgressMessage() {
     messageDiv.id = id;
     messageDiv.className = 'message assistant progress-message';
 
-    if (typeof createMessageAvatar === 'function') {
-        messageDiv.appendChild(createMessageAvatar('assistant'));
-    }
-    
+    messagesDiv.querySelector('.chat-welcome-empty-state')?.remove();
+
     const contentWrapper = document.createElement('div');
     contentWrapper.className = 'message-content';
     
@@ -4870,6 +4868,16 @@ async function attachRunningTaskEventStream(conversationId) {
                 window.CyberStrikeChatScroll.onTaskEventStreamBegin(conversationId, asEl.id, progressId);
             }
 
+            // 刷新后的初始消息渲染已经滚到底部，但恢复最新一页详情会再次增高 DOM。
+            // 若用户期间没有主动上滑，完成补页后重新精确粘底；主动浏览历史时不抢滚动。
+            if (
+                window.CyberStrikeChatScroll &&
+                typeof window.CyberStrikeChatScroll.forceScrollToBottom === 'function' &&
+                (typeof window.captureScrollPinState !== 'function' || window.captureScrollPinState())
+            ) {
+                window.CyberStrikeChatScroll.forceScrollToBottom(false);
+            }
+
             const url = '/api/agent-loop/task-events?conversationId=' + encodeURIComponent(conversationId);
             const response = await apiFetch(url, {
                 method: 'GET',
@@ -4938,6 +4946,9 @@ async function attachRunningTaskEventStream(conversationId) {
             if (replaySawDone && typeof window.loadConversation === 'function' && window.currentConversationId === conversationId) {
                 const replayTimeline = document.getElementById('process-details-' + asEl.id + '-timeline');
                 const keepExpanded = !!(replayTimeline && replayTimeline.classList.contains('expanded'));
+                const keepFollowingFinalRender = typeof window.captureScrollPinState === 'function'
+                    ? window.captureScrollPinState()
+                    : true;
                 await window.loadConversation(conversationId);
                 // loadConversation 使用轻量消息接口，会把详情重新置为懒加载状态；
                 // 任务终态再从 DB 全量对账一次，补回订阅建立期间可能错过的事件。
@@ -4947,6 +4958,14 @@ async function attachRunningTaskEventStream(conversationId) {
                     if (finalAssistant && finalAssistant.id) {
                         expandProcessDetailsTimeline(finalAssistant.id);
                     }
+                }
+                // 最终消息和详情重绘都会增高 DOM；仅当用户之前仍在跟随时重新粘底。
+                if (
+                    keepFollowingFinalRender &&
+                    window.CyberStrikeChatScroll &&
+                    typeof window.CyberStrikeChatScroll.forceScrollToBottom === 'function'
+                ) {
+                    window.CyberStrikeChatScroll.forceScrollToBottom(false);
                 }
             }
             return true;
