@@ -9,6 +9,7 @@ import (
 	einoopenai "github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/adk/prebuilt/planexecute"
+	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 	"go.uber.org/zap"
 
@@ -261,7 +262,9 @@ func syncCairnFactToProject(db *database.DB, projectID, conversationID, step, re
 
 // CairnRootArgs 构建 Cairn 模式根 Agent 所需参数。
 type CairnRootArgs struct {
-	MainToolCallingModel *einoopenai.ChatModel
+	// MainToolCallingModel 使用 ToolCallingChatModel 接口而非具体类型：
+	// 上游对 mainModel 包装过 stream-tool-call-index-repair 后是接口类型，具体类型会编译失败。
+	MainToolCallingModel model.ToolCallingChatModel
 	ExecModel            *einoopenai.ChatModel
 	OrchInstruction      string // Reason 提示词（orchestrator-cairn.md）
 	ExecInstruction      string // Explore 提示词（executor-cairn.md）
