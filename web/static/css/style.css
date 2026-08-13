@@ -207,11 +207,14 @@ html[data-theme="dark"] .main-sidebar {
     padding: 16px 0;
     background: transparent;
     padding-top: 56px;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    transition: scrollbar-color 0.2s ease;
 }
 
-/* 侧边栏滚动条样式 */
+/* 侧边栏滚动条：默认隐藏，悬停时显示 */
 .main-sidebar-nav::-webkit-scrollbar {
-    width: 6px;
+    width: 4px;
 }
 
 .main-sidebar-nav::-webkit-scrollbar-track {
@@ -219,12 +222,33 @@ html[data-theme="dark"] .main-sidebar {
 }
 
 .main-sidebar-nav::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 3px;
+    background: transparent;
+    border-radius: 999px;
+    transition: background 0.2s ease;
 }
 
-.main-sidebar-nav::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.3);
+.main-sidebar-nav:hover {
+    scrollbar-color: rgba(0, 0, 0, 0.22) transparent;
+}
+
+.main-sidebar-nav:hover::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.22);
+}
+
+.main-sidebar-nav:hover::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.35);
+}
+
+html[data-theme="dark"] .main-sidebar-nav:hover {
+    scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+}
+
+html[data-theme="dark"] .main-sidebar-nav:hover::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+html[data-theme="dark"] .main-sidebar-nav:hover::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.42);
 }
 
 .nav-section-label {
@@ -1735,6 +1759,48 @@ html[data-theme="dark"] .new-chat-btn:focus-visible {
     overflow-x: hidden;
     padding: 16px;
     min-height: 0;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    transition: scrollbar-color 0.2s ease;
+}
+
+/* 对话列表滚动条：默认隐藏，悬停时显示 */
+.sidebar-content::-webkit-scrollbar {
+    width: 4px;
+}
+
+.sidebar-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 999px;
+    transition: background 0.2s ease;
+}
+
+.sidebar-content:hover {
+    scrollbar-color: rgba(0, 0, 0, 0.22) transparent;
+}
+
+.sidebar-content:hover::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.22);
+}
+
+.sidebar-content:hover::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.35);
+}
+
+html[data-theme="dark"] .sidebar-content:hover {
+    scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+}
+
+html[data-theme="dark"] .sidebar-content:hover::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+html[data-theme="dark"] .sidebar-content:hover::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.42);
 }
 
 .hitl-sidebar-card {
@@ -3451,6 +3517,34 @@ html[data-theme="dark"] .new-chat-btn:focus-visible {
     display: flex;
     flex-direction: column;
     min-height: 0;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+}
+
+.chat-messages:hover {
+    scrollbar-color: color-mix(in srgb, var(--text-muted) 55%, transparent) transparent;
+}
+
+.chat-messages::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 999px;
+}
+
+.chat-messages:hover::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--text-muted) 55%, transparent);
+}
+
+.chat-messages:hover::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--text-muted) 80%, transparent);
 }
 
 .chat-welcome-empty-state {
@@ -7189,24 +7283,41 @@ html[data-theme="dark"] .login-card .login-submit:disabled {
     color: var(--accent-hover);
 }
 
-/* 滚动条样式 */
+/* 全局滚动条：细条，默认隐藏，悬停显示 */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+}
+
+*:hover {
+    scrollbar-color: color-mix(in srgb, var(--text-muted, #94a3b8) 55%, transparent) transparent;
+}
+
 ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 4px;
+    height: 4px;
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--bg-secondary);
-    border-radius: 4px;
+    background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--text-muted);
-    border-radius: 4px;
+    background: transparent;
+    border-radius: 999px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-    background: var(--text-secondary);
+/* 未悬停时强制隐藏，覆盖各模块常显滑块 */
+:not(:hover)::-webkit-scrollbar-thumb {
+    background: transparent !important;
+}
+
+*:hover::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--text-muted, #94a3b8) 55%, transparent);
+}
+
+*:hover::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--text-muted, #94a3b8) 80%, transparent);
 }
 
 /* 响应式设计 */
@@ -36623,16 +36734,20 @@ html[data-theme="dark"] .btn-secondary:hover {
     border-color: var(--accent-color);
 }
 
-html[data-theme="dark"] ::-webkit-scrollbar-track {
-    background: #0b1120;
+html[data-theme="dark"] *:hover {
+    scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
 }
 
-html[data-theme="dark"] ::-webkit-scrollbar-thumb {
-    background: #334155;
+html[data-theme="dark"] :not(:hover)::-webkit-scrollbar-thumb {
+    background: transparent !important;
 }
 
-html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-    background: #475569;
+html[data-theme="dark"] *:hover::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+html[data-theme="dark"] *:hover::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.42);
 }
 
 /* Dashboard has a late, highly specific light theme block. Keep its dark
@@ -44277,17 +44392,17 @@ html[data-theme="dark"] #project-panel-assets .projects-panel-pagination.paginat
    and recent conversations remain secondary navigation below it.
    -------------------------------------------------------------------------- */
 .conversation-sidebar {
-    width: 320px;
+    width: 280px;
     background: #ffffff;
 }
 
 .conversation-sidebar-header {
-    padding: 14px;
+    padding: 12px;
     background: #ffffff;
 }
 
 .conversation-sidebar .sidebar-content {
-    padding: 14px 14px 18px;
+    padding: 12px 12px 16px;
 }
 
 .conversation-sidebar .conversation-search-box {

@@ -2001,7 +2001,7 @@ html[data-theme="dark"] .c2-file-upload-hint {
     overflow-y: auto;
     overflow-x: hidden;
     scrollbar-width: thin;
-    scrollbar-color: color-mix(in srgb, var(--c2-text-dim) 70%, transparent) transparent;
+    scrollbar-color: transparent transparent;
 }
 
 .c2-tasks-table tr {
@@ -2010,24 +2010,29 @@ html[data-theme="dark"] .c2-file-upload-hint {
     table-layout: fixed;
 }
 
+.c2-tasks-table tbody:hover {
+    scrollbar-color: color-mix(in srgb, var(--c2-text-dim) 70%, transparent) transparent;
+}
+
 .c2-tasks-table tbody::-webkit-scrollbar {
-    width: 8px;
+    width: 4px;
 }
 
 .c2-tasks-table tbody::-webkit-scrollbar-track {
-    background: var(--c2-surface);
+    background: transparent;
 }
 
 .c2-tasks-table tbody::-webkit-scrollbar-thumb {
-    border: 2px solid transparent;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--c2-text-dim) 70%, transparent);
-    background-clip: content-box;
+    background: transparent;
 }
 
-.c2-tasks-table tbody::-webkit-scrollbar-thumb:hover {
+.c2-tasks-table tbody:hover::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--c2-text-dim) 70%, transparent);
+}
+
+.c2-tasks-table tbody:hover::-webkit-scrollbar-thumb:hover {
     background: color-mix(in srgb, var(--c2-text-muted) 78%, transparent);
-    background-clip: content-box;
 }
 
 .c2-tasks-table thead th {
@@ -2861,6 +2866,10 @@ html[data-theme="dark"] .c2-file-upload-hint {
     overflow-y: auto;
     overflow-x: hidden;
     scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+}
+
+.c2-events-table tbody:hover {
     scrollbar-color: color-mix(in srgb, var(--c2-text-dim) 70%, transparent) transparent;
 }
 
@@ -2871,23 +2880,24 @@ html[data-theme="dark"] .c2-file-upload-hint {
 }
 
 .c2-events-table tbody::-webkit-scrollbar {
-    width: 8px;
+    width: 4px;
 }
 
 .c2-events-table tbody::-webkit-scrollbar-track {
-    background: var(--c2-surface);
+    background: transparent;
 }
 
 .c2-events-table tbody::-webkit-scrollbar-thumb {
-    border: 2px solid transparent;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--c2-text-dim) 70%, transparent);
-    background-clip: content-box;
+    background: transparent;
 }
 
-.c2-events-table tbody::-webkit-scrollbar-thumb:hover {
+.c2-events-table tbody:hover::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--c2-text-dim) 70%, transparent);
+}
+
+.c2-events-table tbody:hover::-webkit-scrollbar-thumb:hover {
     background: color-mix(in srgb, var(--c2-text-muted) 78%, transparent);
-    background-clip: content-box;
 }
 
 .c2-events-table thead th {
