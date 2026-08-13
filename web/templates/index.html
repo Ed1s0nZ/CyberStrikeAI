@@ -1247,6 +1247,14 @@
                                                     </div>
                                                     <div class="role-selection-checkmark-main agent-mode-check" data-agent-mode-check="supervisor">✓</div>
                                                 </button>
+                                                <button type="button" class="role-selection-item-main agent-mode-option" data-value="cairn" role="option" onclick="selectAgentMode('cairn')" data-agent-mode-detail="黑板架构：Reason 维护 Fact-Intent-Hint 图，Explore 并行执行意图，状态不丢" data-i18n="chat.agentModeCairnHint" data-i18n-attr="data-agent-mode-detail" data-i18n-skip-text="true">
+                                                    <div class="role-selection-item-icon-main" aria-hidden="true">🗂️</div>
+                                                    <div class="role-selection-item-content-main">
+                                                        <div class="role-selection-item-name-main" data-i18n="chat.agentModeCairnLabel">Cairn（黑板架构）</div>
+                                                        <div class="role-selection-item-description-main" data-i18n="chat.agentModeCairnHint">黑板架构：Reason 维护 Fact-Intent-Hint 图，Explore 并行执行意图，状态不丢</div>
+                                                    </div>
+                                                    <div class="role-selection-checkmark-main agent-mode-check" data-agent-mode-check="cairn">✓</div>
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -3738,6 +3746,7 @@
                                                 <option value="deep" data-i18n="chat.agentModeDeep">Deep（DeepAgent）</option>
                                                 <option value="plan_execute" data-i18n="chat.agentModePlanExecuteLabel">Plan-Execute</option>
                                                 <option value="supervisor" data-i18n="chat.agentModeSupervisorLabel">Supervisor</option>
+                                                <option value="cairn" data-i18n="chat.agentModeCairnLabel">Cairn（黑板架构）</option>
                                             </select>
                                             <small class="form-hint" data-i18n="settingsBasic.multiAgentRobotModeHint">企业微信 / 钉钉 / 飞书机器人每条消息使用的执行模式；Deep / Plan-Execute / Supervisor 需启用多代理。</small>
                                         </div>
@@ -6042,6 +6051,7 @@
                         <option value="deep" data-i18n="chat.agentModeDeep">Deep（DeepAgent）</option>
                         <option value="plan_execute" data-i18n="chat.agentModePlanExecuteLabel">Plan-Execute</option>
                         <option value="supervisor" data-i18n="chat.agentModeSupervisorLabel">Supervisor</option>
+                        <option value="cairn" data-i18n="chat.agentModeCairnLabel">Cairn（黑板架构）</option>
                     </select>
                     <div class="form-hint" style="margin-top: 4px;" data-i18n="batchImportModal.agentModeHint">与对话页一致：Eino 单代理（ADK），或 Deep / Plan-Execute / Supervisor（后三种需已启用多代理）。</div>
                 </div>
@@ -6716,7 +6726,7 @@
     <script src="/static/js/dashboard.js"></script>
     <script src="/static/js/chat-scroll.js"></script>
     <script src="/static/js/monitor.js?v=20260723-1"></script>
-    <script src="/static/js/chat.js?v=20260724-1"></script>
+    <script src="/static/js/chat.js?v=20260812-1"></script>
     <script src="/static/js/hitl.js"></script>
     <script src="/static/js/settings.js?v=20260717-1"></script>
     <script src="/static/js/audit-datetime-picker.js"></script>

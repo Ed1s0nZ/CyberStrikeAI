@@ -119,7 +119,7 @@ func (h *AgentHandler) prepareMultiAgentSession(req *ChatRequest, c *gin.Context
 		// WebShell 模式下如果同时指定了角色，追加角色 user_prompt（工具集仍仅限 webshell 专用工具）
 		if req.Role != "" && req.Role != "默认" && h.config != nil && h.config.Roles != nil {
 			if role, exists := h.config.Roles[req.Role]; exists && role.Enabled && role.UserPrompt != "" {
-				finalMessage = role.UserPrompt + "\n\n" + webshellContext
+				finalMessage = composeRoleUserMessage(role.UserPrompt, webshellContext)
 				h.logger.Info("WebShell + 角色: 应用角色提示词（多代理）", zap.String("role", req.Role))
 			} else {
 				finalMessage = webshellContext
@@ -147,7 +147,7 @@ func (h *AgentHandler) prepareMultiAgentSession(req *ChatRequest, c *gin.Context
 	} else if req.Role != "" && req.Role != "默认" && h.config != nil && h.config.Roles != nil {
 		if role, exists := h.config.Roles[req.Role]; exists && role.Enabled {
 			if role.UserPrompt != "" {
-				finalMessage = role.UserPrompt + "\n\n" + req.Message
+				finalMessage = composeRoleUserMessage(role.UserPrompt, req.Message)
 			}
 			roleTools = role.Tools
 		}

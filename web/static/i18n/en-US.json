@@ -693,6 +693,8 @@
     "agentModePlanExecuteHint": "Plan → execute → replan (single executor with tools)",
     "agentModeSupervisorLabel": "Supervisor (Expert routing)",
     "agentModeSupervisorHint": "Expert-routing scenarios: route across multiple specialist sub-agents via transfer",
+    "agentModeCairnLabel": "Cairn (Blackboard)",
+    "agentModeCairnHint": "Blackboard architecture: Reason maintains Fact-Intent-Hint graph, Explore executes intents in parallel, state persists",
     "agentModeSingle": "Single-agent",
     "agentModeMulti": "Multi-agent",
     "agentModeSingleHint": "Eino ADK single-agent for chat and tool use",
@@ -2440,16 +2442,16 @@
     "errorGeneric": "Something went wrong. Please try again."
   },
   "vulnerabilityPage": {
-	"alertTitle": "Robot vulnerability alerts",
-	"alertDescription": "Push newly discovered vulnerabilities to robots bound to this account, filtered by severity.",
-	"alertHint": "Send newly discovered vulnerabilities at or above this severity to your bound robot accounts.",
-	"alertConfiguredNotBound": "{{platforms}} is enabled, but this Web account is not bound to a recipient identity.",
-	"alertNoBinding": "No proactive robot is both enabled and bound. Your settings are still saved.",
-	"alertBindAction": "Bind recipient account",
-	"alertMinimum": "Minimum severity",
-	"alertEnabled": "Enable alerts",
-	"alertSaved": "Vulnerability alert settings saved",
-	"alertSaveFailed": "Failed to save vulnerability alert settings",
+    "alertTitle": "Robot vulnerability alerts",
+    "alertDescription": "Push newly discovered vulnerabilities to robots bound to this account, filtered by severity.",
+    "alertHint": "Send newly discovered vulnerabilities at or above this severity to your bound robot accounts.",
+    "alertConfiguredNotBound": "{{platforms}} is enabled, but this Web account is not bound to a recipient identity.",
+    "alertNoBinding": "No proactive robot is both enabled and bound. Your settings are still saved.",
+    "alertBindAction": "Bind recipient account",
+    "alertMinimum": "Minimum severity",
+    "alertEnabled": "Enable alerts",
+    "alertSaved": "Vulnerability alert settings saved",
+    "alertSaveFailed": "Failed to save vulnerability alert settings",
     "statTotal": "Total",
     "statClickAll": "View all (clear severity filter)",
     "statClickFilter": "Click to filter by this severity; click again to clear",
@@ -4417,10 +4419,22 @@
       }
     },
     "systemRoles": {
-      "admin": { "name": "Administrator", "description": "Full platform administration access" },
-      "operator": { "name": "Operator", "description": "Run daily security workflows without account or core configuration management" },
-      "auditor": { "name": "Auditor", "description": "Read-only access to audits, monitoring, and assets" },
-      "viewer": { "name": "Read-only User", "description": "Read-only access to explicitly granted resources" }
+      "admin": {
+        "name": "Administrator",
+        "description": "Full platform administration access"
+      },
+      "operator": {
+        "name": "Operator",
+        "description": "Run daily security workflows without account or core configuration management"
+      },
+      "auditor": {
+        "name": "Auditor",
+        "description": "Read-only access to audits, monitoring, and assets"
+      },
+      "viewer": {
+        "name": "Read-only User",
+        "description": "Read-only access to explicitly granted resources"
+      }
     },
     "empty": {
       "noMatchingUsers": "No matching members",
@@ -4495,14 +4509,20 @@
       "workflow": "Workflows"
     },
     "permissionDescriptions": {
-      "auth": { "self": "Manage own session and password" },
-      "dashboard": { "read": "View dashboard summaries" },
+      "auth": {
+        "self": "Manage own session and password"
+      },
+      "dashboard": {
+        "read": "View dashboard summaries"
+      },
       "chat": {
         "read": "View conversations",
         "write": "Create and update conversations",
         "delete": "Delete conversations and turns"
       },
-      "agent": { "execute": "Run AI agents and workflows" },
+      "agent": {
+        "execute": "Run AI agents and workflows"
+      },
       "hitl": {
         "read": "View human-in-the-loop queues and logs",
         "write": "Approve, dismiss, and configure human-in-the-loop requests"
@@ -4565,7 +4585,9 @@
         "read": "View system configuration",
         "write": "Update and apply system configuration"
       },
-      "terminal": { "execute": "Execute terminal commands" },
+      "terminal": {
+        "execute": "Execute terminal commands"
+      },
       "audit": {
         "read": "View and export audit logs",
         "delete": "Delete audit logs"
@@ -4591,8 +4613,12 @@
         "read": "View attack chains",
         "write": "Regenerate attack chains"
       },
-      "fofa": { "execute": "Run FOFA searches and parse queries" },
-      "openapi": { "read": "Read OpenAPI aggregation results" },
+      "fofa": {
+        "execute": "Run FOFA searches and parse queries"
+      },
+      "openapi": {
+        "read": "Read OpenAPI aggregation results"
+      },
       "group": {
         "read": "View conversation groups",
         "write": "Create and update conversation groups",

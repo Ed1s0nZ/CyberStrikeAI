@@ -23,6 +23,12 @@ const OrchestratorPlanExecuteMarkdownFilename = "orchestrator-plan-execute.md"
 // OrchestratorSupervisorMarkdownFilename supervisor 模式主代理专用 Markdown 文件名。
 const OrchestratorSupervisorMarkdownFilename = "orchestrator-supervisor.md"
 
+// OrchestratorCairnMarkdownFilename cairn 模式推理主代理（Reason）专用 Markdown 文件名。
+const OrchestratorCairnMarkdownFilename = "orchestrator-cairn.md"
+
+// ExecutorCairnMarkdownFilename cairn 模式执行主代理（Explore）专用 Markdown 文件名。
+const ExecutorCairnMarkdownFilename = "executor-cairn.md"
+
 // FrontMatter 对应 Markdown 文件头部字段（与文档示例一致）。
 type FrontMatter struct {
 	Name          string      `yaml:"name"`
@@ -49,6 +55,8 @@ type MarkdownDirLoad struct {
 	Orchestrator            *OrchestratorMarkdown // Deep 主代理
 	OrchestratorPlanExecute *OrchestratorMarkdown // plan_execute 规划主代理
 	OrchestratorSupervisor  *OrchestratorMarkdown // supervisor 监督主代理
+	OrchestratorCairn       *OrchestratorMarkdown // cairn 推理主代理
+	ExecutorCairn           *OrchestratorMarkdown // cairn 执行主代理
 	FileEntries             []FileAgent           // 含主代理与所有子代理，供管理 API 列表
 }
 
@@ -366,6 +374,38 @@ func LoadMarkdownAgentsDir(dir string) (*MarkdownDirLoad, error) {
 				return nil, fmt.Errorf("%s: %w", n, err)
 			}
 			out.OrchestratorSupervisor = orch
+			out.FileEntries = append(out.FileEntries, FileAgent{
+				Filename:       n,
+				Config:         orchestratorConfigFromOrchestrator(orch),
+				IsOrchestrator: true,
+			})
+			continue
+		}
+		if strings.EqualFold(filepath.Base(n), OrchestratorCairnMarkdownFilename) {
+			if out.OrchestratorCairn != nil {
+				return nil, fmt.Errorf("agents: 仅能定义一个 %s，已有 %s", OrchestratorCairnMarkdownFilename, out.OrchestratorCairn.Filename)
+			}
+			orch, err := orchestratorFromParsed(n, fm, body)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", n, err)
+			}
+			out.OrchestratorCairn = orch
+			out.FileEntries = append(out.FileEntries, FileAgent{
+				Filename:       n,
+				Config:         orchestratorConfigFromOrchestrator(orch),
+				IsOrchestrator: true,
+			})
+			continue
+		}
+		if strings.EqualFold(filepath.Base(n), ExecutorCairnMarkdownFilename) {
+			if out.ExecutorCairn != nil {
+				return nil, fmt.Errorf("agents: 仅能定义一个 %s，已有 %s", ExecutorCairnMarkdownFilename, out.ExecutorCairn.Filename)
+			}
+			orch, err := orchestratorFromParsed(n, fm, body)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", n, err)
+			}
+			out.ExecutorCairn = orch
 			out.FileEntries = append(out.FileEntries, FileAgent{
 				Filename:       n,
 				Config:         orchestratorConfigFromOrchestrator(orch),

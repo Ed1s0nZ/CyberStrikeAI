@@ -138,7 +138,7 @@ func (h *AgentHandler) executeOneBatchSubTask(queueID string, queue *BatchTaskQu
 		if h.config.Roles != nil {
 			if role, exists := h.config.Roles[queue.Role]; exists && role.Enabled {
 				if role.UserPrompt != "" {
-					finalMessage = role.UserPrompt + "\n\n" + task.Message
+					finalMessage = composeRoleUserMessage(role.UserPrompt, task.Message)
 					h.logger.Info("应用角色用户提示词", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("role", queue.Role))
 				}
 				if len(role.Tools) > 0 {

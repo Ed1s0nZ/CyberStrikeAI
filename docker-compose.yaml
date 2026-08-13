@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  cyberstrike-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cyberstrike-ai
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.yaml:/app/config.yaml
+      - ./data:/app/data
+      - ./chat_uploads:/app/chat_uploads
+    restart: always

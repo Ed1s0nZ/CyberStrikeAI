@@ -105,6 +105,17 @@ Skill 内容结构：
 
 写法要让 Agent 能执行，而不是只给人阅读。
 
+### 仓库级静态审计
+
+修改 Agent、角色提示词或 Skill 后运行：
+
+```bash
+go run ./cmd/prompt-audit
+go test ./internal/promptaudit ./internal/skillpackage ./internal/config ./internal/agents ./internal/multiagent
+```
+
+`prompt-audit` 会检查 Agent/角色文件能否解析、Skill front matter 与目录名是否一致、附属文件引用是否存在，以及 Skill 是否包含触发、前置、流程、停止和输出章节。行数和字节阈值是上下文治理的建议值，不是 Agent Skills 规范的硬限制；超限项应优先拆到 `references/`，再通过代表性任务评测是否改善。
+
 ## 排错
 
 Skill 没被使用：
