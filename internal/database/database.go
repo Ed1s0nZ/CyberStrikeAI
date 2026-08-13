@@ -855,6 +855,10 @@ func (db *DB) initTables() error {
 	if _, err := db.Exec(createProjectFactEdgesTable); err != nil {
 		return fmt.Errorf("创建project_fact_edges表失败: %w", err)
 	}
+	// Cairn canonical schema is additive. Runtime cutover remains disabled until repository, migration and projection gates pass.
+	if err := db.initCairnTables(); err != nil {
+		return fmt.Errorf("创建 Cairn canonical schema 失败: %w", err)
+	}
 
 	if _, err := db.Exec(createVulnerabilitiesTable); err != nil {
 		return fmt.Errorf("创建vulnerabilities表失败: %w", err)

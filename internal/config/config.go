@@ -129,6 +129,15 @@ type MultiAgentConfig struct {
 	EinoMiddleware MultiAgentEinoMiddlewareConfig `yaml:"eino_middleware,omitempty" json:"eino_middleware,omitempty"`
 	// EinoCallbacks attaches CloudWeGo eino callbacks.InitCallbacks on ADK Runner context (structured logs + optional SSE trace).
 	EinoCallbacks MultiAgentEinoCallbacksConfig `yaml:"eino_callbacks,omitempty" json:"eino_callbacks,omitempty"`
+
+	// CairnStateDir 仅兼容 legacy YAML v2 读写。SQLite canonical 启用后它只用作只读导出目录。
+	CairnStateDir string `yaml:"cairn_state_dir,omitempty" json:"cairn_state_dir,omitempty"`
+	// CairnSQLiteCanonicalEnabled gates the SQLite canonical state cutover. Default false preserves legacy traffic.
+	CairnSQLiteCanonicalEnabled bool `yaml:"cairn_sqlite_canonical_enabled,omitempty" json:"cairn_sqlite_canonical_enabled,omitempty"`
+	// CairnMaxIntents Reason 单轮最大 intent 数（默认 5）。
+	CairnMaxIntents int `yaml:"cairn_max_intents,omitempty" json:"cairn_max_intents,omitempty"`
+	// CairnMaxParallelExplorers 已弃用。当前可靠闭环固定串行，effective_parallelism=1。
+	CairnMaxParallelExplorers int `yaml:"cairn_max_parallel_explorers,omitempty" json:"cairn_max_parallel_explorers,omitempty"`
 }
 
 // SubAgentUserContextMaxRunesEffective returns max runes for sub-agent task supplement; 0 = unlimited; negative = disabled.
@@ -530,6 +539,8 @@ func NormalizeAgentMode(mode string) string {
 		return "plan_execute"
 	case "supervisor", "super", "sv":
 		return "supervisor"
+	case "cairn", "blackboard", "fact_intent":
+		return "cairn"
 	default:
 		return "eino_single"
 	}
@@ -540,7 +551,7 @@ func NormalizeRobotAgentMode(ma MultiAgentConfig) string {
 	return NormalizeAgentMode(ma.RobotDefaultAgentMode)
 }
 
-// NormalizeMultiAgentOrchestration 返回 deep、plan_execute 或 supervisor。
+// NormalizeMultiAgentOrchestration 返回 deep、plan_execute、supervisor 或 cairn。
 func NormalizeMultiAgentOrchestration(s string) string {
 	v := strings.TrimSpace(strings.ToLower(s))
 	switch v {
@@ -548,6 +559,8 @@ func NormalizeMultiAgentOrchestration(s string) string {
 		return "plan_execute"
 	case "supervisor", "super", "sv":
 		return "supervisor"
+	case "cairn", "blackboard", "fact_intent":
+		return "cairn"
 	default:
 		return "deep"
 	}

@@ -371,7 +371,7 @@ func RunDeepAgent(
 			sb.WriteString(supInstr)
 			sb.WriteString("\n\n")
 		}
-		sb.WriteString("你是监督协调者：可将任务通过 transfer 工具委派给下列专家子代理（使用其在系统中的 Agent 名称）。专家列表：")
+		sb.WriteString("你是监督协调者：可将任务通过 transfer_to_agent 工具委派给下列专家子代理（使用其在系统中的 Agent 名称）。专家列表：")
 		for _, sa := range subAgents {
 			if sa == nil {
 				continue
@@ -379,7 +379,7 @@ func RunDeepAgent(
 			sb.WriteString("\n- ")
 			sb.WriteString(sa.Name(ctx))
 		}
-		sb.WriteString("\n\nSupervisor 是专家路由模式：仅当任务确实需要不同专家分工时才 transfer；简单查询、单步工具调用或无需专业分流的任务由你直接完成。避免在同一子代理之间反复 transfer；除非有新的、具体的补充目标。专家返回后，你必须自行汇总、裁剪、校验证据，再用 exit 交付最终答案。")
+		sb.WriteString("\n\nSupervisor 是专家路由模式：仅当任务确实需要不同专家分工时才调用 transfer_to_agent；简单查询、单步工具调用或无需专业分流的任务由你直接完成。同一子代理的补充 transfer_to_agent 由新的、具体目标触发。专家返回后，你必须自行汇总、裁剪、校验证据，再用 exit 交付最终答案。")
 		sb.WriteString("\n\n当你已完成用户目标或需要将最终结论交付用户时，使用 exit 工具结束。")
 		supInstr = sb.String()
 	}
@@ -564,6 +564,50 @@ func RunDeepAgent(
 			return nil, fmt.Errorf("supervisor.New: %w", serr)
 		}
 		da = supRoot
+	case "cairn":
+		// cairn: 执行器模型与提示词
+		cairnExecModel, cerr := einoopenai.NewChatModel(ctx, baseModelCfg)
+		if cerr != nil {
+			return nil, fmt.Errorf("cairn 执行器模型: %w", cerr)
+		}
+		execInstruction := resolveCairnExecutorInstruction(ma, markdownLoad)
+		var cairnFsMw adk.ChatModelAgentMiddleware
+		if einoSkillMW != nil && einoFSTools && einoLoc != nil {
+			cairnFsMw, err = subAgentFilesystemMiddleware(ctx, einoLoc, toolInvokeNotify, "cairn_explorer", einoExecBegin, einoExecAppendPartial, einoExecRegisterCancel, einoExecUnregisterCancel, einoExecFinish, agentToolTimeoutMinutes(appCfg), agentToolWaitTimeoutSeconds(appCfg), agentShellNoOutputTimeoutSeconds(appCfg), nil)
+			if err != nil {
+				return nil, fmt.Errorf("cairn filesystem 中间件: %w", err)
+			}
+		}
+		cairnRoot, cerr := NewCairnRoot(ctx, &CairnRootArgs{
+			MainToolCallingModel:            mainModel,
+			ExecModel:                       cairnExecModel,
+			OrchInstruction:                 orchInstruction,
+			ExecInstruction:                 execInstruction,
+			ToolsCfg:                        mainToolsCfg,
+			ExecMaxIter:                     deepMaxIter,
+			StateDir:                        ma.CairnStateDir,
+			MaxIntents:                      ma.CairnMaxIntents,
+			MaxParallelExplorers:            ma.CairnMaxParallelExplorers,
+			LoopMaxIter:                     ma.PlanExecuteLoopMaxIterations,
+			AppCfg:                          appCfg,
+			MwCfg:                           &ma.EinoMiddleware,
+			ConversationID:                  conversationID,
+			ProjectID:                       projectID,
+			DB:                              db,
+			Logger:                          logger,
+			ModelName:                       appCfg.OpenAI.Model,
+			GoalText:                        runtimeUserMessage,
+			InputHash:                       cairnInputHash(runtimeUserMessage),
+			ExecPreMiddlewares:              mainOrchestratorPre,
+			SkillMiddleware:                 einoSkillMW,
+			FilesystemMiddleware:            cairnFsMw,
+			PlannerReplannerRewriteHandlers: mainOrchestratorPre,
+			ModelFacingTrace:                modelFacingTrace,
+		})
+		if cerr != nil {
+			return nil, fmt.Errorf("cairn.New: %w", cerr)
+		}
+		da = cairnRoot
 	default:
 		dcfg := &deep.Config{
 			Name:                   orchestratorName,

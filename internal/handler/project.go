@@ -8,6 +8,7 @@ import (
 
 	"cyberstrike-ai/internal/attackchain"
 	"cyberstrike-ai/internal/database"
+	"cyberstrike-ai/internal/multiagent"
 	"cyberstrike-ai/internal/project"
 	"cyberstrike-ai/internal/security"
 
@@ -27,13 +28,27 @@ func clampProjectDescription(s string) string {
 
 // ProjectHandler 项目管理处理器。
 type ProjectHandler struct {
-	db     *database.DB
-	logger *zap.Logger
+	db                    *database.DB
+	logger                *zap.Logger
+	stateDir              string
+	cairnCanonicalEnabled bool
 }
 
 // NewProjectHandler 创建项目管理处理器。
 func NewProjectHandler(db *database.DB, logger *zap.Logger) *ProjectHandler {
-	return &ProjectHandler{db: db, logger: logger}
+	return &ProjectHandler{db: db, logger: logger, stateDir: "state"}
+}
+
+func (h *ProjectHandler) SetCairnStateDir(dir string) {
+	if strings.TrimSpace(dir) != "" {
+		h.stateDir = strings.TrimSpace(dir)
+	}
+}
+
+// SetCairnCanonicalEnabled switches read APIs to SQLite canonical snapshots.
+// Runtime writes stay on their separately gated path.
+func (h *ProjectHandler) SetCairnCanonicalEnabled(enabled bool) {
+	h.cairnCanonicalEnabled = enabled
 }
 
 type createProjectRequest struct {
@@ -417,6 +432,148 @@ func (h *ProjectHandler) GetFactGraph(c *gin.Context) {
 		graph.Edges = []database.ProjectFactGraphEdge{}
 	}
 	c.JSON(http.StatusOK, graph)
+}
+
+// GetCairnState GET /api/projects/:id/cairn/state?conversation_id=...
+func (h *ProjectHandler) GetCairnState(c *gin.Context) {
+	projectID := strings.TrimSpace(c.Param("id"))
+	if _, err := h.db.GetProject(projectID); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "项目不存在"})
+		return
+	}
+	conversationID := strings.TrimSpace(c.Query("conversation_id"))
+	if conversationID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_id 不能为空"})
+		return
+	}
+	boundProjectID, err := h.db.GetConversationProjectID(conversationID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "对话不存在"})
+		return
+	}
+	if boundProjectID != projectID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "对话未绑定当前项目"})
+		return
+	}
+	if h.cairnCanonicalEnabled {
+		snapshot, err := h.db.GetLatestCairnStateSnapshot(c.Request.Context(), projectID, conversationID)
+		if err != nil {
+			h.logger.Error("读取 Cairn canonical state 失败", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"project_id":       projectID,
+			"conversation_id":  conversationID,
+			"storage":          "sqlite_canonical",
+			"schema_version":   snapshot.SchemaVersion,
+			"initialized":      snapshot.Initialized,
+			"run":              snapshot.Run,
+			"facts":            snapshot.Facts,
+			"intents":          snapshot.Intents,
+			"hints":            snapshot.Hints,
+			"state_updated_at": cairnSnapshotUpdatedAt(snapshot),
+		})
+		return
+	}
+	statePath := multiagent.StateFilePath(h.stateDir, projectID, conversationID)
+	state, err := multiagent.LoadCairnState(statePath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"project_id": projectID, "conversation_id": conversationID, "storage": "yaml_legacy", "state": state})
+}
+
+func cairnSnapshotUpdatedAt(snapshot *database.CairnStateSnapshot) interface{} {
+	if snapshot == nil || snapshot.Run == nil {
+		return nil
+	}
+	return snapshot.Run.UpdatedAt
+}
+
+// GetCairnGraph GET /api/projects/:id/cairn/graph?conversation_id=...
+func (h *ProjectHandler) GetCairnGraph(c *gin.Context) {
+	projectID := strings.TrimSpace(c.Param("id"))
+	if _, err := h.db.GetProject(projectID); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "项目不存在"})
+		return
+	}
+	conversationID := strings.TrimSpace(c.Query("conversation_id"))
+	if conversationID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_id 不能为空"})
+		return
+	}
+	boundProjectID, err := h.db.GetConversationProjectID(conversationID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "对话不存在"})
+		return
+	}
+	if boundProjectID != projectID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "对话未绑定当前项目"})
+		return
+	}
+	if h.cairnCanonicalEnabled {
+		snapshot, err := h.db.GetLatestCairnStateSnapshot(c.Request.Context(), projectID, conversationID)
+		if err != nil {
+			h.logger.Error("读取 Cairn canonical graph 失败", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		nodes := make([]gin.H, 0, len(snapshot.Facts)+len(snapshot.Intents)+len(snapshot.Hints))
+		for _, fact := range snapshot.Facts {
+			nodes = append(nodes, gin.H{"id": fact.ID, "type": "fact", "label": fact.Statement, "status": fact.Confidence, "source_intent_id": fact.SourceIntentID, "observation_type": fact.ObservationType})
+		}
+		for _, intent := range snapshot.Intents {
+			nodes = append(nodes, gin.H{"id": intent.ID, "type": "intent", "label": intent.Description, "status": intent.Status, "ordinal": intent.Ordinal, "attempt_count": intent.AttemptCount})
+		}
+		for _, hint := range snapshot.Hints {
+			nodes = append(nodes, gin.H{"id": hint.ID, "type": "hint", "label": hint.Content, "status": hint.Status, "creator_type": hint.CreatorType, "creator_id": hint.CreatorID})
+		}
+		edges := make([]gin.H, 0, len(snapshot.Facts)+len(snapshot.Edges))
+		for _, fact := range snapshot.Facts {
+			edges = append(edges, gin.H{"source": fact.SourceIntentID, "target": fact.ID, "type": "produced_fact", "source_event_id": fact.SourceEventID})
+		}
+		for _, edge := range snapshot.Edges {
+			edges = append(edges, gin.H{"id": edge.ID, "source": edge.SourceNodeID, "target": edge.TargetNodeID, "type": edge.EdgeType, "source_event_id": edge.SourceEventID})
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"project_id":       projectID,
+			"conversation_id":  conversationID,
+			"storage":          "sqlite_canonical",
+			"schema_version":   snapshot.SchemaVersion,
+			"initialized":      snapshot.Initialized,
+			"run":              snapshot.Run,
+			"nodes":            nodes,
+			"edges":            edges,
+			"state_updated_at": cairnSnapshotUpdatedAt(snapshot),
+		})
+		return
+	}
+	statePath := multiagent.StateFilePath(h.stateDir, projectID, conversationID)
+	state, err := multiagent.LoadCairnState(statePath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	nodes := make([]gin.H, 0, len(state.Facts)+len(state.Intents)+len(state.Hints))
+	edges := make([]gin.H, 0)
+	for _, f := range state.Facts {
+		nodes = append(nodes, gin.H{"id": f.ID, "type": "fact", "label": f.Description, "status": "valid", "source_intent": f.SourceIntent})
+		if f.SourceIntent != "" {
+			edges = append(edges, gin.H{"source": f.SourceIntent, "target": f.ID, "type": "produced_fact"})
+		}
+	}
+	for _, it := range state.Intents {
+		nodes = append(nodes, gin.H{"id": it.ID, "type": "intent", "label": it.Description, "status": it.Status, "from": it.From})
+		for _, from := range it.From {
+			edges = append(edges, gin.H{"source": from, "target": it.ID, "type": "opens_intent"})
+		}
+	}
+	for _, hint := range state.Hints {
+		nodes = append(nodes, gin.H{"id": hint.ID, "type": "hint", "label": hint.Content, "creator": hint.Creator})
+	}
+	c.JSON(http.StatusOK, gin.H{"project_id": projectID, "conversation_id": conversationID, "storage": "yaml_legacy", "nodes": nodes, "edges": edges, "state_updated_at": state.UpdatedAt})
 }
 
 // CreateFact POST /api/projects/:id/facts

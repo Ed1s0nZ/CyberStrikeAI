@@ -398,6 +398,8 @@ func New(cfg *config.Config, log *logger.Logger, configPath string) (*App, error
 	vulnerabilityHandler := handler.NewVulnerabilityHandler(db, log.Logger)
 	assetHandler := handler.NewAssetHandler(db, log.Logger)
 	projectHandler := handler.NewProjectHandler(db, log.Logger)
+	projectHandler.SetCairnStateDir(cfg.MultiAgent.CairnStateDir)
+	projectHandler.SetCairnCanonicalEnabled(cfg.MultiAgent.CairnSQLiteCanonicalEnabled)
 	rbacHandler := handler.NewRBACHandler(db, log.Logger)
 	rbacHandler.SetAudit(auditSvc)
 	rbacHandler.SetAuthManager(authManager)
@@ -632,6 +634,14 @@ func (a *App) Run() error {
 
 // RunWithContext 启动应用，支持通过 context 取消来优雅关闭
 func (a *App) RunWithContext(ctx context.Context) error {
+	// Cairn canonical outbox 投影 worker（canonical enabled 时才启动）。
+	// 投影失败走重试/死信，不阻塞主链。
+	if a.config.MultiAgent.CairnSQLiteCanonicalEnabled && a.db != nil {
+		worker := multiagent.NewCairnOutboxWorker(a.db, a.config.MultiAgent.CairnStateDir, a.logger.Logger, 0)
+		worker.Start(ctx)
+		a.logger.Info("Cairn canonical outbox worker 已启动")
+	}
+
 	// 启动MCP服务器（如果启用）
 	var mcpServer *http.Server
 	if a.config.MCP.Enabled {
@@ -1265,6 +1275,8 @@ func setupRoutes(
 		protected.PUT("/projects/:id", projectHandler.UpdateProject)
 		protected.DELETE("/projects/:id", projectHandler.DeleteProject)
 		protected.GET("/projects/:id/fact-graph", projectHandler.GetFactGraph)
+		protected.GET("/projects/:id/cairn/state", projectHandler.GetCairnState)
+		protected.GET("/projects/:id/cairn/graph", projectHandler.GetCairnGraph)
 		protected.GET("/projects/:id/fact-edges", projectHandler.ListFactEdges)
 		protected.POST("/projects/:id/fact-edges", projectHandler.CreateFactEdge)
 		protected.DELETE("/projects/:id/fact-edges/:edgeId", projectHandler.DeleteFactEdge)

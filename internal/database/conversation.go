@@ -399,7 +399,7 @@ func normalizeConversationAgentMode(agentMode string) string {
 	agentMode = strings.ToLower(strings.TrimSpace(agentMode))
 	agentMode = strings.ReplaceAll(agentMode, "-", "_")
 	switch agentMode {
-	case "deep", "plan_execute", "supervisor":
+	case "deep", "plan_execute", "supervisor", "cairn":
 		return agentMode
 	default:
 		return "eino_single"
