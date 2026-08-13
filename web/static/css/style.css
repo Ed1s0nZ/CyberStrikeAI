@@ -480,6 +480,12 @@ html[data-theme="dark"] .main-sidebar {
     background: #f5f7fa;
 }
 
+/* 模板默认 active 页是仪表盘。带其他 hash 直接刷新时，在路由脚本同步选中
+   目标页之前隐藏内容区，避免先闪出仪表盘再跳转。 */
+html.initial-route-pending .content-area {
+    visibility: hidden;
+}
+
 /* 对话页面不需要page-header */
 #page-chat .page-header {
     display: none;
@@ -3409,6 +3415,16 @@ html[data-theme="dark"] .new-chat-btn:focus-visible {
     overflow: hidden;
     height: 100%;
     position: relative;
+}
+
+/* 带 conversation hash 刷新时，在目标对话数据完成恢复前不展示默认新对话状态。
+   该状态在同一事件循环内设置，避免“无项目”与欢迎页短暂闪现。 */
+.chat-container.is-conversation-restoring #active-tasks-bar,
+.chat-container.is-conversation-restoring #chat-messages,
+.chat-container.is-conversation-restoring #chat-turn-rail,
+.chat-container.is-conversation-restoring #chat-return-latest,
+.chat-container.is-conversation-restoring #chat-input-container {
+    visibility: hidden;
 }
 
 /* 会话顶部栏样式 */
@@ -7439,13 +7455,14 @@ html[data-theme="dark"] .login-card .login-submit:disabled {
     overflow-y: auto;
 }
 
-/* 流式执行中：取消时间线内层滚动，由 #chat-messages 统一跟随 */
+/* 流式执行中：内层迭代与外层 #chat-messages 各自滚动、各自跟随最新内容。 */
 .progress-container.is-streaming .progress-timeline.expanded,
 .process-details-container.is-streaming .process-details-content .progress-timeline.expanded {
-    max-height: none;
+    max-height: min(64vh, 720px);
     overflow-x: hidden;
-    overflow-y: visible;
+    overflow-y: auto;
     overscroll-behavior: auto;
+    scrollbar-gutter: stable;
 }
 
 .timeline-item {
@@ -45120,6 +45137,7 @@ html[data-theme="dark"] .project-conversation-item {
 
 html[data-theme="dark"] .project-folder-item:hover,
 html[data-theme="dark"] .project-conversation-item:hover,
+html[data-theme="dark"] .project-conversation-row:hover .project-conversation-item,
 html[data-theme="dark"] .recent-conversations-toggle:hover {
     background: var(--bg-tertiary);
 }
@@ -45128,8 +45146,9 @@ html[data-theme="dark"] .project-folder-action:hover,
 html[data-theme="dark"] .project-folder-action:focus-visible,
 html[data-theme="dark"] .project-conversation-menu:hover,
 html[data-theme="dark"] .project-conversation-menu:focus-visible {
-    background: rgba(30, 41, 59, 0.92);
+    background: rgba(71, 85, 105, 0.28);
     color: var(--text-primary);
+    box-shadow: none;
 }
 
 html[data-theme="dark"] .project-conversation-item.is-selected {
@@ -46222,8 +46241,11 @@ html[data-theme="dark"] .chat-composer-surface > .chat-session-settings-popover 
 }
 
 .message.progress-message .progress-timeline.expanded {
-    max-height: none;
-    overflow: visible;
+    max-height: min(64vh, 720px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: auto;
+    scrollbar-gutter: stable;
 }
 
 /* Open-document execution timeline. */

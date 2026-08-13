@@ -75,8 +75,11 @@ found:
 
 // responsePlanAgg buffers main-assistant response_stream chunks for one "planning" process_detail row.
 type responsePlanAgg struct {
-	meta map[string]interface{}
-	b    strings.Builder
+	meta            map[string]interface{}
+	b               strings.Builder
+	detailID        string
+	lastPersistAt   time.Time
+	lastPersistSize int
 }
 
 // thinkingBuf aggregates thinking_stream_* / reasoning_chain_stream_* before flush to process_details.
@@ -145,30 +148,36 @@ func responseStreamIterationFromMeta(m map[string]interface{}) int {
 	}
 }
 
-func discardPlanningIfEchoesToolResult(respPlan *responsePlanAgg, toolData interface{}) {
+func discardPlanningIfEchoesToolResult(respPlan *responsePlanAgg, toolData interface{}) string {
 	if respPlan == nil {
-		return
+		return ""
 	}
 	plan := normalizeProcessDetailText(respPlan.b.String())
 	if plan == "" {
-		return
+		return ""
 	}
 	dataMap, ok := toolData.(map[string]interface{})
 	if !ok {
-		return
+		return ""
 	}
 	res, ok := dataMap["result"].(string)
 	if !ok {
-		return
+		return ""
 	}
 	r := normalizeProcessDetailText(res)
 	if r == "" {
-		return
+		return ""
 	}
 	if plan == r || strings.HasSuffix(plan, r) {
+		detailID := respPlan.detailID
 		respPlan.meta = nil
 		respPlan.b.Reset()
+		respPlan.detailID = ""
+		respPlan.lastPersistAt = time.Time{}
+		respPlan.lastPersistSize = 0
+		return detailID
 	}
+	return ""
 }
 
 // AgentHandler Agent处理器
@@ -976,14 +985,15 @@ func (h *AgentHandler) createProgressCallback(runCtx context.Context, cancelRun 
 	syncHitlCognition := func() {
 		h.syncHitlCognitionFromProgress(conversationID, assistantMessageID, thinkingStreams, &respPlan)
 	}
-	flushResponsePlan := func() {
+	persistResponsePlan := func(reset bool) {
 		if assistantMessageID == "" {
 			return
 		}
 		content := strings.TrimSpace(respPlan.b.String())
 		if content == "" {
-			respPlan.meta = nil
-			respPlan.b.Reset()
+			if reset {
+				respPlan = responsePlanAgg{}
+			}
 			return
 		}
 		data := map[string]interface{}{
@@ -992,13 +1002,26 @@ func (h *AgentHandler) createProgressCallback(runCtx context.Context, cancelRun 
 		for k, v := range respPlan.meta {
 			data[k] = v
 		}
-		if err := h.db.AddProcessDetail(assistantMessageID, conversationID, "planning", content, data); err != nil {
+		var err error
+		if respPlan.detailID == "" {
+			respPlan.detailID, err = h.db.AddProcessDetailWithID(
+				assistantMessageID, conversationID, "planning", content, data,
+			)
+		} else {
+			err = h.db.UpdateProcessDetailContent(respPlan.detailID, content, data)
+		}
+		if err != nil {
 			h.logger.Warn("保存过程详情失败", zap.Error(err), zap.String("eventType", "planning"))
+		} else {
+			respPlan.lastPersistAt = time.Now()
+			respPlan.lastPersistSize = respPlan.b.Len()
 		}
 		syncHitlCognition()
-		respPlan.meta = nil
-		respPlan.b.Reset()
+		if reset {
+			respPlan = responsePlanAgg{}
+		}
 	}
+	flushResponsePlan := func() { persistResponsePlan(true) }
 
 	flushThinkingStreams := func() {
 		if assistantMessageID == "" {
@@ -1068,15 +1091,15 @@ func (h *AgentHandler) createProgressCallback(runCtx context.Context, cancelRun 
 		}
 
 		deferToolProgressSend := eventType == "tool_call" || eventType == "tool_result"
-		// 流式：写 HTTP SSE；非流式（机器人等）：镜像到 taskEventBus 供 Web 订阅。
-		// 工具事件需先落库拿 processDetailId，再向前端发送摘要，避免大 payload 默认进入浏览器。
+		// 主 HTTP SSE 与 taskEventBus 必须同时写入：页面刷新会切断原连接，刷新后的
+		// GET task-events 订阅依赖 eventBus 才能继续收到后续迭代。机器人等无主 SSE
+		// 的来源同样只写 eventBus。工具事件需先落库拿 processDetailId，再发送摘要。
 		if !deferToolProgressSend {
 			clientData := enrichProgressEventData(data, conversationID, assistantMessageID)
 			if sendEventFunc != nil {
 				sendEventFunc(eventType, message, clientData)
-			} else {
-				h.publishProgressToTaskEventBus(conversationID, eventType, message, clientData)
 			}
+			h.publishProgressToTaskEventBus(conversationID, eventType, message, clientData)
 		}
 
 		// 保存tool_call事件中的参数
@@ -1329,6 +1352,14 @@ func (h *AgentHandler) createProgressCallback(runCtx context.Context, cancelRun 
 					respPlan.meta[k] = v
 				}
 			}
+			// 运行中的主回复不能只保存在内存：刷新会销毁旧页面，新的 task-events
+			// 订阅只能收到未来增量。按时间或增量大小节流更新同一条 planning 记录，
+			// 这样刷新时能从数据库恢复刷新前已经展示的全部文本。
+			if respPlan.lastPersistAt.IsZero() ||
+				time.Since(respPlan.lastPersistAt) >= 300*time.Millisecond ||
+				respPlan.b.Len()-respPlan.lastPersistSize >= 1024 {
+				persistResponsePlan(false)
+			}
 			syncHitlCognition()
 			return
 		}
@@ -1439,7 +1470,11 @@ func (h *AgentHandler) createProgressCallback(runCtx context.Context, cancelRun 
 			eventType != "eino_agent_reply_stream_delta" &&
 			eventType != "eino_agent_reply_stream_end" {
 			if eventType == "tool_result" {
-				discardPlanningIfEchoesToolResult(&respPlan, data)
+				if detailID := discardPlanningIfEchoesToolResult(&respPlan, data); detailID != "" {
+					if err := h.db.DeleteProcessDetail(detailID); err != nil {
+						h.logger.Warn("删除工具结果回显规划失败", zap.Error(err), zap.String("processDetailId", detailID))
+					}
+				}
 			}
 			// 在关键过程事件落库前，先把「规划中」与聚合中的 thinking / reasoning_chain 流落库
 			flushResponsePlan()
@@ -1455,17 +1490,15 @@ func (h *AgentHandler) createProgressCallback(runCtx context.Context, cancelRun 
 				}
 				if sendEventFunc != nil {
 					sendEventFunc(eventType, message, clientData)
-				} else {
-					h.publishProgressToTaskEventBus(conversationID, eventType, message, clientData)
 				}
+				h.publishProgressToTaskEventBus(conversationID, eventType, message, clientData)
 			}
 		} else if deferToolProgressSend {
 			clientData := enrichProgressEventData(summarizeProcessDetailData(eventType, data), conversationID, assistantMessageID)
 			if sendEventFunc != nil {
 				sendEventFunc(eventType, message, clientData)
-			} else {
-				h.publishProgressToTaskEventBus(conversationID, eventType, message, clientData)
 			}
+			h.publishProgressToTaskEventBus(conversationID, eventType, message, clientData)
 		}
 	}
 }

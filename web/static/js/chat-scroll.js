@@ -11,11 +11,16 @@
     const CHAT_SCROLL_NAV_BOTTOM_THRESHOLD_PX = 120;
     /** 用户上滑后的短暂锁，防止 SSE 与 scroll 事件竞态抢滚动 */
     const DETACH_LOCK_MS = 280;
+    /** 刷新恢复会跨越历史消息、过程详情、字体与流订阅等多轮异步布局。 */
+    const CONVERSATION_RESTORE_SETTLE_MIN_MS = 3000;
+    const CONVERSATION_RESTORE_SETTLE_MAX_MS = 6000;
+    const CONVERSATION_RESTORE_STABLE_FRAMES = 12;
 
     /** @type {'following' | 'detached'} */
     let scrollMode = 'following';
     let scrollFollowRaf = 0;
     let scrollSettleGeneration = 0;
+    let conversationRestoreGeneration = 0;
     /** 用户脱离跟随后，下方是否有未读的新输出（不按 SSE 次数计） */
     let hasPendingNewBelow = false;
     let listenersBound = false;
@@ -28,6 +33,7 @@
     let turnRailSignature = '';
     let activeTurnIndex = -1;
     let turnRailObserver = null;
+    let chatMessagesResizeObserver = null;
     let turnPreviewHideTimer = 0;
 
     function getChatMessagesEl() {
@@ -485,6 +491,52 @@
         });
     }
 
+    /**
+     * 刷新恢复长会话时，消息、详情和审批卡会跨多帧继续增高。
+     * 进入恢复流程时明确回到 following；用户随后若主动上滑，既有输入监听会立即
+     * 切换为 detached，并使后续校准帧停止，不会抢回阅读位置。
+     */
+    function settleConversationRestoreToBottom(frameCount) {
+        setScrollFollowing();
+        const requestedFrames = Number.isFinite(Number(frameCount))
+            ? Math.max(1, Math.floor(Number(frameCount)))
+            : 30;
+        const minimumDuration = Math.max(
+            CONVERSATION_RESTORE_SETTLE_MIN_MS,
+            Math.ceil(requestedFrames * (1000 / 60))
+        );
+        const generation = ++conversationRestoreGeneration;
+        const startedAt = Date.now();
+        let lastHeight = -1;
+        let stableFrames = 0;
+
+        function settleRestoreFrame() {
+            if (generation !== conversationRestoreGeneration) return;
+            // wheel / touch / keyboard / scrollbar drag 会进入 detached；立即尊重用户阅读位置。
+            if (scrollMode !== 'following' || Date.now() < detachLockUntil) return;
+            const el = getChatMessagesEl();
+            if (!el) return;
+
+            scrollChatToBottomInstant();
+            const currentHeight = el.scrollHeight;
+            if (currentHeight === lastHeight && isNearBottom(1)) {
+                stableFrames += 1;
+            } else {
+                stableFrames = 0;
+            }
+            lastHeight = currentHeight;
+
+            const elapsed = Date.now() - startedAt;
+            const reachedStableMinimum = elapsed >= minimumDuration
+                && stableFrames >= CONVERSATION_RESTORE_STABLE_FRAMES;
+            if (!reachedStableMinimum && elapsed < CONVERSATION_RESTORE_SETTLE_MAX_MS) {
+                requestAnimationFrame(settleRestoreFrame);
+            }
+        }
+
+        requestAnimationFrame(settleRestoreFrame);
+    }
+
     /** @param {boolean} wasPinned DOM 更新前是否应跟随（由 captureScrollPinState 传入） */
     function scrollChatMessagesToBottomIfPinned(wasPinned) {
         scheduleChatScrollToBottomIfFollowing(wasPinned);
@@ -703,9 +755,26 @@
             turnRailObserver.observe(el, { childList: true, subtree: true, characterData: true });
         }
 
+        if (typeof ResizeObserver === 'function') {
+            chatMessagesResizeObserver = new ResizeObserver(function () {
+                // 顶部运行任务条、输入框或视口变化会改变消息区 clientHeight，
+                // 但不会触发消息子树 MutationObserver。跟随模式下需重新精确粘底。
+                if (scrollMode === 'following' && Date.now() >= detachLockUntil) {
+                    scheduleChatScrollToBottomIfFollowing(true);
+                } else {
+                    updateTurnRailState();
+                }
+            });
+            chatMessagesResizeObserver.observe(el);
+        }
+
         window.addEventListener('resize', function () {
             hideTurnPreview();
-            updateTurnRailState();
+            if (scrollMode === 'following' && Date.now() >= detachLockUntil) {
+                scheduleChatScrollToBottomIfFollowing(true);
+            } else {
+                updateTurnRailState();
+            }
         }, { passive: true });
     }
 
@@ -730,6 +799,7 @@
         scheduleScroll: scheduleChatScrollToBottomIfFollowing,
         scrollIfPinned: scrollChatMessagesToBottomIfPinned,
         settleToBottomIfFollowing: settleChatToBottomIfFollowing,
+        settleConversationRestoreToBottom: settleConversationRestoreToBottom,
         forceScrollToBottom: forceScrollChatToBottom,
         applyMessageScroll: applyMessageScrollOption,
         scrollIntoViewIfFollowing: scrollElementIntoViewIfFollowing,

@@ -1353,6 +1353,39 @@ func (db *DB) AddProcessDetailWithID(messageID, conversationID, eventType, messa
 	return id, nil
 }
 
+// UpdateProcessDetailContent 更新流式聚合详情的正文与元数据。使用固定记录 ID，
+// 避免每个 token 新增一行，同时让页面刷新能读取到尚未结束的规划输出。
+func (db *DB) UpdateProcessDetailContent(id, message string, data interface{}) error {
+	var dataJSON string
+	if data != nil {
+		jsonData, err := json.Marshal(data)
+		if err != nil {
+			return fmt.Errorf("序列化过程详情数据失败: %w", err)
+		}
+		dataJSON = string(jsonData)
+	}
+	result, err := db.Exec(
+		"UPDATE process_details SET message = ?, data = ? WHERE id = ?",
+		message, dataJSON, strings.TrimSpace(id),
+	)
+	if err != nil {
+		return fmt.Errorf("更新过程详情失败: %w", err)
+	}
+	if affected, affectedErr := result.RowsAffected(); affectedErr == nil && affected == 0 {
+		return fmt.Errorf("过程详情不存在: %s", id)
+	}
+	return nil
+}
+
+// DeleteProcessDetail 删除被判定为工具结果回显的临时规划记录。
+func (db *DB) DeleteProcessDetail(id string) error {
+	_, err := db.Exec("DELETE FROM process_details WHERE id = ?", strings.TrimSpace(id))
+	if err != nil {
+		return fmt.Errorf("删除过程详情失败: %w", err)
+	}
+	return nil
+}
+
 // GetProcessDetails 获取消息的过程详情
 func (db *DB) GetProcessDetails(messageID string) ([]ProcessDetail, error) {
 	rows, err := db.Query(

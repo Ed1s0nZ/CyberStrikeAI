@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const scroll = fs.readFileSync('web/static/js/chat-scroll.js', 'utf8');
 const monitor = fs.readFileSync('web/static/js/monitor.js', 'utf8');
 const chat = fs.readFileSync('web/static/js/chat.js', 'utf8');
+const router = fs.readFileSync('web/static/js/router.js', 'utf8');
 const html = fs.readFileSync('web/templates/index.html', 'utf8');
 
 function functionSource(source, name, nextName) {
@@ -43,6 +44,77 @@ test('刷新运行中任务补齐最新详情后保持粘底但尊重用户上�
     assert.match(settleSource, /Date\.now\(\) < detachLockUntil/);
     assert.match(settleSource, /settleFrame\(remaining - 1\)/);
     assert.match(settleSource, /scrollChatToBottomInstant\(\)/);
+    assert.match(scroll, /function settleConversationRestoreToBottom\(frameCount\)/);
+    assert.match(scroll, /CONVERSATION_RESTORE_SETTLE_MIN_MS = 3000/);
+    assert.match(scroll, /CONVERSATION_RESTORE_SETTLE_MAX_MS = 6000/);
+    assert.match(scroll, /const generation = \+\+conversationRestoreGeneration/);
+    assert.match(scroll, /scrollMode !== 'following'/);
+    assert.match(scroll, /stableFrames >= CONVERSATION_RESTORE_STABLE_FRAMES/);
+    assert.match(scroll, /requestAnimationFrame\(settleRestoreFrame\)/);
+    assert.match(chat, /settleConversationRestoreToBottom\(30\)/);
+});
+
+test('刷新后迭代思考区独立跟随最新内容且允许用户上滑解除', () => {
+    const startSource = functionSource(monitor, 'startProcessDetailsLatestFollow', 'loadProcessDetailsPaginated');
+    const loadSource = functionSource(monitor, 'loadProcessDetailsPaginated', 'shouldInitiallyOpenProcessDetailsAtLatest');
+    const attachSource = functionSource(monitor, 'attachRunningTaskEventStream', 'parseToolCallArgsFromData');
+
+    assert.match(startSource, /new MutationObserver\(scheduleFollowLatest\)/);
+    assert.match(startSource, /characterData: true/);
+    assert.match(startSource, /new ResizeObserver\(scheduleFollowLatest\)/);
+    assert.match(startSource, /scrollProcessDetailsToLatest\(String\(assistantMessageId \|\| ''\), false\)/);
+    assert.match(startSource, /event\.deltaY < -1/);
+    assert.match(startSource, /event\.clientX >= rect\.right - PROCESS_DETAILS_FOLLOW_SCROLLBAR_GUTTER_PX/);
+    assert.match(startSource, /event\.key === 'ArrowUp'/);
+    assert.match(startSource, /distance <= PROCESS_DETAILS_FOLLOW_RESUME_THRESHOLD_PX/);
+    assert.match(startSource, /state\.detached = false/);
+    assert.match(loadSource, /startProcessDetailsLatestFollow\(assistantMessageId/);
+    assert.match(attachSource, /startProcessDetailsLatestFollow\(asEl\.id, \{ persistent: true \}\)/);
+    assert.match(attachSource, /stopProcessDetailsLatestFollow\(asEl\.id\)/);
+});
+
+test('首次实时输出与刷新恢复都保留独立迭代滚动并跟随最新内容', () => {
+    const css = fs.readFileSync('web/static/css/style.css', 'utf8');
+    const addSource = functionSource(monitor, 'addProgressMessage', 'toggleProgressDetails');
+    const liveSource = functionSource(monitor, 'startLiveProgressLatestFollow', 'stopLiveProgressLatestFollow');
+
+    assert.match(css, /\.progress-container\.is-streaming \.progress-timeline\.expanded,[\s\S]{0,360}max-height: min\(64vh, 720px\);[\s\S]{0,180}overflow-y: auto;/);
+    assert.match(css, /\.message\.progress-message \.progress-timeline\.expanded \{[\s\S]{0,260}max-height: min\(64vh, 720px\);[\s\S]{0,160}overflow-y: auto;/);
+    assert.doesNotMatch(css, /流式执行中[\s\S]{0,320}overflow-y: visible;/);
+    assert.match(addSource, /startLiveProgressLatestFollow\(id\)/);
+    assert.match(liveSource, /stateKey: liveProgressLatestFollowKey\(id\)/);
+    assert.match(liveSource, /persistent: true/);
+    assert.match(liveSource, /target\.scrollTop = Math\.max\(0, target\.scrollHeight - target\.clientHeight\)/);
+    assert.match(monitor, /function finalizeProgressTask\(progressId, finalLabel\) \{[\s\S]{0,120}stopLiveProgressLatestFollow\(progressId\)/);
+});
+
+test('同一会话的其他标签页自动补流且发送前阻止重复任务', () => {
+    const syncSource = functionSource(monitor, 'syncVisibleConversationTaskReplay', 'getActiveTaskDisplayName');
+    const sendSource = functionSource(chat, 'sendMessage', 'renderChatFileChips');
+
+    assert.match(monitor, /new BroadcastChannel\(CHAT_TASK_SYNC_CHANNEL_NAME\)/);
+    assert.match(monitor, /payload\.type !== 'task-started'/);
+    assert.match(monitor, /conversationExecutionTracker\.markRunning\(id\)/);
+    assert.match(syncSource, /await window\.loadConversation\(conversationId\)/);
+    assert.match(syncSource, /return attachRunningTaskEventStream\(conversationId\)/);
+    assert.match(monitor, /syncVisibleConversationTaskReplay\(normalizedTasks\)/);
+    assert.match(sendSource, /await loadActiveTasks\(\)/);
+    assert.match(sendSource, /if \(isCurrentChatTaskActive\(\)\)/);
+    assert.ok(sendSource.indexOf('if (isCurrentChatTaskActive())') < sendSource.indexOf("addMessage('user'"));
+    assert.match(sendSource, /window\.notifyConversationTaskStarted\(streamConversationId\)/);
+});
+
+test('刷新补流在订阅竞态或终态帧丢失时从数据库对账最终正文', () => {
+    const attachSource = functionSource(monitor, 'attachRunningTaskEventStream', 'parseToolCallArgsFromData');
+    const reconcileSource = functionSource(monitor, 'reconcileConversationAfterTaskReplay', 'cancelRunningTaskEventStream');
+
+    assert.match(attachSource, /const eventStreamResponsePromise = apiFetch\(url/);
+    assert.ok(attachSource.indexOf('const eventStreamResponsePromise') < attachSource.indexOf('loadProcessDetailsPaginated'));
+    assert.match(attachSource, /if \(!active\) \{[\s\S]*?assistantMessageNeedsTaskReplayReconcile\(staleAssistant\)[\s\S]*?reconcileConversationAfterTaskReplay\(conversationId, true\)/);
+    assert.match(attachSource, /if \(!response\.ok\) \{[\s\S]*?reconcileConversationAfterTaskReplay\(conversationId, true\)/);
+    assert.match(attachSource, /if \(!replaySawDone\) \{[\s\S]*?reconcileConversationAfterTaskReplay/);
+    assert.match(reconcileSource, /updateAssistantBubbleContent\(assistantEl\.id, finalMessage\.content \|\| '', true\)/);
+    assert.match(reconcileSource, /loadProcessDetailsPaginated\(assistantEl\.id, finalMessage\.id,[\s\S]*?initialLatest: true,[\s\S]*?autoLoadAll: false/);
 });
 
 test('消息气泡内部流式增高时仅在跟随模式继续粘底', () => {
@@ -51,14 +123,17 @@ test('消息气泡内部流式增高时仅在跟随模式继续粘底', () => {
     assert.match(bindSource, /scrollMode === 'following'/);
     assert.match(bindSource, /scheduleChatScrollToBottomIfFollowing\(true\)/);
     assert.match(bindSource, /\{ childList: true, subtree: true, characterData: true \}/);
+    assert.match(bindSource, /new ResizeObserver/);
+    assert.match(bindSource, /chatMessagesResizeObserver\.observe\(el\)/);
+    assert.match(bindSource, /改变消息区 clientHeight/);
     assert.match(bindSource, /e\.deltaY < -1/);
     assert.match(bindSource, /e\.clientX >= rect\.right - 18/);
     assert.match(bindSource, /e\.key === 'ArrowUp'/);
 });
 
 test('页面在任务补流脚本之前加载智能滚动控制器', () => {
-    const scrollIndex = html.indexOf('/static/js/chat-scroll.js?v=20260812-2');
-    const monitorIndex = html.indexOf('/static/js/monitor.js?v=20260812-5');
+    const scrollIndex = html.indexOf('/static/js/chat-scroll.js?v=20260813-3');
+    const monitorIndex = html.indexOf('/static/js/monitor.js?v=20260813-5');
 
     assert.notEqual(scrollIndex, -1);
     assert.notEqual(monitorIndex, -1);
@@ -75,6 +150,42 @@ test('直接点击项目对话也会写入 hash 以便刷新后恢复并补流',
     assert.match(syncSource, /window\.history\.replaceState/);
     assert.match(loadSource, /syncChatConversationHash\(conversationId\)/);
     assert.match(streamSource, /window\.syncChatConversationHash\(cid\)/);
+});
+
+test('刷新指定对话时立即恢复且加载完成前不闪出无项目状态', () => {
+    const scheduleSource = functionSource(router, 'scheduleChatConversationFromHash', 'navigateToConversation');
+    const restoreStateSource = functionSource(router, 'setChatConversationRestorePending', 'finishChatConversationRestore');
+    const loadSource = functionSource(chat, 'loadConversation', 'attachDeleteTurnButton');
+    const css = fs.readFileSync('web/static/css/style.css', 'utf8');
+
+    assert.match(router, /scheduleChatConversationFromHash\(0\)/);
+    assert.doesNotMatch(router, /scheduleChatConversationFromHash\((200|500)\)/);
+    assert.match(scheduleSource, /setChatConversationRestorePending\(conversationId, true\)/);
+    assert.match(restoreStateSource, /is-conversation-restoring/);
+    assert.match(restoreStateSource, /aria-busy/);
+    assert.match(loadSource, /finally \{[\s\S]*?finishChatConversationRestore\(conversationId\)/);
+    assert.match(css, /\.chat-container\.is-conversation-restoring #chat-messages/);
+    assert.match(css, /\.chat-container\.is-conversation-restoring #chat-input-container/);
+    assert.match(html, /router\.js\?v=20260813-2/);
+    assert.match(html, /chat\.js\?v=20260813-2/);
+});
+
+test('刷新运行中回复会复用已持久化 planning 并继续追加未来增量', () => {
+    const findSource = functionSource(monitor, 'findRestoredMainResponseStreamItem', 'responseStreamStateFromRestoredItem');
+    const handleSource = functionSource(monitor, 'handleStreamEvent', 'hitlApprovalTranslate');
+
+    assert.match(findSource, /timeline-item-planning/);
+    assert.match(findSource, /dataset\.responseStreamId/);
+    assert.match(handleSource, /case 'response_start':[\s\S]*?findRestoredMainResponseStreamItem/);
+    assert.match(handleSource, /case 'response_delta':[\s\S]*?responseStreamStateFromRestoredItem/);
+    assert.match(monitor, /item\.dataset\.responseStreamId = String\(options\.data\.streamId\)/);
+});
+
+test('非仪表盘 hash 首屏在路由确定前隐藏默认仪表盘', () => {
+    const css = fs.readFileSync('web/static/css/style.css', 'utf8');
+    assert.match(html, /document\.documentElement\.classList\.add\('initial-route-pending'\)/);
+    assert.match(router, /document\.documentElement\.classList\.remove\('initial-route-pending'\)/);
+    assert.match(css, /html\.initial-route-pending \.content-area \{[\s\S]*?visibility: hidden;/);
 });
 
 test('刷新恢复运行中助手消息时隐藏处理中占位且终态正文会重新显示', () => {
@@ -102,4 +213,11 @@ test('暗色模式用户气泡使用协调的深蓝灰层级', () => {
     const css = fs.readFileSync('web/static/css/style.css', 'utf8');
     assert.match(css, /html\[data-theme="dark"\] \.message\.user \.message-bubble \{[\s\S]*?background: #1b2638;/);
     assert.match(css, /border-color: rgba\(96, 165, 250, 0\.18\)/);
+});
+
+test('暗色模式对话三点悬浮不会触发浅色父行背景', () => {
+    const css = fs.readFileSync('web/static/css/style.css', 'utf8');
+    assert.match(css, /html\[data-theme="dark"\] \.project-conversation-row:hover \.project-conversation-item/);
+    assert.match(css, /html\[data-theme="dark"\] \.project-folder-action:hover,[\s\S]*?background: rgba\(71, 85, 105, 0\.28\);[\s\S]*?box-shadow: none;/);
+    assert.match(html, /style\.css\?v=20260813-5/);
 });

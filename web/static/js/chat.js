@@ -2057,6 +2057,17 @@ async function sendMessage() {
         return;
     }
 
+    // Enter 会直接调用 sendMessage；同一会话在其他标签页已启动任务时，
+    // 必须在渲染用户气泡和发起 POST 前做一次权威状态同步，避免生成一轮“已有任务执行中”伪对话。
+    if (currentConversationId && typeof loadActiveTasks === 'function') {
+        await loadActiveTasks();
+    }
+    if (isCurrentChatTaskActive()) {
+        updateChatPrimaryActionState();
+        showChatToast(chatTranslate('chat.taskAlreadyRunning', '当前会话已有任务正在执行，请先等待完成或停止任务。'), 'info');
+        return;
+    }
+
     if (hasAttachments) {
         const needWait = chatAttachments.some((a) => a.uploading);
         if (needWait) {
@@ -2184,6 +2195,9 @@ async function sendMessage() {
         detached: false
     };
     window.__csAgentLiveStream = liveStreamState;
+    if (streamConversationId && typeof window.notifyConversationTaskStarted === 'function') {
+        window.notifyConversationTaskStarted(streamConversationId);
+    }
     updateChatPrimaryActionState();
     loadActiveTasks();
     let assistantMessageId = null;
@@ -6083,6 +6097,12 @@ async function loadConversation(conversationId) {
             if (currentConversationId === conversationId && typeof window.restoreHitlInlineForConversation === 'function') {
                 await window.restoreHitlInlineForConversation(conversationId);
             }
+            if (
+                window.CyberStrikeChatScroll &&
+                typeof window.CyberStrikeChatScroll.settleConversationRestoreToBottom === 'function'
+            ) {
+                window.CyberStrikeChatScroll.settleConversationRestoreToBottom(30);
+            }
         } else {
             renderChatWelcomeEmptyState();
             if (window.CyberStrikeChatScroll) {
@@ -6127,6 +6147,9 @@ async function loadConversation(conversationId) {
         console.error('加载对话失败:', error);
         showChatToast('加载对话失败: ' + (error && error.message ? error.message : String(error)), 'error');
     } finally {
+        if (seq === loadConversationRequestSeq && typeof window.finishChatConversationRestore === 'function') {
+            window.finishChatConversationRestore(conversationId);
+        }
         if (loadConversationAbortController === conversationLoadController) {
             loadConversationAbortController = null;
         }

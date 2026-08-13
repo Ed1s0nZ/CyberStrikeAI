@@ -23,10 +23,18 @@
             }
         })();
     </script>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260813-1">
+    <script>
+        (function () {
+            var initialPage = String(window.location.hash || '').replace(/^#/, '').split('?')[0];
+            if (initialPage && initialPage !== 'dashboard') {
+                document.documentElement.classList.add('initial-route-pending');
+            }
+        })();
+    </script>
+    <link rel="stylesheet" href="/static/css/style.css?v=20260813-5">
     <link rel="stylesheet" href="/static/css/c2.css">
     <link rel="stylesheet" href="/static/vendor/xterm.css">
-    <script src="/static/js/router.js"></script>
+    <script src="/static/js/router.js?v=20260813-2"></script>
 </head>
 <body>
     <div id="login-overlay" class="login-overlay" style="display: none;">
@@ -6810,9 +6818,9 @@
     <script src="/static/js/assets.js?v=20260717-7"></script>
     <script src="/static/js/agents.js"></script>
     <script src="/static/js/dashboard.js"></script>
-    <script src="/static/js/chat-scroll.js?v=20260812-2"></script>
-    <script src="/static/js/monitor.js?v=20260812-5"></script>
-    <script src="/static/js/chat.js?v=20260812-8"></script>
+    <script src="/static/js/chat-scroll.js?v=20260813-3"></script>
+    <script src="/static/js/monitor.js?v=20260813-5"></script>
+    <script src="/static/js/chat.js?v=20260813-2"></script>
     <script src="/static/js/hitl.js?v=20260811-4"></script>
     <script src="/static/js/settings.js?v=20260717-1"></script>
     <script src="/static/js/audit-datetime-picker.js"></script>
