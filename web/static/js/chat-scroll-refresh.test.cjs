@@ -139,15 +139,32 @@ test('用户真正滑到底部后恢复自动跟随且不会提前强制跳底',
     assert.match(scroll, /CHAT_SCROLL_FOLLOW_RESUME_THRESHOLD_PX = 2/);
     assert.doesNotMatch(captureSource, /resumeFollowingIfAtBottom/);
     assert.doesNotMatch(autoSource, /resumeFollowingIfAtBottom/);
+    assert.match(resumeSource, /if \(!userInitiated\) return false/);
     assert.match(scrollSource, /scrolledDown/);
-    assert.match(scrollSource, /scrolledDown && isNearBottom\(CHAT_SCROLL_FOLLOW_RESUME_THRESHOLD_PX\)/);
-    assert.match(scrollSource, /setScrollFollowing\(\)/);
+    assert.match(scrollSource, /hasUserScrollIntent/);
+    assert.match(scrollSource, /resumeFollowingIfAtBottom\(CHAT_SCROLL_FOLLOW_RESUME_THRESHOLD_PX, true\)/);
     assert.doesNotMatch(scrollSource, /resumeFollowingIfAtBottom\(CHAT_SCROLL_NAV_BOTTOM_THRESHOLD_PX\)/);
     assert.doesNotMatch(scrollSource, /else if \(resumeFollowingIfAtBottom\(\)\)/);
     assert.doesNotMatch(scrollSource, /scheduleChatScrollToBottomIfFollowing\(true\)/);
+    assert.doesNotMatch(scrollSource, /else if \(resumeFollowingIfAtBottom\(\)\)/);
     assert.match(scrollSource, /contentShrank/);
     assert.match(scrollSource, /sh < lastScrollHeight - 1/);
-    assert.match(scrollSource, /scrollMode === 'detached' \|\| Date\.now\(\) <= upwardScrollIntentUntil/);
+    assert.match(scrollSource, /if \(scrolledUp\) \{[\s\S]*?setScrollDetached\(\)/);
+    assert.match(scrollSource, /if \(programmaticScroll\) \{[\s\S]*?st < lastScrollTop - 1[\s\S]*?setScrollDetached\(\)/);
+});
+
+test('切换对话模式引起的布局滚动不会重新开启粘底', () => {
+    const scrollSource = functionSource(scroll, 'onChatMessagesScroll', 'bindChatScrollListeners');
+    const bindSource = functionSource(scroll, 'bindChatScrollListeners', 'initChatScroll');
+    const selectModeSource = functionSource(chat, 'selectAgentMode', 'initChatAgentModeFromConfig');
+
+    assert.match(scroll, /let userScrollIntentUntil = 0/);
+    assert.match(scrollSource, /const hasUserScrollIntent = Date\.now\(\) <= userScrollIntentUntil/);
+    assert.match(scrollSource, /scrolledDown &&[\s\S]*?hasUserScrollIntent &&[\s\S]*?resumeFollowingIfAtBottom/);
+    assert.doesNotMatch(scrollSource, /else if \(resumeFollowingIfAtBottom\(\)\)/);
+    assert.match(bindSource, /Math\.abs\(e\.deltaY\) > 1/);
+    assert.match(bindSource, /userScrollIntentUntil = Date\.now\(\) \+ 1800/);
+    assert.doesNotMatch(selectModeSource, /setScrollFollowing|forceScrollToBottom|scrollTop/);
 });
 
 test('刷新运行中任务补齐最新详情后保持粘底但尊重用户上滑', () => {
@@ -183,18 +200,37 @@ test('刷新后迭代思考区独立跟随最新内容且允许用户上滑解�
     assert.match(startSource, /characterData: true/);
     assert.match(startSource, /new ResizeObserver\(scheduleFollowLatest\)/);
     assert.match(startSource, /scrollProcessDetailsToLatest\(String\(assistantMessageId \|\| ''\), false\)/);
-    assert.match(startSource, /event\.deltaY < 0/);
+    assert.match(startSource, /event\.deltaY < -1/);
+    assert.match(startSource, /state\.userScrollIntentUntil = Date\.now\(\) \+ 1200/);
     assert.match(startSource, /event\.clientX >= rect\.right - PROCESS_DETAILS_FOLLOW_SCROLLBAR_GUTTER_PX/);
     assert.match(startSource, /event\.key === 'ArrowUp'/);
     assert.match(startSource, /cancelAnimationFrame\(state\.rafId\)/);
-    assert.match(startSource, /const scrolledUp = currentTop < state\.lastScrollTop - 0\.5/);
-    assert.match(startSource, /state\.detached && scrolledDown && distance <= PROCESS_DETAILS_FOLLOW_RESUME_THRESHOLD_PX/);
+    assert.match(startSource, /if \(scrolledUp\) \{[\s\S]*?detachForUserNavigation\(\)/);
+    assert.match(startSource, /state\.detached &&[\s\S]*?scrolledDown &&[\s\S]*?Date\.now\(\) <= state\.userScrollIntentUntil/);
     assert.match(monitor, /PROCESS_DETAILS_FOLLOW_RESUME_THRESHOLD_PX = 2/);
     assert.match(startSource, /distance <= PROCESS_DETAILS_FOLLOW_RESUME_THRESHOLD_PX/);
     assert.match(startSource, /state\.detached = false/);
+    assert.doesNotMatch(startSource, /if \(distance <= PROCESS_DETAILS_FOLLOW_RESUME_THRESHOLD_PX\) \{\s*state\.detached = false/);
     assert.match(loadSource, /startProcessDetailsLatestFollow\(assistantMessageId/);
     assert.match(attachSource, /startProcessDetailsLatestFollow\(asEl\.id, \{ persistent: true \}\)/);
     assert.match(attachSource, /stopProcessDetailsLatestFollow\(asEl\.id\)/);
+});
+
+test('刷新后的工具调用恢复与实时一致的成功失败徽标', () => {
+    const renderSource = functionSource(chat, 'renderProcessDetails', 'finishProcessDetailsRender');
+    const presentationSource = functionSource(monitor, 'getToolCallStatusPresentation', 'applyToolCallStatus');
+    const applySource = functionSource(monitor, 'applyToolCallStatus', 'updateToolCallStatus');
+    const addSource = functionSource(monitor, 'addTimelineItem', 'loadActiveTasks');
+
+    assert.match(renderSource, /toolStatusByProcessDetailId/);
+    assert.match(renderSource, /timelineOpts\.toolStatus = toolStatusByProcessDetailId\.get/);
+    assert.match(presentationSource, /normalized === 'completed'/);
+    assert.match(presentationSource, /normalized === 'failed'/);
+    assert.match(applySource, /tool-status-badge/);
+    assert.match(applySource, /item\.dataset\.toolDisplayStatus = presentation\.status/);
+    assert.match(addSource, /initialToolStatus = item\.dataset\.toolDisplayStatus/);
+    assert.match(addSource, /applyToolCallStatus\(item, initialToolStatus\)/);
+    assert.match(monitor, /refreshProgressAndTimelineI18n\(\)[\s\S]*?applyToolCallStatus\(item, item\.dataset\.toolDisplayStatus\)/);
 });
 
 test('首次实时输出与刷新恢复都保留独立迭代滚动并跟随最新内容', () => {
@@ -250,14 +286,15 @@ test('消息气泡内部流式增高时仅在跟随模式继续粘底', () => {
     assert.match(bindSource, /new ResizeObserver/);
     assert.match(bindSource, /chatMessagesResizeObserver\.observe\(el\)/);
     assert.match(bindSource, /改变消息区 clientHeight/);
-    assert.match(bindSource, /e\.deltaY < 0/);
+    assert.match(bindSource, /Math\.abs\(e\.deltaY\) > 1/);
+    assert.match(bindSource, /e\.deltaY < -1/);
     assert.match(bindSource, /e\.clientX >= rect\.right - 18/);
     assert.match(bindSource, /e\.key === 'ArrowUp'/);
 });
 
 test('页面在任务补流脚本之前加载智能滚动控制器', () => {
-    const scrollIndex = html.indexOf('/static/js/chat-scroll.js?v=20260813-4');
-    const monitorIndex = html.indexOf('/static/js/monitor.js?v=20260813-7');
+    const scrollIndex = html.indexOf('/static/js/chat-scroll.js?v=20260813-5');
+    const monitorIndex = html.indexOf('/static/js/monitor.js?v=20260813-8');
 
     assert.notEqual(scrollIndex, -1);
     assert.notEqual(monitorIndex, -1);

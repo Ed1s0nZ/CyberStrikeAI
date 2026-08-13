@@ -30,7 +30,8 @@
     let lastScrollHeight = 0;
     let programmaticScroll = false;
     let detachLockUntil = 0;
-    let upwardScrollIntentUntil = 0;
+    /** 最近一次由用户发起的滚动意图；布局变化或脚本滚动不得据此恢复粘底。 */
+    let userScrollIntentUntil = 0;
     let turnRailRefreshRaf = 0;
     let turnRailSignature = '';
     let activeTurnIndex = -1;
@@ -344,13 +345,18 @@
     }
 
     /** 已在底部时恢复 following（解决：手动滚到底但 scrollMode 仍为 detached） */
-    function resumeFollowingIfAtBottom(thresholdPx) {
-        if (Date.now() < detachLockUntil) return false;
+    function resumeFollowingIfAtBottom(thresholdPx, userInitiated) {
+        if (!userInitiated && Date.now() < detachLockUntil) return false;
         const threshold = Number.isFinite(Number(thresholdPx))
             ? Math.max(0, Number(thresholdPx))
             : CHAT_SCROLL_FOLLOW_RESUME_THRESHOLD_PX;
         if (!isNearBottom(threshold)) return false;
-        if (scrollMode === 'detached') setScrollFollowing();
+        // detached 是用户明确上滑后的阅读状态。布局变化、流式增高和模式切换
+        // 即使让视口暂时接近底部，也不能自行恢复；只有用户明确向下滚到底才恢复。
+        if (scrollMode === 'detached') {
+            if (!userInitiated) return false;
+            setScrollFollowing();
+        }
         return true;
     }
 
@@ -362,7 +368,7 @@
     function setScrollFollowing() {
         scrollMode = 'following';
         detachLockUntil = 0;
-        upwardScrollIntentUntil = 0;
+        userScrollIntentUntil = 0;
         hasPendingNewBelow = false;
         updateTurnRailState();
     }
@@ -639,17 +645,25 @@
         const el = getChatMessagesEl();
         if (!el) return;
 
+        const st = el.scrollTop;
+        const sh = el.scrollHeight;
+
         if (programmaticScroll) {
-            lastScrollTop = el.scrollTop;
+            // 正在执行恢复/流式粘底时，用户仍可能反向滚轮或拖动滚动条。
+            // 脚本滚底只会让 scrollTop 增大；此处出现减小必定是用户在中断跟随。
+            if (st < lastScrollTop - 1) {
+                setScrollDetached();
+            }
+            lastScrollTop = st;
+            lastScrollHeight = sh;
             updateTurnRailState();
             return;
         }
 
-        const st = el.scrollTop;
-        const sh = el.scrollHeight;
         const scrolledUp = st < lastScrollTop - 1;
         const scrolledDown = st > lastScrollTop + 1;
         const contentShrank = sh < lastScrollHeight - 1;
+        const hasUserScrollIntent = Date.now() <= userScrollIntentUntil;
 
         // 刷新/终态重绘会先清空或折叠旧 DOM，浏览器会被动把 scrollTop 压小。
         // 这不是用户上滑，不应错误退出 following。
@@ -660,13 +674,14 @@
             return;
         }
 
-        if (scrolledUp && (scrollMode === 'detached' || Date.now() <= upwardScrollIntentUntil)) {
+        if (scrolledUp) {
             setScrollDetached();
-        } else if (scrolledDown && isNearBottom(CHAT_SCROLL_FOLLOW_RESUME_THRESHOLD_PX)) {
-            // 用户明确向下滚到真实底部时立即恢复，不受上滑防抢锁影响。
-            // 否则快速“上滑查看 → 立刻滚回底部”会在锁结束后仍卡在 detached。
-            setScrollFollowing();
-            // 仅在用户确实滚到最底部时恢复跟随，不主动改写 scrollTop。
+        } else if (
+            scrolledDown &&
+            hasUserScrollIntent &&
+            resumeFollowingIfAtBottom(CHAT_SCROLL_FOLLOW_RESUME_THRESHOLD_PX, true)
+        ) {
+            // 仅在用户明确向下滚动并到达真实底部时恢复跟随，不主动改写 scrollTop。
             // 后续新增内容再按 following 状态自然粘底，避免接近底部时突然跳动。
         }
 
@@ -684,8 +699,10 @@
         lastScrollHeight = el.scrollHeight;
 
         el.addEventListener('wheel', function (e) {
-            if (e.deltaY < 0) {
-                upwardScrollIntentUntil = Date.now() + 1200;
+            if (Math.abs(e.deltaY) > 1) {
+                userScrollIntentUntil = Date.now() + 1200;
+            }
+            if (e.deltaY < -1) {
                 setScrollDetached();
             }
         }, { passive: true });
@@ -694,22 +711,25 @@
         el.addEventListener('pointerdown', function (e) {
             const rect = el.getBoundingClientRect();
             if (e.clientX >= rect.right - 18) {
-                upwardScrollIntentUntil = Date.now() + 1800;
+                userScrollIntentUntil = Date.now() + 1800;
             }
         }, { passive: true });
 
         el.addEventListener('keydown', function (e) {
-            if (e.key === 'ArrowUp' || e.key === 'PageUp' || e.key === 'Home') {
-                upwardScrollIntentUntil = Date.now() + 1200;
+            const scrollKeys = ['ArrowUp', 'PageUp', 'Home', 'ArrowDown', 'PageDown', 'End', ' '];
+            if (scrollKeys.includes(e.key)) {
+                userScrollIntentUntil = Date.now() + 1200;
+            }
+            if (e.key === 'ArrowUp' || e.key === 'PageUp' || e.key === 'Home' || (e.key === ' ' && e.shiftKey)) {
                 setScrollDetached();
             }
         });
 
         el.addEventListener('touchmove', function (e) {
             if (e.touches && e.touches.length === 1) {
+                userScrollIntentUntil = Date.now() + 1200;
                 el._csTouchLastY = el._csTouchLastY != null ? el._csTouchLastY : e.touches[0].clientY;
                 if (e.touches[0].clientY > el._csTouchLastY + 4) {
-                    upwardScrollIntentUntil = Date.now() + 1200;
                     setScrollDetached();
                 }
                 el._csTouchLastY = e.touches[0].clientY;

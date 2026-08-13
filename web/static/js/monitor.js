@@ -1989,7 +1989,8 @@ function startProcessDetailsLatestFollow(assistantMessageId, options) {
         detached: false,
         persistent: persistent,
         lastScrollTop: timeline.scrollTop,
-        upwardIntentUntil: 0,
+        userScrollIntentUntil: 0,
+        touchLastY: null,
         rafId: 0,
         timeoutId: 0,
         observer: null,
@@ -2006,36 +2007,62 @@ function startProcessDetailsLatestFollow(assistantMessageId, options) {
         }
     };
     const onWheel = function (event) {
-        if (event && event.deltaY < 0) {
-            state.upwardIntentUntil = Date.now() + 1200;
-            detachForUserNavigation();
+        if (!event) return;
+        if (Math.abs(event.deltaY) > 1) {
+            state.userScrollIntentUntil = Date.now() + 1200;
         }
+        if (event.deltaY < -1) detachForUserNavigation();
     };
     const onPointerDown = function (event) {
         if (!event) return;
         const rect = timeline.getBoundingClientRect();
         if (event.clientX >= rect.right - PROCESS_DETAILS_FOLLOW_SCROLLBAR_GUTTER_PX) {
-            detachForUserNavigation();
+            state.userScrollIntentUntil = Date.now() + 1800;
         }
     };
     const onKeyDown = function (event) {
         if (!event) return;
+        if (['ArrowUp', 'PageUp', 'Home', 'ArrowDown', 'PageDown', 'End', ' '].includes(event.key)) {
+            state.userScrollIntentUntil = Date.now() + 1200;
+        }
         if (event.key === 'ArrowUp' || event.key === 'PageUp' || event.key === 'Home') {
             detachForUserNavigation();
         }
     };
-    const onTouchStart = function () {
-        detachForUserNavigation();
+    const onTouchStart = function (event) {
+        if (!event || !event.touches || event.touches.length !== 1) return;
+        state.touchLastY = event.touches[0].clientY;
+        state.userScrollIntentUntil = Date.now() + 1200;
+    };
+    const onTouchMove = function (event) {
+        if (!event || !event.touches || event.touches.length !== 1) return;
+        const nextY = event.touches[0].clientY;
+        state.userScrollIntentUntil = Date.now() + 1200;
+        if (state.touchLastY != null && nextY > state.touchLastY + 4) {
+            detachForUserNavigation();
+        }
+        state.touchLastY = nextY;
+    };
+    const onTouchEnd = function () {
+        state.touchLastY = null;
     };
     const onScroll = function () {
         if (state.stopped) return;
         const currentTop = timeline.scrollTop;
-        const scrolledUp = currentTop < state.lastScrollTop - 0.5;
-        const scrolledDown = currentTop > state.lastScrollTop + 0.5;
+        const scrolledUp = currentTop < state.lastScrollTop - 1;
+        const scrolledDown = currentTop > state.lastScrollTop + 1;
         const distance = Math.max(0, timeline.scrollHeight - timeline.clientHeight - timeline.scrollTop);
-        if (scrolledUp && (state.detached || Date.now() <= state.upwardIntentUntil)) {
+
+        // 第一次小幅上滑时仍可能处在“距底部 32px”阈值内，不能在同一个 scroll
+        // 事件里刚脱离又立即恢复，否则持续输出会把视口反复拉回底部。
+        if (scrolledUp) {
             detachForUserNavigation();
-        } else if (state.detached && scrolledDown && distance <= PROCESS_DETAILS_FOLLOW_RESUME_THRESHOLD_PX) {
+        } else if (
+            state.detached &&
+            scrolledDown &&
+            Date.now() <= state.userScrollIntentUntil &&
+            distance <= PROCESS_DETAILS_FOLLOW_RESUME_THRESHOLD_PX
+        ) {
             state.detached = false;
             scheduleFollowLatest();
         }
@@ -2045,11 +2072,15 @@ function startProcessDetailsLatestFollow(assistantMessageId, options) {
     timeline.addEventListener('pointerdown', onPointerDown, { passive: true });
     timeline.addEventListener('keydown', onKeyDown);
     timeline.addEventListener('touchstart', onTouchStart, { passive: true });
+    timeline.addEventListener('touchmove', onTouchMove, { passive: true });
+    timeline.addEventListener('touchend', onTouchEnd, { passive: true });
     timeline.addEventListener('scroll', onScroll, { passive: true });
     state.cleanup.push(function () { timeline.removeEventListener('wheel', onWheel); });
     state.cleanup.push(function () { timeline.removeEventListener('pointerdown', onPointerDown); });
     state.cleanup.push(function () { timeline.removeEventListener('keydown', onKeyDown); });
     state.cleanup.push(function () { timeline.removeEventListener('touchstart', onTouchStart); });
+    state.cleanup.push(function () { timeline.removeEventListener('touchmove', onTouchMove); });
+    state.cleanup.push(function () { timeline.removeEventListener('touchend', onTouchEnd); });
     state.cleanup.push(function () { timeline.removeEventListener('scroll', onScroll); });
 
     const followLatest = function () {
@@ -5759,6 +5790,7 @@ function mergeToolResultIntoCallItem(item, data, options) {
         item.dataset.toolDisplayStatus = backgroundRunning ? 'background_running' : (displayState.isError ? 'failed' : 'completed');
         item.classList.remove('tool-call-running', 'tool-call-completed', 'tool-call-failed');
         item.classList.add(backgroundRunning ? 'tool-call-running' : (displayState.isError ? 'tool-call-failed' : 'tool-call-completed'));
+        applyToolCallStatus(item, item.dataset.toolDisplayStatus);
         return true;
     }
 
@@ -5798,6 +5830,7 @@ function mergeToolResultIntoCallItem(item, data, options) {
     item.dataset.toolDisplayStatus = backgroundRunning ? 'background_running' : (displayState.isError ? 'failed' : 'completed');
     item.classList.remove('tool-call-running', 'tool-call-completed', 'tool-call-failed');
     item.classList.add(backgroundRunning ? 'tool-call-running' : (displayState.isError ? 'tool-call-failed' : 'tool-call-completed'));
+    applyToolCallStatus(item, item.dataset.toolDisplayStatus);
     return true;
 }
 
@@ -5908,6 +5941,54 @@ window.getToolResultDisplayState = getToolResultDisplayState;
 window.getBackgroundRunningToolLabel = getBackgroundRunningToolLabel;
 window.buildToolResultSectionHtml = buildToolResultSectionHtml;
 
+function getToolCallStatusPresentation(status) {
+    const normalized = String(status || '').toLowerCase();
+    const translate = function (key, fallback) {
+        if (typeof window.t !== 'function') return fallback;
+        const value = window.t(key);
+        return value && value !== key ? value : fallback;
+    };
+    if (normalized === 'running') {
+        return { status: normalized, itemClass: 'tool-call-running', badgeClass: 'tool-status-running', label: translate('timeline.running', '执行中...'), icon: '' };
+    }
+    if (normalized === 'background_running') {
+        return { status: normalized, itemClass: 'tool-call-running', badgeClass: 'tool-status-running', label: getBackgroundRunningToolLabel(), icon: '' };
+    }
+    if (normalized === 'completed') {
+        return { status: normalized, itemClass: 'tool-call-completed', badgeClass: 'tool-status-completed', label: translate('timeline.completed', '已完成'), icon: '✅ ' };
+    }
+    if (normalized === 'failed') {
+        return { status: normalized, itemClass: 'tool-call-failed', badgeClass: 'tool-status-failed', label: translate('timeline.execFailed', '执行失败'), icon: '❌ ' };
+    }
+    if (normalized === 'result_missing') {
+        return { status: normalized, itemClass: 'tool-call-incomplete', badgeClass: 'tool-status-incomplete', label: translate('timeline.resultMissing', '结果记录缺失'), icon: '⚠️ ' };
+    }
+    return null;
+}
+
+// 实时事件、刷新后的历史记录和语言切换都复用同一套工具状态展示。
+function applyToolCallStatus(item, status) {
+    if (!item) return;
+    const presentation = getToolCallStatusPresentation(status);
+    const titleElement = item.querySelector('.timeline-item-title');
+    if (!titleElement) return;
+
+    item.classList.remove('tool-call-running', 'tool-call-completed', 'tool-call-failed', 'tool-call-incomplete');
+    const previousBadge = titleElement.querySelector('.tool-status-badge');
+    if (previousBadge) previousBadge.remove();
+    if (!presentation) {
+        delete item.dataset.toolDisplayStatus;
+        return;
+    }
+
+    item.dataset.toolDisplayStatus = presentation.status;
+    item.classList.add(presentation.itemClass);
+    const badge = document.createElement('span');
+    badge.className = 'tool-status-badge ' + presentation.badgeClass;
+    badge.textContent = presentation.icon + presentation.label;
+    titleElement.appendChild(badge);
+}
+
 // 更新工具调用状态
 function updateToolCallStatus(progressId, toolCallId, status) {
     const mapping = getToolCallMapping(progressId, toolCallId);
@@ -5916,35 +5997,7 @@ function updateToolCallStatus(progressId, toolCallId, status) {
     const item = document.getElementById(mapping.itemId);
     if (!item) return;
     
-    const titleElement = item.querySelector('.timeline-item-title');
-    if (!titleElement) return;
-    
-    // 移除之前的状态类
-    item.classList.remove('tool-call-running', 'tool-call-completed', 'tool-call-failed');
-    
-    const runningLabel = typeof window.t === 'function' ? window.t('timeline.running') : '执行中...';
-    const completedLabel = typeof window.t === 'function' ? window.t('timeline.completed') : '已完成';
-    const failedLabel = typeof window.t === 'function' ? window.t('timeline.execFailed') : '执行失败';
-    const backgroundRunningLabel = getBackgroundRunningToolLabel();
-    let statusText = '';
-    if (status === 'running' || status === 'background_running') {
-        item.classList.add('tool-call-running');
-        statusText = ' <span class="tool-status-badge tool-status-running">' +
-            escapeHtml(status === 'background_running' ? backgroundRunningLabel : runningLabel) +
-            '</span>';
-    } else if (status === 'completed') {
-        item.classList.add('tool-call-completed');
-        statusText = ' <span class="tool-status-badge tool-status-completed">✅ ' + escapeHtml(completedLabel) + '</span>';
-    } else if (status === 'failed') {
-        item.classList.add('tool-call-failed');
-        statusText = ' <span class="tool-status-badge tool-status-failed">❌ ' + escapeHtml(failedLabel) + '</span>';
-    }
-    
-    // 更新标题（保留原有文本，追加状态）
-    const originalText = titleElement.innerHTML;
-    // 移除之前可能存在的状态标记
-    const cleanText = originalText.replace(/\s*<span class="tool-status-badge[^>]*>.*?<\/span>/g, '');
-    titleElement.innerHTML = cleanText + statusText;
+    applyToolCallStatus(item, status);
 }
 
 // 添加时间线项目
@@ -6103,10 +6156,15 @@ function addTimelineItem(timeline, type, options) {
             }
         } else if (terminalStatus === 'completed' || terminalStatus === 'failed') {
             item.dataset.toolSuccess = terminalStatus === 'completed' ? '1' : '0';
+            item.dataset.toolDisplayStatus = terminalStatus;
             item.classList.add(terminalStatus === 'completed' ? 'tool-call-completed' : 'tool-call-failed');
         } else if (terminalStatus === 'result_missing') {
+            item.dataset.toolDisplayStatus = 'result_missing';
             item.classList.add('tool-call-incomplete');
             item.title = typeof window.t === 'function' ? window.t('timeline.resultMissing') : '结果记录缺失';
+        } else if (terminalStatus === 'running' || terminalStatus === 'background_running') {
+            item.dataset.toolDisplayStatus = terminalStatus;
+            item.classList.add('tool-call-running');
         }
     }
     if ((type === 'hitl_interrupt' || type === 'hitl_audit_agent_started' || type === 'hitl_audit_agent' || type === 'hitl_resumed' || type === 'hitl_rejected') && options.data && options.data.interruptId != null && String(options.data.interruptId).trim() !== '') {
@@ -6280,6 +6338,15 @@ function addTimelineItem(timeline, type, options) {
     }
 
     item.innerHTML = content;
+    if (type === 'tool_call') {
+        let initialToolStatus = item.dataset.toolDisplayStatus || '';
+        if (!initialToolStatus && item.classList.contains('tool-call-running')) {
+            initialToolStatus = 'running';
+        }
+        if (initialToolStatus) {
+            applyToolCallStatus(item, initialToolStatus);
+        }
+    }
     if (type === 'iteration') {
         const scope = options.data && options.data.einoScope != null
             ? String(options.data.einoScope).trim()
@@ -8910,6 +8977,9 @@ function refreshProgressAndTimelineI18n() {
                 ? formatToolCallTimelineTitle(name, index, total)
                 : _t('chat.callTool', { name: name, index: index, total: total });
             titleSpan.textContent = ap + '\uD83D\uDD27 ' + callTitle;
+            if (item.dataset.toolDisplayStatus) {
+                applyToolCallStatus(item, item.dataset.toolDisplayStatus);
+            }
         } else if (type === 'tool_result' && (item.dataset.toolName !== undefined || item.dataset.toolSuccess !== undefined)) {
             const name = (item.dataset.toolName != null && item.dataset.toolName !== '') ? item.dataset.toolName : _t('chat.unknownTool');
             const displayStatus = item.dataset.toolDisplayStatus || '';
