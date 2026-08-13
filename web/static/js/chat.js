@@ -1,5 +1,17 @@
 let currentConversationId = null;
+
+/** Persist the visible chat in the URL so a reload can restore and reconnect it. */
+function syncChatConversationHash(conversationId) {
+    const normalizedConversationId = String(conversationId || '').trim();
+    if (!normalizedConversationId || window.location.hash.split('?')[0] !== '#chat') return;
+    const targetHash = '#chat?conversation=' + encodeURIComponent(normalizedConversationId);
+    if (window.location.hash !== targetHash) {
+        window.history.replaceState(null, '', targetHash);
+    }
+}
+window.syncChatConversationHash = syncChatConversationHash;
 let loadConversationRequestSeq = 0;
+let loadConversationAbortController = null;
 
 /**
  * 轻量会话 LRU 缓存。
@@ -60,6 +72,7 @@ let compositionEndTimer = null;
 
 // 输入框草稿保存相关
 const DRAFT_STORAGE_KEY = 'cyberstrike-chat-draft';
+const RECENT_CONVERSATIONS_EXPANDED_KEY = 'cyberstrike-chat-recent-conversations-expanded';
 let draftSaveTimer = null;
 const DRAFT_SAVE_DELAY = 500; // 500ms防抖延迟
 
@@ -91,6 +104,13 @@ let multiAgentAPIEnabled = false;
 let chatAIChannels = {};
 let chatDefaultAIChannel = '';
 let chatAIChannelIdByNormalizedId = {};
+let chatHitlAuditModelName = '';
+let chatSystemModelRequestSeq = 0;
+let chatSystemModelSaving = false;
+let chatSystemModelCloseTimer = null;
+let chatSystemModelOptions = [];
+let chatSystemModelCurrent = '';
+let chatSystemModelLoadError = '';
 
 // 人机协同（HITL）会话级配置
 const HITL_STORAGE_PREFIX = 'cyberstrike-chat-hitl';
@@ -101,6 +121,11 @@ const HITL_MODE_OFF = 'off';
 const HITL_MODE_APPROVAL = 'approval';
 const HITL_MODE_REVIEW_EDIT = 'review_edit';
 const HITL_MODE_OPTIONS = [HITL_MODE_OFF, HITL_MODE_APPROVAL, HITL_MODE_REVIEW_EDIT];
+const DEFAULT_HITL_TIMEOUT_SECONDS = 300;
+// Agent orchestration/control tools are safe baseline exemptions for every
+// conversation. Keep this separate from config.tool_whitelist: the latter is
+// enforced globally by the backend and must not be copied into this field.
+const DEFAULT_HITL_SESSION_TOOL_WHITELIST = 'tool_search, skill, task, write_todos, transfer_to_agent, exit, TaskCreate, TaskGet, TaskUpdate, TaskList, upsert_project_fact, get_project_fact';
 let hitlApplyFeedbackTimer = null;
 let hitlAutoSaveTimer = null;
 const sessionSettingsSelects = new Map();
@@ -268,16 +293,31 @@ function refreshSessionSettingsSelects() {
 }
 
 function syncChatReasoningBarHeight() {
-    const inputBar = document.getElementById('chat-input-container');
     const reasoning = document.getElementById('chat-reasoning-wrapper');
-    if (!inputBar || !reasoning) return;
-    const h = Math.ceil(inputBar.getBoundingClientRect().height || 0);
-    if (h > 0) {
-        reasoning.style.setProperty('--chat-input-bar-height', h + 'px');
+    const inputBar = document.getElementById('chat-input-container');
+    if (!reasoning || !inputBar) return;
+    // The composer is now a two-layer surface and is intentionally taller than
+    // the sidebar trigger. Do not mirror its height into the settings card.
+    reasoning.style.removeProperty('--chat-input-bar-height');
+    const chatContainer = inputBar.closest('.chat-container');
+    const height = Math.ceil(inputBar.getBoundingClientRect().height || 0);
+    if (chatContainer && height > 0) {
+        chatContainer.style.setProperty('--chat-composer-total-height', height + 'px');
     }
 }
 
+function mountChatSessionSettingsPopover() {
+    const wrap = document.getElementById('chat-reasoning-wrapper');
+    const composerSurface = document.querySelector('.chat-composer-surface');
+    if (!wrap || !composerSurface) return;
+    if (wrap.parentElement !== composerSurface) {
+        composerSurface.appendChild(wrap);
+    }
+    wrap.classList.add('chat-session-settings-popover');
+}
+
 function initChatReasoningBarHeightSync() {
+    mountChatSessionSettingsPopover();
     syncChatReasoningBarHeight();
     window.addEventListener('resize', syncChatReasoningBarHeight);
     const inputBar = document.getElementById('chat-input-container');
@@ -333,6 +373,12 @@ function normalizeHitlMode(mode) {
     return HITL_MODE_OFF;
 }
 
+function normalizeHitlTimeoutForChat(value, fallback) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.max(0, Math.min(86400, Math.round(n)));
+}
+
 function defaultHitlConfig() {
     const serverReviewer = (typeof window !== 'undefined' && window.csaiHitlDefaultReviewer)
         ? window.csaiHitlDefaultReviewer
@@ -340,7 +386,8 @@ function defaultHitlConfig() {
     return {
         mode: HITL_MODE_OFF,
         reviewer: normalizeHitlReviewer(serverReviewer),
-        sensitiveTools: '',
+        sensitiveTools: DEFAULT_HITL_SESSION_TOOL_WHITELIST,
+        timeoutSeconds: DEFAULT_HITL_TIMEOUT_SECONDS,
         updatedAt: ''
     };
 }
@@ -401,19 +448,24 @@ function getHitlStorageKeyByConversation(conversationId) {
     return `${HITL_STORAGE_PREFIX}:${String(conversationId || '').trim()}`;
 }
 
+function chatTranslate(key, fallback) {
+    if (typeof window.t === 'function') {
+        const translated = window.t(key);
+        if (translated && translated !== key) return translated;
+    }
+    return fallback;
+}
+
 function getHitlModeLabel(mode) {
     const safeMode = normalizeHitlMode(mode);
-    if (typeof window.t === 'function') {
-        switch (safeMode) {
-            case HITL_MODE_APPROVAL:
-                return window.t('chat.hitlModeApproval');
-            case HITL_MODE_REVIEW_EDIT:
-                return window.t('chat.hitlModeReviewEdit');
-            default:
-                return window.t('chat.hitlModeOff');
-        }
+    switch (safeMode) {
+        case HITL_MODE_APPROVAL:
+            return chatTranslate('chat.hitlModeApproval', '审批模式');
+        case HITL_MODE_REVIEW_EDIT:
+            return chatTranslate('chat.hitlModeReviewEdit', '审查编辑');
+        default:
+            return chatTranslate('chat.hitlModeOff', '关闭');
     }
-    return safeMode;
 }
 
 function getHitlLastGlobalConfig() {
@@ -427,6 +479,7 @@ function getHitlLastGlobalConfig() {
             mode: normalizeHitlMode(parsed.mode),
             reviewer: normalizeHitlReviewer(parsed.reviewer),
             sensitiveTools: typeof parsed.sensitiveTools === 'string' ? parsed.sensitiveTools : fallback.sensitiveTools,
+            timeoutSeconds: normalizeHitlTimeoutForChat(parsed.timeoutSeconds, fallback.timeoutSeconds),
             updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : ''
         };
     } catch (e) {
@@ -458,6 +511,7 @@ function getHitlConfigForConversation(conversationId) {
                         mode: normalizeHitlMode(parsed.mode),
                         reviewer: normalizeHitlReviewer(parsed.reviewer),
                         sensitiveTools: typeof parsed.sensitiveTools === 'string' ? parsed.sensitiveTools : fallback.sensitiveTools,
+                        timeoutSeconds: normalizeHitlTimeoutForChat(parsed.timeoutSeconds, fallback.timeoutSeconds),
                         updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : ''
                     };
                 }
@@ -469,6 +523,7 @@ function getHitlConfigForConversation(conversationId) {
             mode: normalizeHitlMode(globalLast.mode),
             reviewer: normalizeHitlReviewer(globalLast.reviewer),
             sensitiveTools: typeof globalLast.sensitiveTools === 'string' ? globalLast.sensitiveTools : fallback.sensitiveTools,
+            timeoutSeconds: normalizeHitlTimeoutForChat(globalLast.timeoutSeconds, fallback.timeoutSeconds),
             updatedAt: typeof globalLast.updatedAt === 'string' ? globalLast.updatedAt : ''
         } : null;
         if (!draftCfg && !g) return fallback;
@@ -482,20 +537,21 @@ function getHitlConfigForConversation(conversationId) {
     try {
         const raw = localStorage.getItem(key);
         if (!raw) {
-            return getHitlLastGlobalConfig() || fallback;
+            return fallback;
         }
         const parsed = JSON.parse(raw);
         if (!parsed || typeof parsed !== 'object') {
-            return getHitlLastGlobalConfig() || fallback;
+            return fallback;
         }
         return {
             mode: normalizeHitlMode(parsed.mode),
             reviewer: normalizeHitlReviewer(parsed.reviewer),
             sensitiveTools: typeof parsed.sensitiveTools === 'string' ? parsed.sensitiveTools : fallback.sensitiveTools,
+            timeoutSeconds: normalizeHitlTimeoutForChat(parsed.timeoutSeconds, fallback.timeoutSeconds),
             updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : ''
         };
     } catch (e) {
-        return getHitlLastGlobalConfig() || fallback;
+        return fallback;
     }
 }
 
@@ -512,6 +568,7 @@ function setHitlReviewerUI(reviewer) {
 
 async function onHitlReviewerChanged(reviewer) {
     setHitlReviewerUI(reviewer);
+    updateChatReasoningSummary();
     const cfg = readHitlConfigFromForm();
     const cid = typeof currentConversationId === 'string' ? currentConversationId.trim() : '';
     saveHitlConfigForConversation(cid, cfg, { syncGlobalLast: true });
@@ -548,6 +605,7 @@ function saveHitlConfigForConversation(conversationId, cfg, opts) {
         mode: normalizeHitlMode(cfg && cfg.mode),
         reviewer: normalizeHitlReviewer(cfg && cfg.reviewer),
         sensitiveTools: typeof (cfg && cfg.sensitiveTools) === 'string' ? cfg.sensitiveTools : '',
+        timeoutSeconds: normalizeHitlTimeoutForChat(cfg && cfg.timeoutSeconds, DEFAULT_HITL_TIMEOUT_SECONDS),
         updatedAt: typeof (cfg && cfg.updatedAt) === 'string' ? cfg.updatedAt : ''
     };
     const key = conversationId ? getHitlStorageKeyByConversation(conversationId) : HITL_DRAFT_KEY;
@@ -565,6 +623,7 @@ function readHitlConfigFromForm() {
     const modeEl = document.getElementById('hitl-mode-select');
     const reviewerEl = document.getElementById('hitl-reviewer-select');
     const toolsEl = document.getElementById('hitl-sensitive-tools');
+    const timeoutEl = document.getElementById('hitl-timeout-select');
     const mode = normalizeHitlMode(modeEl ? modeEl.value : HITL_MODE_OFF);
     const reviewer = normalizeHitlReviewer(reviewerEl ? reviewerEl.value : 'human');
     let sensitiveTools = toolsEl ? String(toolsEl.value || '').trim() : '';
@@ -576,41 +635,57 @@ function readHitlConfigFromForm() {
         mode,
         reviewer,
         sensitiveTools,
+        timeoutSeconds: normalizeHitlTimeoutForChat(timeoutEl ? timeoutEl.value : DEFAULT_HITL_TIMEOUT_SECONDS, DEFAULT_HITL_TIMEOUT_SECONDS),
         updatedAt: new Date().toISOString()
     };
 }
 
 function updateHitlStatusUI(_cfg) {
-    /* 侧栏已改为自动保存，不再用角标展示模式 */
+    /* 侧栏已改为自动保存；同步更新输入框快捷摘要。 */
+    updateChatReasoningSummary();
 }
 
 function applyHitlConfigToUI(cfg) {
     const conf = cfg || defaultHitlConfig();
     const modeEl = document.getElementById('hitl-mode-select');
     const toolsEl = document.getElementById('hitl-sensitive-tools');
+    const timeoutEl = document.getElementById('hitl-timeout-select');
     const uiMode = normalizeHitlMode(conf.mode);
     if (modeEl) modeEl.value = uiMode;
     setHitlReviewerUI(conf.reviewer);
-    let toolsVal = conf.sensitiveTools || '';
-    const g = typeof window !== 'undefined' ? window.csaiHitlGlobalToolWhitelist : null;
-    if (Array.isArray(g) && g.length > 0) {
-        const sessionArr = hitlToolsSplitToArray(toolsVal);
-        toolsVal = hitlMergeToolsForDisplay(g, sessionArr);
+    // Keep this field scoped to the current conversation. The config-level
+    // allowlist is applied by the backend and must not be copied into the
+    // editable session value. Empty/legacy sessions receive only the stable
+    // Agent control-tool baseline shown by the original UI.
+    const toolsVal = typeof conf.sensitiveTools === 'string' && conf.sensitiveTools.trim()
+        ? conf.sensitiveTools.trim()
+        : DEFAULT_HITL_SESSION_TOOL_WHITELIST;
+    if (toolsEl) {
+        toolsEl.value = toolsVal;
     }
-    if (toolsEl) toolsEl.value = toolsVal;
+    if (timeoutEl) {
+        const timeoutSeconds = normalizeHitlTimeoutForChat(conf.timeoutSeconds, DEFAULT_HITL_TIMEOUT_SECONDS);
+        const supported = Array.from(timeoutEl.options || []).some(function (option) {
+            return Number(option.value) === timeoutSeconds;
+        });
+        timeoutEl.value = String(supported ? timeoutSeconds : DEFAULT_HITL_TIMEOUT_SECONDS);
+    }
     updateHitlStatusUI(conf);
     refreshSessionSettingsSelects();
 }
 
 function bindHitlSidebarModeListener() {
     const modeEl = document.getElementById('hitl-mode-select');
-    if (!modeEl || modeEl.dataset.hitlModeBound === '1') return;
-    modeEl.dataset.hitlModeBound = '1';
-    modeEl.addEventListener('change', function () {
-        applyHitlConfigToUI(readHitlConfigFromForm());
-        refreshSessionSettingsSelects();
-        scheduleHitlSidebarAutosave(0);
-        updateChatReasoningSummary();
+    const timeoutEl = document.getElementById('hitl-timeout-select');
+    [modeEl, timeoutEl].forEach(function (el) {
+        if (!el || el.dataset.hitlModeBound === '1') return;
+        el.dataset.hitlModeBound = '1';
+        el.addEventListener('change', function () {
+            applyHitlConfigToUI(readHitlConfigFromForm());
+            refreshSessionSettingsSelects();
+            scheduleHitlSidebarAutosave(0);
+            updateChatReasoningSummary();
+        });
     });
 }
 
@@ -887,6 +962,7 @@ function syncAgentModeFromValue(value) {
 }
 
 function syncReasoningRowVisibility(modeVal) {
+    mountChatSessionSettingsPopover();
     const wrap = document.getElementById('chat-reasoning-wrapper');
     if (!wrap) return;
     const show = modeVal === CHAT_AGENT_MODE_EINO_SINGLE || (multiAgentAPIEnabled && chatAgentModeIsEino(modeVal));
@@ -953,9 +1029,454 @@ function currentChatAIChannelLabel() {
     const id = selectedChatAIChannelId() || chatDefaultAIChannel;
     const ch = id ? chatAIChannels[id] : null;
     if (!ch) {
-        return typeof window.t === 'function' ? window.t('chat.aiChannelDefaultShort') : '默认通道';
+        return chatTranslate('chat.aiChannelDefaultShort', '默认通道');
     }
     return ch.name || id;
+}
+
+function currentChatModelLabel() {
+    const id = selectedChatAIChannelId() || chatDefaultAIChannel;
+    const ch = id ? chatAIChannels[id] : null;
+    const model = ch && typeof ch.model === 'string' ? ch.model.trim() : '';
+    return model || currentChatAIChannelLabel();
+}
+
+function currentSystemModelLabel() {
+    const ch = chatDefaultAIChannel ? chatAIChannels[chatDefaultAIChannel] : null;
+    const model = ch && typeof ch.model === 'string' ? ch.model.trim() : '';
+    return model || (ch && (ch.name || chatDefaultAIChannel)) || currentChatModelLabel();
+}
+
+function currentHitlAuditModelLabel() {
+    return chatHitlAuditModelName || currentSystemModelLabel();
+}
+
+function currentSystemReasoningEffort() {
+    const ch = chatDefaultAIChannel ? chatAIChannels[chatDefaultAIChannel] : null;
+    const reasoning = ch && ch.reasoning && typeof ch.reasoning === 'object' ? ch.reasoning : {};
+    const effort = typeof reasoning.effort === 'string' ? reasoning.effort.trim() : '';
+    return ['', 'low', 'medium', 'high', 'xhigh', 'max'].includes(effort) ? effort : '';
+}
+
+function chatSystemModelConfigState(cfg) {
+    const source = cfg && typeof cfg === 'object' ? cfg : {};
+    const sourceAI = source.ai && typeof source.ai === 'object' ? source.ai : {};
+    const channels = sourceAI.channels && typeof sourceAI.channels === 'object'
+        ? { ...sourceAI.channels }
+        : {};
+    let channelId = String(sourceAI.default_channel || '').trim();
+    if (!channels[channelId]) {
+        const normalized = normalizeChatAIChannelId(channelId);
+        channelId = Object.keys(channels).find(function (id) {
+            return normalizeChatAIChannelId(id) === normalized;
+        }) || '';
+    }
+    if (!channelId) channelId = Object.keys(channels)[0] || 'default';
+    if (!channels[channelId]) {
+        const legacy = source.openai && typeof source.openai === 'object' ? source.openai : {};
+        channels[channelId] = {
+            name: channelId === 'default' ? 'Default' : channelId,
+            provider: legacy.provider || 'openai',
+            api_key: legacy.api_key || '',
+            base_url: legacy.base_url || '',
+            model: legacy.model || ''
+        };
+    }
+    return {
+        ai: { ...sourceAI, default_channel: channelId, channels: channels },
+        channelId: channelId,
+        channel: channels[channelId]
+    };
+}
+
+function chatSystemModelElements() {
+    return {
+        wrap: document.getElementById('chat-model-shortcut-wrap'),
+        button: document.getElementById('chat-model-shortcut'),
+        menu: document.getElementById('chat-system-model-menu'),
+        main: document.getElementById('chat-system-model-main'),
+        subview: document.getElementById('chat-system-model-subview'),
+        subviewTitle: document.getElementById('chat-system-model-subview-title'),
+        list: document.getElementById('chat-system-model-list'),
+        status: document.getElementById('chat-system-model-status'),
+        subviewStatus: document.getElementById('chat-system-model-subview-status'),
+        currentValue: document.getElementById('chat-system-model-current-value'),
+        effortValue: document.getElementById('chat-system-model-effort-value')
+    };
+}
+
+function setChatSystemModelStatus(message, tone) {
+    const ui = chatSystemModelElements();
+    [ui.status, ui.subviewStatus].forEach(function (status) {
+        if (!status) return;
+        status.textContent = message || '';
+        status.dataset.tone = tone || '';
+    });
+}
+
+function chatReasoningEffortLabel(value) {
+    switch (String(value || '').trim()) {
+        case 'low': return 'low';
+        case 'medium': return 'medium';
+        case 'high': return 'high';
+        case 'xhigh': return 'xhigh';
+        case 'max': return 'max';
+        default: return chatTranslate('chat.reasoningEffortUnset', '不指定');
+    }
+}
+
+function currentChatReasoningEffort() {
+    const effort = document.getElementById('chat-reasoning-effort');
+    return effort ? String(effort.value || '').trim() : '';
+}
+
+function updateChatSystemModelPickerValues() {
+    const ui = chatSystemModelElements();
+    const model = currentSystemModelLabel();
+    const effort = chatReasoningEffortLabel(currentSystemReasoningEffort());
+    if (ui.currentValue) ui.currentValue.textContent = model;
+    if (ui.effortValue) ui.effortValue.textContent = effort;
+    const composerEffort = document.getElementById('chat-model-shortcut-effort');
+    if (composerEffort) composerEffort.textContent = effort;
+}
+
+function closeChatSystemModelPicker(force) {
+    if (chatSystemModelSaving && !force) return;
+    const ui = chatSystemModelElements();
+    if (ui.menu) ui.menu.hidden = true;
+    if (ui.button) {
+        ui.button.classList.remove('active');
+        ui.button.setAttribute('aria-expanded', 'false');
+    }
+    if (ui.main) ui.main.hidden = false;
+    if (ui.subview) ui.subview.hidden = true;
+    chatSystemModelRequestSeq += 1;
+}
+
+async function readChatSystemModelError(response, fallback) {
+    try {
+        const body = await response.json();
+        return body.error || body.message || fallback;
+    } catch (_) {
+        return fallback;
+    }
+}
+
+function renderChatSystemModelOptions(models, currentModel) {
+    const ui = chatSystemModelElements();
+    if (!ui.list) return 0;
+    ui.list.innerHTML = '';
+    const unique = [];
+    const seen = new Set();
+    [currentModel].concat(Array.isArray(models) ? models : []).forEach(function (value) {
+        const model = String(value || '').trim();
+        if (!model || seen.has(model)) return;
+        seen.add(model);
+        unique.push(model);
+    });
+    unique.forEach(function (model) {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.className = 'chat-system-model-option';
+        option.setAttribute('role', 'option');
+        option.setAttribute('aria-selected', model === currentModel ? 'true' : 'false');
+        option.dataset.model = model;
+
+        const label = document.createElement('span');
+        label.className = 'chat-system-model-option-label';
+        label.textContent = model;
+        option.appendChild(label);
+
+        if (model === currentModel) {
+            option.classList.add('is-selected');
+            const current = document.createElement('span');
+            current.className = 'chat-system-model-current';
+            current.textContent = chatTranslate('chat.systemModelCurrent', '当前');
+            option.appendChild(current);
+        }
+        option.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            selectChatSystemModel(model);
+        });
+        ui.list.appendChild(option);
+    });
+    return unique.length;
+}
+
+function renderChatReasoningEffortOptions() {
+    const ui = chatSystemModelElements();
+    if (!ui.list) return;
+    ui.list.innerHTML = '';
+    const currentEffort = currentSystemReasoningEffort();
+    ['', 'low', 'medium', 'high', 'xhigh', 'max'].forEach(function (effort) {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.className = 'chat-system-model-option';
+        option.setAttribute('role', 'option');
+        option.setAttribute('aria-selected', effort === currentEffort ? 'true' : 'false');
+        if (effort === currentEffort) option.classList.add('is-selected');
+
+        const label = document.createElement('span');
+        label.className = 'chat-system-model-option-label chat-system-effort-option-label';
+        label.textContent = chatReasoningEffortLabel(effort);
+        option.appendChild(label);
+
+        if (effort === currentEffort) {
+            const current = document.createElement('span');
+            current.className = 'chat-system-model-current';
+            current.textContent = chatTranslate('chat.systemModelCurrent', '当前');
+            option.appendChild(current);
+        }
+        option.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            selectChatReasoningEffort(effort);
+        });
+        ui.list.appendChild(option);
+    });
+}
+
+async function selectChatReasoningEffort(effort) {
+    if (chatSystemModelSaving) return;
+    if (typeof requirePermission === 'function' && !requirePermission('config:write')) return;
+    const chosen = ['', 'low', 'medium', 'high', 'xhigh', 'max'].includes(String(effort || '').trim())
+        ? String(effort || '').trim()
+        : '';
+    const ui = chatSystemModelElements();
+    chatSystemModelSaving = true;
+    if (ui.list) {
+        ui.list.querySelectorAll('button').forEach(function (button) { button.disabled = true; });
+    }
+    setChatSystemModelStatus(chatTranslate('chat.systemModelSaving', '正在保存…'), 'loading');
+    try {
+        const latestResponse = await apiFetch('/api/config');
+        if (!latestResponse.ok) {
+            throw new Error(await readChatSystemModelError(latestResponse, chatTranslate('chat.systemModelSaveFailed', '保存失败')));
+        }
+        const latest = await latestResponse.json();
+        const state = chatSystemModelConfigState(latest);
+        state.ai.channels[state.channelId] = {
+            ...state.channel,
+            reasoning: { ...(state.channel.reasoning || {}), effort: chosen }
+        };
+        const updateResponse = await apiFetch('/api/config', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ai: state.ai })
+        });
+        if (!updateResponse.ok) {
+            throw new Error(await readChatSystemModelError(updateResponse, chatTranslate('chat.systemModelSaveFailed', '保存失败')));
+        }
+        const applyResponse = await apiFetch('/api/config/apply', { method: 'POST' });
+        if (!applyResponse.ok) {
+            throw new Error(await readChatSystemModelError(applyResponse, chatTranslate('chat.systemModelApplyFailed', '应用模型失败')));
+        }
+        chatAIChannels = state.ai.channels;
+        chatDefaultAIChannel = state.channelId;
+        await initChatAgentModeFromConfig();
+        updateChatComposerSessionShortcuts();
+        renderChatReasoningEffortOptions();
+        setChatSystemModelStatus(chatTranslate('chat.systemModelSaved', '已自动保存'), 'success');
+        if (chatSystemModelCloseTimer) window.clearTimeout(chatSystemModelCloseTimer);
+        chatSystemModelCloseTimer = window.setTimeout(function () {
+            chatSystemModelSaving = false;
+            closeChatSystemModelPicker(true);
+        }, 650);
+        return;
+    } catch (error) {
+        console.error('selectChatReasoningEffort', error);
+        setChatSystemModelStatus(error.message || chatTranslate('chat.systemModelSaveFailed', '保存失败'), 'error');
+    }
+    chatSystemModelSaving = false;
+    if (ui.list) {
+        ui.list.querySelectorAll('button').forEach(function (button) { button.disabled = false; });
+    }
+}
+
+function renderChatSystemModelRetry() {
+    const ui = chatSystemModelElements();
+    if (!ui.list) return;
+    ui.list.innerHTML = '';
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'chat-system-model-retry';
+    retry.textContent = chatTranslate('chat.systemModelRetry', '重新获取');
+    retry.addEventListener('click', function (retryEvent) {
+        closeChatSystemModelPicker(true);
+        openChatSystemModelPicker(retryEvent);
+    });
+    ui.list.appendChild(retry);
+}
+
+function openChatSystemModelView(view, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const ui = chatSystemModelElements();
+    if (!ui.main || !ui.subview || !ui.list) return;
+    if (view === 'main') {
+        ui.main.hidden = false;
+        ui.subview.hidden = true;
+        updateChatSystemModelPickerValues();
+        return;
+    }
+    ui.main.hidden = true;
+    ui.subview.hidden = false;
+    ui.subview.dataset.view = view;
+    if (view === 'effort') {
+        if (ui.subviewTitle) ui.subviewTitle.textContent = chatTranslate('chat.reasoningEffortLabel', '推理强度');
+        setChatSystemModelStatus('', '');
+        renderChatReasoningEffortOptions();
+        return;
+    }
+    if (ui.subviewTitle) ui.subviewTitle.textContent = chatTranslate('chat.systemModelField', '模型');
+    if (chatSystemModelOptions.length) {
+        const count = renderChatSystemModelOptions(chatSystemModelOptions, chatSystemModelCurrent);
+        setChatSystemModelStatus(
+            chatTranslate('chat.systemModelLoaded', '已获取 {count} 个模型').replace('{count}', String(count)),
+            'success'
+        );
+    } else if (chatSystemModelLoadError) {
+        renderChatSystemModelRetry();
+        setChatSystemModelStatus(chatSystemModelLoadError, 'error');
+    } else {
+        ui.list.innerHTML = '';
+        setChatSystemModelStatus(chatTranslate('chat.systemModelLoading', '正在获取模型列表…'), 'loading');
+    }
+}
+
+async function selectChatSystemModel(model) {
+    if (chatSystemModelSaving) return;
+    if (typeof requirePermission === 'function' && !requirePermission('config:write')) return;
+    const chosen = String(model || '').trim();
+    if (!chosen) return;
+    const ui = chatSystemModelElements();
+    chatSystemModelSaving = true;
+    if (ui.list) {
+        ui.list.querySelectorAll('button').forEach(function (button) { button.disabled = true; });
+    }
+    setChatSystemModelStatus(chatTranslate('chat.systemModelSaving', '正在保存…'), 'loading');
+    try {
+        const latestResponse = await apiFetch('/api/config');
+        if (!latestResponse.ok) {
+            throw new Error(await readChatSystemModelError(latestResponse, chatTranslate('chat.systemModelSaveFailed', '保存失败')));
+        }
+        const latest = await latestResponse.json();
+        const state = chatSystemModelConfigState(latest);
+        state.ai.channels[state.channelId] = { ...state.channel, model: chosen };
+        const updateResponse = await apiFetch('/api/config', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ai: state.ai })
+        });
+        if (!updateResponse.ok) {
+            throw new Error(await readChatSystemModelError(updateResponse, chatTranslate('chat.systemModelSaveFailed', '保存失败')));
+        }
+        const applyResponse = await apiFetch('/api/config/apply', { method: 'POST' });
+        if (!applyResponse.ok) {
+            throw new Error(await readChatSystemModelError(applyResponse, chatTranslate('chat.systemModelApplyFailed', '应用模型失败')));
+        }
+        chatAIChannels = state.ai.channels;
+        chatDefaultAIChannel = state.channelId;
+        updateChatComposerSessionShortcuts();
+        await initChatAgentModeFromConfig();
+        chatSystemModelCurrent = chosen;
+        chatSystemModelOptions = [chosen].concat(chatSystemModelOptions);
+        updateChatSystemModelPickerValues();
+        renderChatSystemModelOptions(chatSystemModelOptions, chosen);
+        setChatSystemModelStatus(chatTranslate('chat.systemModelSaved', '已自动保存'), 'success');
+        if (chatSystemModelCloseTimer) window.clearTimeout(chatSystemModelCloseTimer);
+        chatSystemModelCloseTimer = window.setTimeout(function () {
+            chatSystemModelSaving = false;
+            closeChatSystemModelPicker(true);
+        }, 650);
+        return;
+    } catch (error) {
+        console.error('selectChatSystemModel', error);
+        setChatSystemModelStatus(error.message || chatTranslate('chat.systemModelSaveFailed', '保存失败'), 'error');
+    }
+    chatSystemModelSaving = false;
+    if (ui.list) {
+        ui.list.querySelectorAll('button').forEach(function (button) { button.disabled = false; });
+    }
+}
+
+async function openChatSystemModelPicker(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const ui = chatSystemModelElements();
+    if (!ui.menu || !ui.button || !ui.list) return;
+    if (!ui.menu.hidden) {
+        closeChatSystemModelPicker();
+        return;
+    }
+    if (chatSystemModelCloseTimer) {
+        window.clearTimeout(chatSystemModelCloseTimer);
+        chatSystemModelCloseTimer = null;
+    }
+    if (typeof closeChatReasoningPanel === 'function') closeChatReasoningPanel();
+    ui.menu.hidden = false;
+    ui.button.classList.add('active');
+    ui.button.setAttribute('aria-expanded', 'true');
+    if (ui.main) ui.main.hidden = false;
+    if (ui.subview) ui.subview.hidden = true;
+    ui.list.innerHTML = '';
+    chatSystemModelOptions = [];
+    chatSystemModelCurrent = currentSystemModelLabel();
+    chatSystemModelLoadError = '';
+    updateChatSystemModelPickerValues();
+    setChatSystemModelStatus(chatTranslate('chat.systemModelLoading', '正在获取模型列表…'), 'loading');
+    const requestId = ++chatSystemModelRequestSeq;
+    try {
+        const configResponse = await apiFetch('/api/config');
+        if (!configResponse.ok) {
+            throw new Error(await readChatSystemModelError(configResponse, chatTranslate('chat.systemModelLoadFailed', '获取模型失败')));
+        }
+        const cfg = await configResponse.json();
+        const state = chatSystemModelConfigState(cfg);
+        const channel = state.channel || {};
+        if (!String(channel.api_key || '').trim()) {
+            throw new Error(chatTranslate('chat.systemModelNeedApiKey', '请先在系统设置中配置 API Key'));
+        }
+        const listResponse = await apiFetch('/api/config/list-models', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                provider: channel.provider || 'openai',
+                base_url: String(channel.base_url || '').trim(),
+                api_key: String(channel.api_key || '').trim()
+            })
+        });
+        const result = await listResponse.json().catch(function () { return {}; });
+        if (!listResponse.ok || !result.success) {
+            throw new Error(result.error || chatTranslate('chat.systemModelLoadFailed', '获取模型失败'));
+        }
+        if (requestId !== chatSystemModelRequestSeq || ui.menu.hidden) return;
+        chatSystemModelCurrent = String(channel.model || '').trim();
+        chatSystemModelOptions = Array.isArray(result.models) ? result.models.slice() : [];
+        const count = [chatSystemModelCurrent].concat(chatSystemModelOptions)
+            .map(function (model) { return String(model || '').trim(); })
+            .filter(function (model, index, all) { return model && all.indexOf(model) === index; })
+            .length;
+        if (ui.subview && !ui.subview.hidden && ui.subview.dataset.view === 'model') {
+            renderChatSystemModelOptions(chatSystemModelOptions, chatSystemModelCurrent);
+        }
+        setChatSystemModelStatus(
+            chatTranslate('chat.systemModelLoaded', '已获取 {count} 个模型').replace('{count}', String(count)),
+            'success'
+        );
+    } catch (error) {
+        if (requestId !== chatSystemModelRequestSeq || ui.menu.hidden) return;
+        chatSystemModelLoadError = error.message || chatTranslate('chat.systemModelLoadFailed', '获取模型失败');
+        if (ui.subview && !ui.subview.hidden && ui.subview.dataset.view === 'model') {
+            renderChatSystemModelRetry();
+        }
+        setChatSystemModelStatus(chatSystemModelLoadError, 'error');
+    }
 }
 
 function truncateChatAIChannelSummaryLabel(label) {
@@ -975,12 +1496,11 @@ function persistChatAIChannelPref() {
 
 function reasoningSummaryModeLabel(mode) {
     const m = (mode || 'default').trim();
-    const t = (typeof window.t === 'function') ? window.t : function (k) { return k; };
     switch (m) {
-        case 'off': return t('chat.reasoningModeOff');
-        case 'on': return t('chat.reasoningModeOn');
-        case 'auto': return t('chat.reasoningModeAuto');
-        default: return t('chat.reasoningSummaryFollow');
+        case 'off': return chatTranslate('chat.reasoningModeOff', '关闭');
+        case 'on': return chatTranslate('chat.reasoningModeOn', '开启');
+        case 'auto': return chatTranslate('chat.reasoningModeAuto', '自动');
+        default: return chatTranslate('chat.reasoningSummaryFollow', '系统');
     }
 }
 
@@ -1002,9 +1522,210 @@ function updateChatReasoningSummary() {
         hitlPart = '';
     }
     const channelPart = currentChatAIChannelLabel();
+    const modelPart = currentChatModelLabel();
     const parts = [truncateChatAIChannelSummaryLabel(channelPart), reasoningPart, hitlPart].filter(Boolean);
     el.textContent = parts.join(' / ');
     el.title = [channelPart, reasoningPart, hitlPart].filter(Boolean).join(' / ');
+    updateChatComposerSessionShortcuts({
+        channel: channelPart,
+        model: modelPart,
+        reasoning: reasoningPart,
+        hitl: hitlPart
+    });
+}
+
+function updateChatComposerSessionShortcuts(summary) {
+    const data = summary || {};
+    const modelEl = document.getElementById('chat-model-shortcut-text');
+    const hitlEl = document.getElementById('chat-hitl-shortcut-text');
+    if (modelEl) {
+        // 输入框右侧只展示系统默认主模型；审批模型只出现在 HITL 入口。
+        const label = currentSystemModelLabel();
+        modelEl.textContent = truncateChatAIChannelSummaryLabel(label);
+        modelEl.title = label;
+        const shortcut = document.getElementById('chat-model-shortcut');
+        if (shortcut) {
+            const effort = chatReasoningEffortLabel(currentSystemReasoningEffort());
+            const action = chatTranslate('chat.modelSettingsAria', '选择模型与推理强度');
+            shortcut.setAttribute('aria-label', action + '：' + label + ' · ' + effort);
+            shortcut.title = action + '：' + label + ' · ' + effort;
+        }
+        updateChatSystemModelPickerValues();
+    }
+    if (hitlEl) {
+        const cfg = readHitlConfigFromForm();
+        const auditAgent = normalizeHitlReviewer(cfg.reviewer) === 'audit_agent';
+        const prefix = auditAgent
+            ? chatTranslate('chat.sessionShortcutAuditAgent', 'Agent 审查')
+            : chatTranslate('chat.sessionShortcutHuman', '人工审批');
+        const modeLabel = data.hitl || getHitlModeLabel(cfg.mode);
+        const approvalModel = auditAgent ? currentHitlAuditModelLabel() : '';
+        const label = prefix + '：' + modeLabel + (approvalModel ? ' · ' + approvalModel : '');
+        hitlEl.textContent = label;
+        hitlEl.title = label;
+    }
+}
+
+function openChatSessionSettings(section, event) {
+    if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+    mountChatSessionSettingsPopover();
+    const wrap = document.getElementById('chat-reasoning-wrapper');
+    const toggle = document.getElementById('conversation-reasoning-toggle');
+    if (!wrap || !toggle || wrap.style.display === 'none') return;
+    syncChatReasoningBarHeight();
+    wrap.classList.remove('conversation-reasoning-collapsed');
+    toggle.setAttribute('aria-expanded', 'true');
+    if (typeof closeAgentModePanel === 'function') closeAgentModePanel();
+    if (typeof closeRoleSelectionPanel === 'function') closeRoleSelectionPanel();
+    if (typeof closeChatProjectPanel === 'function') closeChatProjectPanel();
+    updateChatReasoningSummary();
+
+    let target = null;
+    if (section === 'hitl') target = document.getElementById('hitl-mode-select');
+    else if (section === 'reasoning') target = document.getElementById('chat-reasoning-mode');
+    else target = document.getElementById('chat-ai-channel-select');
+    const group = target && target.closest('.session-settings-group');
+    if (group && typeof group.scrollIntoView === 'function') {
+        group.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+    const customTrigger = target && target.closest('.session-settings-select')
+        ? target.closest('.session-settings-select').querySelector('.session-settings-select-trigger')
+        : null;
+    window.setTimeout(function () {
+        if (customTrigger) customTrigger.focus({ preventScroll: true });
+        else if (target) target.focus({ preventScroll: true });
+    }, 180);
+}
+
+function getVisibleChatConversationId() {
+    return typeof currentConversationId === 'string' && currentConversationId.trim()
+        ? currentConversationId.trim()
+        : '';
+}
+
+function shouldTreatLiveChatTaskAsCurrent(liveConversationId, visibleConversationId, hasVisibleProgress) {
+    const liveId = String(liveConversationId || '').trim();
+    const visibleId = String(visibleConversationId || '').trim();
+    if (liveId) return !!visibleId && liveId === visibleId;
+    return hasVisibleProgress === true;
+}
+
+function ownsLiveChatStream(liveStream) {
+    return !!liveStream && window.__csAgentLiveStream === liveStream;
+}
+
+function clearLiveChatStreamIfOwned(liveStream) {
+    if (!ownsLiveChatStream(liveStream)) return false;
+    liveStream.active = false;
+    window.__csAgentLiveStream = { active: false, conversationId: null, progressId: null };
+    updateChatPrimaryActionState();
+    return true;
+}
+
+/**
+ * 离开正在读取主 POST 流的对话时，只断开浏览器侧响应流，不停止后端任务。
+ * 后端任务使用 detachedAgentContext，仍会继续运行；重新进入该对话时由
+ * task-events 镜像流接管。这样同时运行多个对话也只占用一个前台长连接，
+ * 不会耗尽浏览器对同一主机的连接槽位而卡住普通 GET/POST 请求。
+ */
+function detachLiveChatStreamForNavigation(nextConversationId, force = false) {
+    const liveStream = window.__csAgentLiveStream;
+    if (!liveStream || !liveStream.active) return false;
+    const liveConversationId = String(liveStream.conversationId || '').trim();
+    const nextId = String(nextConversationId || '').trim();
+    if (!force && liveConversationId && liveConversationId === nextId) return false;
+    if (!force && !liveConversationId && !nextId) return false;
+
+    liveStream.detached = true;
+    liveStream.active = false;
+    const controller = liveStream.abortController;
+    if (controller && !controller.signal.aborted) {
+        controller.abort();
+    }
+    if (ownsLiveChatStream(liveStream)) {
+        updateChatPrimaryActionState();
+    }
+    return true;
+}
+
+function cancelPendingConversationLoad() {
+    if (!loadConversationAbortController) return false;
+    if (!loadConversationAbortController.signal.aborted) {
+        loadConversationAbortController.abort();
+    }
+    loadConversationAbortController = null;
+    return true;
+}
+
+function isLiveChatTaskVisible(live, visibleConversationId) {
+    if (!live || !live.active) return false;
+    const progress = live.progressId ? document.getElementById(live.progressId) : null;
+    const hasVisibleProgress = !!(progress && progress.closest('#chat-messages'));
+    return shouldTreatLiveChatTaskAsCurrent(
+        live.conversationId,
+        visibleConversationId,
+        hasVisibleProgress
+    );
+}
+
+function getCurrentChatTaskConversationId() {
+    const visibleConversationId = getVisibleChatConversationId();
+    if (visibleConversationId) return visibleConversationId;
+    return '';
+}
+
+function isCurrentChatTaskActive() {
+    const live = window.__csAgentLiveStream;
+    const visibleConversationId = getVisibleChatConversationId();
+    if (isLiveChatTaskVisible(live, visibleConversationId)) return true;
+    return !!visibleConversationId &&
+        typeof isConversationTaskRunning === 'function' &&
+        isConversationTaskRunning(visibleConversationId);
+}
+
+function updateChatPrimaryActionState() {
+    const button = document.getElementById('chat-send-btn');
+    if (!button) return;
+    const running = isCurrentChatTaskActive();
+    const label = running
+        ? chatTranslate('tasks.stopTask', '停止任务')
+        : chatTranslate('chat.send', '发送');
+    button.classList.toggle('is-task-running', running);
+    button.setAttribute('aria-label', label);
+    button.setAttribute('title', label);
+    const labelElement = button.querySelector('.send-btn-label');
+    if (labelElement) labelElement.textContent = label;
+}
+
+function handleChatPrimaryAction(event) {
+    if (event) event.preventDefault();
+    if (!isCurrentChatTaskActive()) {
+        sendMessage();
+        return;
+    }
+
+    const live = window.__csAgentLiveStream;
+    const conversationId = getCurrentChatTaskConversationId();
+    if (conversationId && typeof cancelActiveTask === 'function') {
+        cancelActiveTask(conversationId);
+        return;
+    }
+    if (live && live.progressId && typeof cancelProgressTask === 'function') {
+        cancelProgressTask(live.progressId);
+    }
+}
+
+function initChatPrimaryActionButton() {
+    const button = document.getElementById('chat-send-btn');
+    if (!button) return;
+    if (!button.querySelector('.send-btn-stop-icon')) {
+        const stopIcon = document.createElement('span');
+        stopIcon.className = 'send-btn-stop-icon';
+        stopIcon.setAttribute('aria-hidden', 'true');
+        button.appendChild(stopIcon);
+    }
+    button.onclick = handleChatPrimaryAction;
+    updateChatPrimaryActionState();
 }
 
 function closeChatReasoningPanel() {
@@ -1098,7 +1819,13 @@ if (typeof window !== 'undefined') {
     window.toggleChatReasoningPanel = toggleChatReasoningPanel;
     window.toggleConversationReasoningCard = toggleConversationReasoningCard;
     window.updateChatReasoningSummary = updateChatReasoningSummary;
+    window.updateChatComposerSessionShortcuts = updateChatComposerSessionShortcuts;
+    window.openChatSessionSettings = openChatSessionSettings;
+    window.openChatSystemModelPicker = openChatSystemModelPicker;
+    window.openChatSystemModelView = openChatSystemModelView;
+    window.closeChatSystemModelPicker = closeChatSystemModelPicker;
     window.refreshSessionSettingsSelects = refreshSessionSettingsSelects;
+    window.updateChatPrimaryActionState = updateChatPrimaryActionState;
 }
 
 function closeAgentModePanel() {
@@ -1175,6 +1902,11 @@ async function initChatAgentModeFromConfig() {
         const cfg = await r.json();
         multiAgentAPIEnabled = !!(cfg.multi_agent && cfg.multi_agent.enabled);
         populateChatAIChannelSelect(cfg.ai || {});
+        const hitlAuditModel = cfg.hitl && cfg.hitl.audit_model;
+        chatHitlAuditModelName = hitlAuditModel && typeof hitlAuditModel.model === 'string'
+            ? hitlAuditModel.model.trim()
+            : '';
+        updateChatReasoningSummary();
         if (typeof window !== 'undefined') {
             window.__csaiMultiAgentPublic = cfg.multi_agent || null;
             const tw = cfg.hitl && cfg.hitl.tool_whitelist;
@@ -1325,6 +2057,17 @@ async function sendMessage() {
         return;
     }
 
+    // Enter 会直接调用 sendMessage；同一会话在其他标签页已启动任务时，
+    // 必须在渲染用户气泡和发起 POST 前做一次权威状态同步，避免生成一轮“已有任务执行中”伪对话。
+    if (currentConversationId && typeof loadActiveTasks === 'function') {
+        await loadActiveTasks();
+    }
+    if (isCurrentChatTaskActive()) {
+        updateChatPrimaryActionState();
+        showChatToast(chatTranslate('chat.taskAlreadyRunning', '当前会话已有任务正在执行，请先等待完成或停止任务。'), 'info');
+        return;
+    }
+
     if (hasAttachments) {
         const needWait = chatAttachments.some((a) => a.uploading);
         if (needWait) {
@@ -1416,7 +2159,8 @@ async function sendMessage() {
             enabled: true,
             mode: normalizeHitlMode(hitlCfg.mode),
             reviewer: normalizeHitlReviewer(hitlCfg.reviewer),
-            sensitiveTools: sensitiveTools
+            sensitiveTools: sensitiveTools,
+            timeoutSeconds: normalizeHitlTimeoutForChat(hitlCfg.timeoutSeconds, DEFAULT_HITL_TIMEOUT_SECONDS)
         };
     }
     if (hasAttachments) {
@@ -1442,6 +2186,19 @@ async function sendMessage() {
     }
     const progressElement = document.getElementById(progressId);
     registerProgressTask(progressId, streamConversationId);
+    const requestAbortController = new AbortController();
+    const liveStreamState = {
+        active: true,
+        conversationId: streamConversationId || null,
+        progressId: progressId,
+        abortController: requestAbortController,
+        detached: false
+    };
+    window.__csAgentLiveStream = liveStreamState;
+    if (streamConversationId && typeof window.notifyConversationTaskStarted === 'function') {
+        window.notifyConversationTaskStarted(streamConversationId);
+    }
+    updateChatPrimaryActionState();
     loadActiveTasks();
     let assistantMessageId = null;
     let mcpExecutionIds = [];
@@ -1461,17 +2218,14 @@ async function sendMessage() {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(body),
+            signal: requestAbortController.signal,
         });
         
         if (!response.ok) {
             throw new Error('请求失败: ' + response.status);
         }
 
-        window.__csAgentLiveStream = {
-            active: true,
-            conversationId: streamConversationId || null,
-            progressId: progressId
-        };
+        liveStreamState.conversationId = streamConversationId || null;
         try {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
@@ -1491,7 +2245,14 @@ async function sendMessage() {
                     }
                     if (!streamConversationId && eventData.type === 'conversation') {
                         streamConversationId = eventConvId;
+                        liveStreamState.conversationId = eventConvId;
                         justBoundConversation = true;
+                        // 旧请求可能在用户切换对话后才收到 conversation 事件。
+                        // 只完成本地任务绑定，不允许它重新抢占当前对话或新的主流状态。
+                        if (!ownsLiveChatStream(liveStreamState) || liveStreamState.detached) {
+                            updateProgressConversation(progressId, eventConvId);
+                            return;
+                        }
                     }
                 }
                 if (!justBoundConversation && !isStreamStillVisibleForRequest()) {
@@ -1540,8 +2301,14 @@ async function sendMessage() {
                 }
                 const convId = streamConversationId || (body && body.conversationId) || null;
                 let attached = false;
-                if (convId && typeof window.attachRunningTaskEventStream === 'function') {
-                    window.__csAgentLiveStream = { active: false, conversationId: null, progressId: null };
+                if (
+                    convId &&
+                    ownsLiveChatStream(liveStreamState) &&
+                    !liveStreamState.detached &&
+                    isStreamStillVisibleForRequest() &&
+                    typeof window.attachRunningTaskEventStream === 'function'
+                ) {
+                    clearLiveChatStreamIfOwned(liveStreamState);
                     attached = await window.attachRunningTaskEventStream(convId).catch(() => false);
                 }
                 if (!attached && isStreamStillVisibleForRequest()) {
@@ -1552,8 +2319,8 @@ async function sendMessage() {
                 }
             }
         } finally {
-            window.__csAgentLiveStream = { active: false, conversationId: null, progressId: null };
-            if (window.CyberStrikeChatScroll) {
+            const clearedOwnedStream = clearLiveChatStreamIfOwned(liveStreamState);
+            if (clearedOwnedStream && !liveStreamState.detached && window.CyberStrikeChatScroll) {
                 window.CyberStrikeChatScroll.onStreamEnd();
             }
         }
@@ -1567,7 +2334,8 @@ async function sendMessage() {
         }
         
     } catch (error) {
-        if (!isStreamStillVisibleForRequest()) {
+        clearLiveChatStreamIfOwned(liveStreamState);
+        if (liveStreamState.detached || !isStreamStillVisibleForRequest()) {
             if (typeof loadActiveTasks === 'function') {
                 loadActiveTasks();
             }
@@ -1993,9 +2761,10 @@ function handleChatInputKeydown(event) {
         }
     }
 
+    // Enter 直接发送；Shift+Enter 保留 textarea 原生换行行为。
     if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
-        sendMessage();
+        void sendMessage();
     }
 }
 
@@ -2367,8 +3136,7 @@ function initializeChatUI() {
 
     const messagesDiv = document.getElementById('chat-messages');
     if (messagesDiv && messagesDiv.childElementCount === 0) {
-        const readyMsg = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。';
-        addMessage('assistant', readyMsg, null, null, null, { systemReadyMessage: true });
+        renderChatWelcomeEmptyState();
     }
 
     addAttackChainButton(currentConversationId);
@@ -2404,12 +3172,96 @@ function wrapTablesInBubble(bubble) {
     });
 }
 
-/**
- * 将「系统已就绪」类文案按当前语言重新渲染进气泡（与 addMessage 助手分支一致的安全处理）
- */
+const PROJECT_NAME_DISPLAY_MAX_CHARACTERS = 12;
+
+/** 仅限制项目名的界面展示，不修改实际保存的名称。 */
+function formatProjectNameForDisplay(value) {
+    const fullName = String(value == null ? '' : value);
+    const characters = Array.from(fullName);
+    if (characters.length <= PROJECT_NAME_DISPLAY_MAX_CHARACTERS) return fullName;
+    return `${characters.slice(0, PROJECT_NAME_DISPLAY_MAX_CHARACTERS).join('')}…`;
+}
+
+function applyProjectNameDisplay(element, value, fallback = '') {
+    if (!element) return '';
+    const fullName = String(value || fallback || '');
+    element.textContent = formatProjectNameForDisplay(fullName);
+    element.dataset.fullName = fullName;
+    element.title = fullName;
+    return fullName;
+}
+
+window.formatProjectNameForDisplay = formatProjectNameForDisplay;
+window.applyProjectNameDisplay = applyProjectNameDisplay;
+
+function getChatWelcomeProjectName() {
+    const projectElement = document.getElementById('chat-project-text');
+    const projectText = (projectElement?.dataset?.fullName || projectElement?.textContent || '').trim();
+    return projectText || (typeof window.t === 'function' ? window.t('projects.noProject') : '无项目');
+}
+
+function getChatWelcomeText() {
+    const project = getChatWelcomeProjectName();
+    const noProject = typeof window.t === 'function' ? window.t('projects.noProject') : '无项目';
+    if (!project || project === noProject) {
+        return typeof window.t === 'function'
+            ? window.t('chat.noProjectWelcomeMessage')
+            : '当前无项目，请输入您的测试需求，系统将自动执行相应的安全测试。';
+    }
+    return typeof window.t === 'function'
+        ? window.t('chat.projectWelcomeMessage', { project })
+        : `当前${project}项目，请输入您的测试需求，系统将自动执行相应的安全测试。`;
+}
+
+function updateChatWelcomeTitle(title) {
+    if (!title) return;
+    const project = getChatWelcomeProjectName();
+    const noProject = typeof window.t === 'function' ? window.t('projects.noProject') : '无项目';
+    const subtitle = title.parentElement?.querySelector('.chat-welcome-empty-state-subtitle');
+
+    if (project === noProject) {
+        title.textContent = typeof window.t === 'function'
+            ? window.t('chat.noProjectWelcomeTitle')
+            : '要测试什么？';
+    } else {
+        const prefix = typeof window.t === 'function'
+            ? window.t('chat.projectWelcomeTitlePrefix')
+            : '要在 ';
+        const suffix = typeof window.t === 'function'
+            ? window.t('chat.projectWelcomeTitleSuffix')
+            : ' 项目中测试什么？';
+        const projectName = document.createElement('span');
+        projectName.className = 'chat-welcome-project-name';
+        applyProjectNameDisplay(projectName, project);
+        title.replaceChildren(document.createTextNode(prefix), projectName, document.createTextNode(suffix));
+    }
+
+    if (subtitle) {
+        subtitle.textContent = typeof window.t === 'function'
+            ? window.t('chat.welcomeSubtitle')
+            : '请输入您的测试需求，系统将自动执行相应的安全测试。';
+    }
+}
+
+function renderChatWelcomeEmptyState() {
+    const messagesDiv = document.getElementById('chat-messages');
+    if (!messagesDiv) return null;
+    messagesDiv.querySelectorAll('.chat-welcome-empty-state').forEach((node) => node.remove());
+    const state = document.createElement('div');
+    state.className = 'chat-welcome-empty-state';
+    state.setAttribute('role', 'status');
+    state.setAttribute('aria-live', 'polite');
+    state.innerHTML = '<p class="chat-welcome-empty-state-title"></p><p class="chat-welcome-empty-state-subtitle"></p>';
+    updateChatWelcomeTitle(state.querySelector('.chat-welcome-empty-state-title'));
+    messagesDiv.appendChild(state);
+    return state;
+}
+
+/** 更新新对话欢迎空状态，并兼容刷新旧版本遗留的系统就绪消息。 */
 function refreshSystemReadyMessageBubbles() {
-    if (typeof window.t !== 'function') return;
-    const text = window.t('chat.systemReadyMessage');
+    const text = getChatWelcomeText();
+    const welcome = document.querySelector('.chat-welcome-empty-state-title');
+    if (welcome) updateChatWelcomeTitle(welcome);
     const escapeHtmlLocal = (s) => {
         if (!s) return '';
         const div = document.createElement('div');
@@ -2431,29 +3283,7 @@ function refreshSystemReadyMessageBubbles() {
         bubble.innerHTML = formattedContent;
         if (typeof wrapTablesInBubble === 'function') wrapTablesInBubble(bubble);
         messageDiv.dataset.originalContent = text;
-        const copyBtnNew = document.createElement('button');
-        copyBtnNew.className = 'message-copy-btn';
-        copyBtnNew.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg><span>' + window.t('common.copy') + '</span>';
-        copyBtnNew.title = window.t('chat.copyMessageTitle');
-        copyBtnNew.onclick = function (e) {
-            e.stopPropagation();
-            copyMessageToClipboard(messageDiv, this);
-        };
-        bubble.appendChild(copyBtnNew);
     });
-}
-
-function createMessageAvatar(role) {
-    const avatar = document.createElement('div');
-    avatar.className = 'message-avatar';
-    if (role === 'user') {
-        avatar.innerHTML = '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    } else if (role === 'assistant') {
-        avatar.innerHTML = '<img src="/static/logo.png" alt="" class="message-avatar-img">';
-    } else {
-        avatar.textContent = 'S';
-    }
-    return avatar;
 }
 
 // 添加消息（options.systemReadyMessage 为 true 时，语言切换会刷新该条文案）
@@ -2465,9 +3295,8 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
     messageDiv.id = id;
     messageDiv.className = 'message ' + role;
     
-    // 创建头像
-    messageDiv.appendChild(createMessageAvatar(role));
-    
+    messagesDiv.querySelector('.chat-welcome-empty-state')?.remove();
+
     // 创建消息内容容器
     const contentWrapper = document.createElement('div');
     contentWrapper.className = 'message-content';
@@ -2510,6 +3339,13 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
     }
     
     bubble.innerHTML = formattedContent;
+
+    // 刷新恢复运行中会话时，后端正文可能仍是持久化占位值“处理中...”。
+    // 保留消息节点供迭代详情和最终回复复用，但不要把占位值显示成助手正文。
+    if (role === 'assistant' && options && options.hideAssistantPlaceholder) {
+        messageDiv.classList.add('assistant-placeholder-content');
+        bubble.hidden = true;
+    }
     
     if (typeof window.csMarkdownSanitize !== 'undefined') {
         window.csMarkdownSanitize.stripSuspiciousImages(bubble);
@@ -2873,6 +3709,9 @@ function syncProcessDetailButtonLabels(messageId, expanded) {
     document.querySelectorAll('#' + messageId + ' .process-detail-btn').forEach((btn) => {
         btn.innerHTML = '<span>' + label + '</span>';
     });
+    if (typeof window.syncAssistantTurnSummary === 'function') {
+        window.syncAssistantTurnSummary(document.getElementById(messageId));
+    }
 }
 
 /** 懒加载占位提示可点击，与工具栏「展开详情」行为一致 */
@@ -3240,6 +4079,14 @@ function renderProcessDetails(messageId, processDetails, options) {
         } else if (eventType === 'hitl_interrupt') {
             const hitlMsg = (detail.message && String(detail.message).trim()) ? String(detail.message).trim() : (typeof window.t === 'function' ? window.t('hitl.pendingTitle') : '待审批');
             itemTitle = agPx + '🧑‍⚖️ HITL · ' + hitlMsg;
+        } else if (eventType === 'hitl_audit_agent_started') {
+            itemTitle = agPx + '审计 Agent 正在审查';
+        } else if (eventType === 'hitl_audit_agent') {
+            itemTitle = agPx + '审计 Agent 已完成审查';
+        } else if (eventType === 'hitl_resumed') {
+            itemTitle = agPx + '审批已通过';
+        } else if (eventType === 'hitl_rejected') {
+            itemTitle = agPx + '审批已拒绝';
         } else if (eventType === 'progress') {
             itemTitle = typeof window.translateProgressMessage === 'function' ? window.translateProgressMessage(detail.message || '') : (detail.message || '');
         } else if (eventType === 'user_interrupt_continue') {
@@ -3248,6 +4095,28 @@ function renderProcessDetails(messageId, processDetails, options) {
                 : '⏸️ 用户中断并继续';
         }
         
+        if (eventType === 'hitl_interrupt' || eventType === 'hitl_audit_agent_started' ||
+            eventType === 'hitl_audit_agent' || eventType === 'hitl_resumed' || eventType === 'hitl_rejected') {
+            const hitlTarget = typeof findToolCallItemForHitl === 'function'
+                ? findToolCallItemForHitl(timeline, data)
+                : null;
+            if (hitlTarget && hitlTarget.id) {
+                if (eventType === 'hitl_interrupt' || eventType === 'hitl_audit_agent_started') {
+                    renderInlineHitlApproval(hitlTarget.id, Object.assign({}, data, {
+                        reviewer: eventType === 'hitl_audit_agent_started' ? 'audit_agent' : (data.reviewer || 'human'),
+                        status: eventType === 'hitl_audit_agent_started' ? 'audit_running' : (data.status || 'pending')
+                    }));
+                } else {
+                    const decision = eventType === 'hitl_rejected' || data.decision === 'reject' ? 'reject' : 'approve';
+                    resolveInlineHitlDecision(timeline, Object.assign({}, data, {
+                        reviewer: data.reviewer || data.decidedBy || (eventType === 'hitl_audit_agent' ? 'audit_agent' : 'human'),
+                        status: 'decided'
+                    }), decision, detail.message || '');
+                }
+                return;
+            }
+        }
+
         const timelineOpts = {
             title: itemTitle,
             message: detail.message || '',
@@ -3268,6 +4137,19 @@ function renderProcessDetails(messageId, processDetails, options) {
             timelineOpts.toolStatus = toolStatusByProcessDetailId.get(String(detail.id));
         }
         const itemId = addTimelineItem(timeline, eventType, timelineOpts);
+        if (itemId && (eventType === 'hitl_interrupt' || eventType === 'hitl_audit_agent_started')) {
+            renderInlineHitlApproval(itemId, Object.assign({}, data, {
+                reviewer: eventType === 'hitl_audit_agent_started' ? 'audit_agent' : (data.reviewer || 'human'),
+                status: eventType === 'hitl_audit_agent_started' ? 'audit_running' : (data.status || 'pending')
+            }));
+        } else if (itemId && (eventType === 'hitl_audit_agent' || eventType === 'hitl_resumed' || eventType === 'hitl_rejected')) {
+            renderInlineHitlApproval(itemId, Object.assign({}, data, {
+                resolved: true,
+                decision: eventType === 'hitl_rejected' || data.decision === 'reject' ? 'reject' : 'approve',
+                reviewer: data.reviewer || data.decidedBy || (eventType === 'hitl_audit_agent' ? 'audit_agent' : 'human'),
+                status: 'decided'
+            }));
+        }
         if (prependMode && itemId) {
             prependedIds.push(itemId);
         }
@@ -3357,6 +4239,14 @@ function prefetchProcessDetailsSummaryHint(messageId, messageElement) {
             const j = await res.json().catch(() => ({}));
             if (!res.ok || !j.summary) return;
             const s = j.summary;
+            if (typeof window.setAssistantTurnTiming === 'function') {
+                window.setAssistantTurnTiming(messageElement, {
+                    startedAt: s.startedAt,
+                    completedAt: s.completedAt,
+                    durationMs: s.durationMs,
+                    status: s.status || 'completed'
+                });
+            }
             const summaryMcpIds = Array.isArray(s.mcpExecutionIds) ? s.mcpExecutionIds : [];
             const summaryTools = Array.isArray(s.toolExecutions) ? s.toolExecutions : [];
             if (summaryTools.length > 0) {
@@ -3399,7 +4289,7 @@ function removeMessage(id) {
     }
 }
 
-// 输入框事件绑定（回车发送 / @提及）
+// 输入框事件绑定（Enter 发送、Shift+Enter 换行 / @提及）
 const chatInput = document.getElementById('chat-input');
 if (chatInput) {
     chatInput.addEventListener('keydown', handleChatInputKeydown);
@@ -3676,6 +4566,154 @@ function formatMcpToolsToggleLabel(count, expanded) {
     return count + '次工具执行';
 }
 
+function formatAssistantTurnDuration(durationMs) {
+    const totalSeconds = Math.max(0, Math.floor((Number(durationMs) || 0) / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    if (hours > 0) {
+        return typeof window.t === 'function'
+            ? window.t('chat.turnDurationHours', { hours: hours, minutes: minutes })
+            : hours + ' 小时 ' + minutes + ' 分钟';
+    }
+    if (minutes > 0) {
+        return typeof window.t === 'function'
+            ? window.t('chat.turnDurationMinutes', { minutes: minutes, seconds: seconds })
+            : minutes + ' 分钟 ' + seconds + ' 秒';
+    }
+    return typeof window.t === 'function'
+        ? window.t('chat.turnDurationSeconds', { seconds: seconds })
+        : seconds + ' 秒';
+}
+
+function assistantTurnTimestamp(value) {
+    if (value == null || value === '') return NaN;
+    const n = new Date(value).getTime();
+    return Number.isFinite(n) ? n : NaN;
+}
+
+function assistantTurnTerminalState(processDetails) {
+    if (!Array.isArray(processDetails)) return null;
+    for (let i = processDetails.length - 1; i >= 0; i--) {
+        const detail = processDetails[i] || {};
+        const eventType = String(detail.eventType || '').trim().toLowerCase();
+        if (eventType === 'cancelled') {
+            return { status: 'cancelled', completedAt: detail.createdAt || null, detail: detail };
+        }
+        if (eventType === 'timeout') {
+            return { status: 'timeout', completedAt: detail.createdAt || null, detail: detail };
+        }
+        if (eventType === 'error') {
+            return { status: 'failed', completedAt: detail.createdAt || null, detail: detail };
+        }
+    }
+    return null;
+}
+
+let assistantTurnElapsedTimer = null;
+
+function syncRunningAssistantTurnSummaries() {
+    const runningTurns = document.querySelectorAll('#chat-messages .message.assistant[data-turn-status="running"]');
+    runningTurns.forEach((messageElement) => syncAssistantTurnSummary(messageElement));
+    if (runningTurns.length === 0 && assistantTurnElapsedTimer) {
+        clearInterval(assistantTurnElapsedTimer);
+        assistantTurnElapsedTimer = null;
+    }
+}
+
+function syncAssistantTurnElapsedClock() {
+    const hasRunningTurn = !!document.querySelector('#chat-messages .message.assistant[data-turn-status="running"]');
+    if (hasRunningTurn && !assistantTurnElapsedTimer) {
+        assistantTurnElapsedTimer = setInterval(syncRunningAssistantTurnSummaries, 1000);
+    } else if (!hasRunningTurn && assistantTurnElapsedTimer) {
+        clearInterval(assistantTurnElapsedTimer);
+        assistantTurnElapsedTimer = null;
+    }
+}
+
+function setAssistantTurnTiming(messageElementOrId, timing) {
+    const messageElement = typeof messageElementOrId === 'string'
+        ? document.getElementById(messageElementOrId)
+        : messageElementOrId;
+    if (!messageElement || !messageElement.dataset) return;
+    const value = timing || {};
+    if (value.startedAt) messageElement.dataset.turnStartedAt = String(value.startedAt);
+    if (value.completedAt) messageElement.dataset.turnCompletedAt = String(value.completedAt);
+    if (value.status) messageElement.dataset.turnStatus = String(value.status);
+    const status = String(messageElement.dataset.turnStatus || 'completed');
+    if (status === 'running') {
+        // 摘要接口对运行中任务返回 durationMs=0。刷新页面时不能把这个快照
+        // 当作固定耗时保存，否则后续渲染会一直显示“已处理 0 秒”。
+        delete messageElement.dataset.turnDurationMs;
+        delete messageElement.dataset.turnCompletedAt;
+    } else {
+        const explicitDuration = Number(value.durationMs);
+        if (Number.isFinite(explicitDuration) && explicitDuration >= 0) {
+            messageElement.dataset.turnDurationMs = String(Math.round(explicitDuration));
+        }
+        const startedAt = assistantTurnTimestamp(messageElement.dataset.turnStartedAt);
+        const completedAt = assistantTurnTimestamp(messageElement.dataset.turnCompletedAt);
+        if ((!Number.isFinite(explicitDuration) || explicitDuration < 0) &&
+            Number.isFinite(startedAt) && Number.isFinite(completedAt) && completedAt >= startedAt) {
+            messageElement.dataset.turnDurationMs = String(completedAt - startedAt);
+        }
+    }
+    syncAssistantTurnSummary(messageElement);
+    syncAssistantTurnElapsedClock();
+}
+
+function syncAssistantTurnSummary(messageElementOrId) {
+    const messageElement = typeof messageElementOrId === 'string'
+        ? document.getElementById(messageElementOrId)
+        : messageElementOrId;
+    if (!messageElement) return;
+    const label = messageElement.querySelector('.mcp-call-label.turn-process-summary');
+    if (!label) return;
+    const details = messageElement.querySelector('.process-details-container');
+    const timeline = details && details.querySelector('.progress-timeline');
+    const expanded = !!(timeline && timeline.classList.contains('expanded'));
+    const status = String(messageElement.dataset.turnStatus || 'completed');
+    let durationMs = Number(messageElement.dataset.turnDurationMs);
+    if (!Number.isFinite(durationMs) || durationMs < 0) {
+        const startedAt = assistantTurnTimestamp(messageElement.dataset.turnStartedAt);
+        const completedAt = status === 'running'
+            ? Date.now()
+            : assistantTurnTimestamp(messageElement.dataset.turnCompletedAt);
+        durationMs = Number.isFinite(startedAt) && Number.isFinite(completedAt)
+            ? Math.max(0, completedAt - startedAt)
+            : 0;
+    }
+    const duration = formatAssistantTurnDuration(durationMs);
+    let text;
+    if (status === 'running') {
+        text = typeof window.t === 'function' ? window.t('chat.turnElapsedRunning', { duration: duration }) : '已处理 ' + duration;
+    } else if (status === 'cancelled') {
+        text = typeof window.t === 'function' ? window.t('chat.turnElapsedCancelled', { duration: duration }) : '已中断 · 耗时 ' + duration;
+    } else if (status === 'timeout') {
+        text = typeof window.t === 'function' ? window.t('chat.turnElapsedTimeout', { duration: duration }) : '已超时 · 耗时 ' + duration;
+    } else if (status === 'failed') {
+        text = typeof window.t === 'function' ? window.t('chat.turnElapsedFailed', { duration: duration }) : '执行失败 · 耗时 ' + duration;
+    } else {
+        text = typeof window.t === 'function' ? window.t('chat.turnElapsedComplete', { duration: duration }) : '耗时 ' + duration;
+    }
+    label.innerHTML = `
+        <span class="turn-process-leading">
+            <span class="turn-process-status-dot${status === 'running' ? ' is-running' : ''}" aria-hidden="true"></span>
+            <span class="turn-process-summary-text">${escapeHtml(text)}</span>
+        </span>
+        <svg class="turn-process-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7.5 5.5L12 10l-4.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    `;
+    label.classList.toggle('is-expanded', expanded);
+    label.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    label.setAttribute('aria-label', typeof window.t === 'function'
+        ? window.t('chat.turnProcessAria', { state: text })
+        : text + '，展开或收起执行过程');
+}
+
+window.setAssistantTurnTiming = setAssistantTurnTiming;
+window.syncAssistantTurnSummary = syncAssistantTurnSummary;
+window.formatAssistantTurnDuration = formatAssistantTurnDuration;
+
 /** 渗透测试区：工具栏（展开详情 | N次工具执行）+ 独立工具列表 + 迭代时间线 */
 function ensureMcpCallSectionChrome(messageElement, messageId) {
     const contentWrapper = messageElement && messageElement.querySelector('.message-content');
@@ -3685,18 +4723,26 @@ function ensureMcpCallSectionChrome(messageElement, messageId) {
     if (!mcpSection) {
         mcpSection = document.createElement('div');
         mcpSection.className = 'mcp-call-section';
-        const mcpLabel = document.createElement('div');
-        mcpLabel.className = 'mcp-call-label';
-        mcpLabel.textContent = '📋 ' + (typeof window.t === 'function' ? window.t('chat.penetrationTestDetail') : '任务执行详情');
+        const mcpLabel = document.createElement('button');
+        mcpLabel.type = 'button';
+        mcpLabel.className = 'mcp-call-label turn-process-summary';
+        mcpLabel.onclick = function (event) {
+            event.stopPropagation();
+            toggleProcessDetails(null, messageId || messageElement.id);
+        };
         mcpSection.appendChild(mcpLabel);
-        contentWrapper.appendChild(mcpSection);
-    } else {
-        const mcpLabel = mcpSection.querySelector('.mcp-call-label');
-        const labelText = '📋 ' + (typeof window.t === 'function' ? window.t('chat.penetrationTestDetail') : '任务执行详情');
-        if (mcpLabel && mcpLabel.textContent !== labelText) {
-            mcpLabel.textContent = labelText;
+        const resultBubble = contentWrapper.querySelector(':scope > .message-bubble');
+        contentWrapper.insertBefore(mcpSection, resultBubble || contentWrapper.firstChild);
+    } else if (mcpSection.parentNode === contentWrapper) {
+        const resultBubble = contentWrapper.querySelector(':scope > .message-bubble');
+        if (resultBubble && mcpSection.nextSibling !== resultBubble) {
+            contentWrapper.insertBefore(mcpSection, resultBubble);
         }
     }
+
+    messageElement.classList.add('assistant-turn-with-process');
+    const resultBubble = contentWrapper.querySelector(':scope > .message-bubble');
+    if (resultBubble) resultBubble.classList.add('assistant-final-result');
 
     let toolbar = mcpSection.querySelector('.mcp-call-toolbar');
     if (!toolbar) {
@@ -3726,6 +4772,7 @@ function ensureMcpCallSectionChrome(messageElement, messageId) {
         toolbar.appendChild(processDetailBtn);
     }
 
+    syncAssistantTurnSummary(messageElement);
     return { mcpSection, toolbar, toolList };
 }
 
@@ -4354,7 +5401,23 @@ function copyDetailBlock(elementId, triggerBtn = null) {
 
 
 // 开始新对话
-async function startNewConversation() {
+async function startNewConversation(options = {}) {
+    const hasExplicitProjectId = !!options
+        && Object.prototype.hasOwnProperty.call(options, 'projectId');
+    const inheritedProjectId = typeof resolveChatProjectSelection === 'function'
+        ? resolveChatProjectSelection()
+        : (window._loadedConversationProjectId || '');
+    const requestedProjectId = hasExplicitProjectId
+        ? String(options.projectId || '').trim()
+        : String(inheritedProjectId || '').trim();
+    cancelPendingConversationLoad();
+    detachLiveChatStreamForNavigation('', true);
+    if (typeof window.cancelRunningTaskEventStream === 'function') {
+        window.cancelRunningTaskEventStream('');
+    }
+    if (typeof window.clearChatHitlApprovalDock === 'function') {
+        window.clearChatHitlApprovalDock();
+    }
     // 如果当前在分组详情页面，先退出分组详情
     if (currentGroupId) {
         const groupDetailPage = document.getElementById('group-detail-page');
@@ -4371,18 +5434,16 @@ async function startNewConversation() {
     try {
         window.currentConversationId = '';
     } catch (e) { /* ignore */ }
+    updateChatPrimaryActionState();
     currentConversationGroupId = null; // 新对话不属于任何分组
-    if (typeof ensureDefaultActiveProjectForNewChat === 'function') {
-        try {
-            await ensureDefaultActiveProjectForNewChat();
-        } catch (e) { /* ignore */ }
-    }
+    // 顶部“新任务”继承当前文件夹；文件夹内的“+”仍可显式指定（包括无项目）。
+    if (typeof setActiveProjectId === 'function') setActiveProjectId(requestedProjectId);
     if (typeof refreshChatProjectSelector === 'function') {
         await refreshChatProjectSelector();
     }
     document.getElementById('chat-messages').innerHTML = '';
-    const readyMsgNew = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。';
-    addMessage('assistant', readyMsgNew, null, null, null, { systemReadyMessage: true });
+    updateChatPrimaryActionState();
+    renderChatWelcomeEmptyState();
     addAttackChainButton(null);
     updateActiveConversation();
     // 刷新分组列表，清除分组高亮
@@ -4520,6 +5581,193 @@ function clearConversationSearch() {
     loadConversations('');
 }
 
+function conversationSidebarText(key, fallback) {
+    if (typeof window.t === 'function') {
+        const translated = window.t(key);
+        if (translated && translated !== key) return translated;
+    }
+    return fallback;
+}
+
+/**
+ * Go 进程会嵌入 index.html。开发时即使进程尚未重启，也通过新版静态 JS
+ * 将旧侧栏升级为项目文件夹结构；新模板已包含结构时该函数保持幂等。
+ */
+function ensureProjectSidebarStructure() {
+    const sidebar = document.getElementById('conversation-sidebar');
+    const sidebarContent = sidebar && sidebar.querySelector('.sidebar-content');
+    if (!sidebar || !sidebarContent) return;
+
+    const newTaskLabel = sidebar.querySelector('.new-chat-btn span:last-child');
+    if (newTaskLabel) {
+        newTaskLabel.setAttribute('data-i18n', 'chat.newTask');
+        newTaskLabel.textContent = conversationSidebarText('chat.newTask', '新任务');
+    }
+
+    const searchInput = document.getElementById('conversation-search-input');
+    if (searchInput) {
+        searchInput.setAttribute('data-i18n', 'projects.searchProjectsPlaceholder');
+        searchInput.setAttribute('data-i18n-attr', 'placeholder');
+        searchInput.setAttribute('oninput', 'handleProjectFolderSearch(this.value)');
+        searchInput.setAttribute('onkeypress', "if(event.key === 'Enter') handleProjectFolderSearch(this.value)");
+        searchInput.placeholder = conversationSidebarText('projects.searchProjectsPlaceholder', '搜索项目…');
+    }
+    const searchClear = document.getElementById('conversation-search-clear');
+    if (searchClear) searchClear.setAttribute('onclick', 'clearProjectFolderSearch()');
+
+    const projectFilter = sidebarContent.querySelector('.conversation-project-filter');
+    if (projectFilter) projectFilter.hidden = true;
+
+    let projectSection = sidebarContent.querySelector('.project-folders-section');
+    const legacyTaskSection = sidebarContent.querySelector('.task-folders-section');
+    if (!projectSection && legacyTaskSection) {
+        projectSection = legacyTaskSection;
+        projectSection.className = 'project-folders-section';
+        projectSection.setAttribute('aria-labelledby', 'project-folders-title');
+        const legacyHeader = projectSection.querySelector('.task-folders-header');
+        if (legacyHeader) legacyHeader.className = 'section-header project-folders-header';
+        const legacyTitle = projectSection.querySelector('#task-folders-title');
+        if (legacyTitle) {
+            legacyTitle.id = 'project-folders-title';
+            legacyTitle.setAttribute('data-i18n', 'chat.projectFolders');
+            legacyTitle.textContent = conversationSidebarText('chat.projectFolders', '项目');
+        }
+        const legacyList = projectSection.querySelector('#task-folders-list');
+        if (legacyList) {
+            legacyList.id = 'project-folders-list';
+            legacyList.className = 'project-folders-list';
+            legacyList.removeAttribute('role');
+            legacyList.innerHTML = '';
+        }
+    }
+    if (!projectSection) {
+        projectSection = document.createElement('section');
+        projectSection.className = 'project-folders-section';
+        projectSection.setAttribute('aria-labelledby', 'project-folders-title');
+        projectSection.innerHTML =
+            '<div class="section-header project-folders-header">' +
+                '<span id="project-folders-title" class="section-title" data-i18n="chat.projectFolders">项目</span>' +
+                '<button type="button" class="add-group-btn project-folders-add-btn" data-require-permission="project:write" onclick="showNewProjectModalFromChatSidebar()" data-i18n="projects.newProject" data-i18n-attr="title,aria-label" data-i18n-skip-text="true" title="新建项目" aria-label="新建项目">' +
+                    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+                '</button>' +
+            '</div>' +
+            '<div id="project-folders-list" class="project-folders-list"></div>';
+        const searchBox = sidebarContent.querySelector('.conversation-search-box');
+        if (searchBox) searchBox.insertAdjacentElement('afterend', projectSection);
+        else sidebarContent.insertBefore(projectSection, sidebarContent.firstChild);
+    }
+
+    const projectHeader = projectSection.querySelector('.project-folders-header');
+    if (projectHeader && !projectHeader.querySelector('.project-folders-add-btn')) {
+        const addProjectButton = document.createElement('button');
+        addProjectButton.type = 'button';
+        addProjectButton.className = 'add-group-btn project-folders-add-btn';
+        addProjectButton.dataset.requirePermission = 'project:write';
+        addProjectButton.setAttribute('onclick', 'showNewProjectModalFromChatSidebar()');
+        addProjectButton.setAttribute('data-i18n', 'projects.newProject');
+        addProjectButton.setAttribute('data-i18n-attr', 'title,aria-label');
+        addProjectButton.setAttribute('data-i18n-skip-text', 'true');
+        addProjectButton.title = conversationSidebarText('projects.newProject', '新建项目');
+        addProjectButton.setAttribute('aria-label', addProjectButton.title);
+        addProjectButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        projectHeader.appendChild(addProjectButton);
+    }
+
+    const recentSection = sidebarContent.querySelector('.recent-conversations-section');
+    if (recentSection) {
+        recentSection.id = 'recent-conversations-section';
+        recentSection.classList.add('is-collapsed');
+        let toggle = document.getElementById('recent-conversations-toggle');
+        let body = document.getElementById('recent-conversations-body');
+        if (!toggle) {
+            const oldHeader = recentSection.querySelector(':scope > .section-header');
+            const title = oldHeader && oldHeader.querySelector('.section-title');
+            const actions = oldHeader && oldHeader.querySelector('.section-header-actions');
+            const list = recentSection.querySelector('#conversations-list');
+
+            toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.id = 'recent-conversations-toggle';
+            toggle.className = 'section-header recent-conversations-toggle';
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.setAttribute('aria-controls', 'recent-conversations-body');
+            toggle.setAttribute('data-i18n', 'chat.toggleRecentConversations');
+            toggle.setAttribute('data-i18n-attr', 'title,aria-label');
+            toggle.setAttribute('data-i18n-skip-text', 'true');
+            toggle.title = conversationSidebarText('chat.toggleRecentConversations', '展开/折叠最近对话');
+            toggle.setAttribute('aria-label', toggle.title);
+            toggle.addEventListener('click', toggleRecentConversations);
+            if (title) toggle.appendChild(title);
+            else toggle.innerHTML = '<span class="section-title" data-i18n="chat.recentConversations">最近对话</span>';
+
+            const meta = document.createElement('span');
+            meta.className = 'recent-conversations-toggle-meta';
+            meta.innerHTML =
+                '<span id="recent-conversations-count" class="recent-conversations-count">0</span>' +
+                '<svg class="recent-conversations-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            toggle.appendChild(meta);
+
+            body = document.createElement('div');
+            body.id = 'recent-conversations-body';
+            body.className = 'recent-conversations-body';
+            body.hidden = true;
+            if (actions) {
+                actions.classList.add('recent-conversations-actions');
+                body.appendChild(actions);
+            }
+            if (list) body.appendChild(list);
+            if (oldHeader) oldHeader.remove();
+            recentSection.prepend(toggle);
+            recentSection.appendChild(body);
+        }
+    }
+
+    if (typeof window.applyTranslations === 'function') {
+        window.applyTranslations(sidebar);
+    }
+}
+
+function setRecentConversationsExpanded(expanded, options = {}) {
+    const section = document.getElementById('recent-conversations-section');
+    const toggle = document.getElementById('recent-conversations-toggle');
+    const body = document.getElementById('recent-conversations-body');
+    const pagination = document.getElementById('conversations-pagination');
+    const open = !!expanded;
+    if (section) section.classList.toggle('is-collapsed', !open);
+    if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (body) body.hidden = !open;
+    if (pagination) pagination.hidden = !open;
+    if (options.persist !== false) {
+        try {
+            localStorage.setItem(RECENT_CONVERSATIONS_EXPANDED_KEY, open ? '1' : '0');
+        } catch (e) { /* ignore */ }
+    }
+}
+
+function restoreRecentConversationsState() {
+    let expanded = false;
+    try {
+        expanded = localStorage.getItem(RECENT_CONVERSATIONS_EXPANDED_KEY) === '1';
+    } catch (e) { /* ignore */ }
+    setRecentConversationsExpanded(expanded, { persist: false });
+}
+
+function toggleRecentConversations() {
+    const toggle = document.getElementById('recent-conversations-toggle');
+    const expanded = toggle && toggle.getAttribute('aria-expanded') === 'true';
+    setRecentConversationsExpanded(!expanded);
+}
+
+function updateRecentConversationsCount(total) {
+    const count = document.getElementById('recent-conversations-count');
+    if (count) count.textContent = String(Math.max(0, Number(total) || 0));
+}
+
+if (typeof window !== 'undefined') {
+    window.toggleRecentConversations = toggleRecentConversations;
+    window.setRecentConversationsExpanded = setRecentConversationsExpanded;
+}
+
 function formatConversationTimestamp(dateObj, todayStart, yesterdayStart) {
     if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) {
         return '';
@@ -4601,15 +5849,38 @@ async function prefetchLastAssistantProcessDetails() {
 }
 
 async function loadConversation(conversationId) {
+    // Keep the visible conversation addressable across a full page refresh.
+    // Sidebar/project entries call loadConversation directly (rather than the
+    // router helper), so without this synchronization #chat loses the active
+    // conversation and reload falls back to the welcome screen instead of
+    // reconnecting the running task event stream.
+    syncChatConversationHash(conversationId);
     const seq = ++loadConversationRequestSeq;
+    const previousConversationId = currentConversationId;
+    cancelPendingConversationLoad();
+    detachLiveChatStreamForNavigation(conversationId);
+    const conversationLoadController = new AbortController();
+    loadConversationAbortController = conversationLoadController;
+    if (typeof window.selectChatProjectConversationItem === 'function') {
+        window.selectChatProjectConversationItem(conversationId);
+    }
+    if (typeof window.cancelRunningTaskEventStream === 'function') {
+        window.cancelRunningTaskEventStream(conversationId);
+    }
+    if (typeof window.clearChatHitlApprovalDock === 'function') {
+        window.clearChatHitlApprovalDock();
+    }
     try {
         const cachedConversation = getConversationLiteFromCache(conversationId);
         let conversation = null;
         let response = null;
         try {
-            response = await apiFetch(`/api/conversations/${conversationId}?include_process_details=0`);
+            response = await apiFetch(`/api/conversations/${conversationId}?include_process_details=0`, {
+                signal: conversationLoadController.signal
+            });
             conversation = await response.json();
         } catch (fetchError) {
+            if (fetchError && fetchError.name === 'AbortError') return;
             if (!cachedConversation) throw fetchError;
             console.warn('加载最新对话失败，使用本地缓存:', fetchError);
             conversation = cachedConversation;
@@ -4674,8 +5945,9 @@ async function loadConversation(conversationId) {
         try {
             window.currentConversationId = conversationId;
         } catch (e) { /* ignore */ }
+        updateChatPrimaryActionState();
         if (typeof refreshChatProjectSelector === 'function') {
-            refreshChatProjectSelector();
+            refreshChatProjectSelector({ reloadFolders: false, renderFolders: false });
         }
         refreshHitlConfigByCurrentConversation();
         const hitlSyncPromise = (typeof window.syncHitlConfigFromServer === 'function')
@@ -4737,15 +6009,14 @@ async function loadConversation(conversationId) {
                 if (msg.role === 'user' && isInterruptContinueInjectChatMessage(msg.content)) {
                     return;
                 }
+                const assistantContent = String(msg && msg.content != null ? msg.content : '').trim();
+                const terminalState = msg && msg.role === 'assistant'
+                    ? assistantTurnTerminalState(msg.processDetails)
+                    : null;
                 let displayContent = msg.content;
-                if (msg.role === 'assistant' && msg.content === '处理中...' && msg.processDetails && msg.processDetails.length > 0) {
-                    for (let i = msg.processDetails.length - 1; i >= 0; i--) {
-                        const detail = msg.processDetails[i];
-                        if (detail.eventType === 'error' || detail.eventType === 'cancelled') {
-                            displayContent = detail.message || msg.content;
-                            break;
-                        }
-                    }
+                if (msg.role === 'assistant' &&
+                    (assistantContent === '处理中...' || assistantContent === 'Processing...') && terminalState) {
+                    displayContent = terminalState.detail.message || msg.content;
                 }
 
                 // 消息时间口径：
@@ -4753,7 +6024,15 @@ async function loadConversation(conversationId) {
                 // - assistant: 如果后端提供 updatedAt（任务完成时写回），优先用它，避免占位消息“任务开始时间”误导
                 const msgTime = (msg && msg.role === 'assistant' && msg.updatedAt) ? msg.updatedAt : (msg ? msg.createdAt : null);
                 const mcpIds = (msg.mcpExecutionIds && Array.isArray(msg.mcpExecutionIds)) ? msg.mcpExecutionIds : [];
-                const addOpts = (msg.role === 'assistant' && mcpIds.length > 0) ? { deferMcpButtons: true } : null;
+                const isAssistantPlaceholder = msg.role === 'assistant' && (
+                    assistantContent === '处理中...' || assistantContent === 'Processing...'
+                );
+                const addOpts = (msg.role === 'assistant' && (mcpIds.length > 0 || isAssistantPlaceholder))
+                    ? {
+                        deferMcpButtons: mcpIds.length > 0,
+                        hideAssistantPlaceholder: isAssistantPlaceholder
+                    }
+                    : null;
                 const messageId = addMessage(msg.role, displayContent, mcpIds, null, msgTime, addOpts);
                 const messageEl = document.getElementById(messageId);
                 if (messageEl && msg && msg.id) {
@@ -4761,6 +6040,24 @@ async function loadConversation(conversationId) {
                     attachDeleteTurnButton(messageEl);
                 }
                 if (msg.role === 'assistant') {
+                    if (messageEl && typeof window.setAssistantTurnTiming === 'function') {
+                        const startedAt = msg && msg.createdAt ? msg.createdAt : null;
+                        const completedAt = terminalState && terminalState.completedAt
+                            ? terminalState.completedAt
+                            : (msg && msg.updatedAt ? msg.updatedAt : startedAt);
+                        const startedMs = assistantTurnTimestamp(startedAt);
+                        const completedMs = assistantTurnTimestamp(completedAt);
+                        const isRunning = isAssistantPlaceholder && !terminalState;
+                        const status = terminalState ? terminalState.status : (isRunning ? 'running' : 'completed');
+                        window.setAssistantTurnTiming(messageEl, {
+                            startedAt: startedAt,
+                            completedAt: isRunning ? null : completedAt,
+                            durationMs: (!isRunning && Number.isFinite(startedMs) && Number.isFinite(completedMs))
+                                ? Math.max(0, completedMs - startedMs)
+                                : undefined,
+                            status: status
+                        });
+                    }
                     if (messageEl && msg.reasoningContent) {
                         setMessageReasoningContent(messageEl, msg.reasoningContent);
                     }
@@ -4828,9 +6125,14 @@ async function loadConversation(conversationId) {
             if (currentConversationId === conversationId && typeof window.restoreHitlInlineForConversation === 'function') {
                 await window.restoreHitlInlineForConversation(conversationId);
             }
+            if (
+                window.CyberStrikeChatScroll &&
+                typeof window.CyberStrikeChatScroll.settleConversationRestoreToBottom === 'function'
+            ) {
+                window.CyberStrikeChatScroll.settleConversationRestoreToBottom(30);
+            }
         } else {
-            const readyMsgEmpty = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。';
-            addMessage('assistant', readyMsgEmpty, null, null, null, { systemReadyMessage: true, scroll: 'force' });
+            renderChatWelcomeEmptyState();
             if (window.CyberStrikeChatScroll) {
                 window.CyberStrikeChatScroll.forceScrollToBottom(false);
             } else {
@@ -4866,8 +6168,19 @@ async function loadConversation(conversationId) {
             });
         }
     } catch (error) {
+        if (error && error.name === 'AbortError') return;
+        if (seq === loadConversationRequestSeq && typeof window.selectChatProjectConversationItem === 'function') {
+            window.selectChatProjectConversationItem(previousConversationId);
+        }
         console.error('加载对话失败:', error);
         showChatToast('加载对话失败: ' + (error && error.message ? error.message : String(error)), 'error');
+    } finally {
+        if (seq === loadConversationRequestSeq && typeof window.finishChatConversationRestore === 'function') {
+            window.finishChatConversationRestore(conversationId);
+        }
+        if (loadConversationAbortController === conversationLoadController) {
+            loadConversationAbortController = null;
+        }
     }
 }
 
@@ -4962,8 +6275,7 @@ async function deleteConversation(conversationId, skipConfirm = false) {
                 window.currentConversationId = '';
             } catch (e) { /* ignore */ }
             document.getElementById('chat-messages').innerHTML = '';
-            const readyMsgLoad = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。';
-            addMessage('assistant', readyMsgLoad, null, null, null, { systemReadyMessage: true });
+            renderChatWelcomeEmptyState();
             addAttackChainButton(null);
         }
         
@@ -4972,6 +6284,12 @@ async function deleteConversation(conversationId, skipConfirm = false) {
         invalidateConversationLiteCache(conversationId);
         // 同时从待保留映射中移除
         delete pendingGroupMappings[conversationId];
+
+        // 先同步所有侧栏的本地状态，再执行网络刷新。项目文件夹使用独立的
+        // conversation cache；如果只刷新“最近对话”，删除项会一直残留到整页刷新。
+        try {
+            document.dispatchEvent(new CustomEvent('conversation-deleted', { detail: { conversationId } }));
+        } catch (e) { /* ignore */ }
         
         // 如果当前在分组详情页面，重新加载分组对话
         if (currentGroupId) {
@@ -4992,10 +6310,6 @@ async function deleteConversation(conversationId, skipConfirm = false) {
             applyBatchConversationFilters();
         }
 
-        // 通知其他模块（如 WebShell AI 助手）同步删除，保持列表一致
-        try {
-            document.dispatchEvent(new CustomEvent('conversation-deleted', { detail: { conversationId } }));
-        } catch (e) { /* ignore */ }
     } catch (error) {
         console.error('删除对话失败:', error);
         alert('删除对话失败: ' + error.message);
@@ -7210,6 +8524,7 @@ function exportAttackChain(format) {
 let currentGroupId = null; // 当前正在查看的分组详情页面
 let currentConversationGroupId = null; // 当前对话所属的分组ID（用于高亮显示）
 let contextMenuConversationId = null;
+let contextMenuConversationTitle = '';
 let contextMenuGroupId = null;
 let groupsCache = [];
 let conversationGroupMappingCache = {};
@@ -8036,7 +9351,8 @@ function renderConversationsPagination(visibleCount) {
 
     const totalPages = getConversationsTotalPages();
     const navDisabled = totalPages <= 1;
-    el.hidden = false;
+    const recentToggle = document.getElementById('recent-conversations-toggle');
+    el.hidden = !recentToggle || recentToggle.getAttribute('aria-expanded') !== 'true';
     const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
     const end = Math.min(page * pageSize, total);
     const tFn = typeof window.t === 'function' ? window.t.bind(window) : null;
@@ -8175,8 +9491,11 @@ async function loadGroups() {
             groupItem.appendChild(content);
 
             const menuBtn = document.createElement('button');
+            menuBtn.type = 'button';
             menuBtn.className = 'group-item-menu';
             menuBtn.innerHTML = '⋯';
+            menuBtn.title = typeof window.t === 'function' ? window.t('common.actions') : '操作';
+            menuBtn.setAttribute('aria-label', menuBtn.title);
             menuBtn.onclick = (e) => {
                 e.stopPropagation();
                 showGroupContextMenu(e, group.id);
@@ -8246,6 +9565,7 @@ async function loadConversationsWithGroups(searchQuery = '', options = {}) {
         if (!response.ok) {
             listContainer.innerHTML = emptyStateHtml;
             if (typeof window.applyTranslations === 'function') window.applyTranslations(listContainer);
+            updateRecentConversationsCount(0);
             renderConversationsPagination(0);
             return;
         }
@@ -8256,6 +9576,7 @@ async function loadConversationsWithGroups(searchQuery = '', options = {}) {
         const resolvedTotal = await resolveConversationsListTotal(convParams, parsed, pageSize, offset);
         if (isStaleConversationListLoad(loadSeq, intentPage, navigateGenAtStart, activePage)) return;
         conversationsPagination.total = resolvedTotal;
+        updateRecentConversationsCount(resolvedTotal);
 
         const pageCheck = reconcileConversationsPageAfterTotal(
             activePage, intentPage, parsed, pageSize, offset, resolvedTotal
@@ -8443,6 +9764,7 @@ async function loadConversationsWithGroups(searchQuery = '', options = {}) {
         if (listContainer) {
             listContainer.innerHTML = getConversationListEmptyHtml();
             if (typeof window.applyTranslations === 'function') window.applyTranslations(listContainer);
+            updateRecentConversationsCount(0);
             renderConversationsPagination(0);
         }
     }
@@ -8513,11 +9835,7 @@ function createConversationListItemWithMenu(conversation, isPinned) {
     const menuBtn = document.createElement('button');
     menuBtn.className = 'conversation-item-menu';
     menuBtn.innerHTML = '⋯';
-    menuBtn.onclick = (e) => {
-        e.stopPropagation();
-        contextMenuConversationId = conversation.id;
-        showConversationContextMenu(e);
-    };
+    menuBtn.onclick = (e) => openConversationContextMenuForId(e, conversation.id, conversation.title || '');
     item.appendChild(menuBtn);
 
     item.onclick = (e) => {
@@ -8530,6 +9848,14 @@ function createConversationListItemWithMenu(conversation, isPinned) {
     };
 
     return item;
+}
+
+function openConversationContextMenuForId(event, conversationId, conversationTitle = '') {
+    event.stopPropagation();
+    event.preventDefault();
+    contextMenuConversationId = conversationId;
+    contextMenuConversationTitle = conversationTitle;
+    return showConversationContextMenu(event);
 }
 
 // 显示对话上下文菜单
@@ -8821,16 +10147,92 @@ async function showGroupContextMenu(event, groupId) {
     }, 0);
 }
 
-// 重命名对话
-async function renameConversation() {
+let renameConversationTargetId = null;
+
+function ensureConversationRenameModal() {
+    let modal = document.getElementById('conversation-rename-modal');
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = 'conversation-rename-modal';
+    modal.className = 'modal-overlay projects-modal-overlay';
+    modal.style.display = 'none';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'conversation-rename-title');
+    modal.innerHTML = `
+        <div class="projects-modal-dialog">
+            <div class="projects-modal-header">
+                <div class="projects-modal-header-text">
+                    <div>
+                        <h3 id="conversation-rename-title" data-i18n="chat.renameConversationTitle">重命名对话</h3>
+                        <p class="projects-modal-subtitle" data-i18n="chat.renameConversationSubtitle">修改后会同步更新项目文件夹和最近对话中的名称</p>
+                    </div>
+                </div>
+                <button type="button" class="projects-modal-close" data-conversation-rename-close aria-label="关闭" data-i18n="common.close" data-i18n-attr="aria-label" data-i18n-skip-text="true">&times;</button>
+            </div>
+            <div class="projects-modal-body">
+                <div class="projects-form-field">
+                    <label for="conversation-rename-input" data-i18n="chat.conversationTitleLabel">对话名称</label>
+                    <input type="text" id="conversation-rename-input" class="form-input" maxlength="200" autocomplete="off" data-i18n="chat.conversationTitlePlaceholder" data-i18n-attr="placeholder" placeholder="请输入对话名称">
+                </div>
+            </div>
+            <div class="projects-modal-footer">
+                <button class="btn-secondary" type="button" data-conversation-rename-close data-i18n="common.cancel">取消</button>
+                <button class="btn-primary" type="button" id="conversation-rename-submit" data-i18n="contextMenu.rename">重命名</button>
+            </div>
+        </div>`;
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) closeConversationRenameModal();
+    });
+    modal.querySelectorAll('[data-conversation-rename-close]').forEach((button) => {
+        button.addEventListener('click', closeConversationRenameModal);
+    });
+    modal.querySelector('#conversation-rename-submit')?.addEventListener('click', saveConversationRename);
+    modal.querySelector('#conversation-rename-input')?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            saveConversationRename();
+        } else if (event.key === 'Escape') {
+            closeConversationRenameModal();
+        }
+    });
+    document.body.appendChild(modal);
+    if (typeof window.applyTranslations === 'function') window.applyTranslations(modal);
+    return modal;
+}
+
+// 打开应用内重命名弹窗，避免内置浏览器拦截 window.prompt。
+function renameConversation() {
     const convId = contextMenuConversationId;
     if (!convId) return;
 
-    const newTitle = prompt('请输入新标题:', '');
-    if (newTitle === null || !newTitle.trim()) {
-        closeContextMenu();
+    renameConversationTargetId = convId;
+    const currentTitle = contextMenuConversationTitle || '';
+    ensureConversationRenameModal();
+    const input = document.getElementById('conversation-rename-input');
+    if (input) input.value = currentTitle;
+    closeContextMenu();
+    openAppModal('conversation-rename-modal', { focusEl: input });
+    if (input) input.select();
+}
+
+function closeConversationRenameModal() {
+    renameConversationTargetId = null;
+    closeAppModal('conversation-rename-modal');
+}
+
+async function saveConversationRename() {
+    const convId = renameConversationTargetId;
+    const input = document.getElementById('conversation-rename-input');
+    const newTitle = (input?.value || '').trim();
+    if (!convId || !newTitle) {
+        input?.focus();
         return;
     }
+
+    const submitButton = document.getElementById('conversation-rename-submit');
+    if (submitButton) submitButton.disabled = true;
 
     try {
         const response = await apiFetch(`/api/conversations/${convId}`, {
@@ -8847,13 +10249,14 @@ async function renameConversation() {
         }
 
         // 更新前端显示
-        const item = document.querySelector(`[data-conversation-id="${convId}"]`);
-        if (item) {
-            const titleEl = item.querySelector('.conversation-title');
-            if (titleEl) {
-                titleEl.textContent = newTitle.trim();
-            }
-        }
+        document.querySelectorAll('[data-conversation-id]').forEach((item) => {
+            if (item.dataset.conversationId !== convId) return;
+            item.querySelectorAll('.conversation-title, .group-conversation-title, .project-conversation-title')
+                .forEach((titleEl) => {
+                    titleEl.textContent = newTitle.trim();
+                    titleEl.title = newTitle.trim();
+                });
+        });
 
         // 如果在分组详情页，也需要更新
         const groupItem = document.querySelector(`.group-conversation-item[data-conversation-id="${convId}"]`);
@@ -8870,21 +10273,45 @@ async function renameConversation() {
         }
 
         // 重新加载对话列表
-        loadConversationsWithGroups();
+        await loadConversationsWithGroups();
+        if (typeof window.refreshChatProjectFolders === 'function') {
+            await window.refreshChatProjectFolders();
+        }
+        closeConversationRenameModal();
     } catch (error) {
         console.error('重命名对话失败:', error);
         const failedLabel = typeof window.t === 'function' ? window.t('chat.renameFailed') : '重命名失败';
         const unknownErr = typeof window.t === 'function' ? window.t('createGroupModal.unknownError') : '未知错误';
         alert(failedLabel + ': ' + (error.message || unknownErr));
+    } finally {
+        if (submitButton) submitButton.disabled = false;
     }
+}
 
-    closeContextMenu();
+async function assertConversationActionResponse(response, fallbackMessage) {
+    if (response && response.ok) return response;
+    let payload = {};
+    try {
+        payload = response ? await response.json() : {};
+    } catch (e) { /* ignore */ }
+    throw new Error(payload.error || payload.message || fallbackMessage);
+}
+
+function notifyConversationPinnedChanged(conversationId, pinned) {
+    try {
+        document.dispatchEvent(new CustomEvent('conversation-pinned-changed', {
+            detail: { conversationId, pinned: !!pinned }
+        }));
+    } catch (e) { /* ignore */ }
 }
 
 // 置顶对话
 async function pinConversation() {
     const convId = contextMenuConversationId;
     if (!convId) return;
+
+    // 点击后立即收起菜单，避免网络请求期间看起来“没有反应”。
+    closeContextMenu();
 
     try {
         // 检查对话是否真的在当前分组中
@@ -8897,6 +10324,7 @@ async function pinConversation() {
         if (isInCurrentGroup) {
             // 获取当前对话在分组中的置顶状态
             const response = await apiFetch(`/api/groups/${currentGroupId}/conversations`);
+            await assertConversationActionResponse(response, '获取分组对话失败');
             const groupConvs = await response.json();
             const conv = groupConvs.find(c => c.id === convId);
             
@@ -8905,31 +10333,37 @@ async function pinConversation() {
             const newPinned = !currentPinned;
 
             // 更新分组内置顶状态
-            await apiFetch(`/api/groups/${currentGroupId}/conversations/${convId}/pinned`, {
+            const updateResponse = await apiFetch(`/api/groups/${currentGroupId}/conversations/${convId}/pinned`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ pinned: newPinned }),
             });
+            await assertConversationActionResponse(updateResponse, '更新分组内置顶状态失败');
 
             // 重新加载分组对话
-            loadGroupConversations(currentGroupId);
+            await loadGroupConversations(currentGroupId);
         } else {
             // 不在分组详情页面，或者对话不在当前分组中，使用全局置顶
             const response = await apiFetch(`/api/conversations/${convId}`);
+            await assertConversationActionResponse(response, '获取对话失败');
             const conv = await response.json();
             const newPinned = !conv.pinned;
 
             // 更新全局置顶状态
-            await apiFetch(`/api/conversations/${convId}/pinned`, {
+            const updateResponse = await apiFetch(`/api/conversations/${convId}/pinned`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ pinned: newPinned }),
             });
+            await assertConversationActionResponse(updateResponse, '更新置顶状态失败');
 
+            // 项目文件夹侧栏与“最近对话”使用不同缓存；先发事件做即时更新，
+            // projects.js 再后台拉取服务端数据校准。
+            notifyConversationPinnedChanged(convId, newPinned);
             loadConversationsWithGroups();
         }
     } catch (error) {
@@ -8937,7 +10371,6 @@ async function pinConversation() {
         alert('置顶失败: ' + (error.message || '未知错误'));
     }
 
-    closeContextMenu();
 }
 
 // 显示移动到分组子菜单
@@ -9565,6 +10998,7 @@ function closeContextMenu() {
     clearDownloadMarkdownSubmenuHideTimeout();
     submenuLoading = false;
     contextMenuConversationId = null;
+    contextMenuConversationTitle = '';
 }
 
 // 显示批量管理模态框
@@ -10156,9 +11590,6 @@ function refreshChatPanelI18n() {
                 }
             } catch (e) { /* ignore */ }
         });
-        messagesEl.querySelectorAll('.mcp-call-label').forEach(function (el) {
-            el.textContent = '\uD83D\uDCCB ' + t('chat.penetrationTestDetail');
-        });
         messagesEl.querySelectorAll('.process-detail-btn').forEach(function (btn) {
             const span = btn.querySelector('span');
             if (!span) return;
@@ -10179,10 +11610,16 @@ function refreshChatPanelI18n() {
             btn.setAttribute('aria-label', copyTitle);
         });
         messagesEl.querySelectorAll('.message.assistant').forEach(function (msgEl) {
+            if (typeof window.syncAssistantTurnSummary === 'function') {
+                window.syncAssistantTurnSummary(msgEl);
+            }
             if (typeof window.syncMcpToolsToggleButton === 'function') {
                 window.syncMcpToolsToggleButton(msgEl);
             }
         });
+        if (window.CyberStrikeChatScroll && typeof window.CyberStrikeChatScroll.refreshTurnRail === 'function') {
+            window.CyberStrikeChatScroll.refreshTurnRail();
+        }
     }
 
     if (isAppModalOpen('mcp-detail-modal')) {
@@ -10354,8 +11791,10 @@ function applyCustomIcon() {
 
 // 自定义图标输入框回车键处理
 document.addEventListener('DOMContentLoaded', function() {
+    mountChatSessionSettingsPopover();
     initSessionSettingsSelects();
     initChatReasoningBarHeightSync();
+    initChatPrimaryActionButton();
     const customInput = document.getElementById('custom-icon-input');
     if (customInput) {
         customInput.addEventListener('keydown', function(e) {
@@ -10376,6 +11815,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 document.addEventListener('languagechange', function () {
     refreshHitlConfigByCurrentConversation();
+    updateChatPrimaryActionState();
+});
+
+document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') closeChatSystemModelPicker();
 });
 
 // 点击外部关闭图标选择器、对话模式面板、侧栏折叠卡片
@@ -10395,6 +11839,12 @@ document.addEventListener('click', function(event) {
         if (!agentWrap.contains(event.target)) {
             closeAgentModePanel();
         }
+    }
+
+    const modelWrap = document.getElementById('chat-model-shortcut-wrap');
+    const modelMenu = document.getElementById('chat-system-model-menu');
+    if (modelWrap && modelMenu && !modelMenu.hidden && !modelWrap.contains(event.target)) {
+        closeChatSystemModelPicker();
     }
 
     const reasoningWrap = document.getElementById('chat-reasoning-wrapper');
@@ -10752,11 +12202,7 @@ async function loadGroupConversations(groupId, searchQuery = '') {
                 const menuBtn = document.createElement('button');
                 menuBtn.className = 'conversation-item-menu';
                 menuBtn.innerHTML = '⋯';
-                menuBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    contextMenuConversationId = conv.id;
-                    showConversationContextMenu(e);
-                };
+                menuBtn.onclick = (e) => openConversationContextMenuForId(e, conv.id, fullConv.title || conv.title || '');
                 item.appendChild(menuBtn);
 
                 item.onclick = (e) => {
@@ -10847,46 +12293,61 @@ async function editGroup() {
     }
 }
 
-// 删除分组
-async function deleteGroup() {
-    if (typeof requirePermission === 'function' && !requirePermission('group:delete')) return;
-    if (!currentGroupId) return;
+function removeConversationGroupFromLocalState(groupId) {
+    groupsCache = groupsCache.filter(group => group.id !== groupId);
+    Object.keys(conversationGroupMappingCache).forEach(convId => {
+        if (conversationGroupMappingCache[convId] === groupId) {
+            delete conversationGroupMappingCache[convId];
+        }
+    });
+    document.querySelectorAll('.group-item[data-group-id]').forEach(item => {
+        if (item.dataset.groupId === groupId) item.remove();
+    });
+}
+
+async function deleteConversationGroupById(groupId, options = {}) {
+    if (typeof requirePermission === 'function' && !requirePermission('group:delete')) {
+        if (options.closeContextMenu) closeGroupContextMenu();
+        return;
+    }
+    if (!groupId) return;
 
     const deleteConfirmMsg = typeof window.t === 'function' ? window.t('chat.deleteGroupConfirm') : '确定要删除此分组吗？分组中的对话不会被删除，但会从分组中移除。';
     if (!confirm(deleteConfirmMsg)) {
+        if (options.closeContextMenu) closeGroupContextMenu();
         return;
     }
 
     try {
-        await apiFetch(`/api/groups/${currentGroupId}`, {
+        const deleteResponse = await apiFetch(`/api/groups/${groupId}`, {
             method: 'DELETE',
         });
+        await assertConversationActionResponse(deleteResponse, '删除分组失败');
 
-        // 更新缓存
-        groupsCache = groupsCache.filter(g => g.id !== currentGroupId);
-        Object.keys(conversationGroupMappingCache).forEach(convId => {
-            if (conversationGroupMappingCache[convId] === currentGroupId) {
-                delete conversationGroupMappingCache[convId];
-            }
-        });
+        // 删除成功后先同步本地界面，再做服务端列表校准。
+        removeConversationGroupFromLocalState(groupId);
+        if (currentGroupId === groupId) exitGroupDetail();
 
         // 如果"移动到分组"子菜单是打开的，刷新它
         const submenu = document.getElementById('move-to-group-submenu');
+        await loadGroups();
         if (submenu && submenu.style.display !== 'none') {
-            // 子菜单是打开的，重新加载分组列表并刷新子菜单
-            await loadGroups();
             await showMoveToGroupSubmenu();
-        } else {
-            exitGroupDetail();
-            await loadGroups();
         }
-        
+
         // 刷新对话列表，确保之前被分组的对话能立即显示
         await loadConversationsWithGroups();
     } catch (error) {
         console.error('删除分组失败:', error);
         alert('删除失败: ' + (error.message || '未知错误'));
+    } finally {
+        if (options.closeContextMenu) closeGroupContextMenu();
     }
+}
+
+// 删除当前分组详情中的分组
+async function deleteGroup() {
+    await deleteConversationGroupById(currentGroupId);
 }
 
 // 从上下文菜单重命名分组
@@ -11008,51 +12469,9 @@ async function pinGroupFromContext() {
 
 // 从上下文菜单删除分组
 async function deleteGroupFromContext() {
-    if (typeof requirePermission === 'function' && !requirePermission('group:delete')) return;
     const groupId = contextMenuGroupId;
     if (!groupId) return;
-
-    const deleteConfirmMsg = typeof window.t === 'function' ? window.t('chat.deleteGroupConfirm') : '确定要删除此分组吗？分组中的对话不会被删除，但会从分组中移除。';
-    if (!confirm(deleteConfirmMsg)) {
-        closeGroupContextMenu();
-        return;
-    }
-
-    try {
-        await apiFetch(`/api/groups/${groupId}`, {
-            method: 'DELETE',
-        });
-
-        // 更新缓存
-        groupsCache = groupsCache.filter(g => g.id !== groupId);
-        Object.keys(conversationGroupMappingCache).forEach(convId => {
-            if (conversationGroupMappingCache[convId] === groupId) {
-                delete conversationGroupMappingCache[convId];
-            }
-        });
-
-        // 如果"移动到分组"子菜单是打开的，刷新它
-        const submenu = document.getElementById('move-to-group-submenu');
-        if (submenu && submenu.style.display !== 'none') {
-            // 子菜单是打开的，重新加载分组列表并刷新子菜单
-            await loadGroups();
-            await showMoveToGroupSubmenu();
-        } else {
-            // 如果当前在分组详情页，退出详情页
-            if (currentGroupId === groupId) {
-                exitGroupDetail();
-            }
-            await loadGroups();
-        }
-        
-        // 刷新对话列表，确保之前被分组的对话能立即显示
-        await loadConversationsWithGroups();
-    } catch (error) {
-        console.error('删除分组失败:', error);
-        alert('删除失败: ' + (error.message || '未知错误'));
-    }
-
-    closeGroupContextMenu();
+    await deleteConversationGroupById(groupId, { closeContextMenu: true });
 }
 
 // 关闭分组上下文菜单
@@ -11157,7 +12576,14 @@ function clearGroupSearch() {
 
 // 初始化时加载分组
 document.addEventListener('DOMContentLoaded', async () => {
+    ensureProjectSidebarStructure();
     if (window.i18nReady) await window.i18nReady;
+    if (typeof window.applyTranslations === 'function') {
+        window.applyTranslations(document.getElementById('conversation-sidebar'));
+    }
+    // 任务栏不再暴露项目筛选，清除旧选择以免隐藏部分任务。
+    setConversationProjectFilter('');
+    restoreRecentConversationsState();
     updateConversationSortMenuUI();
     initConversationProjectCustomSelect();
     initConversationsPaginationEvents();
@@ -11199,6 +12625,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.addEventListener('conversation-deleted', (e) => {
         const id = e.detail && e.detail.conversationId;
         if (!id) return;
+        // API 已确认删除后立即移除可见列表项，网络刷新只负责校准分页和计数。
+        document.querySelectorAll('.conversation-item[data-conversation-id], .group-conversation-item[data-conversation-id]')
+            .forEach((item) => {
+                if (item.dataset.conversationId === id) item.remove();
+            });
         if (id === currentConversationId) {
             currentConversationId = null;
             try {
@@ -11206,8 +12637,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             } catch (e) { /* ignore */ }
             const messagesDiv = document.getElementById('chat-messages');
             if (messagesDiv) messagesDiv.innerHTML = '';
-            const readyMsg = typeof window.t === 'function' ? window.t('chat.systemReadyMessage') : '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。';
-            addMessage('assistant', readyMsg, null, null, null, { systemReadyMessage: true });
+            renderChatWelcomeEmptyState();
             addAttackChainButton(null);
         }
         if (typeof loadConversationsWithGroups === 'function') {
@@ -11227,6 +12657,11 @@ async function refreshAllProjectFilterSelects() {
 if (typeof window !== 'undefined') {
     window.loadConversation = loadConversation;
     window.startNewConversation = startNewConversation;
+    window.refreshChatWelcomeEmptyState = refreshSystemReadyMessageBubbles;
+    window.openConversationContextMenuForId = openConversationContextMenuForId;
+    window.renameConversation = renameConversation;
+    window.closeConversationRenameModal = closeConversationRenameModal;
+    window.saveConversationRename = saveConversationRename;
     window.refreshConversationProjectFilter = refreshConversationProjectFilter;
     window.refreshAllProjectFilterSelects = refreshAllProjectFilterSelects;
     window.onConversationProjectFilterChange = onConversationProjectFilterChange;

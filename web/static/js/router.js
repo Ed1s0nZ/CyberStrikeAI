@@ -17,6 +17,27 @@ function buildHashForPage(pageId) {
 }
 
 let chatConversationFromHashSeq = 0;
+
+function setChatConversationRestorePending(conversationId, pending) {
+    const container = document.querySelector('.chat-container');
+    if (!container) return;
+    const id = String(conversationId || '').trim();
+    if (pending && id) {
+        container.classList.add('is-conversation-restoring');
+        container.dataset.restoringConversationId = id;
+        container.setAttribute('aria-busy', 'true');
+        return;
+    }
+    container.classList.remove('is-conversation-restoring');
+    delete container.dataset.restoringConversationId;
+    container.removeAttribute('aria-busy');
+}
+
+function finishChatConversationRestore(conversationId) {
+    setChatConversationRestorePending(conversationId, false);
+}
+window.finishChatConversationRestore = finishChatConversationRestore;
+
 function scheduleChatConversationFromHash(delayMs) {
     const hash = window.location.hash.slice(1);
     const hashParts = hash.split('?');
@@ -35,6 +56,8 @@ function scheduleChatConversationFromHash(delayMs) {
     if (!conversationId) {
         return;
     }
+    // 同一事件循环内先遮住默认新对话状态，避免网络请求返回前闪出“无项目”。
+    setChatConversationRestorePending(conversationId, true);
     const token = ++chatConversationFromHashSeq;
     setTimeout(() => {
         if (token !== chatConversationFromHashSeq) {
@@ -84,7 +107,7 @@ function initRouter() {
         if (pageId && ['dashboard', 'chat', 'hitl', 'asset-overview', 'asset-library', 'info-collect', 'projects', 'vulnerabilities', 'webshell', 'chat-files', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'roles-management', 'platform-rbac', 'workflows', 'skills-monitor', 'skills-management', 'agents-management', 'settings', 'tasks', 'c2-listeners', 'c2-sessions', 'c2-tasks', 'c2-payloads', 'c2-events', 'c2-profiles'].includes(pageId)) {
             switchPage(pageId);
             if (pageId === 'chat') {
-                scheduleChatConversationFromHash(500);
+                scheduleChatConversationFromHash(0);
             }
             return;
         }
@@ -98,6 +121,9 @@ function initRouter() {
 function switchPage(pageId) {
     const targetPage = document.getElementById(`page-${pageId}`);
     if (!targetPage) return;
+    if (pageId !== 'chat') {
+        setChatConversationRestorePending('', false);
+    }
 
     // 导航点击会修改 hash，随后浏览器还会触发 hashchange。
     // 同一页面已经激活时不再重复初始化，避免接口重复请求和页面二次重绘。
@@ -563,6 +589,7 @@ async function initPage(pageId) {
 // 页面加载完成后初始化路由
 document.addEventListener('DOMContentLoaded', function() {
     initRouter();
+    document.documentElement.classList.remove('initial-route-pending');
     initSidebarState();
     
     // 监听hash变化
@@ -576,7 +603,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (pageId && ['dashboard', 'chat', 'hitl', 'asset-overview', 'asset-library', 'info-collect', 'projects', 'tasks', 'workflows', 'vulnerabilities', 'webshell', 'chat-files', 'mcp-monitor', 'mcp-management', 'knowledge-management', 'knowledge-retrieval-logs', 'roles-management', 'platform-rbac', 'skills-monitor', 'skills-management', 'agents-management', 'settings', 'c2-listeners', 'c2-sessions', 'c2-tasks', 'c2-payloads', 'c2-events', 'c2-profiles'].includes(pageId)) {
             switchPage(pageId);
             if (pageId === 'chat') {
-                scheduleChatConversationFromHash(200);
+                scheduleChatConversationFromHash(0);
             }
         }
     });

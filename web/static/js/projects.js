@@ -891,6 +891,8 @@ function renderProjectsSidebar() {
         return;
     }
     el.innerHTML = list.map((p) => {
+        const fullName = p.name || tp('common.untitled');
+        const displayName = window.formatProjectNameForDisplay(fullName);
         const active = p.id === currentProjectId ? ' is-active' : '';
         const archived = p.status === 'archived' ? ' is-archived' : '';
         const badges = [
@@ -899,7 +901,7 @@ function renderProjectsSidebar() {
         ].join('');
         return `<div class="projects-list-item${active}${archived}" data-id="${escapeAttr(p.id)}" onclick="selectProject(${escapeJsStringAttr(p.id)})">
             <div class="projects-list-item-body">
-                <div class="projects-list-item-name">${escapeHtml(p.name)}${badges}</div>
+                <div class="projects-list-item-name" title="${escapeAttr(fullName)}">${escapeHtml(displayName)}${badges}</div>
                 <div class="projects-list-item-meta">${formatProjectTime(p.updated_at)}</div>
             </div>
             <button type="button" class="projects-list-item-menu" title="${escapeHtml(tp('projects.projectActions'))}" aria-label="${escapeHtml(tp('projects.projectActions'))}" onclick="showProjectListActionMenu(event, ${escapeJsStringAttr(p.id)})">⋯</button>
@@ -919,8 +921,7 @@ function renderProjectDetailTitle(name) {
     const titleEl = document.getElementById('projects-detail-title');
     if (!titleEl) return;
     const text = (name || '').trim() || tp('projects.defaultProjectName');
-    titleEl.textContent = text;
-    titleEl.title = text;
+    window.applyProjectNameDisplay(titleEl, text);
 }
 
 function renderProjectDetailDesc(desc) {
@@ -1965,10 +1966,11 @@ function showNewProjectModal() {
     openProjectsOverlay('project-modal');
 }
 
-async function showEditProjectModal(projectId) {
+async function showEditProjectModal(projectId, options = {}) {
     if (!projectId) return;
     if (!requireProjectWrite()) return;
     window._projectModalFromChat = false;
+    window._projectModalFromChatSidebar = options.fromChatSidebar === true;
     window._projectModalEditId = projectId;
     document.getElementById('project-modal-title').textContent = tp('projects.modalEditTitle');
     const sub = document.getElementById('project-modal-subtitle');
@@ -2009,6 +2011,14 @@ function showNewProjectModalFromChat() {
     showNewProjectModal();
 }
 
+/** 从对话侧栏新建项目，保持当前对话的项目绑定不变。 */
+function showNewProjectModalFromChatSidebar() {
+    if (!requireProjectWrite()) return;
+    window._projectModalFromChat = false;
+    window._projectModalFromChatSidebar = true;
+    showNewProjectModal();
+}
+
 async function saveProjectModal() {
     if (!requireProjectWrite()) return;
     const name = document.getElementById('project-modal-name').value.trim().slice(0, PROJECT_NAME_MAX_LENGTH);
@@ -2026,8 +2036,10 @@ async function saveProjectModal() {
             : await apiFetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         if (!(await notifyProjectApiFailure(res, 'projects.saveFailed', '保存失败'))) return;
         const fromChat = !!window._projectModalFromChat;
+        const fromChatSidebar = !!window._projectModalFromChatSidebar;
         const fromWebshellConnId = window._projectModalFromWebshellConnId || '';
         window._projectModalFromChat = false;
+        window._projectModalFromChatSidebar = false;
         window._projectModalFromWebshellConnId = '';
         closeProjectModal();
         const saved = await res.json();
@@ -2039,7 +2051,7 @@ async function saveProjectModal() {
                 }
             } else if (fromChat && !editId) {
                 await applyChatProjectSelection(saved.id);
-            } else {
+            } else if (!fromChatSidebar) {
                 await selectProject(saved.id);
             }
         }
@@ -2056,6 +2068,7 @@ async function saveProjectModal() {
 
 function closeProjectModal() {
     window._projectModalFromChat = false;
+    window._projectModalFromChatSidebar = false;
     window._projectModalEditId = null;
     closeProjectsOverlay('project-modal');
 }
@@ -2122,6 +2135,7 @@ function findProjectById(projectId) {
 }
 
 let _projectListMenuTargetId = null;
+let _projectListMenuSource = '';
 let _projectListMenuDocClickBound = false;
 
 function closeProjectListActionMenu() {
@@ -2129,6 +2143,7 @@ function closeProjectListActionMenu() {
     if (!menu) return;
     menu.style.display = 'none';
     _projectListMenuTargetId = null;
+    _projectListMenuSource = '';
 }
 
 function positionProjectListActionMenu(event) {
@@ -2153,7 +2168,7 @@ function positionProjectListActionMenu(event) {
     menu.style.top = `${top}px`;
 }
 
-function showProjectListActionMenu(event, projectId) {
+function showProjectListActionMenu(event, projectId, source = '') {
     event.stopPropagation();
     event.preventDefault();
     const menu = document.getElementById('projects-list-action-menu');
@@ -2166,10 +2181,21 @@ function showProjectListActionMenu(event, projectId) {
     const p = findProjectById(projectId);
     if (!p) return;
     _projectListMenuTargetId = projectId;
+    _projectListMenuSource = source;
     const editText = document.getElementById('projects-list-menu-edit-text');
+    const pinText = document.getElementById('projects-list-menu-pin-text');
     const archiveText = document.getElementById('projects-list-menu-archive-text');
     const deleteText = document.getElementById('projects-list-menu-delete-text');
-    if (editText) editText.textContent = tp('projects.editProject');
+    if (editText) {
+        editText.textContent = source === 'chat'
+            ? pickerMessage(tp, 'projects.renameProject', '重命名')
+            : tp('projects.editProject');
+    }
+    if (pinText) {
+        pinText.textContent = p.pinned
+            ? pickerMessage(tp, 'projects.unpinProjectAction', '取消置顶')
+            : pickerMessage(tp, 'projects.pinProjectAction', '置顶项目');
+    }
     if (archiveText) {
         archiveText.textContent = p.status === 'archived'
             ? tp('projects.restoreProjectActive')
@@ -2180,6 +2206,38 @@ function showProjectListActionMenu(event, projectId) {
     if (typeof applyRBACToUI === 'function') applyRBACToUI(menu);
 }
 
+function updateCachedProjectPinnedState(projectId, pinned) {
+    const update = (project) => {
+        if (project?.id === projectId) project.pinned = !!pinned;
+        return project;
+    };
+    projectsCache = sortProjectsForPicker(projectsCache.map(update));
+    projectsCacheAll = sortProjectsForPicker(projectsCacheAll.map(update));
+    renderProjectsSidebar();
+    if (isProjectsCacheReady() && chatProjectFolderContext.ready) {
+        renderChatProjectFolders(projectsCacheAll);
+    }
+}
+
+async function toggleProjectPinnedFromListMenu() {
+    if (!requireProjectWrite()) return;
+    const projectId = _projectListMenuTargetId;
+    const project = findProjectById(projectId);
+    closeProjectListActionMenu();
+    if (!projectId || !project) return;
+
+    const nextPinned = !project.pinned;
+    const res = await apiFetch(`/api/projects/${projectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pinned: nextPinned }),
+    });
+    if (!(await notifyProjectApiFailure(res, 'projects.operationFailed', '操作失败'))) return;
+
+    updateCachedProjectPinnedState(projectId, nextPinned);
+    await loadProjectsList();
+}
+
 function initProjectListActionMenu() {
     if (_projectListMenuDocClickBound) return;
     _projectListMenuDocClickBound = true;
@@ -2187,7 +2245,7 @@ function initProjectListActionMenu() {
         const menu = document.getElementById('projects-list-action-menu');
         if (!menu || menu.style.display === 'none') return;
         if (menu.contains(event.target)) return;
-        if (event.target.closest('.projects-list-item-menu')) return;
+        if (event.target.closest('.projects-list-item-menu, .project-folder-menu')) return;
         closeProjectListActionMenu();
     });
     document.addEventListener('keydown', (event) => {
@@ -2244,9 +2302,10 @@ async function toggleProjectArchiveFromListMenu() {
 
 function editProjectFromListMenu() {
     const projectId = _projectListMenuTargetId;
+    const fromChatSidebar = _projectListMenuSource === 'chat';
     closeProjectListActionMenu();
     if (!projectId) return;
-    showEditProjectModal(projectId);
+    showEditProjectModal(projectId, { fromChatSidebar });
 }
 
 async function deleteProjectFromListMenu() {
@@ -2527,6 +2586,1164 @@ const projectPickerPanelState = {
     webshell: { seq: 0, timer: null },
 };
 
+let chatProjectFolderSearchQuery = '';
+let chatProjectFolderRenderSeq = 0;
+let chatProjectFolderContextLoadSeq = 0;
+const CHAT_PROJECT_FOLDER_PAGE_SIZE = 6;
+let chatProjectFolderVisibleCount = CHAT_PROJECT_FOLDER_PAGE_SIZE;
+let chatProjectFolderLastQuery = '';
+const chatProjectFolderExpandedIds = new Set();
+let chatProjectFolderLastSelectionId = null;
+const CHAT_UNASSIGNED_PROJECT_FOLDER_ID = '__chat_unassigned_project__';
+const PROJECT_FOLDER_COMPLETION_SEEN_KEY = 'cyberstrike-project-folder-completion-seen';
+const chatProjectFolderContext = {
+    ready: false,
+    conversations: [],
+    runningIds: new Set(),
+    completedByConversation: new Map(),
+    pendingApprovalByConversation: new Map(),
+};
+const PROJECT_FOLDER_PREVIEW_OPEN_DELAY_MS = 160;
+const PROJECT_FOLDER_PREVIEW_CLOSE_DELAY_MS = 120;
+const PROJECT_APPROVAL_TICK_INTERVAL_MS = 1000;
+const projectApprovalTickerEntries = new Set();
+let projectApprovalTickerId = 0;
+let projectFolderPreviewOpenTimer = null;
+let projectFolderPreviewCloseTimer = null;
+let projectFolderPreviewAnchor = null;
+let projectConversationPreviewOpenTimer = null;
+let projectConversationPreviewCloseTimer = null;
+let projectConversationPreviewAnchor = null;
+let projectConversationPreviewSuppressedUntil = 0;
+
+function readProjectFolderCompletionSeen() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(PROJECT_FOLDER_COMPLETION_SEEN_KEY) || '{}');
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (e) {
+        return {};
+    }
+}
+
+function markProjectConversationViewed(conversationId, completedAt) {
+    const id = String(conversationId || '').trim();
+    if (!id) return;
+    const seen = readProjectFolderCompletionSeen();
+    const timestamp = completedAt || new Date().toISOString();
+    seen[id] = timestamp;
+    try {
+        localStorage.setItem(PROJECT_FOLDER_COMPLETION_SEEN_KEY, JSON.stringify(seen));
+    } catch (e) { /* ignore */ }
+}
+
+function markCurrentProjectConversationViewed() {
+    const conversationId = String(window.currentConversationId || '').trim();
+    if (!conversationId || !isProjectConversationUnread(conversationId)) return false;
+    const completed = chatProjectFolderContext.completedByConversation.get(conversationId);
+    markProjectConversationViewed(conversationId, completed?.completedAt);
+    if (isProjectsCacheReady() && chatProjectFolderContext.ready) {
+        renderChatProjectFolders(projectsCacheAll);
+    }
+    return true;
+}
+
+function initProjectConversationReadTracking() {
+    if (window._projectConversationReadTrackingInited) return;
+    const chatContainer = document.querySelector('#page-chat .chat-container');
+    if (!chatContainer) return;
+    window._projectConversationReadTrackingInited = true;
+    const markViewed = () => markCurrentProjectConversationViewed();
+    chatContainer.addEventListener('pointerdown', markViewed, { passive: true });
+    chatContainer.addEventListener('focusin', markViewed);
+    document.getElementById('chat-input')?.addEventListener('input', markViewed);
+}
+
+function isProjectConversationUnread(conversationId) {
+    const completed = chatProjectFolderContext.completedByConversation.get(conversationId);
+    if (!completed || String(completed.status || '').toLowerCase() !== 'completed') return false;
+    const completedAt = Date.parse(completed.completedAt || '');
+    if (!Number.isFinite(completedAt)) return false;
+    const seenAt = Date.parse(readProjectFolderCompletionSeen()[conversationId] || '');
+    return !Number.isFinite(seenAt) || completedAt > seenAt;
+}
+
+function getProjectApprovalTiming(details) {
+    if (!details || typeof details !== 'object') return { timeoutSeconds: 0, expiresAt: 0 };
+    let payload = details.payload;
+    if (typeof payload === 'string') {
+        try { payload = JSON.parse(payload); } catch (e) { payload = {}; }
+    }
+    if (!payload || typeof payload !== 'object') payload = {};
+    const approval = payload.hitlApproval && typeof payload.hitlApproval === 'object' ? payload.hitlApproval : {};
+    const timeout = Number(details.timeoutSeconds != null ? details.timeoutSeconds : approval.timeoutSeconds);
+    const timeoutSeconds = Number.isFinite(timeout) && timeout > 0 ? Math.floor(timeout) : 0;
+    const createdAt = Date.parse(details.createdAt || approval.createdAt || '');
+    let expiresAt = Date.parse(details.expiresAt || approval.expiresAt || '');
+    if (!Number.isFinite(expiresAt) && timeoutSeconds > 0 && Number.isFinite(createdAt)) {
+        expiresAt = createdAt + timeoutSeconds * 1000;
+    }
+    return { timeoutSeconds, expiresAt: Number.isFinite(expiresAt) ? expiresAt : 0 };
+}
+
+function formatProjectApprovalRemaining(milliseconds) {
+    const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
+    const minutes = Math.floor(seconds / 60);
+    return minutes + ':' + String(seconds % 60).padStart(2, '0');
+}
+
+function registerProjectApprovalTicker(status, update) {
+    const entry = { status, update };
+    if (update() === false) return;
+    projectApprovalTickerEntries.add(entry);
+    if (projectApprovalTickerId) return;
+    projectApprovalTickerId = window.setInterval(() => {
+        projectApprovalTickerEntries.forEach((candidate) => {
+            if (!candidate.status.isConnected || candidate.update() === false) {
+                projectApprovalTickerEntries.delete(candidate);
+            }
+        });
+        if (!projectApprovalTickerEntries.size) {
+            window.clearInterval(projectApprovalTickerId);
+            projectApprovalTickerId = 0;
+        }
+    }, PROJECT_APPROVAL_TICK_INTERVAL_MS);
+}
+
+function bindProjectApprovalProgress(status, details) {
+    const timing = getProjectApprovalTiming(details);
+    if (!timing.timeoutSeconds || !timing.expiresAt) return;
+    const time = status.querySelector('.project-approval-time');
+    const value = status.querySelector('.project-approval-progress-value');
+    const update = () => {
+        const remaining = Math.max(0, timing.expiresAt - Date.now());
+        const percent = Math.max(0, Math.min(100, remaining / (timing.timeoutSeconds * 1000) * 100));
+        if (time) time.textContent = formatProjectApprovalRemaining(remaining);
+        if (value) value.style.width = `${percent.toFixed(2)}%`;
+        status.setAttribute('aria-valuenow', String(Math.round(percent)));
+        if (remaining <= 0) {
+            status.classList.add('is-expired');
+            return false;
+        }
+        return true;
+    };
+    status.setAttribute('role', 'progressbar');
+    status.setAttribute('aria-valuemin', '0');
+    status.setAttribute('aria-valuemax', '100');
+    registerProjectApprovalTicker(status, update);
+}
+
+const PROJECT_APPROVAL_URGENCY_CLASSES = [
+    'is-urgency-normal',
+    'is-urgency-warning',
+    'is-urgency-urgent',
+    'is-urgency-critical',
+];
+
+function projectApprovalUrgencyLevel(remainingMilliseconds, hasDeadline) {
+    if (!hasDeadline) return 'normal';
+    const remaining = Math.max(0, Number(remainingMilliseconds) || 0);
+    if (remaining <= 60 * 1000) return 'critical';
+    if (remaining <= 3 * 60 * 1000) return 'warning';
+    return 'normal';
+}
+
+function getProjectApprovalUrgency(details) {
+    const timing = getProjectApprovalTiming(details);
+    if (!timing.timeoutSeconds || !timing.expiresAt) {
+        return {
+            level: 'normal',
+            label: pickerMessage(tp, 'hitl.approvalUrgencyUnlimited', '审批不限时'),
+            remaining: 0,
+        };
+    }
+    const remaining = Math.max(0, timing.expiresAt - Date.now());
+    const level = projectApprovalUrgencyLevel(remaining, true);
+    const urgencyLabels = {
+        critical: pickerMessage(tp, 'hitl.approvalUrgencyWithinOne', '最早审批将在 1 分钟内到期'),
+        warning: pickerMessage(tp, 'hitl.approvalUrgencyOneToThree', '最早审批将在 1–3 分钟内到期'),
+        normal: pickerMessage(tp, 'hitl.approvalUrgencyMoreThanThree', '最早审批将在 3 分钟后到期'),
+    };
+    return {
+        level,
+        label: urgencyLabels[level],
+        remaining,
+    };
+}
+
+function bindProjectApprovalUrgency(status, details, baseLabel) {
+    const timing = getProjectApprovalTiming(details);
+    const update = () => {
+        const urgency = getProjectApprovalUrgency(details);
+        status.classList.remove(...PROJECT_APPROVAL_URGENCY_CLASSES);
+        status.classList.add(`is-urgency-${urgency.level}`);
+        status.dataset.approvalUrgency = urgency.level;
+        status.setAttribute('aria-label', `${baseLabel}，${urgency.label}`);
+        status.title = `${baseLabel} · ${urgency.label}`;
+        return !(timing.expiresAt && urgency.remaining <= 0);
+    };
+    if (timing.timeoutSeconds && timing.expiresAt) {
+        registerProjectApprovalTicker(status, update);
+    } else {
+        update();
+    }
+}
+
+function createProjectTaskStatus(kind, details, options) {
+    if (!kind) return null;
+    const config = options && typeof options === 'object' ? options : {};
+    const isApprovalSummary = kind === 'approval' && config.aggregate === true;
+    const approvalCount = Math.max(0, Math.floor(Number(config.count) || 0));
+    const status = document.createElement('span');
+    status.className = `project-task-status project-task-status--${kind}`;
+    const label = isApprovalSummary
+        ? tpFmt('hitl.waitingApprovalCount', `等待批准 ${approvalCount}`, { count: approvalCount })
+        : (kind === 'approval'
+        ? pickerMessage(tp, 'hitl.waitingApprovalShort', '等待批准')
+        : (kind === 'running'
+            ? pickerMessage(tp, 'tasks.statusRunning', '运行中')
+            : pickerMessage(tp, 'chat.completedUnread', '已完成，尚未查看')));
+    if (kind === 'approval') {
+        const timing = getProjectApprovalTiming(details);
+        status.innerHTML = '<span class="project-approval-label"></span>' +
+            (!isApprovalSummary && timing.timeoutSeconds && timing.expiresAt
+                ? '<span class="project-approval-time"></span><span class="project-approval-progress"><span class="project-approval-progress-value"></span></span>'
+                : '');
+        status.querySelector('.project-approval-label').textContent = label;
+        if (isApprovalSummary) {
+            // 项目文件夹只汇总待审批数量，始终使用绿色；
+            // 紧急程度仅属于具体对话，避免多个审批让项目颜色来回跳变。
+            status.classList.add('project-task-status--approval-summary', 'is-urgency-normal');
+            status.dataset.approvalCount = String(approvalCount);
+            status.dataset.approvalUrgency = 'normal';
+            status.setAttribute('aria-label', label);
+            status.title = label;
+        } else {
+            bindProjectApprovalProgress(status, details);
+            bindProjectApprovalUrgency(status, details, label);
+        }
+    }
+    if (!isApprovalSummary) {
+        status.setAttribute('aria-label', label);
+        status.title = label;
+    }
+    return status;
+}
+
+function appendProjectTaskStatuses(container, kinds, detailsByKind, optionsByKind) {
+    const normalizedKinds = Array.from(new Set((Array.isArray(kinds) ? kinds : [kinds]).filter(Boolean)));
+    if (!container || !normalizedKinds.length) return;
+    const group = document.createElement('span');
+    group.className = 'project-task-status-group';
+    normalizedKinds.forEach((kind) => {
+        const status = createProjectTaskStatus(
+            kind,
+            detailsByKind && detailsByKind[kind],
+            optionsByKind && optionsByKind[kind]
+        );
+        if (status) group.appendChild(status);
+    });
+    if (!group.childElementCount) return null;
+    container.appendChild(group);
+    return group;
+}
+
+function getProjectFolderStatuses(conversations) {
+    const kinds = [];
+    if (conversations.some((conversation) => chatProjectFolderContext.pendingApprovalByConversation.has(conversation.id))) {
+        kinds.push('approval');
+    }
+    if (conversations.some((conversation) => isProjectConversationUnread(conversation.id))) {
+        kinds.push('unread');
+    }
+    if (conversations.some((conversation) => chatProjectFolderContext.runningIds.has(conversation.id))) {
+        kinds.push('running');
+    }
+    return kinds;
+}
+
+function projectFolderDisclosureMarkup(isExpanded) {
+    const path = isExpanded ? 'M3.5 5.5 7.5 9.5l4-4' : 'm5.5 3.5 4 4-4 4';
+    return `<svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="${path}" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
+function projectFolderIconMarkup(isExpanded) {
+    // Codex 风格：折叠时为闭合文件夹，展开时露出向前翻开的文件夹盖。
+    const path = isExpanded
+        ? 'M3.5 18V6.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v1.25M3.5 18l1.75-6.25A2 2 0 0 1 7.18 10.3H20.5l-2 7.7H3.5Z'
+        : 'M3.5 7a2 2 0 0 1 2-2h4l2 2H18.5a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V7Zm0 2.5h17';
+    return `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="${path}" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
+function clampProjectPreviewText(value, maxLength = 220) {
+    const text = String(value || '').replace(/\s+/g, ' ').trim();
+    return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+}
+
+function getProjectScopePreview(project) {
+    const raw = String(project?.scope_json || project?.scopeJson || '').trim();
+    if (!raw) return '';
+    try {
+        const parsed = JSON.parse(raw);
+        const values = [];
+        const appendValue = (value) => {
+            if (typeof value === 'string' || typeof value === 'number') {
+                const text = String(value).trim();
+                if (text) values.push(text);
+            } else if (Array.isArray(value)) {
+                value.slice(0, 4).forEach(appendValue);
+            }
+        };
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            ['targets', 'target', 'domains', 'ips', 'urls', 'scope'].forEach((key) => appendValue(parsed[key]));
+            if (!values.length) appendValue(parsed.notes);
+        } else {
+            appendValue(parsed);
+        }
+        return clampProjectPreviewText(values.slice(0, 4).join(' · '));
+    } catch (e) {
+        return clampProjectPreviewText(raw);
+    }
+}
+
+function ensureProjectFolderPreview() {
+    let preview = document.getElementById('project-folder-preview');
+    if (preview) return preview;
+
+    preview = document.createElement('div');
+    preview.id = 'project-folder-preview';
+    preview.className = 'project-folder-preview';
+    preview.hidden = true;
+    preview.setAttribute('role', 'dialog');
+    preview.setAttribute('aria-label', pickerMessage(tp, 'chat.projectPreviewLabel', '项目信息'));
+    preview.innerHTML = `
+        <div class="project-folder-preview-header">
+            <span class="project-folder-preview-icon" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 6.5h6l2 2h10v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+            </span>
+            <span class="project-folder-preview-title"></span>
+        </div>
+        <div class="project-folder-preview-stats">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 12a8.5 8.5 0 0 1-9 8.48A8.5 8.5 0 1 1 20.48 11H21v5l-2-2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span></span>
+        </div>
+        <div class="project-folder-preview-details">
+            <div class="project-folder-preview-detail project-folder-preview-description">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/><path d="M12 11v5M12 8h.01" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+                <span></span>
+            </div>
+            <div class="project-folder-preview-detail project-folder-preview-scope">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                <span></span>
+            </div>
+        </div>
+        <button type="button" class="project-folder-preview-edit" data-require-permission="project:write">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" stroke="currentColor" stroke-width="1.7"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.95 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3v-4h.08A1.7 1.7 0 0 0 4.6 8.95a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 8.95 4.6 1.7 1.7 0 0 0 10 3.08V3h4v.08a1.7 1.7 0 0 0 1.03 1.55 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.14.61.69 1.04 1.32 1.04H21v4h-.28A1.7 1.7 0 0 0 19.4 15Z" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span></span>
+        </button>
+    `;
+    document.body.appendChild(preview);
+
+    preview.addEventListener('mouseenter', () => {
+        clearTimeout(projectFolderPreviewCloseTimer);
+    });
+    preview.addEventListener('mouseleave', scheduleHideProjectFolderPreview);
+    preview.querySelector('.project-folder-preview-edit')?.addEventListener('click', () => {
+        const projectId = preview.dataset.projectId || '';
+        hideProjectFolderPreview(true);
+        if (projectId) showEditProjectModal(projectId, { fromChatSidebar: true });
+    });
+    window.addEventListener('resize', () => hideProjectFolderPreview(true));
+    window.addEventListener('scroll', () => hideProjectFolderPreview(true), true);
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !preview.hidden) hideProjectFolderPreview(true);
+    });
+    return preview;
+}
+
+function positionProjectFolderPreview(preview, row) {
+    if (!preview || !row?.isConnected) return;
+    const anchorRect = row.getBoundingClientRect();
+    const previewRect = preview.getBoundingClientRect();
+    const gap = 10;
+    const edge = 12;
+    let left = anchorRect.right + gap;
+    if (left + previewRect.width > window.innerWidth - edge) {
+        left = Math.max(edge, anchorRect.left - previewRect.width - gap);
+    }
+    const top = Math.min(
+        Math.max(edge, anchorRect.top - 10),
+        Math.max(edge, window.innerHeight - previewRect.height - edge)
+    );
+    preview.style.left = `${Math.round(left)}px`;
+    preview.style.top = `${Math.round(top)}px`;
+}
+
+function showProjectFolderPreview(project, row, conversations) {
+    if (!project || !row?.isConnected || window.matchMedia('(max-width: 900px), (hover: none)').matches) return;
+    hideProjectConversationPreview(true);
+    const preview = ensureProjectFolderPreview();
+    const isUnassigned = project._isUnassigned === true;
+    clearTimeout(projectFolderPreviewCloseTimer);
+    if (projectFolderPreviewAnchor && projectFolderPreviewAnchor !== row) {
+        projectFolderPreviewAnchor.querySelector('.project-folder-item')?.removeAttribute('aria-controls');
+    }
+    projectFolderPreviewAnchor = row;
+    const title = project.name || tp('common.untitled');
+    const total = conversations.length;
+    const active = conversations.filter((conversation) => chatProjectFolderContext.runningIds.has(conversation.id)).length;
+    const fallbackStats = `${total} 个任务 · ${active} 个已开启`;
+    const description = clampProjectPreviewText(project.description)
+        || pickerMessage(tp, 'chat.projectPreviewNoDescription', '暂无项目说明');
+    const scope = getProjectScopePreview(project);
+
+    preview.dataset.projectId = project.id || '';
+    preview.classList.toggle('is-unassigned', isUnassigned);
+    preview.querySelector('.project-folder-preview-title').textContent = title;
+    preview.querySelector('.project-folder-preview-stats span').textContent = tpFmt(
+        'chat.projectPreviewStats',
+        fallbackStats,
+        { total, active }
+    );
+    const descriptionRow = preview.querySelector('.project-folder-preview-description');
+    descriptionRow.querySelector('span').textContent = description;
+    descriptionRow.classList.toggle('is-empty', !String(project.description || '').trim());
+    const scopeRow = preview.querySelector('.project-folder-preview-scope');
+    scopeRow.hidden = isUnassigned || !scope;
+    scopeRow.querySelector('span').textContent = scope
+        ? tpFmt('chat.projectPreviewScope', `测试范围：${scope}`, { scope })
+        : '';
+    const editButton = preview.querySelector('.project-folder-preview-edit');
+    editButton.hidden = isUnassigned;
+    editButton.querySelector('span').textContent = tpFmt(
+        'chat.projectPreviewEdit',
+        '编辑项目'
+    );
+    preview.hidden = false;
+    row.querySelector('.project-folder-item')?.setAttribute('aria-controls', preview.id);
+    positionProjectFolderPreview(preview, row);
+    if (typeof applyRBACToUI === 'function') applyRBACToUI(preview);
+}
+
+function scheduleShowProjectFolderPreview(project, row, conversations, immediate = false) {
+    clearTimeout(projectFolderPreviewOpenTimer);
+    clearTimeout(projectFolderPreviewCloseTimer);
+    projectFolderPreviewOpenTimer = setTimeout(
+        () => showProjectFolderPreview(project, row, conversations),
+        immediate ? 0 : PROJECT_FOLDER_PREVIEW_OPEN_DELAY_MS
+    );
+}
+
+function hideProjectFolderPreview(immediate = false) {
+    clearTimeout(projectFolderPreviewOpenTimer);
+    clearTimeout(projectFolderPreviewCloseTimer);
+    const close = () => {
+        const preview = document.getElementById('project-folder-preview');
+        if (preview) preview.hidden = true;
+        projectFolderPreviewAnchor?.querySelector('.project-folder-item')?.removeAttribute('aria-controls');
+        projectFolderPreviewAnchor = null;
+    };
+    if (immediate) close();
+    else projectFolderPreviewCloseTimer = setTimeout(close, PROJECT_FOLDER_PREVIEW_CLOSE_DELAY_MS);
+}
+
+function scheduleHideProjectFolderPreview() {
+    hideProjectFolderPreview(false);
+}
+
+function formatProjectConversationPreviewAge(value) {
+    const timestamp = Date.parse(value || '');
+    if (!Number.isFinite(timestamp)) return '';
+    const date = new Date(timestamp);
+    const pad = (part) => String(part).padStart(2, '0');
+    const parts = {
+        year: String(date.getFullYear()),
+        month: pad(date.getMonth() + 1),
+        day: pad(date.getDate()),
+        hour: pad(date.getHours()),
+        minute: pad(date.getMinutes()),
+    };
+    return tpFmt(
+        'chat.conversationPreviewDateTime',
+        `${parts.year}年${parts.month}月${parts.day}日 ${parts.hour}:${parts.minute}`,
+        parts
+    );
+}
+
+function getProjectConversationModeLabel(conversation) {
+    const mode = String(conversation?.agentMode || conversation?.agent_mode || '').trim().toLowerCase();
+    const labels = {
+        eino_single: ['chat.agentModeEinoSingle', 'Eino 单代理（ADK）'],
+        deep: ['chat.agentModeDeep', 'Deep（DeepAgent）'],
+        plan_execute: ['chat.agentModePlanExecuteLabel', 'Plan-Execute'],
+        supervisor: ['chat.agentModeSupervisorLabel', 'Supervisor（专家路由）'],
+    };
+    if (labels[mode]) return tpFmt(labels[mode][0], labels[mode][1]);
+    return clampProjectPreviewText(
+        conversation?.roleName || conversation?.role_name || pickerMessage(tp, 'chat.conversationPreviewDefaultMode', '默认'),
+        80
+    );
+}
+
+function ensureProjectConversationPreview() {
+    let preview = document.getElementById('project-conversation-preview');
+    if (preview) return preview;
+    preview = document.createElement('div');
+    preview.id = 'project-conversation-preview';
+    preview.className = 'project-conversation-preview';
+    preview.hidden = true;
+    preview.setAttribute('role', 'tooltip');
+    preview.innerHTML = `
+        <div class="project-conversation-preview-header">
+            <span class="project-conversation-preview-title"></span>
+            <span class="project-conversation-preview-age"></span>
+        </div>
+        <div class="project-conversation-preview-meta">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 6.5h6l2 2h10v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+            <span class="project-conversation-preview-project"></span>
+        </div>
+        <div class="project-conversation-preview-meta">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="6" cy="5" r="2" stroke="currentColor" stroke-width="1.7"/><circle cx="6" cy="19" r="2" stroke="currentColor" stroke-width="1.7"/><circle cx="18" cy="9" r="2" stroke="currentColor" stroke-width="1.7"/><path d="M6 7v10M8 15c5 0 3-6 8-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            <span class="project-conversation-preview-mode"></span>
+            <span class="project-conversation-preview-separator" aria-hidden="true">·</span>
+            <span class="project-conversation-preview-status"></span>
+        </div>
+    `;
+    document.body.appendChild(preview);
+    window.addEventListener('resize', () => hideProjectConversationPreview(true));
+    window.addEventListener('scroll', () => hideProjectConversationPreview(true), true);
+    return preview;
+}
+
+function positionProjectConversationPreview(preview, row) {
+    if (!preview || !row?.isConnected) return;
+    const anchorRect = row.getBoundingClientRect();
+    const previewRect = preview.getBoundingClientRect();
+    const gap = 10;
+    const edge = 12;
+    let left = anchorRect.right + gap;
+    if (left + previewRect.width > window.innerWidth - edge) {
+        left = Math.max(edge, anchorRect.left - previewRect.width - gap);
+    }
+    const top = Math.min(
+        Math.max(edge, anchorRect.top - 8),
+        Math.max(edge, window.innerHeight - previewRect.height - edge)
+    );
+    preview.style.left = `${Math.round(left)}px`;
+    preview.style.top = `${Math.round(top)}px`;
+}
+
+function showProjectConversationPreview(conversation, project, row) {
+    if (!conversation || !row?.isConnected || window.matchMedia('(max-width: 900px), (hover: none)').matches) return;
+    hideProjectFolderPreview(true);
+    const preview = ensureProjectConversationPreview();
+    clearTimeout(projectConversationPreviewCloseTimer);
+    if (projectConversationPreviewAnchor && projectConversationPreviewAnchor !== row) {
+        projectConversationPreviewAnchor.querySelector('.project-conversation-item')?.removeAttribute('aria-describedby');
+    }
+    projectConversationPreviewAnchor = row;
+    const isRunning = chatProjectFolderContext.runningIds.has(conversation.id);
+    const isWaitingApproval = chatProjectFolderContext.pendingApprovalByConversation.has(conversation.id);
+    const completed = chatProjectFolderContext.completedByConversation.get(conversation.id);
+    const isUnread = !isRunning && isProjectConversationUnread(conversation.id);
+    const status = isWaitingApproval
+        ? pickerMessage(tp, 'hitl.waitingApprovalShort', '等待批准')
+        : (isRunning
+        ? pickerMessage(tp, 'tasks.statusRunning', '执行中')
+        : (isUnread
+            ? pickerMessage(tp, 'chat.conversationPreviewUnread', '有未读更新')
+            : (completed
+                ? pickerMessage(tp, 'chat.conversationPreviewViewed', '已查看')
+                : pickerMessage(tp, 'chat.conversationPreviewConversation', '对话'))));
+    const statusEl = preview.querySelector('.project-conversation-preview-status');
+
+    preview.querySelector('.project-conversation-preview-title').textContent = conversation.title
+        || pickerMessage(tp, 'projects.untitledConversation', '未命名对话');
+    const ageEl = preview.querySelector('.project-conversation-preview-age');
+    ageEl.textContent = formatProjectConversationPreviewAge(
+        conversation.updatedAt || conversation.updated_at || conversation.createdAt || conversation.created_at
+    );
+    ageEl.hidden = !ageEl.textContent;
+    preview.querySelector('.project-conversation-preview-project').textContent = project?.name
+        || pickerMessage(tp, 'chat.conversationPreviewNoProject', '未绑定项目');
+    preview.querySelector('.project-conversation-preview-mode').textContent = getProjectConversationModeLabel(conversation);
+    statusEl.textContent = status;
+    statusEl.className = 'project-conversation-preview-status'
+        + (isWaitingApproval ? ' is-approval' : (isRunning ? ' is-running' : (isUnread ? ' is-unread' : '')));
+    preview.hidden = false;
+    row.querySelector('.project-conversation-item')?.setAttribute('aria-describedby', preview.id);
+    positionProjectConversationPreview(preview, row);
+}
+
+function scheduleShowProjectConversationPreview(conversation, project, row, immediate = false) {
+    if (Date.now() < projectConversationPreviewSuppressedUntil) return;
+    clearTimeout(projectConversationPreviewOpenTimer);
+    clearTimeout(projectConversationPreviewCloseTimer);
+    projectConversationPreviewOpenTimer = setTimeout(
+        () => showProjectConversationPreview(conversation, project, row),
+        immediate ? 0 : PROJECT_FOLDER_PREVIEW_OPEN_DELAY_MS
+    );
+}
+
+function hideProjectConversationPreview(immediate = false) {
+    clearTimeout(projectConversationPreviewOpenTimer);
+    clearTimeout(projectConversationPreviewCloseTimer);
+    const close = () => {
+        const preview = document.getElementById('project-conversation-preview');
+        if (preview) preview.hidden = true;
+        projectConversationPreviewAnchor?.querySelector('.project-conversation-item')?.removeAttribute('aria-describedby');
+        projectConversationPreviewAnchor = null;
+    };
+    if (immediate) close();
+    else projectConversationPreviewCloseTimer = setTimeout(close, PROJECT_FOLDER_PREVIEW_CLOSE_DELAY_MS);
+}
+
+function appendChatProjectFolderItem(list, project, expandedIds, conversations) {
+    const row = document.createElement('div');
+    const isUnassigned = project._isUnassigned === true;
+    const folderId = isUnassigned ? CHAT_UNASSIGNED_PROJECT_FOLDER_ID : project.id;
+    const isExpanded = expandedIds.has(folderId);
+    const statusKinds = getProjectFolderStatuses(conversations);
+    row.className = 'project-folder-row'
+        + (isExpanded ? ' is-expanded' : '')
+        + (isUnassigned ? ' is-unassigned' : '');
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'project-folder-item';
+    button.dataset.projectId = project.id || '';
+    button.dataset.folderId = folderId;
+    button.setAttribute('aria-label', project.name || tp('common.untitled'));
+    button.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+
+    const disclosure = document.createElement('span');
+    disclosure.className = 'project-folder-disclosure';
+    disclosure.setAttribute('aria-hidden', 'true');
+    disclosure.innerHTML = projectFolderDisclosureMarkup(isExpanded);
+
+    const icon = document.createElement('span');
+    icon.className = 'project-folder-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.innerHTML = projectFolderIconMarkup(isExpanded);
+
+    const title = document.createElement('span');
+    title.className = 'project-folder-title';
+    window.applyProjectNameDisplay(title, project.name, tp('common.untitled'));
+
+    const label = document.createElement('span');
+    label.className = 'project-folder-label';
+    label.appendChild(title);
+    if (!isUnassigned && project.pinned) {
+        const pinIcon = document.createElement('span');
+        pinIcon.className = 'project-folder-pinned';
+        pinIcon.textContent = '📌';
+        pinIcon.title = pickerMessage(tp, 'projects.pinned', '已置顶');
+        pinIcon.setAttribute('aria-label', pinIcon.title);
+        label.appendChild(pinIcon);
+    }
+    const folderApprovals = conversations
+        .map((conversation) => chatProjectFolderContext.pendingApprovalByConversation.get(conversation.id))
+        .filter(Boolean);
+    const folderStatusGroup = appendProjectTaskStatuses(
+        label,
+        statusKinds,
+        { approval: null },
+        { approval: { aggregate: true, count: folderApprovals.length } }
+    );
+    if (folderStatusGroup) folderStatusGroup.classList.add('project-task-status-group--folder');
+
+    button.appendChild(disclosure);
+    button.appendChild(icon);
+    button.appendChild(label);
+    button.addEventListener('click', () => {
+        if (isExpanded) {
+            chatProjectFolderExpandedIds.delete(folderId);
+        } else {
+            chatProjectFolderExpandedIds.add(folderId);
+        }
+        renderChatProjectFolders(projectsCacheAll);
+    });
+    row.addEventListener('mouseenter', () => scheduleShowProjectFolderPreview(project, row, conversations));
+    row.addEventListener('mouseleave', scheduleHideProjectFolderPreview);
+    button.addEventListener('focus', () => scheduleShowProjectFolderPreview(project, row, conversations, true));
+    row.addEventListener('focusout', (event) => {
+        const preview = document.getElementById('project-folder-preview');
+        if (row.contains(event.relatedTarget) || preview?.contains(event.relatedTarget)) return;
+        scheduleHideProjectFolderPreview();
+    });
+
+    const actions = document.createElement('div');
+    actions.className = 'project-folder-actions';
+
+    if (!isUnassigned) {
+        const menuButton = document.createElement('button');
+        menuButton.type = 'button';
+        menuButton.className = 'project-folder-action project-folder-menu';
+        menuButton.setAttribute('aria-label', tp('projects.projectActions'));
+        menuButton.title = menuButton.getAttribute('aria-label');
+        menuButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>';
+        menuButton.addEventListener('click', (event) => {
+            showProjectListActionMenu(event, project.id, 'chat');
+        });
+        actions.appendChild(menuButton);
+    }
+
+    const newConversationButton = document.createElement('button');
+    newConversationButton.type = 'button';
+    newConversationButton.className = 'project-folder-action project-folder-new-conversation';
+    newConversationButton.setAttribute(
+        'aria-label',
+        isUnassigned
+            ? pickerMessage(tp, 'chat.newUnassignedConversation', '新建无项目对话')
+            : pickerMessage(tp, 'chat.newConversationInProject', '在此项目中新建对话')
+    );
+    newConversationButton.title = newConversationButton.getAttribute('aria-label');
+    newConversationButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+    newConversationButton.addEventListener('click', async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        chatProjectFolderExpandedIds.add(folderId);
+        if (typeof window.startNewConversation === 'function') {
+            await window.startNewConversation({ projectId: isUnassigned ? '' : project.id });
+        }
+        renderChatProjectFolders(projectsCacheAll);
+    });
+
+    actions.appendChild(newConversationButton);
+    row.appendChild(button);
+    row.appendChild(actions);
+    list.appendChild(row);
+}
+
+function appendChatProjectConversationItem(list, conversation, project) {
+    const row = document.createElement('div');
+    const button = document.createElement('button');
+    const isSelected = window.currentConversationId === conversation.id;
+    const isRunning = chatProjectFolderContext.runningIds.has(conversation.id);
+    const isWaitingApproval = chatProjectFolderContext.pendingApprovalByConversation.has(conversation.id);
+    const completed = chatProjectFolderContext.completedByConversation.get(conversation.id);
+    const isUnread = !isRunning && isProjectConversationUnread(conversation.id);
+    row.className = 'project-conversation-row' + (isSelected ? ' is-selected' : '');
+    button.type = 'button';
+    button.className = 'project-conversation-item' + (isSelected ? ' is-selected' : '');
+    button.dataset.conversationId = conversation.id;
+    if (isSelected) button.setAttribute('aria-current', 'true');
+
+    const title = document.createElement('span');
+    title.className = 'project-conversation-title';
+    title.textContent = conversation.title || pickerMessage(tp, 'projects.untitledConversation', '未命名对话');
+
+    const label = document.createElement('span');
+    label.className = 'project-conversation-label';
+    label.appendChild(title);
+    if (conversation.pinned) {
+        const pinIcon = document.createElement('span');
+        pinIcon.className = 'conversation-item-pinned project-conversation-pinned';
+        pinIcon.textContent = '📌';
+        pinIcon.title = pickerMessage(tp, 'projects.pinned', '已置顶');
+        pinIcon.setAttribute('aria-label', pinIcon.title);
+        label.appendChild(pinIcon);
+    }
+    const statusKinds = [];
+    if (isWaitingApproval) statusKinds.push('approval');
+    if (isRunning) statusKinds.push('running');
+    else if (isUnread) statusKinds.push('unread');
+    if (statusKinds.length) appendProjectTaskStatuses(label, statusKinds, {
+        approval: chatProjectFolderContext.pendingApprovalByConversation.get(conversation.id)
+    });
+    button.appendChild(label);
+
+    button.addEventListener('click', async () => {
+        projectConversationPreviewSuppressedUntil = Date.now() + 700;
+        hideProjectConversationPreview(true);
+        selectChatProjectConversationItem(conversation.id);
+        if (typeof window.loadConversation === 'function') {
+            await window.loadConversation(conversation.id);
+        }
+        if (window.currentConversationId === conversation.id && completed) {
+            markProjectConversationViewed(conversation.id, completed.completedAt);
+            renderChatProjectFolders(projectsCacheAll);
+        }
+    });
+    row.addEventListener('mouseenter', () => scheduleShowProjectConversationPreview(conversation, project, row));
+    row.addEventListener('mouseleave', () => hideProjectConversationPreview(false));
+    button.addEventListener('focus', () => scheduleShowProjectConversationPreview(conversation, project, row, true));
+    row.addEventListener('focusout', (event) => {
+        if (row.contains(event.relatedTarget)) return;
+        hideProjectConversationPreview(false);
+    });
+    const menuButton = document.createElement('button');
+    menuButton.type = 'button';
+    menuButton.className = 'project-conversation-menu';
+    menuButton.setAttribute(
+        'aria-label',
+        pickerMessage(tp, 'chat.conversationActions', '对话操作')
+    );
+    menuButton.title = menuButton.getAttribute('aria-label');
+    menuButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>';
+    menuButton.addEventListener('click', (event) => {
+        if (typeof window.openConversationContextMenuForId === 'function') {
+            window.openConversationContextMenuForId(event, conversation.id, conversation.title || '');
+        }
+    });
+
+    row.appendChild(button);
+    row.appendChild(menuButton);
+    list.appendChild(row);
+}
+
+function selectChatProjectConversationItem(conversationId) {
+    const id = String(conversationId || '').trim();
+    document.querySelectorAll('.project-conversation-row').forEach((row) => {
+        const button = row.querySelector('.project-conversation-item');
+        const selected = !!id && button?.dataset.conversationId === id;
+        row.classList.toggle('is-selected', selected);
+        if (!button) return;
+        button.classList.toggle('is-selected', selected);
+        if (selected) button.setAttribute('aria-current', 'true');
+        else button.removeAttribute('aria-current');
+    });
+}
+
+window.selectChatProjectConversationItem = selectChatProjectConversationItem;
+
+async function loadChatProjectFolderContext() {
+    const loadSeq = ++chatProjectFolderContextLoadSeq;
+    const conversationsParams = new URLSearchParams({ limit: '1000', offset: '0', sort_by: 'updated_at' });
+    const [conversationResponse, activeResponse, completedResponse, pendingResponse] = await Promise.all([
+        apiFetch(`/api/conversations?${conversationsParams}`),
+        apiFetch('/api/agent-loop/tasks'),
+        apiFetch('/api/agent-loop/tasks/completed'),
+        apiFetch('/api/hitl/pending?page=1&pageSize=200'),
+    ]);
+    if (!conversationResponse.ok) throw new Error(tp('projects.loadProjectsFailed'));
+    const conversationData = await conversationResponse.json();
+    const activeData = activeResponse.ok ? await activeResponse.json() : { tasks: [] };
+    const completedData = completedResponse.ok ? await completedResponse.json() : { tasks: [] };
+    const pendingData = pendingResponse.ok ? await pendingResponse.json() : { items: [] };
+    if (loadSeq !== chatProjectFolderContextLoadSeq) return false;
+    const conversations = Array.isArray(conversationData)
+        ? conversationData
+        : (conversationData.conversations || conversationData.items || []);
+    chatProjectFolderContext.conversations = Array.isArray(conversations) ? conversations : [];
+    chatProjectFolderContext.runningIds = new Set(
+        (activeData.tasks || [])
+            .filter((task) => task && !['completed', 'failed', 'timeout', 'cancelled'].includes(String(task.status || '').toLowerCase()))
+            .map((task) => task.conversationId)
+            .filter(Boolean)
+    );
+    chatProjectFolderContext.completedByConversation = new Map();
+    (completedData.tasks || []).forEach((task) => {
+        if (task?.conversationId && !chatProjectFolderContext.completedByConversation.has(task.conversationId)) {
+            chatProjectFolderContext.completedByConversation.set(task.conversationId, task);
+        }
+    });
+    chatProjectFolderContext.pendingApprovalByConversation = new Map();
+    (pendingData.items || []).filter(isHumanProjectPendingApproval).forEach((item) => {
+        const conversationId = String(item?.conversationId || '').trim();
+        // pending 审批必须属于当前进程仍在运行的任务；服务重启/取消后的旧记录
+        // 即使在并发窗口内被读到，也不能重新显示倒计时徽标。
+        if (conversationId && chatProjectFolderContext.runningIds.has(conversationId) &&
+            !chatProjectFolderContext.pendingApprovalByConversation.has(conversationId)) {
+            chatProjectFolderContext.pendingApprovalByConversation.set(conversationId, item);
+        }
+    });
+    chatProjectFolderContext.ready = true;
+    return true;
+}
+
+function isHumanProjectPendingApproval(item) {
+    if (!item) return false;
+    const reviewer = String(item.reviewer || item.decidedBy || item.decided_by || '').trim().toLowerCase();
+    const status = String(item.status || '').trim().toLowerCase();
+    return reviewer !== 'audit_agent' && reviewer !== 'agent' && reviewer !== 'ai' && status !== 'audit_running';
+}
+
+function getProjectConversationSortTime(conversation) {
+    const value = conversation?.updatedAt || conversation?.updated_at
+        || conversation?.createdAt || conversation?.created_at || '';
+    const timestamp = Date.parse(value);
+    return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function sortProjectFolderConversations(conversations) {
+    return [...conversations].sort((a, b) => {
+        const pinnedDelta = Number(!!b?.pinned) - Number(!!a?.pinned);
+        if (pinnedDelta) return pinnedDelta;
+        return getProjectConversationSortTime(b) - getProjectConversationSortTime(a);
+    });
+}
+
+function updateChatProjectConversationPinnedState(conversationId, pinned) {
+    const id = String(conversationId || '').trim();
+    const conversation = chatProjectFolderContext.conversations.find(
+        (item) => String(item?.id || '').trim() === id
+    );
+    if (!conversation) return false;
+    conversation.pinned = !!pinned;
+    if (isProjectsCacheReady() && chatProjectFolderContext.ready) {
+        renderChatProjectFolders(projectsCacheAll);
+    }
+    return true;
+}
+
+function removeChatProjectConversation(conversationId) {
+    const id = String(conversationId || '').trim();
+    if (!id) return false;
+    const previousLength = chatProjectFolderContext.conversations.length;
+    chatProjectFolderContext.conversations = chatProjectFolderContext.conversations.filter(
+        (item) => String(item?.id || '').trim() !== id
+    );
+    chatProjectFolderContext.runningIds.delete(id);
+    chatProjectFolderContext.completedByConversation.delete(id);
+    chatProjectFolderContext.pendingApprovalByConversation.delete(id);
+    if (projectConversationPreviewAnchor?.querySelector('.project-conversation-item')?.dataset.conversationId === id) {
+        hideProjectConversationPreview(true);
+    }
+    if (isProjectsCacheReady() && chatProjectFolderContext.ready) {
+        renderChatProjectFolders(projectsCacheAll);
+    }
+    return chatProjectFolderContext.conversations.length !== previousLength;
+}
+
+function refreshChatProjectFoldersAfterAction() {
+    Promise.resolve().then(() => refreshChatProjectFolders()).catch((error) => {
+        console.warn('刷新项目对话列表失败:', error);
+    });
+}
+
+function resolveChatProjectFolderSelection() {
+    const conversationId = String(window.currentConversationId || '').trim();
+    if (!conversationId) return resolveChatProjectSelection();
+    if (!chatProjectFolderContext.ready) return null;
+
+    const conversation = chatProjectFolderContext.conversations.find(
+        (item) => String(item?.id || '').trim() === conversationId
+    );
+    if (!conversation) return null;
+    return String(conversation.projectId || conversation.project_id || '').trim();
+}
+
+function appendChatProjectFoldersLoadMore(list, remainingCount) {
+    if (!list || remainingCount <= 0) return;
+    const button = document.createElement('button');
+    const label = pickerMessage(tp, 'common.loadMore', '加载更多');
+    button.type = 'button';
+    button.className = 'project-folders-load-more';
+    button.setAttribute('aria-label', tpFmt(
+        'chat.projectFoldersLoadMoreRemaining',
+        `${label}，剩余 ${remainingCount} 个项目`,
+        { count: remainingCount }
+    ));
+    button.innerHTML = `<span>${escapeHtml(label)}</span><span class="project-folders-load-more-count">${remainingCount}</span>`;
+    button.addEventListener('click', loadMoreChatProjectFolders);
+    list.appendChild(button);
+}
+
+function loadMoreChatProjectFolders() {
+    chatProjectFolderVisibleCount += CHAT_PROJECT_FOLDER_PAGE_SIZE;
+    if (isProjectsCacheReady() && chatProjectFolderContext.ready) {
+        renderChatProjectFolders(projectsCacheAll);
+    } else {
+        refreshChatProjectFolders();
+    }
+}
+
+function renderChatProjectFolders(projects) {
+    const list = document.getElementById('project-folders-list');
+    if (!list) return;
+    hideProjectFolderPreview(true);
+    hideProjectConversationPreview(true);
+    const selectedId = resolveChatProjectFolderSelection();
+    if (selectedId !== null && chatProjectFolderLastSelectionId !== selectedId) {
+        chatProjectFolderExpandedIds.add(selectedId || CHAT_UNASSIGNED_PROJECT_FOLDER_ID);
+        chatProjectFolderLastSelectionId = selectedId;
+    }
+    const filtered = filterActiveProjectsLocal(projects, chatProjectFolderSearchQuery);
+    const unassignedProject = {
+        id: '',
+        name: tp('projects.noProject'),
+        description: tp('projects.noProjectDescription'),
+        _isUnassigned: true,
+    };
+    const includeUnassigned = matchProjectSearchQuery(unassignedProject, chatProjectFolderSearchQuery);
+    const pinnedProjects = filtered.filter((project) => !!project.pinned);
+    const regularProjects = filtered.filter((project) => !project.pinned);
+    const folders = includeUnassigned
+        ? [...pinnedProjects, unassignedProject, ...regularProjects]
+        : filtered;
+    const queryKey = chatProjectFolderSearchQuery.toLocaleLowerCase();
+    if (queryKey !== chatProjectFolderLastQuery) {
+        chatProjectFolderLastQuery = queryKey;
+        chatProjectFolderVisibleCount = CHAT_PROJECT_FOLDER_PAGE_SIZE;
+    }
+    const selectedFolderId = selectedId === null
+        ? null
+        : (selectedId || CHAT_UNASSIGNED_PROJECT_FOLDER_ID);
+    if (selectedFolderId !== null) {
+        const selectedIndex = folders.findIndex((project) => (
+            project._isUnassigned ? CHAT_UNASSIGNED_PROJECT_FOLDER_ID : project.id
+        ) === selectedFolderId);
+        if (selectedIndex >= chatProjectFolderVisibleCount) {
+            chatProjectFolderVisibleCount = selectedIndex + 1;
+        }
+    }
+    const visibleFolders = folders.slice(0, chatProjectFolderVisibleCount);
+    list.innerHTML = '';
+    if (!folders.length) {
+        const empty = document.createElement('div');
+        empty.className = 'project-folders-empty';
+        empty.textContent = chatProjectFolderSearchQuery
+            ? pickerMessage(tp, 'chat.filterProjectSearchEmpty', '没有匹配的项目')
+            : pickerMessage(tp, 'projects.noProjects', '暂无项目');
+        list.appendChild(empty);
+        return;
+    }
+    visibleFolders.forEach((project) => {
+        const folderId = project._isUnassigned ? CHAT_UNASSIGNED_PROJECT_FOLDER_ID : project.id;
+        const conversations = sortProjectFolderConversations(
+            chatProjectFolderContext.conversations
+                .filter((conversation) => (conversation.projectId || conversation.project_id || '') === project.id)
+        );
+        appendChatProjectFolderItem(list, project, chatProjectFolderExpandedIds, conversations);
+        if (chatProjectFolderExpandedIds.has(folderId)) {
+            conversations.forEach((conversation) => appendChatProjectConversationItem(list, conversation, project));
+        }
+    });
+    appendChatProjectFoldersLoadMore(list, folders.length - visibleFolders.length);
+}
+
+async function refreshChatProjectFolders() {
+    const list = document.getElementById('project-folders-list');
+    if (!list) return;
+    const seq = ++chatProjectFolderRenderSeq;
+    if (!isProjectsCacheReady()) {
+        list.innerHTML = '';
+        appendChatProjectPanelMessage(list, 'project-folders-empty', pickerMessage(tp, 'common.loading', '加载中…'));
+    }
+    try {
+        const [projects] = await Promise.all([
+            ensureProjectsLoaded(),
+            loadChatProjectFolderContext(),
+        ]);
+        if (seq !== chatProjectFolderRenderSeq) return;
+        renderChatProjectFolders(projects);
+    } catch (e) {
+        if (seq !== chatProjectFolderRenderSeq) return;
+        list.innerHTML = '';
+        appendChatProjectPanelMessage(
+            list,
+            'project-folders-empty',
+            pickerMessage(tp, 'projects.loadProjectsFailed', '加载项目失败')
+        );
+    }
+}
+
+function handleProjectFolderSearch(value) {
+    chatProjectFolderSearchQuery = String(value || '').trim();
+    const clearButton = document.getElementById('conversation-search-clear');
+    if (clearButton) clearButton.style.display = chatProjectFolderSearchQuery ? 'flex' : 'none';
+    if (isProjectsCacheReady() && chatProjectFolderContext.ready) {
+        renderChatProjectFolders(projectsCacheAll);
+    } else {
+        refreshChatProjectFolders();
+    }
+}
+
+function clearProjectFolderSearch() {
+    const input = document.getElementById('conversation-search-input');
+    if (input) input.value = '';
+    handleProjectFolderSearch('');
+    input?.focus();
+}
+
+function updateProjectFolderTaskStatuses(tasks) {
+    const previous = chatProjectFolderContext.runningIds;
+    const next = new Set(
+        (Array.isArray(tasks) ? tasks : [])
+            .filter((task) => task && !['completed', 'failed', 'timeout', 'cancelled'].includes(String(task.status || '').toLowerCase()))
+            .map((task) => task.conversationId)
+            .filter(Boolean)
+    );
+    const taskFinished = [...previous].some((conversationId) => !next.has(conversationId));
+    let approvalChanged = false;
+    chatProjectFolderContext.pendingApprovalByConversation.forEach((_details, conversationId) => {
+        if (next.has(conversationId)) return;
+        chatProjectFolderContext.pendingApprovalByConversation.delete(conversationId);
+        approvalChanged = true;
+    });
+    const changed = previous.size !== next.size || [...previous].some((conversationId) => !next.has(conversationId));
+    if (!changed && !approvalChanged) return;
+    chatProjectFolderContext.runningIds = next;
+    if (isProjectsCacheReady() && chatProjectFolderContext.ready) {
+        renderChatProjectFolders(projectsCacheAll);
+    }
+    if (taskFinished) refreshChatProjectFolders();
+}
+
+function setProjectConversationApprovalStatus(conversationId, pending, details) {
+    const id = String(conversationId || '').trim();
+    if (!id) return;
+    if (pending && isHumanProjectPendingApproval(details || {})) chatProjectFolderContext.pendingApprovalByConversation.set(id, details || { conversationId: id });
+    else chatProjectFolderContext.pendingApprovalByConversation.delete(id);
+    if (isProjectsCacheReady() && chatProjectFolderContext.ready) {
+        renderChatProjectFolders(projectsCacheAll);
+    }
+}
+
+function syncProjectConversationApprovalStatuses(items) {
+    const next = new Map();
+    (Array.isArray(items) ? items : []).forEach((details) => {
+        if (!isHumanProjectPendingApproval(details)) return;
+        const id = String(details && details.conversationId || '').trim();
+        if (id && chatProjectFolderContext.runningIds.has(id) && !next.has(id)) {
+            next.set(id, details);
+        }
+    });
+    let changed = next.size !== chatProjectFolderContext.pendingApprovalByConversation.size;
+    if (!changed) {
+        next.forEach((details, id) => {
+            const previous = chatProjectFolderContext.pendingApprovalByConversation.get(id);
+            const previousInterruptId = String(previous && (previous.interruptId || previous.id) || '');
+            const nextInterruptId = String(details && (details.interruptId || details.id) || '');
+            if (!previous || previousInterruptId !== nextInterruptId) changed = true;
+        });
+    }
+    if (!changed) return;
+    chatProjectFolderContext.pendingApprovalByConversation = next;
+    if (isProjectsCacheReady() && chatProjectFolderContext.ready) {
+        renderChatProjectFolders(projectsCacheAll);
+    }
+}
+
+window.setProjectConversationApprovalStatus = setProjectConversationApprovalStatus;
+window.syncProjectConversationApprovalStatuses = syncProjectConversationApprovalStatuses;
+
+if (!window._projectConversationActionEventsBound) {
+    window._projectConversationActionEventsBound = true;
+    document.addEventListener('conversation-pinned-changed', (event) => {
+        const details = event?.detail || {};
+        updateChatProjectConversationPinnedState(details.conversationId, details.pinned);
+        refreshChatProjectFoldersAfterAction();
+    });
+    document.addEventListener('conversation-deleted', (event) => {
+        const conversationId = event?.detail?.conversationId;
+        removeChatProjectConversation(conversationId);
+        refreshChatProjectFoldersAfterAction();
+    });
+}
+
+if (!window._projectApprovalStatusEventsBound) {
+    window._projectApprovalStatusEventsBound = true;
+    window.addEventListener('hitl-interrupt', (event) => {
+        const details = event && event.detail ? event.detail : {};
+        setProjectConversationApprovalStatus(details.conversationId || window.currentConversationId || '', true, details);
+    });
+    window.addEventListener('hitl-resolved', (event) => {
+        const details = event && event.detail ? event.detail : {};
+        setProjectConversationApprovalStatus(details.conversationId || window.currentConversationId || '', false);
+    });
+}
+
 function appendChatProjectPanelItem(list, project, selectedId, onSelect, tFn) {
     const t = tFn || tp;
     const isNone = !project.id;
@@ -2537,16 +3754,19 @@ function appendChatProjectPanelItem(list, project, selectedId, onSelect, tFn) {
     const desc = isNone
         ? (project.description || '')
         : fullDesc.slice(0, 80);
+    const fullName = project.name || t('common.untitled');
+    const displayName = window.formatProjectNameForDisplay(fullName);
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'role-selection-item-main' + (isSelected ? ' selected' : '');
     btn.setAttribute('role', 'option');
+    btn.setAttribute('aria-label', fullName);
     btn.setAttribute('data-selection-detail', fullDesc);
     btn.onclick = () => onSelect(project.id || '');
     btn.innerHTML = `
         <div class="role-selection-item-icon-main">${isNone ? '—' : '📁'}</div>
         <div class="role-selection-item-content-main">
-            <div class="role-selection-item-name-main">${escapeHtml(project.name || t('common.untitled'))}</div>
+            <div class="role-selection-item-name-main" title="${escapeAttr(fullName)}">${escapeHtml(displayName)}</div>
             <div class="role-selection-item-description-main">${escapeHtml(desc)}</div>
         </div>
         ${isSelected ? '<div class="role-selection-checkmark-main">✓</div>' : ''}
@@ -2694,7 +3914,13 @@ function updateChatProjectButtonLabel() {
     const textEl = document.getElementById('chat-project-text');
     if (!textEl) return;
     const id = resolveChatProjectSelection();
-    textEl.textContent = id && projectNameById[id] ? projectNameById[id] : tp('projects.noProject');
+    window.applyProjectNameDisplay(
+        textEl,
+        id && projectNameById[id] ? projectNameById[id] : tp('projects.noProject')
+    );
+    if (typeof window.refreshChatWelcomeEmptyState === 'function') {
+        window.refreshChatWelcomeEmptyState();
+    }
 }
 
 async function renderChatProjectPanel() {
@@ -2748,6 +3974,7 @@ async function applyChatProjectSelection(projectId) {
     const prev = getChatProjectSelection();
     if (projectId === prev) {
         updateChatProjectButtonLabel();
+        await refreshChatProjectFolders();
         return;
     }
     if (window.currentConversationId) {
@@ -2775,19 +4002,25 @@ async function applyChatProjectSelection(projectId) {
         setActiveProjectId(projectId);
     }
     updateChatProjectButtonLabel();
+    await refreshChatProjectFolders();
     if (typeof window.onConversationProjectBindingChanged === 'function') {
         window.onConversationProjectBindingChanged(projectId);
     }
 }
 
 /** 对话页项目选择器：同步按钮文案；若浮层已打开则刷新列表 */
-async function refreshChatProjectSelector() {
+async function refreshChatProjectSelector(options = {}) {
     if (!document.getElementById('chat-project-btn')) return;
     try {
         await normalizeStaleChatProjectSelection();
         await ensureChatProjectButtonLabel();
     } catch (e) {
         console.warn(e);
+    }
+    if (options.renderFolders !== false) {
+        const reloadFolders = options.reloadFolders !== false || !isProjectsCacheReady() || !chatProjectFolderContext.ready;
+        if (reloadFolders) await refreshChatProjectFolders();
+        else renderChatProjectFolders(projectsCacheAll);
     }
     const panel = document.getElementById('chat-project-panel');
     if (panel && panel.style.display === 'flex') {
@@ -2810,6 +4043,7 @@ function initChatProjectSelector() {
             renderProjectsPagination();
             syncAllProjectsFilterSelects();
             updateChatProjectButtonLabel();
+            refreshChatProjectFolders();
             const panel = document.getElementById('chat-project-panel');
             if (panel && panel.style.display === 'flex') loadChatProjectPanelList();
             if (currentProjectId) {
@@ -2850,12 +4084,14 @@ function initProjectGraphFooterWheelScroll() {
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         initChatProjectSelector();
+        initProjectConversationReadTracking();
         initProjectListActionMenu();
         initProjectGraphFooterWheelScroll();
         refreshProjectsFilterSelects();
     });
 } else {
     initChatProjectSelector();
+    initProjectConversationReadTracking();
     initProjectListActionMenu();
     initProjectGraphFooterWheelScroll();
     refreshProjectsFilterSelects();
@@ -2865,6 +4101,7 @@ window.initProjectsPage = initProjectsPage;
 window.showNewProjectModal = showNewProjectModal;
 window.showEditProjectModal = showEditProjectModal;
 window.showNewProjectModalFromChat = showNewProjectModalFromChat;
+window.showNewProjectModalFromChatSidebar = showNewProjectModalFromChatSidebar;
 window.saveProjectModal = saveProjectModal;
 window.closeProjectModal = closeProjectModal;
 window.selectProject = selectProject;
@@ -2880,6 +4117,7 @@ window.archiveCurrentProject = archiveCurrentProject;
 window.deleteCurrentProject = deleteCurrentProject;
 window.showProjectListActionMenu = showProjectListActionMenu;
 window.editProjectFromListMenu = editProjectFromListMenu;
+window.toggleProjectPinnedFromListMenu = toggleProjectPinnedFromListMenu;
 window.toggleProjectArchiveFromListMenu = toggleProjectArchiveFromListMenu;
 window.deleteProjectFromListMenu = deleteProjectFromListMenu;
 window.refreshChatProjectSelector = refreshChatProjectSelector;
@@ -2892,6 +4130,12 @@ window.initProjectPickerPanelSearch = initProjectPickerPanelSearch;
 window.clearProjectPickerPanelSearch = clearProjectPickerPanelSearch;
 window.scheduleProjectPickerPanelSearch = scheduleProjectPickerPanelSearch;
 window.loadChatProjectPanelList = loadChatProjectPanelList;
+window.refreshChatProjectFolders = refreshChatProjectFolders;
+window.handleProjectFolderSearch = handleProjectFolderSearch;
+window.clearProjectFolderSearch = clearProjectFolderSearch;
+window.loadMoreChatProjectFolders = loadMoreChatProjectFolders;
+window.updateProjectFolderTaskStatuses = updateProjectFolderTaskStatuses;
+window.markCurrentProjectConversationViewed = markCurrentProjectConversationViewed;
 window.prefetchProjectsForChat = prefetchProjectsForChat;
 window.ensureDefaultActiveProjectForNewChat = ensureDefaultActiveProjectForNewChat;
 window.getActiveProjectId = getActiveProjectId;

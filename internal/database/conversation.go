@@ -1353,6 +1353,39 @@ func (db *DB) AddProcessDetailWithID(messageID, conversationID, eventType, messa
 	return id, nil
 }
 
+// UpdateProcessDetailContent 更新流式聚合详情的正文与元数据。使用固定记录 ID，
+// 避免每个 token 新增一行，同时让页面刷新能读取到尚未结束的规划输出。
+func (db *DB) UpdateProcessDetailContent(id, message string, data interface{}) error {
+	var dataJSON string
+	if data != nil {
+		jsonData, err := json.Marshal(data)
+		if err != nil {
+			return fmt.Errorf("序列化过程详情数据失败: %w", err)
+		}
+		dataJSON = string(jsonData)
+	}
+	result, err := db.Exec(
+		"UPDATE process_details SET message = ?, data = ? WHERE id = ?",
+		message, dataJSON, strings.TrimSpace(id),
+	)
+	if err != nil {
+		return fmt.Errorf("更新过程详情失败: %w", err)
+	}
+	if affected, affectedErr := result.RowsAffected(); affectedErr == nil && affected == 0 {
+		return fmt.Errorf("过程详情不存在: %s", id)
+	}
+	return nil
+}
+
+// DeleteProcessDetail 删除被判定为工具结果回显的临时规划记录。
+func (db *DB) DeleteProcessDetail(id string) error {
+	_, err := db.Exec("DELETE FROM process_details WHERE id = ?", strings.TrimSpace(id))
+	if err != nil {
+		return fmt.Errorf("删除过程详情失败: %w", err)
+	}
+	return nil
+}
+
 // GetProcessDetails 获取消息的过程详情
 func (db *DB) GetProcessDetails(messageID string) ([]ProcessDetail, error) {
 	rows, err := db.Query(
@@ -1420,6 +1453,10 @@ type ProcessDetailsSummary struct {
 	ToolCount       int                           `json:"toolCount"`
 	ToolExecutions  []ProcessDetailsToolExecution `json:"toolExecutions,omitempty"`
 	MCPExecutionIDs []string                      `json:"mcpExecutionIds,omitempty"`
+	StartedAt       *time.Time                    `json:"startedAt,omitempty"`
+	CompletedAt     *time.Time                    `json:"completedAt,omitempty"`
+	DurationMs      int64                         `json:"durationMs"`
+	Status          string                        `json:"status,omitempty"`
 }
 
 type ProcessDetailsToolExecution struct {
@@ -1442,6 +1479,54 @@ func (db *DB) GetProcessDetailsSummary(messageID string) (*ProcessDetailsSummary
 	}
 
 	summary := &ProcessDetailsSummary{Total: total}
+	var messageCreatedAt, messageUpdatedAt sql.NullString
+	var messageContent string
+	if err := db.QueryRow(
+		"SELECT created_at, updated_at, content FROM messages WHERE id = ?",
+		messageID,
+	).Scan(&messageCreatedAt, &messageUpdatedAt, &messageContent); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("查询过程详情耗时失败: %w", err)
+	}
+	if messageCreatedAt.Valid {
+		if startedAt := parseDBTime(messageCreatedAt.String); !startedAt.IsZero() {
+			summary.StartedAt = &startedAt
+		}
+	}
+	var terminalEvent, terminalCreatedAt string
+	terminalErr := db.QueryRow(`
+SELECT event_type, created_at
+FROM process_details
+WHERE message_id = ? AND event_type IN ('cancelled', 'timeout', 'error')
+ORDER BY created_at DESC, rowid DESC
+LIMIT 1`, messageID).Scan(&terminalEvent, &terminalCreatedAt)
+	if terminalErr != nil && !errors.Is(terminalErr, sql.ErrNoRows) {
+		return nil, fmt.Errorf("查询过程详情终态失败: %w", terminalErr)
+	}
+	if terminalEvent != "" {
+		switch terminalEvent {
+		case "cancelled":
+			summary.Status = "cancelled"
+		case "timeout":
+			summary.Status = "timeout"
+		default:
+			summary.Status = "failed"
+		}
+		if completedAt := parseDBTime(terminalCreatedAt); !completedAt.IsZero() {
+			summary.CompletedAt = &completedAt
+		}
+	} else if strings.TrimSpace(messageContent) == "处理中..." || strings.TrimSpace(messageContent) == "Processing..." {
+		summary.Status = "running"
+	} else {
+		summary.Status = "completed"
+		if messageUpdatedAt.Valid {
+			if completedAt := parseDBTime(messageUpdatedAt.String); !completedAt.IsZero() {
+				summary.CompletedAt = &completedAt
+			}
+		}
+	}
+	if summary.StartedAt != nil && summary.CompletedAt != nil && !summary.CompletedAt.Before(*summary.StartedAt) {
+		summary.DurationMs = summary.CompletedAt.Sub(*summary.StartedAt).Milliseconds()
+	}
 	if total == 0 {
 		return summary, nil
 	}

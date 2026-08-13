@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS hitl_interrupts (
     tool_call_id TEXT,
     payload TEXT,
     status TEXT NOT NULL,
+    reviewer TEXT NOT NULL DEFAULT 'human',
     decision TEXT,
     decision_comment TEXT,
     created_at DATETIME NOT NULL,
@@ -98,13 +99,177 @@ CREATE TABLE IF NOT EXISTS hitl_conversation_configs (
 	// On startup, cancel all orphaned pending interrupts from previous process.
 	// Their in-memory channels are gone, so they can never be resolved.
 	res, err := m.db.Exec(`UPDATE hitl_interrupts SET status='cancelled', decision='reject',
-		decision_comment='process restarted', decided_at=CURRENT_TIMESTAMP WHERE status='pending'`)
+		decision_comment='process restarted', decided_at=CURRENT_TIMESTAMP, decided_by='system'
+		WHERE status='pending'`)
 	if err != nil {
 		m.logger.Warn("failed to cancel orphaned HITL interrupts", zap.Error(err))
 	} else if n, _ := res.RowsAffected(); n > 0 {
 		m.logger.Info("cancelled orphaned HITL interrupts from previous process", zap.Int64("count", n))
 	}
+	if err := m.reconcileRestartInterruptedMessages(); err != nil {
+		m.logger.Warn("failed to finalize assistant messages interrupted by process restart", zap.Error(err))
+	}
 	return nil
+}
+
+// reconcileRestartInterruptedMessages completes durable terminal state for
+// historical assistant placeholders that have explicit evidence of being over:
+// a terminal HITL/process event, or a later message in the same conversation.
+// The evidence requirement avoids rewriting a placeholder that could still be
+// recoverable by another runtime.
+func (m *HITLManager) reconcileRestartInterruptedMessages() error {
+	rows, err := m.db.Query(`
+SELECT msg.id, msg.conversation_id,
+       COALESCE((
+           SELECT pd.event_type
+           FROM process_details pd
+           WHERE pd.message_id = msg.id
+             AND pd.event_type IN ('cancelled', 'timeout', 'error')
+           ORDER BY pd.created_at DESC LIMIT 1
+       ), '') AS terminal_event,
+       COALESCE((
+           SELECT hi.status
+           FROM hitl_interrupts hi
+           WHERE hi.message_id = msg.id
+           ORDER BY COALESCE(hi.decided_at, hi.created_at) DESC LIMIT 1
+       ), '') AS hitl_status,
+       COALESCE((
+           SELECT hi.decision
+           FROM hitl_interrupts hi
+           WHERE hi.message_id = msg.id
+           ORDER BY COALESCE(hi.decided_at, hi.created_at) DESC LIMIT 1
+       ), '') AS hitl_decision,
+       COALESCE((
+           SELECT hi.decision_comment
+           FROM hitl_interrupts hi
+           WHERE hi.message_id = msg.id
+           ORDER BY COALESCE(hi.decided_at, hi.created_at) DESC LIMIT 1
+       ), '') AS decision_comment,
+       COALESCE((
+           SELECT MAX(COALESCE(hi.decided_at, hi.created_at))
+           FROM hitl_interrupts hi
+           WHERE hi.message_id = msg.id
+       ), (
+           SELECT MIN(later.created_at)
+           FROM messages later
+           WHERE later.conversation_id = msg.conversation_id
+             AND later.created_at > msg.created_at
+       ), (
+           SELECT MAX(pd.created_at)
+           FROM process_details pd
+           WHERE pd.message_id = msg.id
+       ), msg.updated_at, msg.created_at) AS interrupted_at
+FROM messages msg
+WHERE msg.role = 'assistant'
+  AND TRIM(msg.content) IN ('处理中...', 'Processing...')
+  AND (
+      EXISTS (
+          SELECT 1 FROM hitl_interrupts hi
+          WHERE hi.message_id = msg.id
+            AND (hi.status IN ('cancelled', 'timeout')
+                 OR (hi.status = 'decided' AND hi.decision = 'reject'))
+      )
+      OR EXISTS (
+          SELECT 1 FROM process_details pd
+          WHERE pd.message_id = msg.id
+            AND pd.event_type IN ('cancelled', 'timeout', 'error')
+      )
+      OR EXISTS (
+          SELECT 1 FROM messages later
+          WHERE later.conversation_id = msg.conversation_id
+            AND later.created_at > msg.created_at
+      )
+  )`)
+	if err != nil {
+		return err
+	}
+	type interruptedMessage struct {
+		messageID       string
+		conversationID  string
+		terminalEvent   string
+		hitlStatus      string
+		hitlDecision    string
+		decisionComment string
+		interruptedAt   string
+	}
+	var interrupted []interruptedMessage
+	for rows.Next() {
+		var item interruptedMessage
+		if err := rows.Scan(&item.messageID, &item.conversationID, &item.terminalEvent,
+			&item.hitlStatus, &item.hitlDecision, &item.decisionComment, &item.interruptedAt); err != nil {
+			rows.Close()
+			return err
+		}
+		interrupted = append(interrupted, item)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if len(interrupted) == 0 {
+		return nil
+	}
+
+	tx, err := m.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, item := range interrupted {
+		eventType := strings.ToLower(strings.TrimSpace(item.terminalEvent))
+		decision := strings.ToLower(strings.TrimSpace(item.hitlDecision))
+		comment := strings.ToLower(strings.TrimSpace(item.decisionComment))
+		if eventType == "" {
+			if strings.EqualFold(strings.TrimSpace(item.hitlStatus), "timeout") || strings.Contains(comment, "timeout") {
+				eventType = "timeout"
+			} else {
+				eventType = "cancelled"
+			}
+		}
+
+		notice := "任务因服务重启已中断。"
+		reason := "process_restarted"
+		switch eventType {
+		case "timeout":
+			notice = "任务等待审批超时，已自动拒绝。"
+			reason = "hitl_timeout"
+		case "error":
+			notice = "任务执行失败，已停止。"
+			reason = "execution_error"
+		case "cancelled":
+			if decision == "reject" && comment != "process restarted" {
+				notice = "任务审批已拒绝，执行已停止。"
+				reason = "hitl_rejected"
+			} else if comment == "process restarted" {
+				notice = "任务因服务重启已中断，审批已取消。"
+			}
+		default:
+			eventType = "cancelled"
+		}
+		detailData, _ := json.Marshal(map[string]string{"reason": reason, "status": eventType})
+		result, err := tx.Exec(`
+UPDATE messages
+SET content = ?, updated_at = ?
+WHERE id = ? AND TRIM(content) IN ('处理中...', 'Processing...')`,
+			notice, item.interruptedAt, item.messageID)
+		if err != nil {
+			return err
+		}
+		updated, _ := result.RowsAffected()
+		if updated == 0 {
+			continue
+		}
+		if _, err := tx.Exec(`
+INSERT INTO process_details (id, message_id, conversation_id, event_type, message, data, created_at)
+SELECT ?, ?, ?, ?, ?, ?, ?
+WHERE NOT EXISTS (
+    SELECT 1 FROM process_details
+    WHERE message_id = ? AND event_type IN ('cancelled', 'timeout', 'error')
+)`, uuid.NewString(), item.messageID, item.conversationID, eventType, notice, string(detailData),
+			item.interruptedAt, item.messageID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func normalizeHitlMode(mode string) string {
@@ -234,13 +399,14 @@ func (m *HITLManager) NeedsToolApproval(conversationID, toolName string) bool {
 	return need
 }
 
-func (m *HITLManager) CreatePendingInterrupt(conversationID, assistantMessageID, mode, toolName, toolCallID, payload string) (*pendingInterrupt, error) {
+func (m *HITLManager) CreatePendingInterrupt(conversationID, assistantMessageID, mode, toolName, toolCallID, payload, reviewer string) (*pendingInterrupt, error) {
 	now := time.Now()
 	id := "hitl_" + strings.ReplaceAll(uuid.New().String(), "-", "")
+	reviewer = normalizeHitlReviewer(reviewer)
 	if _, err := m.db.Exec(`INSERT INTO hitl_interrupts
-		(id, conversation_id, message_id, mode, tool_name, tool_call_id, payload, status, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
-		id, conversationID, assistantMessageID, mode, toolName, toolCallID, payload, now); err != nil {
+		(id, conversation_id, message_id, mode, tool_name, tool_call_id, payload, status, reviewer, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+		id, conversationID, assistantMessageID, mode, toolName, toolCallID, payload, reviewer, now); err != nil {
 		return nil, err
 	}
 	// 刷新页面后侧栏依赖 DB 配置；若仅内存 Activate 未落库，会导致「有待审批却显示关闭」
@@ -253,9 +419,12 @@ func (m *HITLManager) CreatePendingInterrupt(conversationID, assistantMessageID,
 		ToolCallID:     toolCallID,
 		decideCh:       make(chan hitlDecision, 1),
 	}
-	m.mu.Lock()
-	m.pending[id] = p
-	m.mu.Unlock()
+	// Agent 审查不会等待人工决策，也不应进入人工审批的内存待办队列。
+	if reviewer != "audit_agent" {
+		m.mu.Lock()
+		m.pending[id] = p
+		m.mu.Unlock()
+	}
 	return p, nil
 }
 
@@ -471,66 +640,107 @@ func (h *AgentHandler) waitHITLApproval(runCtx context.Context, cancelRun contex
 		return nil, nil
 	}
 	h.enrichHitlApprovalPayload(conversationID, assistantMessageID, payload)
+	approvalStartedAt := time.Now().UTC()
+	timeoutSeconds := int(cfg.Timeout / time.Second)
+	var approvalExpiresAt *time.Time
+	if timeoutSeconds > 0 {
+		expiresAt := approvalStartedAt.Add(cfg.Timeout)
+		approvalExpiresAt = &expiresAt
+	}
+	payload["hitlApproval"] = map[string]interface{}{
+		"createdAt":      approvalStartedAt,
+		"timeoutSeconds": timeoutSeconds,
+		"expiresAt":      approvalExpiresAt,
+	}
 	payloadRaw, _ := json.Marshal(payload)
-	p, err := h.hitlManager.CreatePendingInterrupt(conversationID, assistantMessageID, cfg.Mode, toolName, toolCallID, string(payloadRaw))
+	p, err := h.hitlManager.CreatePendingInterrupt(conversationID, assistantMessageID, cfg.Mode, toolName, toolCallID, string(payloadRaw), cfg.Reviewer)
 	if err != nil {
 		h.logger.Warn("创建 HITL 中断失败", zap.Error(err))
 		return nil, err
 	}
+	emitHITL := func(eventType, message string, eventData map[string]interface{}) {
+		clientData := enrichProgressEventData(eventData, conversationID, assistantMessageID)
+		if sendEventFunc != nil {
+			sendEventFunc(eventType, message, clientData)
+		}
+		if strings.TrimSpace(assistantMessageID) != "" && h.db != nil {
+			if err := h.db.AddProcessDetail(assistantMessageID, conversationID, eventType, message, clientData); err != nil {
+				h.logger.Warn("保存 HITL 过程详情失败", zap.Error(err), zap.String("eventType", eventType))
+			}
+		}
+	}
 
 	if cfg.Reviewer == "audit_agent" {
+		emitHITL("hitl_audit_agent_started", "审计 Agent 正在审查此请求", map[string]interface{}{
+			"conversationId": conversationID,
+			"interruptId":    p.InterruptID,
+			"toolName":       toolName,
+			"toolCallId":     toolCallID,
+			"mode":           cfg.Mode,
+			"reviewer":       "audit_agent",
+			"status":         "audit_running",
+			"payload":        payload,
+		})
 		ad := h.auditAgentReview(runCtx, cfg.Mode, toolName, payload)
 		now := time.Now()
 		_, _ = h.db.Exec(`UPDATE hitl_interrupts SET status='decided', decision=?, decision_comment=?, decided_at=?, decided_by='audit_agent' WHERE id=?`,
 			ad.Decision, ad.Comment, now, p.InterruptID)
-		if sendEventFunc != nil {
-			sendEventFunc("hitl_audit_agent", "审计 Agent 已裁决", map[string]interface{}{
+		emitHITL("hitl_audit_agent", "审计 Agent 已裁决", map[string]interface{}{
+			"conversationId": conversationID,
+			"interruptId":    p.InterruptID,
+			"toolName":       toolName,
+			"toolCallId":     toolCallID,
+			"mode":           cfg.Mode,
+			"status":         "decided",
+			"decision":       ad.Decision,
+			"comment":        ad.Comment,
+			"editedArgs":     ad.EditedArguments,
+			"decidedBy":      "audit_agent",
+			"reviewer":       "audit_agent",
+		})
+		if ad.Decision == "reject" {
+			emitHITL("hitl_rejected", "审计 Agent 拒绝本次工具调用", map[string]interface{}{
 				"conversationId": conversationID,
 				"interruptId":    p.InterruptID,
 				"toolName":       toolName,
+				"toolCallId":     toolCallID,
 				"mode":           cfg.Mode,
-				"decision":       ad.Decision,
+				"decision":       "reject",
 				"comment":        ad.Comment,
-				"editedArgs":     ad.EditedArguments,
 				"decidedBy":      "audit_agent",
+				"reviewer":       "audit_agent",
 			})
-		}
-		if ad.Decision == "reject" {
-			if sendEventFunc != nil {
-				sendEventFunc("hitl_rejected", "审计 Agent 拒绝本次工具调用", map[string]interface{}{
-					"conversationId": conversationID,
-					"interruptId":    p.InterruptID,
-					"toolName":       toolName,
-					"comment":        ad.Comment,
-					"decidedBy":      "audit_agent",
-				})
-			}
 			return &ad, nil
 		}
-		if sendEventFunc != nil {
-			sendEventFunc("hitl_resumed", "审计 Agent 已通过，继续执行", map[string]interface{}{
-				"conversationId": conversationID,
-				"interruptId":    p.InterruptID,
-				"toolName":       toolName,
-				"comment":        ad.Comment,
-				"editedArgs":     ad.EditedArguments,
-				"decidedBy":      "audit_agent",
-			})
-		}
+		emitHITL("hitl_resumed", "审计 Agent 已通过，继续执行", map[string]interface{}{
+			"conversationId": conversationID,
+			"interruptId":    p.InterruptID,
+			"toolName":       toolName,
+			"toolCallId":     toolCallID,
+			"mode":           cfg.Mode,
+			"decision":       "approve",
+			"comment":        ad.Comment,
+			"editedArgs":     ad.EditedArguments,
+			"decidedBy":      "audit_agent",
+			"reviewer":       "audit_agent",
+		})
 		h.hitlManager.TrackApprovedHitlExecution(p.InterruptID, conversationID, toolName, toolCallID)
 		return &ad, nil
 	}
 
-	if sendEventFunc != nil {
-		sendEventFunc("hitl_interrupt", "命中人机协同审批", map[string]interface{}{
-			"conversationId": conversationID,
-			"interruptId":    p.InterruptID,
-			"mode":           cfg.Mode,
-			"toolName":       toolName,
-			"toolCallId":     toolCallID,
-			"payload":        payload,
-		})
-	}
+	emitHITL("hitl_interrupt", "命中人机协同审批", map[string]interface{}{
+		"conversationId": conversationID,
+		"interruptId":    p.InterruptID,
+		"mode":           cfg.Mode,
+		"toolName":       toolName,
+		"toolCallId":     toolCallID,
+		"reviewer":       "human",
+		"status":         "pending",
+		"createdAt":      approvalStartedAt,
+		"timeoutSeconds": timeoutSeconds,
+		"expiresAt":      approvalExpiresAt,
+		"payload":        payload,
+	})
 	d, waitErr := h.hitlManager.waitDecision(runCtx, p, cfg.Timeout)
 	if waitErr != nil {
 		if cancelRun != nil && (errors.Is(waitErr, context.Canceled) || errors.Is(waitErr, context.DeadlineExceeded)) {
@@ -550,28 +760,41 @@ func (h *AgentHandler) waitHITLApproval(runCtx context.Context, cancelRun contex
 	}
 	if d.Decision == "reject" {
 		rejectMsg := "人工拒绝本次工具调用，模型将基于反馈继续迭代"
-		if strings.Contains(strings.ToLower(strings.TrimSpace(d.Comment)), "timeout") {
+		timedOut := strings.Contains(strings.ToLower(strings.TrimSpace(d.Comment)), "timeout")
+		if timedOut {
 			rejectMsg = "审批超时，安全起见已自动拒绝，模型将基于反馈继续迭代"
 		}
-		if sendEventFunc != nil {
-			sendEventFunc("hitl_rejected", rejectMsg, map[string]interface{}{
-				"conversationId": conversationID,
-				"interruptId":    p.InterruptID,
-				"toolName":       toolName,
-				"comment":        d.Comment,
-			})
+		status := "decided"
+		decidedBy := "human"
+		if timedOut {
+			status = "timeout"
+			decidedBy = "system"
 		}
-		return &d, nil
-	}
-	if sendEventFunc != nil {
-		sendEventFunc("hitl_resumed", "人工确认通过，继续执行", map[string]interface{}{
+		emitHITL("hitl_rejected", rejectMsg, map[string]interface{}{
 			"conversationId": conversationID,
 			"interruptId":    p.InterruptID,
 			"toolName":       toolName,
+			"toolCallId":     toolCallID,
+			"mode":           cfg.Mode,
+			"status":         status,
+			"decision":       "reject",
 			"comment":        d.Comment,
-			"editedArgs":     d.EditedArguments,
+			"decidedBy":      decidedBy,
+			"reviewer":       "human",
 		})
+		return &d, nil
 	}
+	emitHITL("hitl_resumed", "人工确认通过，继续执行", map[string]interface{}{
+		"conversationId": conversationID,
+		"interruptId":    p.InterruptID,
+		"toolName":       toolName,
+		"toolCallId":     toolCallID,
+		"mode":           cfg.Mode,
+		"decision":       "approve",
+		"comment":        d.Comment,
+		"editedArgs":     d.EditedArguments,
+		"reviewer":       "human",
+	})
 	h.hitlManager.TrackApprovedHitlExecution(p.InterruptID, conversationID, toolName, toolCallID)
 	return &d, nil
 }

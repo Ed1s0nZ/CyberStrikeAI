@@ -42,6 +42,7 @@
         // 项目
         showNewProjectModal: 'project:write',
         showNewProjectModalFromChat: 'project:write',
+        showNewProjectModalFromChatSidebar: 'project:write',
         showNewProjectModalFromWebshellAi: 'project:write',
         showEditProjectModal: 'project:write',
         saveProjectModal: 'project:write',

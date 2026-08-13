@@ -3,6 +3,7 @@ package database
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	"go.uber.org/zap"
 )
@@ -102,6 +103,63 @@ func TestProcessDetailsSummaryDoesNotReportPersistedOrphanAsRunning(t *testing.T
 	}
 	if len(summary.ToolExecutions) != 1 || summary.ToolExecutions[0].Status != "result_missing" {
 		t.Fatalf("tool executions = %#v, want result_missing", summary.ToolExecutions)
+	}
+}
+
+func TestProcessDetailsSummaryIncludesPersistedTurnTiming(t *testing.T) {
+	db, _, messageID := setupProcessDetailsSummaryTest(t)
+	startedAt := "2026-08-10T08:00:00Z"
+	completedAt := "2026-08-10T08:12:59Z"
+	if _, err := db.Exec(
+		"UPDATE messages SET content = ?, created_at = ?, updated_at = ? WHERE id = ?",
+		"done", startedAt, completedAt, messageID,
+	); err != nil {
+		t.Fatalf("update message timing: %v", err)
+	}
+
+	summary, err := db.GetProcessDetailsSummary(messageID)
+	if err != nil {
+		t.Fatalf("GetProcessDetailsSummary: %v", err)
+	}
+	if summary.Status != "completed" {
+		t.Fatalf("status = %q, want completed", summary.Status)
+	}
+	if summary.StartedAt == nil || summary.CompletedAt == nil {
+		t.Fatalf("timing missing: %#v", summary)
+	}
+	if want := int64((12*time.Minute + 59*time.Second) / time.Millisecond); summary.DurationMs != want {
+		t.Fatalf("durationMs = %d, want %d", summary.DurationMs, want)
+	}
+}
+
+func TestProcessDetailsSummaryTreatsCancelledPlaceholderAsTerminal(t *testing.T) {
+	db, conversationID, messageID := setupProcessDetailsSummaryTest(t)
+	startedAt := "2026-08-10T08:00:00Z"
+	if _, err := db.Exec(
+		"UPDATE messages SET content = ?, created_at = ?, updated_at = ? WHERE id = ?",
+		"处理中...", startedAt, startedAt, messageID,
+	); err != nil {
+		t.Fatalf("update running placeholder: %v", err)
+	}
+	if _, err := db.Exec(`
+INSERT INTO process_details (id, message_id, conversation_id, event_type, message, data, created_at)
+VALUES ('cancelled-detail', ?, ?, 'cancelled', 'interrupted', '{}', '2026-08-10T08:02:05Z')`,
+		messageID, conversationID); err != nil {
+		t.Fatalf("insert cancelled detail: %v", err)
+	}
+
+	summary, err := db.GetProcessDetailsSummary(messageID)
+	if err != nil {
+		t.Fatalf("GetProcessDetailsSummary: %v", err)
+	}
+	if summary.Status != "cancelled" {
+		t.Fatalf("status = %q, want cancelled", summary.Status)
+	}
+	if summary.CompletedAt == nil {
+		t.Fatal("cancelled summary should expose a fixed completion time")
+	}
+	if want := int64((2*time.Minute + 5*time.Second) / time.Millisecond); summary.DurationMs != want {
+		t.Fatalf("durationMs = %d, want %d", summary.DurationMs, want)
 	}
 }
 

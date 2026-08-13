@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"cyberstrike-ai/internal/config"
 	"cyberstrike-ai/internal/database"
@@ -49,6 +51,77 @@ func TestCreateProgressCallback_ConcurrentToolEvents(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+// TestCreateProgressCallback_MirrorsWebStreamEvents 页面刷新后 task-events 订阅必须
+// 继续收到原 Web SSE 任务的后续事件，不能只等数据库最终结果。
+func TestCreateProgressCallback_MirrorsWebStreamEvents(t *testing.T) {
+	bus := NewTaskEventBus()
+	h := &AgentHandler{logger: zap.NewNop(), config: &config.Config{}, taskEventBus: bus}
+	_, events := bus.Subscribe("conv-refresh-stream")
+	primaryCalls := 0
+	cb := h.createProgressCallback(
+		context.Background(), nil, "conv-refresh-stream", "",
+		func(eventType, message string, data interface{}) { primaryCalls++ },
+	)
+
+	cb("progress", "第 3 轮", map[string]interface{}{"iteration": 3})
+	if primaryCalls != 1 {
+		t.Fatalf("expected primary SSE callback once, got %d", primaryCalls)
+	}
+	select {
+	case payload := <-events:
+		body := string(payload)
+		if !strings.Contains(body, `"type":"progress"`) || !strings.Contains(body, `"conversationId":"conv-refresh-stream"`) {
+			t.Fatalf("unexpected mirrored event: %s", body)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected progress event mirrored to task event bus")
+	}
+}
+
+func TestCreateProgressCallback_PersistsRunningResponseBeforeDone(t *testing.T) {
+	tmp := t.TempDir()
+	db, err := database.NewDB(filepath.Join(tmp, "test.sqlite"), zap.NewNop())
+	if err != nil {
+		t.Fatalf("NewDB: %v", err)
+	}
+	conv, err := db.CreateConversation("refresh-running", database.ConversationCreateMeta{})
+	if err != nil {
+		t.Fatalf("CreateConversation: %v", err)
+	}
+	asst, err := db.AddMessage(conv.ID, "assistant", "处理中...", nil)
+	if err != nil {
+		t.Fatalf("AddMessage: %v", err)
+	}
+
+	h := &AgentHandler{logger: zap.NewNop(), db: db}
+	cb := h.createProgressCallback(context.Background(), nil, conv.ID, asst.ID, nil)
+	meta := map[string]interface{}{
+		"streamId":      "response-refresh-1",
+		"einoAgent":     "cyberstrike-eino-single",
+		"orchestration": "eino_single",
+	}
+	cb("response_start", "", meta)
+	cb("response_delta", "刷新前已生成的第一部分", openai.WithSSEAccumulated(meta, "刷新前已生成的第一部分"))
+
+	details, err := db.GetProcessDetails(asst.ID)
+	if err != nil {
+		t.Fatalf("GetProcessDetails: %v", err)
+	}
+	if len(details) != 1 || details[0].EventType != "planning" || details[0].Message != "刷新前已生成的第一部分" {
+		t.Fatalf("expected one running planning snapshot, got %+v", details)
+	}
+
+	longer := "刷新前已生成的第一部分" + strings.Repeat("继续迭代", 300)
+	cb("response_delta", "继续迭代", openai.WithSSEAccumulated(meta, longer))
+	details, err = db.GetProcessDetails(asst.ID)
+	if err != nil {
+		t.Fatalf("GetProcessDetails after update: %v", err)
+	}
+	if len(details) != 1 || details[0].Message != longer {
+		t.Fatalf("running snapshot should update in-place, rows=%d len=%d", len(details), len(details[0].Message))
+	}
 }
 
 // TestCreateProgressCallback_FlushesReasoningOnDone 流式推理聚合须在 done/response 时落库，刷新后可回放。

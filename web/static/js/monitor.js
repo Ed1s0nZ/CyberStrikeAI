@@ -2,9 +2,14 @@ const progressTaskState = new Map();
 /** @type {{ progressId: string, conversationId: string } | null} */
 let userInterruptModalPending = null;
 let activeTaskInterval = null;
-const ACTIVE_TASK_REFRESH_INTERVAL = 10000; // 10秒检查一次
+const ACTIVE_TASK_REFRESH_INTERVAL = 2000; // 运行态与审批态需要及时自刷新
 const TASK_FINAL_STATUSES = new Set(['failed', 'timeout', 'cancelled', 'completed']);
 const hitlInterruptToolItemMap = new Map();
+let activeTasksLoadPromise = null;
+const CHAT_TASK_SYNC_CHANNEL_NAME = 'cyberstrike-chat-task-sync-v1';
+let chatTaskSyncChannel = null;
+let visibleConversationReplaySyncPromise = null;
+let visibleConversationReplaySyncId = '';
 
 /**
  * 主对话 POST 流仍在读取时，禁止再挂 task-events 补流，否则同一事件会画两遍（与 HITL 是否开启无关）。
@@ -17,6 +22,9 @@ function syncAgentLiveStreamConversationId(cid) {
         if (live && live.active) {
             live.conversationId = cid;
         }
+        if (typeof window.updateChatPrimaryActionState === 'function') {
+            window.updateChatPrimaryActionState();
+        }
     } catch (e) { /* ignore */ }
 }
 
@@ -24,6 +32,9 @@ function setCurrentConversationIdFromStream(cid) {
     currentConversationId = cid;
     try {
         window.currentConversationId = cid;
+        if (typeof window.syncChatConversationHash === 'function') {
+            window.syncChatConversationHash(cid);
+        }
     } catch (e) { /* ignore */ }
 }
 
@@ -520,6 +531,43 @@ function shouldReuseMainResponseStream(progressId, prevStream, responseData, str
     return areMainResponseStreamIterationsCompatible(prevIterTag, streamIterTag, orch);
 }
 
+/** 刷新后从数据库恢复的 planning 行，继续复用为当前 response_stream 容器。 */
+function findRestoredMainResponseStreamItem(timeline, responseData) {
+    if (!timeline) return null;
+    const data = responseData || {};
+    const streamId = data.streamId != null ? String(data.streamId).trim() : '';
+    const agent = data.einoAgent != null ? String(data.einoAgent).trim() : '';
+    const orchestration = data.orchestration != null ? String(data.orchestration).trim() : '';
+    const items = timeline.querySelectorAll('.timeline-item-planning, .timeline-item-thinking');
+    for (let i = items.length - 1; i >= 0; i--) {
+        const item = items[i];
+        const itemStreamId = String(item.dataset.responseStreamId || '').trim();
+        if (streamId) {
+            if (itemStreamId === streamId) return item;
+            continue;
+        }
+        const itemAgent = String(item.dataset.einoAgent || '').trim();
+        const itemOrchestration = String(item.dataset.orchestration || '').trim();
+        if (agent && itemAgent === agent && itemOrchestration === orchestration) return item;
+    }
+    return null;
+}
+
+function responseStreamStateFromRestoredItem(progressId, item, responseData) {
+    if (!item) return null;
+    const data = responseData || {};
+    const contentEl = item.querySelector('.timeline-item-content');
+    item.dataset.responseStreamPlaceholder = '1';
+    return {
+        progressId: progressId,
+        itemId: item.id,
+        buffer: contentEl ? String(contentEl.textContent || '') : '',
+        streamMeta: data,
+        streamIdentity: buildMainResponseStreamIdentity(progressId, data),
+        streamId: data.streamId != null ? String(data.streamId).trim() : ''
+    };
+}
+
 // AI 思考流式输出：progressId -> Map(streamId -> { itemId, buffer })
 const thinkingStreamStateByProgressId = new Map();
 
@@ -999,6 +1047,11 @@ function updateAssistantBubbleContent(assistantMessageId, content, renderMarkdow
     if (copyBtn) copyBtn.remove();
 
     const newContent = content == null ? '' : String(content);
+    const normalizedContent = newContent.trim();
+    if (normalizedContent !== '处理中...' && normalizedContent !== 'Processing...') {
+        assistantElement.classList.remove('assistant-placeholder-content');
+        bubble.hidden = false;
+    }
     const html = renderMarkdown
         ? formatAssistantMarkdownContent(newContent)
         : escapeHtmlLocal(newContent).replace(/\n/g, '<br>');
@@ -1020,6 +1073,7 @@ function updateAssistantBubbleContent(assistantMessageId, content, renderMarkdow
 
 const conversationExecutionTracker = {
     activeConversations: new Set(),
+    ready: false,
     update(tasks = []) {
         this.activeConversations.clear();
         tasks.forEach(task => {
@@ -1031,14 +1085,186 @@ const conversationExecutionTracker = {
                 this.activeConversations.add(task.conversationId);
             }
         });
+        this.ready = true;
     },
     isRunning(conversationId) {
         return !!conversationId && this.activeConversations.has(conversationId);
+    },
+    markRunning(conversationId) {
+        const id = String(conversationId || '').trim();
+        if (!id) return false;
+        this.activeConversations.add(id);
+        this.ready = true;
+        return true;
+    }
+};
+
+function notifyConversationTaskStarted(conversationId) {
+    const id = String(conversationId || '').trim();
+    if (!id) return false;
+    conversationExecutionTracker.markRunning(id);
+    if (typeof window.updateChatPrimaryActionState === 'function') {
+        window.updateChatPrimaryActionState();
+    }
+    if (chatTaskSyncChannel) {
+        chatTaskSyncChannel.postMessage({ type: 'task-started', conversationId: id, at: Date.now() });
+    }
+    return true;
+}
+
+function initChatTaskSyncChannel() {
+    if (chatTaskSyncChannel || typeof BroadcastChannel !== 'function') return;
+    chatTaskSyncChannel = new BroadcastChannel(CHAT_TASK_SYNC_CHANNEL_NAME);
+    chatTaskSyncChannel.addEventListener('message', function (event) {
+        const payload = event && event.data;
+        if (!payload || payload.type !== 'task-started') return;
+        const id = String(payload.conversationId || '').trim();
+        if (!id) return;
+        conversationExecutionTracker.markRunning(id);
+        if (typeof window.updateChatPrimaryActionState === 'function') {
+            window.updateChatPrimaryActionState();
+        }
+        // 服务端任务注册可能比跨标签页通知晚一瞬，稍后由权威任务列表确认并挂载补流。
+        setTimeout(function () {
+            if (typeof loadActiveTasks === 'function') loadActiveTasks();
+        }, 180);
+    });
+}
+
+initChatTaskSyncChannel();
+window.notifyConversationTaskStarted = notifyConversationTaskStarted;
+
+const hitlPendingInterruptTracker = {
+    pendingById: new Map(),
+    ready: false,
+    update(items = []) {
+        this.pendingById.clear();
+        items.forEach(item => this.add(item));
+        this.ready = true;
+    },
+    replaceConversation(conversationId, items = []) {
+        const id = String(conversationId || '').trim();
+        if (id) {
+            this.pendingById.forEach((item, interruptId) => {
+                if (String(item && item.conversationId || '').trim() === id) {
+                    this.pendingById.delete(interruptId);
+                }
+            });
+        }
+        items.forEach(item => this.add(item));
+        this.ready = true;
+    },
+    add(item) {
+        const interruptId = String(item && (item.interruptId || item.id) || '').trim();
+        if (!interruptId) return;
+        this.pendingById.set(interruptId, item);
+    },
+    remove(interruptId) {
+        this.pendingById.delete(String(interruptId || '').trim());
+    },
+    has(interruptId) {
+        return !!interruptId && this.pendingById.has(String(interruptId));
     }
 };
 
 function isConversationTaskRunning(conversationId) {
     return conversationExecutionTracker.isRunning(conversationId);
+}
+
+function setHitlApprovalInterruptedVisualState(panel, interrupted) {
+    if (!panel || panel.classList.contains('hitl-inline-done')) return;
+    const eyebrow = panel.querySelector('.hitl-approval-eyebrow');
+    const countdown = panel.querySelector('.hitl-approval-countdown');
+    if (interrupted) {
+        stopHitlApprovalCountdown(panel);
+        panel.classList.add('hitl-approval-interrupted');
+        if (eyebrow && !Object.prototype.hasOwnProperty.call(eyebrow.dataset, 'taskAvailableText')) {
+            eyebrow.dataset.taskAvailableText = eyebrow.textContent || '';
+            eyebrow.textContent = hitlApprovalTranslate('hitl.taskInterrupted', '任务已中断');
+        }
+        if (countdown && !Object.prototype.hasOwnProperty.call(countdown.dataset, 'taskAvailableHtml')) {
+            countdown.dataset.taskAvailableHtml = countdown.innerHTML;
+            countdown.dataset.taskAvailableClass = countdown.className;
+            countdown.dataset.taskAvailableExpiresAt = countdown.dataset.hitlExpiresAt || '';
+            countdown.dataset.taskAvailableTimeout = countdown.dataset.hitlTimeout || '';
+            countdown.removeAttribute('data-hitl-expires-at');
+            countdown.removeAttribute('data-hitl-timeout');
+            countdown.className = 'hitl-approval-countdown hitl-approval-countdown--interrupted';
+            countdown.innerHTML = '<div class="hitl-codex-state hitl-codex-state--interrupted">' +
+                '<span class="hitl-codex-state-icon" aria-hidden="true">×</span>' +
+                '<strong>' + escapeHtml(hitlApprovalTranslate('hitl.interruptedApprovalCancelled', '任务已中断，审批已取消')) + '</strong>' +
+                '</div>';
+        }
+        return;
+    }
+    if (!panel.classList.contains('hitl-approval-interrupted')) return;
+    panel.classList.remove('hitl-approval-interrupted');
+    if (eyebrow && Object.prototype.hasOwnProperty.call(eyebrow.dataset, 'taskAvailableText')) {
+        eyebrow.textContent = eyebrow.dataset.taskAvailableText;
+        delete eyebrow.dataset.taskAvailableText;
+    }
+    if (countdown && Object.prototype.hasOwnProperty.call(countdown.dataset, 'taskAvailableHtml')) {
+        countdown.className = countdown.dataset.taskAvailableClass || 'hitl-approval-countdown';
+        countdown.innerHTML = countdown.dataset.taskAvailableHtml;
+        if (countdown.dataset.taskAvailableExpiresAt) {
+            countdown.dataset.hitlExpiresAt = countdown.dataset.taskAvailableExpiresAt;
+        }
+        if (countdown.dataset.taskAvailableTimeout) {
+            countdown.dataset.hitlTimeout = countdown.dataset.taskAvailableTimeout;
+        }
+        delete countdown.dataset.taskAvailableClass;
+        delete countdown.dataset.taskAvailableHtml;
+        delete countdown.dataset.taskAvailableExpiresAt;
+        delete countdown.dataset.taskAvailableTimeout;
+        if (panel.__hitlApprovalCountdownData) {
+            bindHitlApprovalCountdown(panel, panel.__hitlApprovalCountdownData);
+        }
+    }
+}
+
+function setHitlApprovalTaskAvailability(panel, conversationId) {
+    if (!panel) return;
+    const id = String(conversationId || panel.dataset.conversationId || '').trim();
+    if (id) panel.dataset.conversationId = id;
+    const interruptId = String(panel.dataset.hitlInterruptId || '').trim();
+    const taskClosed = !!id && conversationExecutionTracker.ready && !conversationExecutionTracker.isRunning(id);
+    // 同一对话可能在服务重启后又启动了新任务，不能因此重新激活旧审批。
+    // 具体审批 ID 已不在 pending 列表时，倒计时和按钮必须保持关闭。
+    const interruptClosed = !!interruptId && hitlPendingInterruptTracker.ready &&
+        !hitlPendingInterruptTracker.has(interruptId);
+    const approvalClosed = taskClosed || interruptClosed;
+    const buttons = panel.querySelectorAll(
+        '.hitl-inline-approve, .hitl-inline-reject, .workflow-hitl-inline-approve, .workflow-hitl-inline-reject'
+    );
+    const status = panel.querySelector('.hitl-inline-status, .workflow-hitl-inline-status');
+    panel.classList.toggle('hitl-approval-task-closed', approvalClosed);
+    setHitlApprovalInterruptedVisualState(panel, approvalClosed);
+    buttons.forEach(function (button) {
+        if (approvalClosed) {
+            if (!button.disabled) button.dataset.disabledByClosedTask = '1';
+            button.disabled = true;
+        } else if (button.dataset.disabledByClosedTask === '1') {
+            button.disabled = false;
+            delete button.dataset.disabledByClosedTask;
+        }
+    });
+    if (!status) return;
+    if (approvalClosed) {
+        if (!Object.prototype.hasOwnProperty.call(status.dataset, 'taskAvailableText')) {
+            status.dataset.taskAvailableText = status.textContent || '';
+        }
+        status.textContent = hitlApprovalTranslate('hitl.taskClosedApprovalUnavailable', '任务已结束，审批不可用');
+    } else if (Object.prototype.hasOwnProperty.call(status.dataset, 'taskAvailableText')) {
+        status.textContent = status.dataset.taskAvailableText;
+        delete status.dataset.taskAvailableText;
+    }
+}
+
+function syncHitlApprovalTaskAvailability() {
+    document.querySelectorAll('.hitl-inline-approval[data-conversation-id], .chat-hitl-approval-dock[data-conversation-id]')
+        .forEach(function (panel) {
+            setHitlApprovalTaskAvailability(panel, panel.dataset.conversationId);
+        });
 }
 
 /** 顶栏「停止任务」与进度条按钮对齐时，用会话 ID 反查当前页的 progress 块 ID（无则弹窗内仍可按会话取消） */
@@ -1087,6 +1313,7 @@ function markProgressCancelling(progressId) {
 }
 
 function finalizeProgressTask(progressId, finalLabel) {
+    stopLiveProgressLatestFollow(progressId);
     const stopBtn = document.getElementById(`${progressId}-stop-btn`);
     if (stopBtn) {
         stopBtn.disabled = true;
@@ -1258,14 +1485,61 @@ async function performHardCancelProgressTask(progressId) {
     }
 }
 
+const progressElapsedTimerById = new Map();
+
+function progressElapsedText(progressId) {
+    const el = document.getElementById(progressId);
+    const startedAt = el && el.dataset ? Number(el.dataset.turnStartedAtMs) : NaN;
+    const duration = typeof window.formatAssistantTurnDuration === 'function'
+        ? window.formatAssistantTurnDuration(Number.isFinite(startedAt) ? Date.now() - startedAt : 0)
+        : Math.max(0, Math.floor((Date.now() - (Number.isFinite(startedAt) ? startedAt : Date.now())) / 1000)) + ' 秒';
+    return typeof window.t === 'function'
+        ? window.t('chat.turnElapsedRunning', { duration: duration })
+        : '已处理 ' + duration;
+}
+
+function syncProgressElapsedSummary(progressId) {
+    const el = document.getElementById(progressId);
+    if (!el) return;
+    const title = el.querySelector('.progress-title');
+    if (title) title.textContent = progressElapsedText(progressId);
+    const timeline = document.getElementById(progressId + '-timeline');
+    const summary = el.querySelector('.progress-summary-toggle');
+    if (summary) {
+        const expanded = !!(timeline && timeline.classList.contains('expanded'));
+        summary.classList.toggle('is-expanded', expanded);
+        summary.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    }
+}
+
+function stopProgressElapsedClock(progressId) {
+    const timer = progressElapsedTimerById.get(progressId);
+    if (timer) clearInterval(timer);
+    progressElapsedTimerById.delete(progressId);
+}
+
+function startProgressElapsedClock(progressId) {
+    stopProgressElapsedClock(progressId);
+    syncProgressElapsedSummary(progressId);
+    progressElapsedTimerById.set(progressId, setInterval(function () {
+        if (!document.getElementById(progressId)) {
+            stopProgressElapsedClock(progressId);
+            return;
+        }
+        syncProgressElapsedSummary(progressId);
+    }, 1000));
+}
+
 function addProgressMessage() {
     const messagesDiv = document.getElementById('chat-messages');
     const messageDiv = document.createElement('div');
     messageCounter++;
     const id = 'progress-' + Date.now() + '-' + messageCounter;
     messageDiv.id = id;
-    messageDiv.className = 'message system progress-message';
-    
+    messageDiv.className = 'message assistant progress-message';
+
+    messagesDiv.querySelector('.chat-welcome-empty-state')?.remove();
+
     const contentWrapper = document.createElement('div');
     contentWrapper.className = 'message-content';
     
@@ -1276,12 +1550,19 @@ function addProgressMessage() {
     const collapseDetailText = typeof window.t === 'function' ? window.t('tasks.collapseDetail') : '收起详情';
     bubble.innerHTML = `
         <div class="progress-header">
-            <span class="progress-title">🔍 ${progressTitleText}</span>
+            <button type="button" class="turn-process-summary progress-summary-toggle is-expanded" aria-expanded="true" onclick="toggleProgressDetails('${id}')">
+                <span class="turn-process-leading">
+                    <span class="turn-process-status-dot is-running" aria-hidden="true"></span>
+                    <span class="progress-title"></span>
+                </span>
+                <svg class="turn-process-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7.5 5.5L12 10l-4.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
             <div class="progress-actions">
                 <button class="progress-stop" id="${id}-stop-btn" onclick="cancelProgressTask('${id}')">${stopTaskText}</button>
                 <button class="progress-toggle" onclick="toggleProgressDetails('${id}')">${collapseDetailText}</button>
             </div>
         </div>
+        <div class="progress-stage" aria-live="polite">${progressTitleText}</div>
         <div class="progress-timeline expanded" id="${id}-timeline"></div>
         <div class="progress-footer">
             <button type="button" class="progress-toggle progress-toggle-bottom" onclick="toggleProgressDetails('${id}')">${collapseDetailText}</button>
@@ -1291,6 +1572,8 @@ function addProgressMessage() {
     contentWrapper.appendChild(bubble);
     messageDiv.appendChild(contentWrapper);
     messageDiv.dataset.conversationId = currentConversationId || '';
+    messageDiv.dataset.turnStartedAtMs = String(Date.now());
+    messageDiv.dataset.turnStartedAt = new Date().toISOString();
     messagesDiv.appendChild(messageDiv);
     bubble.classList.add('is-streaming');
     const progressWasPinned = typeof window.captureScrollPinState === 'function'
@@ -1302,6 +1585,8 @@ function addProgressMessage() {
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
+    startProgressElapsedClock(id);
+    startLiveProgressLatestFollow(id);
     return id;
 }
 
@@ -1321,11 +1606,13 @@ function toggleProgressDetails(progressId) {
         timeline.classList.add('expanded');
         toggleBtns.forEach((btn) => { btn.textContent = collapseT; });
     }
+    syncProgressElapsedSummary(progressId);
 }
 
 // 编排器开始输出最终回复时隐藏整条进度消息（过程已迁入助手气泡的「展开详情」，避免与进度卡重复）
 function hideProgressMessageForFinalReply(progressId) {
     if (!progressId) return;
+    stopLiveProgressLatestFollow(progressId);
     const el = document.getElementById(progressId);
     if (el) {
         el.style.display = 'none';
@@ -1333,12 +1620,16 @@ function hideProgressMessageForFinalReply(progressId) {
 }
 
 // 折叠所有进度详情
-function collapseAllProgressDetails(assistantMessageId, progressId) {
+function collapseAllProgressDetails(assistantMessageId, progressId, options) {
+    const forceCollapse = !!(options && options.force);
     // 折叠集成到MCP区域的详情
     if (assistantMessageId) {
         const detailsId = 'process-details-' + assistantMessageId;
         const detailsContainer = document.getElementById(detailsId);
-        if (detailsContainer && detailsContainer.dataset.userExpanded !== '1') {
+        if (detailsContainer && (forceCollapse || detailsContainer.dataset.userExpanded !== '1')) {
+            if (forceCollapse) {
+                delete detailsContainer.dataset.userExpanded;
+            }
             const timeline = detailsContainer.querySelector('.progress-timeline');
             if (timeline) {
                 timeline.classList.remove('expanded');
@@ -1346,6 +1637,9 @@ function collapseAllProgressDetails(assistantMessageId, progressId) {
                     btn.innerHTML = '<span>' + (typeof window.t === 'function' ? window.t('chat.expandDetail') : '展开详情') + '</span>';
                 });
             }
+        }
+        if (typeof window.syncAssistantTurnSummary === 'function') {
+            window.syncAssistantTurnSummary(document.getElementById(assistantMessageId));
         }
     }
     
@@ -1384,9 +1678,28 @@ function getAssistantId() {
     return null;
 }
 
-// 将进度详情集成到工具调用区域（流式阶段助手消息不挂 mcp 条，结束时在此创建，避免图二整行 MCP 芯片样式）
-function integrateProgressToMCPSection(progressId, assistantMessageId, mcpExecutionIds) {
+function applyAssistantTurnTimingFromProgress(progressId, assistantElement, terminalStatus) {
     const progressElement = document.getElementById(progressId);
+    const progressStartedAt = progressElement && progressElement.dataset
+        ? (progressElement.dataset.turnStartedAt || new Date(Number(progressElement.dataset.turnStartedAtMs) || Date.now()).toISOString())
+        : new Date().toISOString();
+    const progressStartedAtMs = progressElement && progressElement.dataset
+        ? Number(progressElement.dataset.turnStartedAtMs)
+        : Date.now();
+    const completedAt = new Date();
+    stopProgressElapsedClock(progressId);
+    if (!assistantElement || typeof window.setAssistantTurnTiming !== 'function') return;
+    window.setAssistantTurnTiming(assistantElement, {
+        startedAt: progressStartedAt,
+        completedAt: completedAt.toISOString(),
+        durationMs: Math.max(0, completedAt.getTime() - (Number.isFinite(progressStartedAtMs) ? progressStartedAtMs : completedAt.getTime())),
+        status: terminalStatus || 'completed'
+    });
+}
+
+// 将进度详情集成到工具调用区域（流式阶段助手消息不挂 mcp 条，结束时在此创建，避免图二整行 MCP 芯片样式）
+function integrateProgressToMCPSection(progressId, assistantMessageId, mcpExecutionIds, terminalStatus) {
+    stopProgressElapsedClock(progressId);
 
     // 只 flush 终态标题/正文；完成后的详情回看统一走后端分页，不再复制实时 DOM 快照。
     flushAllPendingStreamPlainUpdates();
@@ -1413,6 +1726,7 @@ function integrateProgressToMCPSection(progressId, assistantMessageId, mcpExecut
     if (typeof window.ensureMcpCallSectionChrome === 'function') {
         window.ensureMcpCallSectionChrome(assistantElement, assistantMessageId);
     }
+    applyAssistantTurnTimingFromProgress(progressId, assistantElement, terminalStatus || 'completed');
     const mcpSection = assistantElement.querySelector('.mcp-call-section');
     if (!mcpSection) {
         removeMessage(progressId);
@@ -1481,6 +1795,11 @@ function integrateProgressToMCPSection(progressId, assistantMessageId, mcpExecut
 
 const PROCESS_DETAILS_PAGE_SIZE = 50;
 const processDetailsAutoLoadObservers = new WeakMap();
+const processDetailsLatestFollowStates = new Map();
+const PROCESS_DETAILS_RESTORE_FOLLOW_MS = 6000;
+const PROCESS_DETAILS_FOLLOW_SCROLLBAR_GUTTER_PX = 18;
+// 只有用户真正滚到底部才恢复自动跟随；保留 2px 兼容亚像素滚动。
+const PROCESS_DETAILS_FOLLOW_RESUME_THRESHOLD_PX = 2;
 
 function processDetailsContinuousLabel(kind) {
     if (kind === 'older') {
@@ -1509,32 +1828,6 @@ function disconnectProcessDetailsAutoLoader(detailsContainer) {
         old.disconnect();
         processDetailsAutoLoadObservers.delete(detailsContainer);
     }
-}
-
-function scrollProcessDetailsToLatest(assistantMessageId, smooth) {
-    const detailsContainer = document.getElementById('process-details-' + assistantMessageId);
-    if (!detailsContainer) return;
-    const timeline = detailsContainer.querySelector('.progress-timeline');
-    if (!timeline) return;
-    const behavior = smooth === false ? 'auto' : 'smooth';
-    if (timeline.scrollHeight > timeline.clientHeight + 2) {
-        timeline.scrollTo({ top: timeline.scrollHeight, behavior: behavior });
-        return;
-    }
-    const items = timeline.querySelectorAll('.timeline-item');
-    if (!items.length) return;
-    const lastItem = items[items.length - 1];
-    lastItem.scrollIntoView({ behavior: behavior, block: 'nearest' });
-}
-
-function updateProcessDetailsJumpLatestVisibility(detailsContainer) {
-    if (!detailsContainer) return;
-    const btn = detailsContainer.querySelector('.process-details-jump-latest');
-    const timeline = detailsContainer.querySelector('.progress-timeline');
-    if (!btn || !timeline) return;
-    const hasUnloadedNewer = detailsContainer.dataset.hasNext === '1';
-    const awayFromTimelineBottom = timeline.scrollHeight - timeline.clientHeight - timeline.scrollTop > 120;
-    btn.classList.toggle('visible', hasUnloadedNewer || awayFromTimelineBottom);
 }
 
 async function requestProcessDetailsAutoPage(assistantMessageId, backendMessageId, direction, sentinel) {
@@ -1603,34 +1896,6 @@ function updateProcessDetailsPaginationButtons(assistantMessageId, backendMessag
         timeline.appendChild(bottomSentinel);
     }
 
-    let jumpBtn = detailsContainer.querySelector('.process-details-jump-latest');
-    if (!jumpBtn) {
-        jumpBtn = document.createElement('button');
-        jumpBtn.type = 'button';
-        jumpBtn.className = 'process-details-jump-latest';
-        jumpBtn.textContent = typeof window.t === 'function' ? window.t('chat.backToLatestProgress') : '↓ 回到最新进度';
-        detailsContainer.appendChild(jumpBtn);
-    }
-    jumpBtn.onclick = async function () {
-        if (detailsContainer.dataset.hasNext === '1') {
-            await loadProcessDetailsPaginated(assistantMessageId, backendMessageId, {
-                autoLoadAll: false,
-                initialLatest: true
-            });
-        }
-        requestAnimationFrame(function () {
-            scrollProcessDetailsToLatest(assistantMessageId, true);
-            updateProcessDetailsJumpLatestVisibility(detailsContainer);
-        });
-    };
-
-    if (timeline.dataset.continuousScrollBound !== '1') {
-        timeline.dataset.continuousScrollBound = '1';
-        timeline.addEventListener('scroll', function () {
-            updateProcessDetailsJumpLatestVisibility(detailsContainer);
-        }, { passive: true });
-    }
-
     if (typeof IntersectionObserver === 'function' && (topSentinel || bottomSentinel)) {
         const root = document.getElementById('chat-messages') || null;
         const observer = new IntersectionObserver(function (entries) {
@@ -1661,8 +1926,232 @@ function updateProcessDetailsPaginationButtons(assistantMessageId, backendMessag
             };
         }
     }
-    updateProcessDetailsJumpLatestVisibility(detailsContainer);
 }
+
+function scrollProcessDetailsToLatest(assistantMessageId, smooth = true) {
+    const container = document.getElementById('process-details-' + assistantMessageId);
+    const timeline = container && container.querySelector('.progress-timeline');
+    if (!timeline) return false;
+    const targetTop = Math.max(0, timeline.scrollHeight - timeline.clientHeight);
+    if (smooth && typeof timeline.scrollTo === 'function') {
+        timeline.scrollTo({ top: targetTop, behavior: 'smooth' });
+    } else {
+        timeline.scrollTop = targetTop;
+    }
+    return true;
+}
+
+window.scrollProcessDetailsToLatest = scrollProcessDetailsToLatest;
+
+function stopProcessDetailsLatestFollow(assistantMessageId) {
+    const key = String(assistantMessageId || '');
+    const state = processDetailsLatestFollowStates.get(key);
+    if (!state) return false;
+    state.stopped = true;
+    if (state.rafId) cancelAnimationFrame(state.rafId);
+    if (state.timeoutId) clearTimeout(state.timeoutId);
+    if (state.observer) state.observer.disconnect();
+    if (state.resizeObserver) state.resizeObserver.disconnect();
+    state.cleanup.forEach(function (cleanup) {
+        try { cleanup(); } catch (e) { /* ignore */ }
+    });
+    processDetailsLatestFollowStates.delete(key);
+    return true;
+}
+
+function stopAllProcessDetailsLatestFollow() {
+    Array.from(processDetailsLatestFollowStates.keys()).forEach(stopProcessDetailsLatestFollow);
+}
+
+/**
+ * 刷新恢复运行中会话时，迭代思考区有自己独立的滚动容器。
+ * 历史详情首屏、后续分帧渲染和 SSE 字符增量都会继续增高该容器，
+ * 因此不能只粘住外层 #chat-messages，也不能只在首屏完成时滚动一次。
+ */
+function startProcessDetailsLatestFollow(assistantMessageId, options) {
+    const opts = options || {};
+    const key = String(opts.stateKey || assistantMessageId || '');
+    if (!key) return false;
+    const explicitTimeline = opts.timeline && opts.timeline.nodeType === 1 ? opts.timeline : null;
+    const container = explicitTimeline
+        ? explicitTimeline.closest('.progress-container, .process-details-container')
+        : document.getElementById('process-details-' + key);
+    const timeline = explicitTimeline || (container && container.querySelector('.progress-timeline'));
+    if (!container || !timeline) return false;
+
+    stopProcessDetailsLatestFollow(key);
+    const persistent = !!opts.persistent;
+    const durationMs = Number.isFinite(Number(opts.durationMs))
+        ? Math.max(250, Number(opts.durationMs))
+        : PROCESS_DETAILS_RESTORE_FOLLOW_MS;
+    const state = {
+        stopped: false,
+        detached: false,
+        persistent: persistent,
+        lastScrollTop: timeline.scrollTop,
+        userScrollIntentUntil: 0,
+        touchLastY: null,
+        rafId: 0,
+        timeoutId: 0,
+        observer: null,
+        resizeObserver: null,
+        cleanup: []
+    };
+    processDetailsLatestFollowStates.set(key, state);
+
+    const detachForUserNavigation = function () {
+        state.detached = true;
+        if (state.rafId) {
+            cancelAnimationFrame(state.rafId);
+            state.rafId = 0;
+        }
+    };
+    const onWheel = function (event) {
+        if (!event) return;
+        if (Math.abs(event.deltaY) > 1) {
+            state.userScrollIntentUntil = Date.now() + 1200;
+        }
+        if (event.deltaY < -1) detachForUserNavigation();
+    };
+    const onPointerDown = function (event) {
+        if (!event) return;
+        const rect = timeline.getBoundingClientRect();
+        if (event.clientX >= rect.right - PROCESS_DETAILS_FOLLOW_SCROLLBAR_GUTTER_PX) {
+            state.userScrollIntentUntil = Date.now() + 1800;
+        }
+    };
+    const onKeyDown = function (event) {
+        if (!event) return;
+        if (['ArrowUp', 'PageUp', 'Home', 'ArrowDown', 'PageDown', 'End', ' '].includes(event.key)) {
+            state.userScrollIntentUntil = Date.now() + 1200;
+        }
+        if (event.key === 'ArrowUp' || event.key === 'PageUp' || event.key === 'Home') {
+            detachForUserNavigation();
+        }
+    };
+    const onTouchStart = function (event) {
+        if (!event || !event.touches || event.touches.length !== 1) return;
+        state.touchLastY = event.touches[0].clientY;
+        state.userScrollIntentUntil = Date.now() + 1200;
+    };
+    const onTouchMove = function (event) {
+        if (!event || !event.touches || event.touches.length !== 1) return;
+        const nextY = event.touches[0].clientY;
+        state.userScrollIntentUntil = Date.now() + 1200;
+        if (state.touchLastY != null && nextY > state.touchLastY + 4) {
+            detachForUserNavigation();
+        }
+        state.touchLastY = nextY;
+    };
+    const onTouchEnd = function () {
+        state.touchLastY = null;
+    };
+    const onScroll = function () {
+        if (state.stopped) return;
+        const currentTop = timeline.scrollTop;
+        const scrolledUp = currentTop < state.lastScrollTop - 1;
+        const scrolledDown = currentTop > state.lastScrollTop + 1;
+        const distance = Math.max(0, timeline.scrollHeight - timeline.clientHeight - timeline.scrollTop);
+
+        // 第一次小幅上滑时仍可能处在“距底部 32px”阈值内，不能在同一个 scroll
+        // 事件里刚脱离又立即恢复，否则持续输出会把视口反复拉回底部。
+        // 刷新后重建历史迭代会引起无用户输入的滚动锚定变化；这种布局滚动
+        // 不能停止内层最新内容跟随，只有明确用户意图或已分离状态才保持分离。
+        if (scrolledUp && (state.detached || Date.now() <= state.userScrollIntentUntil)) {
+            detachForUserNavigation();
+        } else if (
+            state.detached &&
+            scrolledDown &&
+            Date.now() <= state.userScrollIntentUntil &&
+            distance <= PROCESS_DETAILS_FOLLOW_RESUME_THRESHOLD_PX
+        ) {
+            state.detached = false;
+            scheduleFollowLatest();
+        }
+        state.lastScrollTop = currentTop;
+    };
+    timeline.addEventListener('wheel', onWheel, { passive: true });
+    timeline.addEventListener('pointerdown', onPointerDown, { passive: true });
+    timeline.addEventListener('keydown', onKeyDown);
+    timeline.addEventListener('touchstart', onTouchStart, { passive: true });
+    timeline.addEventListener('touchmove', onTouchMove, { passive: true });
+    timeline.addEventListener('touchend', onTouchEnd, { passive: true });
+    timeline.addEventListener('scroll', onScroll, { passive: true });
+    state.cleanup.push(function () { timeline.removeEventListener('wheel', onWheel); });
+    state.cleanup.push(function () { timeline.removeEventListener('pointerdown', onPointerDown); });
+    state.cleanup.push(function () { timeline.removeEventListener('keydown', onKeyDown); });
+    state.cleanup.push(function () { timeline.removeEventListener('touchstart', onTouchStart); });
+    state.cleanup.push(function () { timeline.removeEventListener('touchmove', onTouchMove); });
+    state.cleanup.push(function () { timeline.removeEventListener('touchend', onTouchEnd); });
+    state.cleanup.push(function () { timeline.removeEventListener('scroll', onScroll); });
+
+    const followLatest = function () {
+        state.rafId = 0;
+        if (state.stopped || !timeline.isConnected) {
+            stopProcessDetailsLatestFollow(key);
+            return;
+        }
+        if (state.detached) return;
+        if (typeof opts.scrollToLatest === 'function') {
+            opts.scrollToLatest(timeline);
+        } else {
+            scrollProcessDetailsToLatest(String(assistantMessageId || ''), false);
+        }
+        state.lastScrollTop = timeline.scrollTop;
+        // 内层迭代区与外层对话区分别粘底；用户上滑内层后，本状态会暂停两者的自动跟随。
+        if (window.CyberStrikeChatScroll &&
+            typeof window.CyberStrikeChatScroll.scrollIfPinned === 'function') {
+            window.CyberStrikeChatScroll.scrollIfPinned(true);
+        }
+    };
+    const scheduleFollowLatest = function () {
+        if (state.stopped || state.detached || state.rafId) return;
+        state.rafId = requestAnimationFrame(followLatest);
+    };
+
+    state.observer = new MutationObserver(scheduleFollowLatest);
+    state.observer.observe(timeline, { childList: true, subtree: true, characterData: true });
+    if (typeof ResizeObserver === 'function') {
+        state.resizeObserver = new ResizeObserver(scheduleFollowLatest);
+        state.resizeObserver.observe(timeline);
+    }
+    scheduleFollowLatest();
+
+    if (!persistent) {
+        state.timeoutId = setTimeout(function () {
+            stopProcessDetailsLatestFollow(key);
+        }, durationMs);
+    }
+    return true;
+}
+
+function liveProgressLatestFollowKey(progressId) {
+    return 'live-progress:' + String(progressId || '');
+}
+
+function startLiveProgressLatestFollow(progressId) {
+    const id = String(progressId || '');
+    const timeline = id ? document.getElementById(id + '-timeline') : null;
+    if (!timeline) return false;
+    return startProcessDetailsLatestFollow(id, {
+        stateKey: liveProgressLatestFollowKey(id),
+        timeline: timeline,
+        persistent: true,
+        scrollToLatest: function (target) {
+            target.scrollTop = Math.max(0, target.scrollHeight - target.clientHeight);
+        }
+    });
+}
+
+function stopLiveProgressLatestFollow(progressId) {
+    return stopProcessDetailsLatestFollow(liveProgressLatestFollowKey(progressId));
+}
+
+window.startProcessDetailsLatestFollow = startProcessDetailsLatestFollow;
+window.stopProcessDetailsLatestFollow = stopProcessDetailsLatestFollow;
+window.stopAllProcessDetailsLatestFollow = stopAllProcessDetailsLatestFollow;
+window.startLiveProgressLatestFollow = startLiveProgressLatestFollow;
+window.stopLiveProgressLatestFollow = stopLiveProgressLatestFollow;
 
 /**
  * 分页加载过程详情并增量渲染。默认全量加载供恢复流程使用；
@@ -1673,6 +2162,8 @@ async function loadProcessDetailsPaginated(assistantMessageId, backendMessageId,
         return;
     }
     const opts = options || {};
+    const signal = opts.signal;
+    if (signal && signal.aborted) return;
     const autoLoadAll = opts.autoLoadAll !== false;
     const detailsContainer = document.getElementById('process-details-' + assistantMessageId);
     const PAGE = PROCESS_DETAILS_PAGE_SIZE;
@@ -1692,7 +2183,8 @@ async function loadProcessDetailsPaginated(assistantMessageId, backendMessageId,
             detailsContainer.dataset.autoLoadSuspended = '1';
         }
         const summaryRes = await apiFetch(
-            '/api/messages/' + encodeURIComponent(String(backendMessageId)) + '/process-details?summary=1'
+            '/api/messages/' + encodeURIComponent(String(backendMessageId)) + '/process-details?summary=1',
+            signal ? { signal: signal } : undefined
         );
         const summaryJSON = await summaryRes.json().catch(() => ({}));
         if (!summaryRes.ok) {
@@ -1703,6 +2195,7 @@ async function loadProcessDetailsPaginated(assistantMessageId, backendMessageId,
     }
     let isFirst = !opts.append;
     while (true) {
+        if (signal && signal.aborted) return;
         const params = new URLSearchParams();
         params.set('limit', String(PAGE));
         if (anchorId && !opts.append && !prepend) {
@@ -1712,12 +2205,14 @@ async function loadProcessDetailsPaginated(assistantMessageId, backendMessageId,
         }
         const res = await apiFetch(
             '/api/messages/' + encodeURIComponent(String(backendMessageId)) +
-            '/process-details?' + params.toString()
+            '/process-details?' + params.toString(),
+            signal ? { signal: signal } : undefined
         );
         const j = await res.json().catch(() => ({}));
         if (!res.ok) {
             throw new Error((j && j.error) ? j.error : String(res.status));
         }
+        if (signal && signal.aborted) return;
         const details = (j && Array.isArray(j.processDetails)) ? j.processDetails : [];
         const toolExecutions = (j && Array.isArray(j.toolExecutions)) ? j.toolExecutions : [];
         const hasMore = !!(j && j.hasMore);
@@ -1755,6 +2250,11 @@ async function loadProcessDetailsPaginated(assistantMessageId, backendMessageId,
         await new Promise((resolve) => requestAnimationFrame(resolve));
     }
     if (opts.initialLatest) {
+        // renderProcessDetails 可能继续分帧追加，且恢复后的 SSE 会继续增长同一条思考文本；
+        // 为迭代详情单独建立短时粘底，而不只滚动外层对话容器。
+        startProcessDetailsLatestFollow(assistantMessageId, {
+            durationMs: PROCESS_DETAILS_RESTORE_FOLLOW_MS
+        });
         requestAnimationFrame(function () {
             scrollProcessDetailsToLatest(assistantMessageId, false);
             if (detailsContainer) {
@@ -1910,6 +2410,9 @@ function toggleProcessDetails(progressId, assistantMessageId) {
         setExpanded(!timeline.classList.contains('expanded'));
     } else if (timeline) {
         setExpanded(!timeline.classList.contains('expanded'));
+    }
+    if (typeof window.syncAssistantTurnSummary === 'function') {
+        window.syncAssistantTurnSummary(document.getElementById(assistantMessageId));
     }
     
     // 滚动到展开的详情位置（流式且用户上滑阅读时不抢主列表滚动）
@@ -2192,6 +2695,9 @@ function handleStreamEvent(event, progressElement, progressId,
                         loadConversationsWithGroups();
                     } else if (typeof loadConversations === 'function') {
                         loadConversations();
+                    }
+                    if (typeof window.refreshChatProjectFolders === 'function') {
+                        window.refreshChatProjectFolders();
                     }
                 }, 200);
             }
@@ -2558,7 +3064,45 @@ function handleStreamEvent(event, progressElement, progressId,
             });
             break;
 
-        case 'hitl_interrupt':
+        case 'hitl_audit_agent_started': {
+            const auditData = Object.assign({}, event.data || {}, {
+                reviewer: 'audit_agent',
+                status: 'audit_running'
+            });
+            const auditTargetItem = findToolCallItemForHitl(timeline, auditData);
+            if (auditTargetItem && auditTargetItem.id) {
+                renderInlineHitlApproval(auditTargetItem.id, auditData);
+            } else {
+                const auditItemId = addTimelineItem(timeline, 'hitl_audit_agent_started', {
+                    title: '审计 Agent 正在审查',
+                    message: event.message,
+                    data: auditData
+                });
+                renderInlineHitlApproval(auditItemId, auditData);
+            }
+            break;
+        }
+        case 'hitl_audit_agent': {
+            const auditDecisionData = Object.assign({}, event.data || {}, {
+                reviewer: 'audit_agent',
+                decidedBy: 'audit_agent',
+                status: 'decided'
+            });
+            const auditDecision = auditDecisionData.decision === 'reject' ? 'reject' : 'approve';
+            if (!resolveInlineHitlDecision(timeline, auditDecisionData, auditDecision, event.message)) {
+                const auditTargetItem = findToolCallItemForHitl(timeline, auditDecisionData);
+                if (auditTargetItem && auditTargetItem.id) {
+                    renderInlineHitlApproval(auditTargetItem.id, Object.assign({}, auditDecisionData, {
+                        resolved: true,
+                        decision: auditDecision
+                    }));
+                }
+            }
+            break;
+        }
+        case 'hitl_interrupt': {
+            hitlPendingInterruptTracker.add(event.data || {});
+            hitlPendingInterruptTracker.ready = true;
             const hitlTargetItem = findToolCallItemForHitl(timeline, event.data || {});
             if (hitlTargetItem && hitlTargetItem.id) {
                 renderInlineHitlApproval(hitlTargetItem.id, event.data || {});
@@ -2570,11 +3114,16 @@ function handleStreamEvent(event, progressElement, progressId,
                 });
                 renderInlineHitlApproval(hitlItemId, event.data || {});
             }
+            renderChatHitlApprovalDock(event.data || {});
+            updateHitlApprovalSidebar(event.data || {}, true);
             try {
                 window.dispatchEvent(new CustomEvent('hitl-interrupt', { detail: event.data || {} }));
             } catch (e) {}
             break;
-        case 'hitl_resumed':
+        }
+        case 'hitl_resumed': {
+            hitlPendingInterruptTracker.remove(event.data && event.data.interruptId);
+            hitlPendingInterruptTracker.ready = true;
             if (!resolveInlineHitlDecision(timeline, event.data || {}, 'approve', event.message)) {
                 addTimelineItem(timeline, 'progress', {
                     title: '✅ HITL',
@@ -2582,8 +3131,16 @@ function handleStreamEvent(event, progressElement, progressId,
                     data: event.data
                 });
             }
+            clearChatHitlApprovalDock(event.data && event.data.interruptId);
+            updateHitlApprovalSidebar(event.data || {}, false);
+            try {
+                window.dispatchEvent(new CustomEvent('hitl-resolved', { detail: event.data || {} }));
+            } catch (e) {}
             break;
-        case 'hitl_rejected':
+        }
+        case 'hitl_rejected': {
+            hitlPendingInterruptTracker.remove(event.data && event.data.interruptId);
+            hitlPendingInterruptTracker.ready = true;
             if (!resolveInlineHitlDecision(timeline, event.data || {}, 'reject', event.message)) {
                 addTimelineItem(timeline, 'error', {
                     title: '⛔ HITL',
@@ -2591,7 +3148,13 @@ function handleStreamEvent(event, progressElement, progressId,
                     data: event.data
                 });
             }
+            clearChatHitlApprovalDock(event.data && event.data.interruptId);
+            updateHitlApprovalSidebar(event.data || {}, false);
+            try {
+                window.dispatchEvent(new CustomEvent('hitl-resolved', { detail: event.data || {} }));
+            } catch (e) {}
             break;
+        }
 
         case 'user_interrupt_continue': {
             const d = event.data || {};
@@ -2881,7 +3444,7 @@ function handleStreamEvent(event, progressElement, progressId,
         }
             
         case 'progress':
-            const progressTitle = document.querySelector(`#${progressId} .progress-title`);
+            const progressTitle = document.querySelector(`#${progressId} .progress-stage`);
             if (progressTitle) {
                 // 保存原文，语言切换时可用 translateProgressMessage 重新套当前语言
                 const progressEl = document.getElementById(progressId);
@@ -2894,11 +3457,12 @@ function handleStreamEvent(event, progressElement, progressId,
                     }
                 }
                 const progressMsg = translateProgressMessage(event.message, event.data);
-                progressTitle.textContent = '🔍 ' + progressMsg;
+                progressTitle.textContent = progressMsg;
             }
             break;
         
         case 'cancelled':
+            stopProgressElapsedClock(progressId);
             const taskCancelledText = typeof window.t === 'function' ? window.t('chat.taskCancelled') : '任务已取消';
             if (timeline) {
                 addTimelineItem(timeline, 'cancelled', {
@@ -2907,7 +3471,7 @@ function handleStreamEvent(event, progressElement, progressId,
                     data: event.data
                 });
             }
-            const cancelTitle = document.querySelector(`#${progressId} .progress-title`);
+            const cancelTitle = document.querySelector(`#${progressId} .progress-stage`);
             if (cancelTitle) {
                 cancelTitle.textContent = '⛔ ' + taskCancelledText;
             }
@@ -2929,8 +3493,9 @@ function handleStreamEvent(event, progressElement, progressId,
                 if (assistantElement) {
                     const detailsId = 'process-details-' + assistantId;
                     if (!document.getElementById(detailsId)) {
-                        integrateProgressToMCPSection(progressId, assistantId, typeof getMcpIds === 'function' ? (getMcpIds() || []) : []);
+                        integrateProgressToMCPSection(progressId, assistantId, typeof getMcpIds === 'function' ? (getMcpIds() || []) : [], 'cancelled');
                     } else if (preferredMessageId) {
+                        applyAssistantTurnTimingFromProgress(progressId, assistantElement, 'cancelled');
                         maybeReloadLazyProcessDetails(assistantId);
                     }
                     setTimeout(() => {
@@ -2984,6 +3549,14 @@ function handleStreamEvent(event, progressElement, progressId,
                 responseStreamStateByProgressId.set(progressId, prevStream);
                 break;
             }
+            const restoredItem = findRestoredMainResponseStreamItem(timeline, responseData);
+            if (restoredItem) {
+                responseStreamStateByProgressId.set(
+                    progressId,
+                    responseStreamStateFromRestoredItem(progressId, restoredItem, responseData)
+                );
+                break;
+            }
             const title = einoMainStreamPlanningTitle(responseData);
             const itemId = addTimelineItem(timeline, 'thinking', {
                 title: title,
@@ -3018,7 +3591,23 @@ function handleStreamEvent(event, progressElement, progressId,
             let state = responseStreamStateByProgressId.get(progressId);
             const incomingStreamId = responseData.streamId != null ? String(responseData.streamId).trim() : '';
             if (!state) {
-                state = { progressId: progressId, itemId: null, buffer: '', streamMeta: responseData, streamId: incomingStreamId };
+                const restoredItem = findRestoredMainResponseStreamItem(timeline, responseData);
+                state = responseStreamStateFromRestoredItem(progressId, restoredItem, responseData);
+                if (!state) {
+                    const itemId = addTimelineItem(timeline, 'thinking', {
+                        title: einoMainStreamPlanningTitle(responseData),
+                        message: ' ',
+                        data: Object.assign({}, responseData, { responseStreamPlaceholder: true })
+                    });
+                    state = {
+                        progressId: progressId,
+                        itemId: itemId,
+                        buffer: '',
+                        streamMeta: responseData,
+                        streamIdentity: buildMainResponseStreamIdentity(progressId, responseData),
+                        streamId: incomingStreamId
+                    };
+                }
                 responseStreamStateByProgressId.set(progressId, state);
             } else if (!state.streamMeta && responseData && (responseData.einoAgent || responseData.orchestration)) {
                 state.streamMeta = responseData;
@@ -3151,6 +3740,7 @@ function handleStreamEvent(event, progressElement, progressId,
             break;
             
         case 'error':
+            stopProgressElapsedClock(progressId);
             // 显示错误
             if (timeline) {
                 addTimelineItem(timeline, 'error', {
@@ -3161,7 +3751,7 @@ function handleStreamEvent(event, progressElement, progressId,
             }
             
             // 更新进度标题为错误状态
-            const errorTitle = document.querySelector(`#${progressId} .progress-title`);
+            const errorTitle = document.querySelector(`#${progressId} .progress-stage`);
             if (errorTitle) {
                 errorTitle.textContent = '❌ ' + (typeof window.t === 'function' ? window.t('chat.executionFailed') : '执行失败');
             }
@@ -3187,8 +3777,11 @@ function handleStreamEvent(event, progressElement, progressId,
                 if (assistantElement) {
                     const detailsId = 'process-details-' + assistantId;
                     if (!document.getElementById(detailsId)) {
-                        integrateProgressToMCPSection(progressId, assistantId, typeof getMcpIds === 'function' ? (getMcpIds() || []) : []);
+                        const terminalStatus = event.data && event.data.errorType === 'timeout' ? 'timeout' : 'failed';
+                        integrateProgressToMCPSection(progressId, assistantId, typeof getMcpIds === 'function' ? (getMcpIds() || []) : [], terminalStatus);
                     } else if (preferredMessageId) {
+                        const terminalStatus = event.data && event.data.errorType === 'timeout' ? 'timeout' : 'failed';
+                        applyAssistantTurnTimingFromProgress(progressId, assistantElement, terminalStatus);
                         maybeReloadLazyProcessDetails(assistantId);
                     }
                     setTimeout(() => {
@@ -3206,7 +3799,7 @@ function handleStreamEvent(event, progressElement, progressId,
             
         case 'done':
             if (event.data && event.data.workflowStatus === 'awaiting_hitl') {
-                const waitingTitle = document.querySelector(`#${progressId} .progress-title`);
+                const waitingTitle = document.querySelector(`#${progressId} .progress-stage`);
                 if (waitingTitle) {
                     waitingTitle.textContent = '⏸️ ' + (typeof window.t === 'function' ? window.t('chat.workflowAwaitingApproval') : '工作流等待审批');
                 }
@@ -3215,6 +3808,7 @@ function handleStreamEvent(event, progressElement, progressId,
                 }
                 break;
             }
+            stopProgressElapsedClock(progressId);
             // 清理流式输出状态
             responseStreamStateByProgressId.delete(progressId);
             mainIterationStateByProgressId.delete(String(progressId));
@@ -3231,7 +3825,7 @@ function handleStreamEvent(event, progressElement, progressId,
                 clearCsTaskReplay();
             }
             // 完成，更新进度标题（如果进度消息还存在）
-            const doneTitle = document.querySelector(`#${progressId} .progress-title`);
+            const doneTitle = document.querySelector(`#${progressId} .progress-stage`);
             if (doneTitle) {
                 doneTitle.textContent = '✅ ' + (typeof window.t === 'function' ? window.t('chat.penetrationTestComplete') : '渗透测试完成');
             }
@@ -3285,6 +3879,216 @@ function handleStreamEvent(event, progressElement, progressId,
     scrollChatMessagesToBottomIfPinned(streamScrollWasPinned);
 }
 
+function hitlApprovalTranslate(key, fallback, vars) {
+    if (typeof window.t !== 'function') return fallback;
+    const value = window.t(key, vars || {});
+    return value && value !== key ? value : fallback;
+}
+
+function hitlApprovalTemplate(key, fallback, vars) {
+    let template = hitlApprovalTranslate(key, fallback);
+    Object.keys(vars || {}).forEach(function (name) {
+        template = template.replaceAll('{{' + name + '}}', String(vars[name]));
+    });
+    return template;
+}
+
+function hitlApprovalPayload(data) {
+    return data && data.payload && typeof data.payload === 'object' ? data.payload : {};
+}
+
+function hitlApprovalArguments(data) {
+    const payload = hitlApprovalPayload(data);
+    if (payload.argumentsObj && typeof payload.argumentsObj === 'object') return payload.argumentsObj;
+    if (payload.arguments && typeof payload.arguments === 'object') return payload.arguments;
+    if (typeof payload.arguments === 'string') {
+        try {
+            const parsed = JSON.parse(payload.arguments);
+            if (parsed && typeof parsed === 'object') return parsed;
+        } catch (e) { /* keep the raw request below */ }
+    }
+    return {};
+}
+
+function findHitlArgumentValue(args, keys) {
+    if (!args || typeof args !== 'object') return '';
+    for (let i = 0; i < keys.length; i++) {
+        const value = args[keys[i]];
+        if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+    const nestedKeys = ['input', 'params', 'options', 'request'];
+    for (let i = 0; i < nestedKeys.length; i++) {
+        const nested = args[nestedKeys[i]];
+        if (nested && typeof nested === 'object') {
+            const found = findHitlArgumentValue(nested, keys);
+            if (found) return found;
+        }
+    }
+    return '';
+}
+
+function describeHitlApprovalRequest(data) {
+    const payload = hitlApprovalPayload(data);
+    const args = hitlApprovalArguments(data);
+    const rawToolName = String(data.toolName || payload.toolName || 'tool').trim() || 'tool';
+    const toolName = rawToolName.toLowerCase();
+    const url = findHitlArgumentValue(args, ['url', 'uri', 'href', 'targetUrl', 'target_url']);
+    const command = findHitlArgumentValue(args, ['command', 'cmd', 'script', 'shell_command']);
+    const path = findHitlArgumentValue(args, ['path', 'filePath', 'file_path', 'filename']);
+    const isBrowser = !!url || /browser|chrome|navigate|open_url|web/.test(toolName);
+    const isCommand = !!command || /(^|::|_)exec$|shell|terminal|command|run_command/.test(toolName);
+    const isFile = !!path || /write_file|edit_file|apply_patch|delete_file|move_file/.test(toolName);
+    let displayTool = rawToolName;
+    let question = hitlApprovalTemplate('hitl.requestGeneric', '允许 CyberStrikeAI 调用 {{tool}}？', { tool: rawToolName });
+    let primary = '';
+    let kind = 'generic';
+    if (isBrowser) {
+        kind = 'browser';
+        question = url
+            ? hitlApprovalTemplate('hitl.requestVisitUrl', '允许 CyberStrikeAI 访问 {{url}}？', { url: url })
+            : hitlApprovalTranslate('hitl.requestBrowser', '允许 CyberStrikeAI 使用浏览器？');
+        primary = url;
+    } else if (isCommand) {
+        kind = 'command';
+        question = hitlApprovalTranslate('hitl.requestCommand', '允许 CyberStrikeAI 执行这条命令？');
+        primary = command;
+    } else if (isFile) {
+        kind = 'file';
+        question = path
+            ? hitlApprovalTemplate('hitl.requestFile', '允许 CyberStrikeAI 修改 {{path}}？', { path: path })
+            : hitlApprovalTranslate('hitl.requestFiles', '允许 CyberStrikeAI 修改文件？');
+        primary = path;
+    }
+    return {
+        rawToolName: rawToolName,
+        displayTool: displayTool,
+        question: question,
+        primary: primary,
+        kind: kind,
+        args: args,
+        argsJSON: JSON.stringify(args, null, 2)
+    };
+}
+
+function isAgentReviewedHitl(data) {
+    if (!data) return false;
+    const reviewer = String(data.reviewer || data.decidedBy || data.decided_by || '').trim().toLowerCase();
+    const status = String(data.status || '').trim().toLowerCase();
+    return reviewer === 'audit_agent' || reviewer === 'agent' || reviewer === 'ai' || status === 'audit_running';
+}
+
+function getHitlApprovalTiming(data) {
+    const payload = hitlApprovalPayload(data);
+    const approval = payload.hitlApproval && typeof payload.hitlApproval === 'object' ? payload.hitlApproval : {};
+    const timeoutSeconds = Number(data.timeoutSeconds != null ? data.timeoutSeconds : approval.timeoutSeconds);
+    const createdRaw = data.createdAt || approval.createdAt || '';
+    const expiresRaw = data.expiresAt || approval.expiresAt || '';
+    const createdAt = Date.parse(createdRaw);
+    let expiresAt = Date.parse(expiresRaw);
+    const safeTimeout = Number.isFinite(timeoutSeconds) && timeoutSeconds > 0 ? Math.floor(timeoutSeconds) : 0;
+    if (!Number.isFinite(expiresAt) && safeTimeout > 0 && Number.isFinite(createdAt)) {
+        expiresAt = createdAt + safeTimeout * 1000;
+    }
+    return {
+        timeoutSeconds: safeTimeout,
+        createdAt: Number.isFinite(createdAt) ? createdAt : 0,
+        expiresAt: Number.isFinite(expiresAt) ? expiresAt : 0
+    };
+}
+
+function formatHitlRemaining(milliseconds) {
+    const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+}
+
+function buildHitlCountdownHtml(data) {
+    const timing = getHitlApprovalTiming(data);
+    if (!timing.timeoutSeconds || !timing.expiresAt) {
+        return '<div class="hitl-approval-countdown hitl-approval-countdown--unlimited">' +
+            '<span>' + escapeHtml(hitlApprovalTranslate('hitl.timeoutUnlimited', '不限时等待')) + '</span></div>';
+    }
+    const remaining = Math.max(0, timing.expiresAt - Date.now());
+    const percent = Math.max(0, Math.min(100, remaining / (timing.timeoutSeconds * 1000) * 100));
+    return '<div class="hitl-approval-countdown" data-hitl-expires-at="' + timing.expiresAt + '" data-hitl-timeout="' + timing.timeoutSeconds + '">' +
+        '<div class="hitl-approval-countdown-copy"><span>' + escapeHtml(hitlApprovalTranslate('hitl.timeoutAutoReject', '到期自动拒绝')) + '</span>' +
+        '<strong class="hitl-approval-countdown-value">' + formatHitlRemaining(remaining) + '</strong></div>' +
+        '<div class="hitl-approval-progress" aria-hidden="true"><span class="hitl-approval-progress-value" style="width:' + percent.toFixed(2) + '%"></span></div>' +
+        '</div>';
+}
+
+function stopHitlApprovalCountdown(panel) {
+    if (panel && panel.__hitlCountdownTimer) {
+        window.clearInterval(panel.__hitlCountdownTimer);
+        panel.__hitlCountdownTimer = 0;
+    }
+}
+
+function bindHitlApprovalCountdown(panel, data) {
+    if (!panel) return;
+    stopHitlApprovalCountdown(panel);
+    panel.__hitlApprovalCountdownData = data;
+    if (panel.classList.contains('hitl-approval-task-closed')) return;
+    const timing = getHitlApprovalTiming(data);
+    const countdown = panel.querySelector('.hitl-approval-countdown[data-hitl-expires-at]');
+    if (!countdown || !timing.expiresAt || !timing.timeoutSeconds) return;
+    const value = countdown.querySelector('.hitl-approval-countdown-value');
+    const progress = countdown.querySelector('.hitl-approval-progress-value');
+    const update = function () {
+        const remaining = Math.max(0, timing.expiresAt - Date.now());
+        const percent = Math.max(0, Math.min(100, remaining / (timing.timeoutSeconds * 1000) * 100));
+        if (value) value.textContent = formatHitlRemaining(remaining);
+        if (progress) progress.style.width = percent.toFixed(2) + '%';
+        if (remaining <= 0) {
+            stopHitlApprovalCountdown(panel);
+            panel.classList.add('hitl-approval-expired');
+            panel.querySelectorAll('.hitl-inline-approve, .hitl-inline-reject').forEach(function (button) {
+                button.disabled = true;
+            });
+            const status = panel.querySelector('.hitl-inline-status');
+            if (status) status.textContent = hitlApprovalTranslate('hitl.expiredAutoRejected', '审批已超时，正在自动拒绝…');
+        }
+    };
+    update();
+    panel.__hitlCountdownTimer = window.setInterval(update, 250);
+}
+
+function renderToolCallApprovalSummary(item, data) {
+    if (!item || !data || !data.interruptId) return;
+    let panel = item.querySelector(':scope > .hitl-inline-approval.hitl-tool-approval-summary');
+    if (!panel) {
+        panel = document.createElement('div');
+        panel.className = 'hitl-inline-approval hitl-tool-approval-summary';
+        const header = item.querySelector(':scope > .timeline-item-header');
+        if (header && header.nextSibling) {
+            item.insertBefore(panel, header.nextSibling);
+        } else {
+            item.appendChild(panel);
+        }
+    }
+    const payload = data.payload && typeof data.payload === 'object' ? data.payload : {};
+    const mode = String(data.mode || 'approval').trim().toLowerCase();
+    const allowEdit = mode === 'review_edit';
+    const argsObj = payload.argumentsObj && typeof payload.argumentsObj === 'object'
+        ? payload.argumentsObj
+        : {};
+    panel.innerHTML = buildInlineHitlApprovalHtml(data, {
+        toolName: '',
+        mode: mode,
+        allowEdit: allowEdit,
+        argsJSON: JSON.stringify(argsObj, null, 2)
+    });
+    panel.dataset.hitlInterruptId = String(data.interruptId);
+    panel.dataset.conversationId = String(data.conversationId || window.currentConversationId || '').trim();
+    panel.classList.toggle('hitl-inline-done', !!data.resolved || String(data.status || '') === 'decided');
+    if (!data.resolved && !isAgentReviewedHitl(data)) {
+        bindInlineHitlApproval(panel, data, { allowEdit: allowEdit });
+        bindHitlApprovalCountdown(panel, data);
+        setHitlApprovalTaskAvailability(panel, panel.dataset.conversationId);
+    }
+}
+
 function renderInlineHitlApproval(itemId, data) {
     const item = document.getElementById(itemId);
     if (!item || !data || !data.interruptId) return;
@@ -3301,7 +4105,8 @@ function renderInlineHitlApproval(itemId, data) {
             existingContent.remove();
             item.classList.remove('tool-call-detail-expanded');
         }
-        renderToolCallDetailContent(item);
+        renderToolCallApprovalSummary(item, data);
+        updateToolDetailToggleLabel(item);
         return;
     }
     let contentEl = item.querySelector('.timeline-item-content');
@@ -3329,6 +4134,8 @@ function renderInlineHitlApproval(itemId, data) {
 
     const panel = document.createElement('div');
     panel.className = 'hitl-inline-approval';
+    panel.dataset.hitlInterruptId = String(data.interruptId);
+    panel.dataset.conversationId = String(data.conversationId || window.currentConversationId || '').trim();
     panel.innerHTML = buildInlineHitlApprovalHtml(data, {
         toolName: toolName,
         mode: mode,
@@ -3337,7 +4144,11 @@ function renderInlineHitlApproval(itemId, data) {
         argsJSON: argsJSON
     });
     contentEl.appendChild(panel);
-    bindInlineHitlApproval(panel, data, { allowEdit: allowEdit });
+    if (!isAgentReviewedHitl(data)) {
+        bindInlineHitlApproval(panel, data, { allowEdit: allowEdit });
+        bindHitlApprovalCountdown(panel, data);
+        setHitlApprovalTaskAvailability(panel, panel.dataset.conversationId);
+    }
 }
 
 function resolveInlineHitlDecision(timeline, data, decision, message) {
@@ -3358,6 +4169,9 @@ function resolveInlineHitlDecision(timeline, data, decision, message) {
             resolved: true,
             decision: decision,
             decisionMessage: message || '',
+            reviewer: data.reviewer || data.decidedBy || (state.hitlData && (state.hitlData.reviewer || state.hitlData.decidedBy)) || 'human',
+            decidedBy: data.decidedBy || (state.hitlData && state.hitlData.decidedBy) || '',
+            status: 'decided',
             comment: data.comment || (state.hitlData && state.hitlData.comment) || '',
             editedArgs: data.editedArgs || data.editedArguments || (state.hitlData && (state.hitlData.editedArgs || state.hitlData.editedArguments)) || null
         });
@@ -3373,13 +4187,21 @@ function resolveInlineHitlDecision(timeline, data, decision, message) {
             content.remove();
             item.classList.remove('tool-call-detail-expanded');
         }
-        renderToolCallDetailContent(item);
+        renderToolCallApprovalSummary(item, state.hitlData);
+        updateToolDetailToggleLabel(item);
         return true;
     }
 
     const panel = item.querySelector('.hitl-inline-approval');
     if (panel) {
-        markInlineHitlDecision(panel, decision, message || '');
+        stopHitlApprovalCountdown(panel);
+        panel.classList.add('hitl-inline-done');
+        panel.innerHTML = buildInlineHitlApprovalHtml(Object.assign({}, data, {
+            resolved: true,
+            decision: decision,
+            decisionMessage: message || '',
+            status: 'decided'
+        }), { toolName: data.toolName || '' });
         return true;
     }
     return false;
@@ -3411,54 +4233,115 @@ function buildInlineHitlApprovalHtml(data, opts) {
     const hasToolNameOverride = opts && Object.prototype.hasOwnProperty.call(opts, 'toolName');
     const toolName = hasToolNameOverride ? String(opts.toolName || '') : (data.toolName || '-');
     const mode = opts && opts.mode ? opts.mode : String(data.mode || 'approval').trim().toLowerCase();
-    const modeLabel = opts && opts.modeLabel ? opts.modeLabel : (mode === 'review_edit' ? '审查编辑' : '审批模式');
     const allowEdit = opts && opts.allowEdit === true;
-    const argsJSON = opts && opts.argsJSON ? opts.argsJSON : '';
-    const toolBadge = toolName
-        ? '<span class="hitl-tool-badge">' + escapeHtml(toolName) + '</span>'
+    const request = describeHitlApprovalRequest(Object.assign({}, data, toolName ? { toolName: toolName } : {}));
+    const argsJSON = opts && opts.argsJSON ? opts.argsJSON : request.argsJSON;
+    const reviewer = String(data.reviewer || data.decidedBy || '').trim().toLowerCase();
+    const audit = reviewer === 'audit_agent' || String(data.status || '') === 'audit_running';
+    const status = String(data.status || '').trim().toLowerCase();
+    const timedOut = status === 'timeout' || String(data.decidedBy || '').trim().toLowerCase() === 'system' && /timeout|超时/i.test(String(data.comment || data.decisionMessage || ''));
+    const cancelled = status === 'cancelled';
+    const resolved = !!data.resolved || status === 'decided' || status === 'timeout' || cancelled || data.decision === 'approve' || data.decision === 'reject';
+    const editedArgs = data.editedArgs || data.editedArguments;
+    const hasEditedArgs = editedArgs && typeof editedArgs === 'object' && Object.keys(editedArgs).length > 0;
+    const tr = hitlApprovalTranslate;
+    const shield = '<svg class="hitl-codex-shield" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 2.2l6 2.5v4.5c0 3.8-2.35 6.55-6 8.6-3.65-2.05-6-4.8-6-8.6V4.7l6-2.5z" stroke="currentColor" stroke-width="1.45" stroke-linejoin="round"/><path d="M7.5 10l1.55 1.55L12.8 7.8" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    const toolHeading = toolName || request.displayTool
+        ? '<div class="hitl-codex-tool-row">' + shield + '<span>' + escapeHtml(request.displayTool || toolName) + '</span></div>'
         : '';
-    if (data && data.resolved) {
-        const ok = data.decision === 'approve';
-        const text = data.decisionMessage || (ok ? '已通过，继续执行' : '已拒绝');
-        const comment = data.comment ? '<span class="hitl-inline-decision-comment">' + escapeHtml(data.comment) + '</span>' : '';
-        return `
-            <div class="hitl-inline-decision hitl-inline-decision--${ok ? 'approve' : 'reject'}">
-                <span class="hitl-inline-decision-dot" aria-hidden="true"></span>
-                <strong>${escapeHtml(ok ? '审批通过' : '审批拒绝')}</strong>
-                <span>${escapeHtml(text)}</span>
+    if (resolved) {
+        if (cancelled) {
+            const statusText = tr('hitl.interruptedApprovalCancelled', '任务已中断，审批已取消');
+            const comment = data.comment && data.comment !== 'process restarted' && data.comment !== 'task cancelled'
+                ? '<p class="hitl-codex-explainer">' + escapeHtml(data.comment) + '</p>'
+                : '';
+            return toolHeading + `
+                <div class="hitl-codex-state hitl-codex-state--interrupted">
+                    <span class="hitl-codex-state-icon" aria-hidden="true">×</span>
+                    <strong>${escapeHtml(statusText)}</strong>
+                </div>
                 ${comment}
+            `;
+        }
+        const ok = !timedOut && data.decision !== 'reject';
+        let statusText;
+        if (timedOut) {
+            statusText = tr('hitl.expiredRejected', '审批超时，已自动拒绝');
+        } else if (audit) {
+            statusText = ok
+                ? (hasEditedArgs ? tr('hitl.auditEditedApproved', '审计 Agent 已修改参数并批准') : tr('hitl.auditApproved', '审计 Agent 已批准'))
+                : tr('hitl.auditRejected', '审计 Agent 已拒绝');
+        } else {
+            statusText = ok
+                ? (hasEditedArgs ? tr('hitl.humanEditedApproved', '已修改参数并允许') : tr('hitl.humanApproved', '已允许一次'))
+                : tr('hitl.humanRejected', '人工审批已拒绝');
+        }
+        const comment = data.comment
+            ? '<p class="hitl-codex-explainer">' + escapeHtml(data.comment) + '</p>'
+            : '';
+        const diff = hasEditedArgs
+            ? '<details class="hitl-codex-diff"><summary>' + escapeHtml(tr('hitl.viewEditedArgs', '查看修改后的参数')) + '</summary><pre>' + escapeHtml(JSON.stringify(editedArgs, null, 2)) + '</pre></details>'
+            : '';
+        return toolHeading + `
+            <div class="hitl-codex-state hitl-codex-state--${ok ? 'approved' : 'rejected'}">
+                <span class="hitl-codex-state-icon" aria-hidden="true">${ok ? '✓' : '×'}</span>
+                <strong>${escapeHtml(statusText)}</strong>
             </div>
+            ${comment}
+            ${diff}
         `;
     }
+    if (audit) {
+        const auditStatus = mode === 'review_edit'
+            ? tr('hitl.auditReviewEditing', '自动审查并校正中')
+            : tr('hitl.auditReviewing', '自动审核中');
+        const explanation = tr('hitl.auditReviewExplanation', '经过谨慎提示的审查智能体正在审查此请求，通过后才会执行。');
+        return toolHeading + `
+            <div class="hitl-codex-state hitl-codex-state--running">
+                <span class="hitl-codex-spinner" aria-hidden="true"></span>
+                <strong>${escapeHtml(auditStatus)}</strong>
+            </div>
+            <p class="hitl-codex-explainer">${escapeHtml(explanation)}</p>
+        `;
+    }
+    const pendingStatus = allowEdit
+        ? tr('hitl.waitingHumanReview', '等待人工审查')
+        : tr('hitl.waitingHumanApproval', '等待人工审批');
+    const rejectLabel = tr('hitl.reject', '拒绝');
+    const approveLabel = allowEdit
+        ? tr('hitl.saveEditedAndAllow', '保存修改并允许')
+        : tr('hitl.allowOnce', '允许一次');
+    const hasArgs = request.args && Object.keys(request.args).length > 0;
+    const primary = request.primary
+        ? '<div class="hitl-approval-primary hitl-approval-primary--' + request.kind + '"><code>' + escapeHtml(request.primary) + '</code></div>'
+        : '';
+    const requestDetails = hasArgs
+        ? '<details class="hitl-approval-details"' + (allowEdit ? ' open' : '') + '><summary>' + escapeHtml(allowEdit
+            ? tr('hitl.editRequestDetails', '查看或修改请求参数')
+            : tr('hitl.viewRequestDetails', '查看请求详情')) + '</summary>' +
+            (allowEdit
+                ? '<textarea class="hitl-edit-args hitl-inline-edit" spellcheck="false">' + escapeHtml(argsJSON === '{}' ? '' : argsJSON) + '</textarea>'
+                : '<pre>' + escapeHtml(argsJSON) + '</pre>') + '</details>'
+        : '';
     return `
-        <div class="hitl-inline-header">
-            <div class="hitl-inline-title">
-                <span class="hitl-inline-icon" aria-hidden="true">!</span>
-                <span>待审批</span>
-            </div>
-            <div class="hitl-inline-badges">
-                ${toolBadge}
-                <span class="hitl-mode-tag hitl-mode-tag--${escapeHtml(mode || 'approval')}">${escapeHtml(modeLabel)}</span>
-            </div>
+        ${toolHeading}
+        <div class="hitl-approval-heading">
+            <span class="hitl-approval-eyebrow">${escapeHtml(pendingStatus)}</span>
+            <h3>${escapeHtml(request.question)}</h3>
         </div>
+        ${primary}
+        ${buildHitlCountdownHtml(data)}
         <div class="hitl-inline-body">
-            <div class="hitl-input-help hitl-inline-summary">确认上方参数后决定是否继续执行。</div>
-            ${allowEdit
-                ? `<label class="hitl-inline-field">
-                       <span class="hitl-context-label">参数覆盖（JSON，可选）</span>
-                       <textarea class="hitl-edit-args hitl-inline-edit" placeholder='{"command":"ls -la"}'>${escapeHtml(argsJSON === '{}' ? '' : argsJSON)}</textarea>
-                   </label>`
-                : ''
-            }
-            <label class="hitl-inline-field">
-                <span class="hitl-context-label">备注（可选）</span>
-                <input class="hitl-config-input hitl-inline-comment" type="text" placeholder="例如：允许只读命令">
-            </label>
+            ${requestDetails}
+            <details class="hitl-approval-details hitl-approval-comment-details">
+                <summary>${escapeHtml(tr('hitl.addApprovalComment', '添加审批备注（可选）'))}</summary>
+                <input class="hitl-config-input hitl-inline-comment" type="text" placeholder="${escapeHtml(tr('hitl.commentPlaceholder', '例如：仅允许只读操作'))}">
+            </details>
         </div>
         <div class="hitl-pending-actions hitl-inline-actions">
             <div class="hitl-input-help hitl-inline-status" aria-live="polite"></div>
-            <button class="btn-secondary hitl-inline-reject">拒绝</button>
-            <button class="btn-primary hitl-inline-approve">通过</button>
+            <button type="button" class="btn-secondary hitl-inline-reject">${escapeHtml(rejectLabel)} <kbd>Esc</kbd></button>
+            <button type="button" class="btn-primary hitl-inline-approve">${escapeHtml(approveLabel)} <kbd>↵</kbd></button>
         </div>
     `;
 }
@@ -3476,7 +4359,7 @@ function bindInlineHitlApproval(panel, data, opts) {
     const editInput = panel.querySelector('.hitl-inline-edit');
     const statusEl = panel.querySelector('.hitl-inline-status');
     const allowEdit = opts && opts.allowEdit === true;
-    if (!approveBtn || !rejectBtn || !commentInput || !statusEl) return;
+    if (!approveBtn || !rejectBtn || !statusEl) return;
 
     if (editInput) {
         autoResizeHitlTextarea(editInput);
@@ -3493,7 +4376,7 @@ function bindInlineHitlApproval(panel, data, opts) {
     const submit = async function (decision) {
         setBusy(true);
         let editedArgs = null;
-        if (allowEdit && editInput) {
+        if (decision === 'approve' && allowEdit && editInput) {
             const raw = String(editInput.value || '').trim();
             if (raw) {
                 try {
@@ -3504,8 +4387,12 @@ function bindInlineHitlApproval(panel, data, opts) {
                     return;
                 }
             }
+            const originalArgs = hitlApprovalArguments(data);
+            if (editedArgs && JSON.stringify(editedArgs) === JSON.stringify(originalArgs)) {
+                editedArgs = null;
+            }
         }
-        const comment = String(commentInput.value || '').trim();
+        const comment = commentInput ? String(commentInput.value || '').trim() : '';
         try {
             if (typeof window.submitHitlDecisionWithPayload === 'function') {
                 const convFollow = data.conversationId || (typeof window.currentConversationId === 'string' ? window.currentConversationId : '');
@@ -3528,6 +4415,8 @@ function bindInlineHitlApproval(panel, data, opts) {
                     resolved: true,
                     decision: decision,
                     decisionMessage: msg,
+                    reviewer: 'human',
+                    status: 'decided',
                     comment: comment,
                     editedArgs: editedArgs
                 });
@@ -3538,30 +4427,268 @@ function bindInlineHitlApproval(panel, data, opts) {
                 }
                 state.pending = decision === 'approve';
                 setToolCallDetailState(toolItem, state);
+                renderToolCallApprovalSummary(toolItem, state.hitlData);
+            } else {
+                markInlineHitlDecision(panel, decision, msg);
             }
-            statusEl.textContent = msg;
-            markInlineHitlDecision(panel, decision, msg);
             panel.classList.add('hitl-inline-done');
+            stopHitlApprovalCountdown(panel);
+            clearChatHitlApprovalDock(data.interruptId);
+            if (typeof window.setProjectConversationApprovalStatus === 'function') {
+                window.setProjectConversationApprovalStatus(data.conversationId || window.currentConversationId || '', false);
+            }
         } catch (e) {
             statusEl.textContent = '提交失败：' + (e && e.message ? e.message : 'unknown error');
             setBusy(false);
         }
     };
 
-    approveBtn.onclick = function () { submit('approve'); };
-    rejectBtn.onclick = function () { submit('reject'); };
+    const bindExplicitHitlAction = function (button, decision) {
+        let pointerArmed = false;
+        button.addEventListener('pointerdown', function (event) {
+            pointerArmed = event.isPrimary !== false && (event.button == null || event.button === 0);
+        });
+        button.addEventListener('pointercancel', function () {
+            pointerArmed = false;
+        });
+        button.onclick = function (event) {
+            const pointerClick = !!event && Number(event.detail || 0) > 0;
+            const explicitlyPressed = pointerArmed;
+            pointerArmed = false;
+            // 鼠标/触摸点击必须从审批按钮自身开始；键盘 Enter/Escape 的 detail 为 0，仍可正常使用。
+            // 这可以拦截滚动定位按钮隐藏后被浏览器重新定向到底部审批按钮的合成 click。
+            if (pointerClick && !explicitlyPressed) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
+            submit(decision);
+        };
+    };
+
+    bindExplicitHitlAction(approveBtn, 'approve');
+    bindExplicitHitlAction(rejectBtn, 'reject');
+    if (panel.classList.contains('chat-hitl-approval-dock')) {
+        panel.onkeydown = function (event) {
+            const tag = event.target && event.target.tagName ? event.target.tagName.toLowerCase() : '';
+            const editing = tag === 'input' || tag === 'textarea' || tag === 'summary';
+            if (event.key === 'Escape' && !editing) {
+                event.preventDefault();
+                rejectBtn.click();
+            } else if (event.key === 'Enter' && !editing) {
+                event.preventDefault();
+                approveBtn.click();
+            }
+        };
+    }
 }
+
+function clearChatHitlApprovalDock(interruptId) {
+    const dock = document.getElementById('chat-hitl-approval-dock');
+    if (!dock) return;
+    if (interruptId && dock.dataset.hitlInterruptId && dock.dataset.hitlInterruptId !== String(interruptId)) return;
+    stopHitlApprovalCountdown(dock);
+    dock.hidden = true;
+    dock.innerHTML = '';
+    dock.removeAttribute('data-hitl-interrupt-id');
+    dock.removeAttribute('data-conversation-id');
+    dock.removeAttribute('tabindex');
+    dock.onkeydown = null;
+    const container = dock.closest('.chat-input-container');
+    if (container) container.classList.remove('has-hitl-approval');
+}
+
+function renderChatHitlApprovalDock(data) {
+    const dock = document.getElementById('chat-hitl-approval-dock');
+    if (!dock || !data || !data.interruptId) return false;
+    const conversationId = String(data.conversationId || '').trim();
+    const currentId = String(window.currentConversationId || '').trim();
+    // 新任务尚未绑定会话 ID 时不能让其他运行中对话的迟到审批覆盖输入框。
+    // 有明确会话 ID 的审批面板只允许显示在同一个当前对话中。
+    if (conversationId && conversationId !== currentId) return false;
+    if (isAgentReviewedHitl(data)) return false;
+    let mode = String(data.mode || 'approval').trim().toLowerCase();
+    if (mode === 'feedback' || mode === 'followup') mode = 'approval';
+    const allowEdit = mode === 'review_edit';
+    dock.dataset.hitlInterruptId = String(data.interruptId);
+    dock.dataset.conversationId = conversationId || currentId;
+    dock.setAttribute('tabindex', '-1');
+    dock.innerHTML = buildInlineHitlApprovalHtml(data, {
+        mode: mode,
+        allowEdit: allowEdit,
+        argsJSON: JSON.stringify(hitlApprovalArguments(data), null, 2)
+    });
+    dock.hidden = false;
+    const container = dock.closest('.chat-input-container');
+    if (container) container.classList.add('has-hitl-approval');
+    bindInlineHitlApproval(dock, data, { allowEdit: allowEdit });
+    bindHitlApprovalCountdown(dock, data);
+    setHitlApprovalTaskAvailability(dock, dock.dataset.conversationId);
+    return true;
+}
+
+const hitlSidebarApprovalState = new Map();
+let hitlSidebarApprovalSyncTimer = 0;
+
+function renderDirectHitlSidebarApproval(conversationId, data) {
+    const id = String(conversationId || '').trim();
+    if (!id) return false;
+    const button = document.querySelector('.project-conversation-item[data-conversation-id="' + hitlEscapeAttrSelector(id) + '"]');
+    if (!button) return false;
+    const label = button.querySelector('.project-conversation-label');
+    if (!label) return false;
+    let group = label.querySelector('.project-task-status-group');
+    if (!group) {
+        group = document.createElement('span');
+        group.className = 'project-task-status-group';
+        label.appendChild(group);
+    }
+    let status = group.querySelector('.project-task-status--approval');
+    if (!status) {
+        status = document.createElement('span');
+        status.className = 'project-task-status project-task-status--approval';
+        status.innerHTML = '<span class="project-approval-label"></span><span class="project-approval-time"></span>' +
+            '<span class="project-approval-progress"><span class="project-approval-progress-value"></span></span>';
+        group.insertBefore(status, group.firstChild);
+    }
+    const text = hitlApprovalTranslate('hitl.waitingApprovalShort', '等待批准');
+    const labelEl = status.querySelector('.project-approval-label');
+    if (labelEl) labelEl.textContent = text;
+    status.setAttribute('aria-label', text);
+    status.title = text;
+    const timing = getHitlApprovalTiming(data || {});
+    const timeEl = status.querySelector('.project-approval-time');
+    const progressEl = status.querySelector('.project-approval-progress');
+    const valueEl = status.querySelector('.project-approval-progress-value');
+    if (!timing.timeoutSeconds || !timing.expiresAt) {
+        if (timeEl) timeEl.textContent = '';
+        if (progressEl) progressEl.hidden = true;
+        return true;
+    }
+    if (progressEl) progressEl.hidden = false;
+    const remaining = Math.max(0, timing.expiresAt - Date.now());
+    const percent = Math.max(0, Math.min(100, remaining / (timing.timeoutSeconds * 1000) * 100));
+    if (timeEl) timeEl.textContent = formatHitlRemaining(remaining).replace(/^0/, '');
+    if (valueEl) valueEl.style.width = percent.toFixed(2) + '%';
+    status.setAttribute('role', 'progressbar');
+    status.setAttribute('aria-valuemin', '0');
+    status.setAttribute('aria-valuemax', '100');
+    status.setAttribute('aria-valuenow', String(Math.round(percent)));
+    status.classList.toggle('is-expired', remaining <= 0);
+    return true;
+}
+
+function removeDirectHitlSidebarApproval(conversationId) {
+    const id = String(conversationId || '').trim();
+    if (!id) return;
+    const button = document.querySelector('.project-conversation-item[data-conversation-id="' + hitlEscapeAttrSelector(id) + '"]');
+    const status = button && button.querySelector('.project-task-status--approval');
+    const group = status && status.closest('.project-task-status-group');
+    if (status) status.remove();
+    if (group && !group.children.length) group.remove();
+}
+
+function syncDirectHitlSidebarApprovals() {
+    hitlSidebarApprovalState.forEach(function (data, conversationId) {
+        renderDirectHitlSidebarApproval(conversationId, data);
+    });
+    if (!hitlSidebarApprovalState.size && hitlSidebarApprovalSyncTimer) {
+        window.clearInterval(hitlSidebarApprovalSyncTimer);
+        hitlSidebarApprovalSyncTimer = 0;
+    }
+}
+
+function updateHitlApprovalSidebar(data, pending) {
+    const conversationId = String((data && data.conversationId) || window.currentConversationId || '').trim();
+    if (!conversationId) return;
+    if (pending && isAgentReviewedHitl(data)) return;
+    if (pending) {
+        hitlSidebarApprovalState.set(conversationId, data || { conversationId: conversationId });
+        renderDirectHitlSidebarApproval(conversationId, data || {});
+        if (!hitlSidebarApprovalSyncTimer) {
+            hitlSidebarApprovalSyncTimer = window.setInterval(syncDirectHitlSidebarApprovals, 500);
+        }
+    } else {
+        hitlSidebarApprovalState.delete(conversationId);
+        removeDirectHitlSidebarApproval(conversationId);
+        syncDirectHitlSidebarApprovals();
+    }
+    if (typeof window.setProjectConversationApprovalStatus === 'function') {
+        window.setProjectConversationApprovalStatus(conversationId, pending, pending ? data : null);
+    }
+}
+
+function syncHitlApprovalSidebarState(items) {
+    const nextByConversation = new Map();
+    (Array.isArray(items) ? items : []).forEach(function (item) {
+        if (isAgentReviewedHitl(item)) return;
+        const conversationId = String(item && item.conversationId || '').trim();
+        if (conversationId && !nextByConversation.has(conversationId)) {
+            nextByConversation.set(conversationId, item);
+        }
+    });
+    hitlSidebarApprovalState.forEach(function (_item, conversationId) {
+        if (!nextByConversation.has(conversationId)) {
+            hitlSidebarApprovalState.delete(conversationId);
+            removeDirectHitlSidebarApproval(conversationId);
+        }
+    });
+    nextByConversation.forEach(function (item, conversationId) {
+        hitlSidebarApprovalState.set(conversationId, item);
+    });
+    syncDirectHitlSidebarApprovals();
+    if (hitlSidebarApprovalState.size && !hitlSidebarApprovalSyncTimer) {
+        hitlSidebarApprovalSyncTimer = window.setInterval(syncDirectHitlSidebarApprovals, 500);
+    }
+}
+
+function reconcilePendingHitlState(rawItems) {
+    const activeItems = (Array.isArray(rawItems) ? rawItems : [])
+        .map(function (item) { return hitlPendingItemToData(item); })
+        .filter(function (item) {
+            return item && !isAgentReviewedHitl(item) && conversationExecutionTracker.isRunning(item.conversationId);
+        });
+    hitlPendingInterruptTracker.update(activeItems);
+    syncHitlApprovalTaskAvailability();
+    syncHitlApprovalSidebarState(activeItems);
+    if (typeof window.syncProjectConversationApprovalStatuses === 'function') {
+        window.syncProjectConversationApprovalStatuses(activeItems);
+    }
+
+    const currentId = String(window.currentConversationId || '').trim();
+    const currentPending = activeItems.find(function (item) {
+        return item.conversationId === currentId;
+    });
+    const dock = document.getElementById('chat-hitl-approval-dock');
+    const dockInterruptId = dock && String(dock.dataset.hitlInterruptId || '').trim();
+    if (!currentPending) {
+        if (dockInterruptId) clearChatHitlApprovalDock();
+        return;
+    }
+
+    if (!dockInterruptId || dockInterruptId !== currentPending.interruptId || dock.hidden) {
+        renderChatHitlApprovalDock(currentPending);
+    }
+    const inlineSelector = '.hitl-inline-approval[data-hitl-interrupt-id="' +
+        hitlEscapeAttrSelector(currentPending.interruptId) + '"]';
+    if (!document.querySelector(inlineSelector)) {
+        restoreHitlInlineForConversation(currentId);
+    }
+}
+
+window.renderChatHitlApprovalDock = renderChatHitlApprovalDock;
+window.clearChatHitlApprovalDock = clearChatHitlApprovalDock;
 
 function markInlineHitlDecision(panel, decision, message) {
     if (!panel) return;
     const ok = decision === 'approve';
     panel.classList.add('hitl-inline-done');
     panel.innerHTML = `
-        <div class="hitl-inline-decision hitl-inline-decision--${ok ? 'approve' : 'reject'}">
-            <span class="hitl-inline-decision-dot" aria-hidden="true"></span>
-            <strong>${escapeHtml(ok ? '审批通过' : '审批拒绝')}</strong>
-            <span>${escapeHtml(message || (ok ? '已通过，继续执行' : '已拒绝'))}</span>
+        <div class="hitl-codex-state hitl-codex-state--${ok ? 'approved' : 'rejected'}">
+            <span class="hitl-codex-state-icon" aria-hidden="true">${ok ? '✓' : '×'}</span>
+            <strong>${escapeHtml(ok ? '已允许一次' : '人工审批已拒绝')}</strong>
         </div>
+        ${message ? '<p class="hitl-codex-explainer">' + escapeHtml(message) + '</p>' : ''}
     `;
 }
 
@@ -3583,6 +4710,7 @@ function renderInlineWorkflowHitlApproval(itemId, data) {
     const prompt = data.prompt || '';
     const panel = document.createElement('div');
     panel.className = 'workflow-hitl-inline-approval hitl-inline-approval';
+    panel.dataset.conversationId = String(data.conversationId || window.currentConversationId || '').trim();
     panel.innerHTML = `
         <div class="hitl-inline-header">
             <div class="hitl-inline-title">
@@ -3650,6 +4778,7 @@ function renderInlineWorkflowHitlApproval(itemId, data) {
 
     approveBtn.onclick = function () { submit(true); };
     rejectBtn.onclick = function () { submit(false); };
+    setHitlApprovalTaskAvailability(panel, panel.dataset.conversationId);
 }
 
 function parseWorkflowHitlPendingJSON(raw) {
@@ -3806,6 +4935,9 @@ function expandProcessDetailsTimeline(assistantMessageId) {
             btn.innerHTML = '<span>' + collapseT + '</span>';
         });
     }
+    if (typeof window.syncAssistantTurnSummary === 'function') {
+        window.syncAssistantTurnSummary(document.getElementById(assistantMessageId));
+    }
     setTimeout(function () {
         if (window.CyberStrikeChatScroll && typeof window.CyberStrikeChatScroll.scrollIntoViewIfFollowing === 'function') {
             window.CyberStrikeChatScroll.scrollIntoViewIfFollowing(detailsContainer, { behavior: 'smooth', block: 'nearest' });
@@ -3824,19 +4956,72 @@ function findLastAssistantMessageElInChat() {
     return null;
 }
 
+function hitlPendingItemToData(item, fallbackConversationId) {
+    if (!item) return null;
+    let payloadObj = item.payload && typeof item.payload === 'object' ? item.payload : {};
+    if (typeof item.payload === 'string') {
+        try {
+            payloadObj = JSON.parse(item.payload || '{}');
+        } catch (e) {
+            payloadObj = {};
+        }
+    }
+    const timing = payloadObj.hitlApproval && typeof payloadObj.hitlApproval === 'object'
+        ? payloadObj.hitlApproval
+        : {};
+    return {
+        interruptId: String(item.interruptId || item.id || '').trim(),
+        mode: item.mode,
+        toolName: item.toolName,
+        toolCallId: item.toolCallId,
+        payload: payloadObj,
+        conversationId: String(item.conversationId || fallbackConversationId || '').trim(),
+        createdAt: timing.createdAt || item.createdAt,
+        timeoutSeconds: timing.timeoutSeconds,
+        expiresAt: timing.expiresAt,
+        reviewer: item.reviewer || item.decidedBy || 'human',
+        status: item.status || 'pending'
+    };
+}
+
+const hitlInlineRestoreInFlight = new Set();
+
 /**
  * 刷新或切换会话后：根据待审批记录恢复时间线里的内联审批入口，并展开详情区。
  */
 async function restoreHitlInlineForConversation(conversationId) {
     if (!conversationId || typeof apiFetch !== 'function') return;
+    if (hitlInlineRestoreInFlight.has(conversationId)) return;
     if (typeof window.currentConversationId === 'string' && window.currentConversationId !== conversationId) {
         return;
     }
+    hitlInlineRestoreInFlight.add(conversationId);
     try {
         const resp = await apiFetch('/api/hitl/pending?conversationId=' + encodeURIComponent(conversationId) + '&status=pending&pageSize=50');
         if (!resp.ok) return;
         const data = await resp.json().catch(function () { return {}; });
-        const items = Array.isArray(data.items) ? data.items : [];
+        const rawItems = (Array.isArray(data.items) ? data.items : []).filter(function (item) {
+            return !isAgentReviewedHitl(item);
+        });
+        // 任务列表是当前进程的权威运行态。服务重启或任务取消后，即使审批查询
+        // 短暂读到旧 pending 记录，也不能重新挂载审批入口和倒计时。
+        const items = conversationExecutionTracker.ready && !conversationExecutionTracker.isRunning(conversationId)
+            ? []
+            : rawItems;
+        if (typeof window.currentConversationId === 'string' && window.currentConversationId !== conversationId) return;
+        clearChatHitlApprovalDock();
+        const normalizedItems = items.map(function (item) {
+            return hitlPendingItemToData(item, conversationId);
+        }).filter(Boolean);
+        hitlPendingInterruptTracker.replaceConversation(conversationId, normalizedItems);
+        syncHitlApprovalTaskAvailability();
+        if (items.length > 0) {
+            const newestPending = normalizedItems[0];
+            renderChatHitlApprovalDock(newestPending);
+            updateHitlApprovalSidebar(newestPending, true);
+        } else {
+            updateHitlApprovalSidebar({ conversationId: conversationId }, false);
+        }
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
             let backendMsgId = item.messageId != null ? String(item.messageId).trim() : '';
@@ -3875,20 +5060,7 @@ async function restoreHitlInlineForConversation(conversationId) {
                 }
             }
             expandProcessDetailsTimeline(clientMsgId);
-            let payloadObj = {};
-            try {
-                payloadObj = JSON.parse(String(item.payload || '{}'));
-            } catch (e) {
-                payloadObj = {};
-            }
-            const hitlData = {
-                interruptId: item.id,
-                mode: item.mode,
-                toolName: item.toolName,
-                toolCallId: item.toolCallId,
-                payload: payloadObj,
-                conversationId: item.conversationId || conversationId
-            };
+            const hitlData = hitlPendingItemToData(item);
             let hitlItemEl = null;
             if (item.toolCallId) {
                 hitlItemEl = detailsContainer.querySelector('[data-tool-call-id="' + hitlEscapeAttrSelector(String(item.toolCallId)) + '"]');
@@ -3918,6 +5090,8 @@ async function restoreHitlInlineForConversation(conversationId) {
         }
     } catch (e) {
         console.error('restoreHitlInlineForConversation failed', e);
+    } finally {
+        hitlInlineRestoreInFlight.delete(conversationId);
     }
 }
 
@@ -3968,8 +5142,85 @@ window.refreshLastAssistantProcessDetails = refreshLastAssistantProcessDetails;
 
 const taskEventReplayAttachState = {
     conversationId: null,
-    inFlightPromise: null
+    inFlightPromise: null,
+    abortController: null
 };
+
+function assistantMessageNeedsTaskReplayReconcile(assistantEl) {
+    if (!assistantEl) return false;
+    if (assistantEl.classList.contains('assistant-placeholder-content')) return true;
+    const bubble = assistantEl.querySelector('.message-bubble');
+    const text = bubble ? String(bubble.textContent || '').trim() : '';
+    return !!(bubble && bubble.hidden) || text === '处理中...' || text === 'Processing...';
+}
+
+/**
+ * task-events 订阅存在一个不可避免的竞态：任务列表仍显示 running，但在 SSE 请求
+ * 真正建立前任务已经完成。此时不能只停止计时，必须从数据库对账最后一条助手正文。
+ */
+async function reconcileConversationAfterTaskReplay(conversationId, keepFollowing) {
+    if (!conversationId || typeof apiFetch !== 'function') return false;
+    if (String(window.currentConversationId || '') !== String(conversationId)) return false;
+
+    const response = await apiFetch(
+        '/api/conversations/' + encodeURIComponent(String(conversationId)) + '?include_process_details=0'
+    );
+    if (!response.ok) return false;
+    const conversation = await response.json().catch(function () { return {}; });
+    const messages = Array.isArray(conversation.messages) ? conversation.messages : [];
+    let finalMessage = null;
+    for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i] && messages[i].role === 'assistant') {
+            finalMessage = messages[i];
+            break;
+        }
+    }
+    const assistantEl = findLastAssistantMessageElInChat();
+    if (!finalMessage || !assistantEl || !assistantEl.id) return false;
+
+    updateAssistantBubbleContent(assistantEl.id, finalMessage.content || '', true);
+    if (finalMessage.id) {
+        applyBackendMessageIdToAssistantDom(assistantEl.id, finalMessage.id);
+    }
+    if (typeof window.setAssistantTurnTiming === 'function') {
+        const startedAt = finalMessage.createdAt || null;
+        const completedAt = finalMessage.updatedAt || startedAt;
+        window.setAssistantTurnTiming(assistantEl, {
+            startedAt: startedAt,
+            completedAt: completedAt,
+            status: 'completed'
+        });
+    }
+    if (finalMessage.id && typeof loadProcessDetailsPaginated === 'function') {
+        await loadProcessDetailsPaginated(assistantEl.id, finalMessage.id, {
+            initialLatest: true,
+            autoLoadAll: false
+        });
+    } else {
+        await refreshLastAssistantProcessDetails(conversationId);
+    }
+    collapseAllProgressDetails(assistantEl.id, null, { force: true });
+    if (keepFollowing && window.CyberStrikeChatScroll) {
+        if (typeof window.CyberStrikeChatScroll.settleToBottomIfFollowing === 'function') {
+            window.CyberStrikeChatScroll.settleToBottomIfFollowing(24);
+        } else if (typeof window.CyberStrikeChatScroll.forceScrollToBottom === 'function') {
+            window.CyberStrikeChatScroll.forceScrollToBottom(false);
+        }
+    }
+    if (typeof loadConversations === 'function') loadConversations();
+    return true;
+}
+
+function cancelRunningTaskEventStream(nextConversationId) {
+    const nextId = String(nextConversationId || '').trim();
+    const activeId = String(taskEventReplayAttachState.conversationId || '').trim();
+    if (!activeId || activeId === nextId) return false;
+    stopAllProcessDetailsLatestFollow();
+    if (taskEventReplayAttachState.abortController) {
+        taskEventReplayAttachState.abortController.abort();
+    }
+    return true;
+}
 
 /**
  * 订阅运行中任务的 SSE 镜像（GET /api/agent-loop/task-events），用于 HITL 通过后主连接已断开时接续 UI。
@@ -3985,24 +5236,49 @@ async function attachRunningTaskEventStream(conversationId) {
     if (shouldSkipTaskEventReplayAttach(conversationId)) {
         return false;
     }
+    cancelRunningTaskEventStream(conversationId);
+    const abortController = new AbortController();
 
     const attachPromise = (async function () {
         try {
-            const check = await apiFetch('/api/agent-loop/tasks');
+            const check = await apiFetch('/api/agent-loop/tasks', { signal: abortController.signal });
             if (!check.ok) return false;
             const j = await check.json().catch(function () { return {}; });
             const active = (j.tasks || []).some(function (t) {
                 return t && t.conversationId === conversationId && (t.status === 'running' || t.status === 'cancelling');
             });
-            if (!active) return false;
+            if (!active) {
+                const staleAssistant = findLastAssistantMessageElInChat();
+                if (assistantMessageNeedsTaskReplayReconcile(staleAssistant)) {
+                    await reconcileConversationAfterTaskReplay(conversationId, true);
+                }
+                return false;
+            }
 
             const asEl = findLastAssistantMessageElInChat();
             if (!asEl || !asEl.id) return false;
+            // 先发起 SSE 请求，再加载长过程详情，避免详情分页期间产生的增量完全错过。
+            const url = '/api/agent-loop/task-events?conversationId=' + encodeURIComponent(conversationId);
+            const eventStreamResponsePromise = apiFetch(url, {
+                method: 'GET',
+                headers: { Accept: 'text/event-stream' },
+                signal: abortController.signal
+            }).then(function (response) {
+                return { response: response, error: null };
+            }, function (error) {
+                // 详情分页可能持续较久；先接住网络异常，避免在稍后 await 前产生
+                // unhandledrejection，再交给当前 attach 流程统一清理。
+                return { response: null, error: error };
+            });
             const backendId = asEl.dataset && asEl.dataset.backendMessageId;
             if (backendId && typeof renderProcessDetails === 'function') {
-                // 运行中会话可能远超默认 50 条；完整补齐数据库历史后再接实时事件。
+                // 运行中会话可能远超默认 50 条；切换时只恢复最新一页，旧记录由滚动分页补齐。
                 if (typeof loadProcessDetailsPaginated === 'function') {
-                    await loadProcessDetailsPaginated(asEl.id, String(backendId));
+                    await loadProcessDetailsPaginated(asEl.id, String(backendId), {
+                        initialLatest: true,
+                        autoLoadAll: false,
+                        signal: abortController.signal
+                    });
                 } else {
                     const res = await apiFetch(
                         '/api/messages/' + encodeURIComponent(String(backendId)) + '/process-details?full=1'
@@ -4012,6 +5288,7 @@ async function attachRunningTaskEventStream(conversationId) {
                         renderProcessDetails(asEl.id, jd.processDetails);
                     }
                 }
+                if (abortController.signal.aborted) return false;
                 // 历史重绘会重建时间线节点，需重新挂载 HITL 审批入口。
                 if (typeof window.restoreHitlInlineForConversation === 'function') {
                     await window.restoreHitlInlineForConversation(conversationId);
@@ -4025,13 +5302,30 @@ async function attachRunningTaskEventStream(conversationId) {
             if (window.CyberStrikeChatScroll && typeof window.CyberStrikeChatScroll.onTaskEventStreamBegin === 'function') {
                 window.CyberStrikeChatScroll.onTaskEventStreamBegin(conversationId, asEl.id, progressId);
             }
+            // task-events 补流期间持续跟随迭代思考区；用户向上滚动详情时会立即解除。
+            startProcessDetailsLatestFollow(asEl.id, { persistent: true });
 
-            const url = '/api/agent-loop/task-events?conversationId=' + encodeURIComponent(conversationId);
-            const response = await apiFetch(url, {
-                method: 'GET',
-                headers: { Accept: 'text/event-stream' }
-            });
+            // 刷新后的初始消息渲染已经滚到底部，但恢复最新一页详情会再次增高 DOM。
+            // 若用户期间没有主动上滑，完成补页后重新精确粘底；主动浏览历史时不抢滚动。
+            if (
+                window.CyberStrikeChatScroll &&
+                typeof window.CyberStrikeChatScroll.settleToBottomIfFollowing === 'function' &&
+                (typeof window.captureScrollPinState !== 'function' || window.captureScrollPinState())
+            ) {
+                window.CyberStrikeChatScroll.settleToBottomIfFollowing(12);
+            } else if (
+                window.CyberStrikeChatScroll &&
+                typeof window.CyberStrikeChatScroll.forceScrollToBottom === 'function' &&
+                (typeof window.captureScrollPinState !== 'function' || window.captureScrollPinState())
+            ) {
+                window.CyberStrikeChatScroll.forceScrollToBottom(false);
+            }
+
+            const eventStreamResult = await eventStreamResponsePromise;
+            if (eventStreamResult.error) throw eventStreamResult.error;
+            const response = eventStreamResult.response;
             if (!response.ok) {
+                stopProcessDetailsLatestFollow(asEl.id);
                 clearCsTaskReplay();
                 if (progressTaskState.has(progressId)) {
                     progressTaskState.delete(progressId);
@@ -4039,6 +5333,7 @@ async function attachRunningTaskEventStream(conversationId) {
                 if (window.CyberStrikeChatScroll && typeof window.CyberStrikeChatScroll.onTaskEventStreamEnd === 'function') {
                     window.CyberStrikeChatScroll.onTaskEventStreamEnd();
                 }
+                await reconcileConversationAfterTaskReplay(conversationId, true);
                 return false;
             }
 
@@ -4089,43 +5384,84 @@ async function attachRunningTaskEventStream(conversationId) {
             if (window.CyberStrikeChatScroll && typeof window.CyberStrikeChatScroll.onTaskEventStreamEnd === 'function') {
                 window.CyberStrikeChatScroll.onTaskEventStreamEnd();
             }
+            stopProcessDetailsLatestFollow(asEl.id);
             if (typeof loadActiveTasks === 'function') loadActiveTasks();
+            if (!replaySawDone) {
+                // 任务结束会关闭事件总线；若终态帧在连接竞态或拥塞中丢失，仍从 DB 对账正文。
+                const keepFollowingOnClose = typeof window.captureScrollPinState === 'function'
+                    ? window.captureScrollPinState()
+                    : true;
+                await reconcileConversationAfterTaskReplay(conversationId, keepFollowingOnClose);
+            }
             if (replaySawDone && typeof window.loadConversation === 'function' && window.currentConversationId === conversationId) {
                 const replayTimeline = document.getElementById('process-details-' + asEl.id + '-timeline');
-                const keepExpanded = !!(replayTimeline && replayTimeline.classList.contains('expanded'));
+                const keepFollowingFinalRender = typeof window.captureScrollPinState === 'function'
+                    ? window.captureScrollPinState()
+                    : true;
                 await window.loadConversation(conversationId);
                 // loadConversation 使用轻量消息接口，会把详情重新置为懒加载状态；
                 // 任务终态再从 DB 全量对账一次，补回订阅建立期间可能错过的事件。
                 await refreshLastAssistantProcessDetails(conversationId);
-                if (keepExpanded) {
-                    const finalAssistant = findLastAssistantMessageElInChat();
-                    if (finalAssistant && finalAssistant.id) {
-                        expandProcessDetailsTimeline(finalAssistant.id);
-                    }
+                // 补流完成即回到终态摘要；刷新期间为展示实时迭代而自动展开的详情
+                // 不应继续保持展开。用户之后仍可通过“展开详情”手动查看。
+                const finalAssistant = findLastAssistantMessageElInChat();
+                if (finalAssistant && finalAssistant.id) {
+                    collapseAllProgressDetails(finalAssistant.id, progressId, { force: true });
+                }
+                // 最终消息和详情重绘都会增高 DOM；仅当用户之前仍在跟随时重新粘底。
+                if (
+                    keepFollowingFinalRender &&
+                    window.CyberStrikeChatScroll &&
+                    typeof window.CyberStrikeChatScroll.settleToBottomIfFollowing === 'function'
+                ) {
+                    window.CyberStrikeChatScroll.settleToBottomIfFollowing(18);
+                } else if (
+                    keepFollowingFinalRender &&
+                    window.CyberStrikeChatScroll &&
+                    typeof window.CyberStrikeChatScroll.forceScrollToBottom === 'function'
+                ) {
+                    window.CyberStrikeChatScroll.forceScrollToBottom(false);
                 }
             }
             return true;
         } catch (e) {
-            console.warn('attachRunningTaskEventStream', e);
-            clearCsTaskReplay();
-            if (window.CyberStrikeChatScroll && typeof window.CyberStrikeChatScroll.onTaskEventStreamEnd === 'function') {
+            if (!(e && e.name === 'AbortError')) {
+                console.warn('attachRunningTaskEventStream', e);
+            }
+            const ownsCurrentAttach = taskEventReplayAttachState.inFlightPromise === attachPromise;
+            if (ownsCurrentAttach && window.csTaskReplay && window.csTaskReplay.conversationId === conversationId) {
+                clearCsTaskReplay();
+            }
+            if (ownsCurrentAttach && window.CyberStrikeChatScroll && typeof window.CyberStrikeChatScroll.onTaskEventStreamEnd === 'function') {
                 window.CyberStrikeChatScroll.onTaskEventStreamEnd();
+            }
+            if (ownsCurrentAttach) {
+                const currentAssistant = findLastAssistantMessageElInChat();
+                if (currentAssistant && currentAssistant.id) {
+                    stopProcessDetailsLatestFollow(currentAssistant.id);
+                }
+            }
+            if (ownsCurrentAttach && !abortController.signal.aborted) {
+                abortController.abort();
             }
             return false;
         } finally {
             if (taskEventReplayAttachState.inFlightPromise === attachPromise) {
                 taskEventReplayAttachState.inFlightPromise = null;
                 taskEventReplayAttachState.conversationId = null;
+                taskEventReplayAttachState.abortController = null;
             }
         }
     })();
 
     taskEventReplayAttachState.conversationId = conversationId;
     taskEventReplayAttachState.inFlightPromise = attachPromise;
+    taskEventReplayAttachState.abortController = abortController;
     return attachPromise;
 }
 
 window.attachRunningTaskEventStream = attachRunningTaskEventStream;
+window.cancelRunningTaskEventStream = cancelRunningTaskEventStream;
 window.taskReplayProgressId = taskReplayProgressId;
 window.expandProcessDetailsTimeline = expandProcessDetailsTimeline;
 
@@ -4385,33 +5721,10 @@ async function renderToolCallDetailContent(item) {
         hitlEditedArgsLabel +
         '<pre class="tool-args">' + escapeHtml(JSON.stringify(args, null, 2)) + '</pre>' +
         '</div>';
-    let hitlBlock = '';
-    if (state.hitlData && state.hitlData.interruptId) {
-        const hitlPayload = state.hitlData.payload && typeof state.hitlData.payload === 'object' ? state.hitlData.payload : {};
-        let hitlMode = String(state.hitlData.mode || '').trim().toLowerCase();
-        if (hitlMode === 'feedback' || hitlMode === 'followup') hitlMode = 'approval';
-        const hitlAllowEdit = hitlMode === 'review_edit';
-        const hitlArgsObj = hitlPayload.argumentsObj && typeof hitlPayload.argumentsObj === 'object' ? hitlPayload.argumentsObj : args;
-        hitlBlock = '<div class="hitl-inline-approval hitl-inline-approval--merged">' +
-            buildInlineHitlApprovalHtml(state.hitlData, {
-                toolName: '',
-                mode: hitlMode,
-                modeLabel: hitlMode === 'review_edit' ? '审查编辑' : '审批模式',
-                allowEdit: hitlAllowEdit,
-                argsJSON: JSON.stringify(hitlArgsObj || {}, null, 2)
-            }) +
-            '</div>';
-    }
-    content.innerHTML = '<div class="tool-details">' + argsBlock + resultBlock + hitlBlock + '</div>';
+    content.innerHTML = '<div class="tool-details">' + argsBlock + resultBlock + '</div>';
     item.appendChild(content);
     item.classList.add('tool-call-detail-expanded');
     updateToolDetailToggleLabel(item);
-    const hitlPanel = content.querySelector('.hitl-inline-approval');
-    if (hitlPanel && state.hitlData) {
-        let bindMode = String(state.hitlData.mode || '').trim().toLowerCase();
-        if (bindMode === 'feedback' || bindMode === 'followup') bindMode = 'approval';
-        bindInlineHitlApproval(hitlPanel, state.hitlData, { allowEdit: bindMode === 'review_edit' });
-    }
 }
 
 if (typeof document !== 'undefined' && !document.__cyberStrikeToolCallDetailToggleBound) {
@@ -4479,6 +5792,7 @@ function mergeToolResultIntoCallItem(item, data, options) {
         item.dataset.toolDisplayStatus = backgroundRunning ? 'background_running' : (displayState.isError ? 'failed' : 'completed');
         item.classList.remove('tool-call-running', 'tool-call-completed', 'tool-call-failed');
         item.classList.add(backgroundRunning ? 'tool-call-running' : (displayState.isError ? 'tool-call-failed' : 'tool-call-completed'));
+        applyToolCallStatus(item, item.dataset.toolDisplayStatus);
         return true;
     }
 
@@ -4518,6 +5832,7 @@ function mergeToolResultIntoCallItem(item, data, options) {
     item.dataset.toolDisplayStatus = backgroundRunning ? 'background_running' : (displayState.isError ? 'failed' : 'completed');
     item.classList.remove('tool-call-running', 'tool-call-completed', 'tool-call-failed');
     item.classList.add(backgroundRunning ? 'tool-call-running' : (displayState.isError ? 'tool-call-failed' : 'tool-call-completed'));
+    applyToolCallStatus(item, item.dataset.toolDisplayStatus);
     return true;
 }
 
@@ -4628,6 +5943,54 @@ window.getToolResultDisplayState = getToolResultDisplayState;
 window.getBackgroundRunningToolLabel = getBackgroundRunningToolLabel;
 window.buildToolResultSectionHtml = buildToolResultSectionHtml;
 
+function getToolCallStatusPresentation(status) {
+    const normalized = String(status || '').toLowerCase();
+    const translate = function (key, fallback) {
+        if (typeof window.t !== 'function') return fallback;
+        const value = window.t(key);
+        return value && value !== key ? value : fallback;
+    };
+    if (normalized === 'running') {
+        return { status: normalized, itemClass: 'tool-call-running', badgeClass: 'tool-status-running', label: translate('timeline.running', '执行中...'), icon: '' };
+    }
+    if (normalized === 'background_running') {
+        return { status: normalized, itemClass: 'tool-call-running', badgeClass: 'tool-status-running', label: getBackgroundRunningToolLabel(), icon: '' };
+    }
+    if (normalized === 'completed') {
+        return { status: normalized, itemClass: 'tool-call-completed', badgeClass: 'tool-status-completed', label: translate('timeline.completed', '已完成'), icon: '✅ ' };
+    }
+    if (normalized === 'failed') {
+        return { status: normalized, itemClass: 'tool-call-failed', badgeClass: 'tool-status-failed', label: translate('timeline.execFailed', '执行失败'), icon: '❌ ' };
+    }
+    if (normalized === 'result_missing') {
+        return { status: normalized, itemClass: 'tool-call-incomplete', badgeClass: 'tool-status-incomplete', label: translate('timeline.resultMissing', '结果记录缺失'), icon: '⚠️ ' };
+    }
+    return null;
+}
+
+// 实时事件、刷新后的历史记录和语言切换都复用同一套工具状态展示。
+function applyToolCallStatus(item, status) {
+    if (!item) return;
+    const presentation = getToolCallStatusPresentation(status);
+    const titleElement = item.querySelector('.timeline-item-title');
+    if (!titleElement) return;
+
+    item.classList.remove('tool-call-running', 'tool-call-completed', 'tool-call-failed', 'tool-call-incomplete');
+    const previousBadge = titleElement.querySelector('.tool-status-badge');
+    if (previousBadge) previousBadge.remove();
+    if (!presentation) {
+        delete item.dataset.toolDisplayStatus;
+        return;
+    }
+
+    item.dataset.toolDisplayStatus = presentation.status;
+    item.classList.add(presentation.itemClass);
+    const badge = document.createElement('span');
+    badge.className = 'tool-status-badge ' + presentation.badgeClass;
+    badge.textContent = presentation.icon + presentation.label;
+    titleElement.appendChild(badge);
+}
+
 // 更新工具调用状态
 function updateToolCallStatus(progressId, toolCallId, status) {
     const mapping = getToolCallMapping(progressId, toolCallId);
@@ -4636,35 +5999,7 @@ function updateToolCallStatus(progressId, toolCallId, status) {
     const item = document.getElementById(mapping.itemId);
     if (!item) return;
     
-    const titleElement = item.querySelector('.timeline-item-title');
-    if (!titleElement) return;
-    
-    // 移除之前的状态类
-    item.classList.remove('tool-call-running', 'tool-call-completed', 'tool-call-failed');
-    
-    const runningLabel = typeof window.t === 'function' ? window.t('timeline.running') : '执行中...';
-    const completedLabel = typeof window.t === 'function' ? window.t('timeline.completed') : '已完成';
-    const failedLabel = typeof window.t === 'function' ? window.t('timeline.execFailed') : '执行失败';
-    const backgroundRunningLabel = getBackgroundRunningToolLabel();
-    let statusText = '';
-    if (status === 'running' || status === 'background_running') {
-        item.classList.add('tool-call-running');
-        statusText = ' <span class="tool-status-badge tool-status-running">' +
-            escapeHtml(status === 'background_running' ? backgroundRunningLabel : runningLabel) +
-            '</span>';
-    } else if (status === 'completed') {
-        item.classList.add('tool-call-completed');
-        statusText = ' <span class="tool-status-badge tool-status-completed">✅ ' + escapeHtml(completedLabel) + '</span>';
-    } else if (status === 'failed') {
-        item.classList.add('tool-call-failed');
-        statusText = ' <span class="tool-status-badge tool-status-failed">❌ ' + escapeHtml(failedLabel) + '</span>';
-    }
-    
-    // 更新标题（保留原有文本，追加状态）
-    const originalText = titleElement.innerHTML;
-    // 移除之前可能存在的状态标记
-    const cleanText = originalText.replace(/\s*<span class="tool-status-badge[^>]*>.*?<\/span>/g, '');
-    titleElement.innerHTML = cleanText + statusText;
+    applyToolCallStatus(item, status);
 }
 
 // 添加时间线项目
@@ -4823,13 +6158,18 @@ function addTimelineItem(timeline, type, options) {
             }
         } else if (terminalStatus === 'completed' || terminalStatus === 'failed') {
             item.dataset.toolSuccess = terminalStatus === 'completed' ? '1' : '0';
+            item.dataset.toolDisplayStatus = terminalStatus;
             item.classList.add(terminalStatus === 'completed' ? 'tool-call-completed' : 'tool-call-failed');
         } else if (terminalStatus === 'result_missing') {
+            item.dataset.toolDisplayStatus = 'result_missing';
             item.classList.add('tool-call-incomplete');
             item.title = typeof window.t === 'function' ? window.t('timeline.resultMissing') : '结果记录缺失';
+        } else if (terminalStatus === 'running' || terminalStatus === 'background_running') {
+            item.dataset.toolDisplayStatus = terminalStatus;
+            item.classList.add('tool-call-running');
         }
     }
-    if (type === 'hitl_interrupt' && options.data && options.data.interruptId != null && String(options.data.interruptId).trim() !== '') {
+    if ((type === 'hitl_interrupt' || type === 'hitl_audit_agent_started' || type === 'hitl_audit_agent' || type === 'hitl_resumed' || type === 'hitl_rejected') && options.data && options.data.interruptId != null && String(options.data.interruptId).trim() !== '') {
         item.dataset.hitlInterruptId = String(options.data.interruptId).trim();
     }
     if (type === 'workflow_hitl_waiting' && options.data) {
@@ -4856,6 +6196,9 @@ function addTimelineItem(timeline, type, options) {
     }
     if (options.data && options.data.orchestration != null && String(options.data.orchestration).trim() !== '') {
         item.dataset.orchestration = String(options.data.orchestration).trim();
+    }
+    if (options.data && options.data.streamId != null && String(options.data.streamId).trim() !== '') {
+        item.dataset.responseStreamId = String(options.data.streamId).trim();
     }
     if (options.data && options.data.responseStreamPlaceholder === true) {
         item.dataset.responseStreamPlaceholder = '1';
@@ -4997,6 +6340,27 @@ function addTimelineItem(timeline, type, options) {
     }
 
     item.innerHTML = content;
+    if (type === 'tool_call') {
+        let initialToolStatus = item.dataset.toolDisplayStatus || '';
+        if (!initialToolStatus && item.classList.contains('tool-call-running')) {
+            initialToolStatus = 'running';
+        }
+        if (initialToolStatus) {
+            applyToolCallStatus(item, initialToolStatus);
+        }
+    }
+    if (type === 'iteration') {
+        const scope = options.data && options.data.einoScope != null
+            ? String(options.data.einoScope).trim()
+            : '';
+        // 主代理每次重新进入模型才形成一轮；子代理的步骤保留普通时间线样式，
+        // 避免把同一轮中的专家调用误显示成新的主迭代分组。
+        if (scope !== 'sub') {
+            item.classList.add('timeline-iteration-divider');
+            item.setAttribute('role', 'separator');
+            item.setAttribute('aria-label', String(options.title || ''));
+        }
+    }
     if (item.classList.contains('tool-detail-collapsible')) {
         updateToolDetailToggleLabel(item);
     }
@@ -5017,25 +6381,99 @@ function addTimelineItem(timeline, type, options) {
 }
 
 // 加载活跃任务列表
-async function loadActiveTasks(showErrors = false) {
+function loadActiveTasks(showErrors = false) {
+    if (activeTasksLoadPromise) return activeTasksLoadPromise;
     const bar = document.getElementById('active-tasks-bar');
-    try {
-        const response = await apiFetch('/api/agent-loop/tasks');
-        const result = await response.json().catch(() => ({}));
+    activeTasksLoadPromise = (async function () {
+        try {
+            const [response, pendingResponse] = await Promise.all([
+                apiFetch('/api/agent-loop/tasks'),
+                apiFetch('/api/hitl/pending?page=1&pageSize=200').catch(function () { return null; })
+            ]);
+            const result = await response.json().catch(() => ({}));
 
-        if (!response.ok) {
-            throw new Error(result.error || (typeof window.t === 'function' ? window.t('tasks.loadActiveTasksFailed') : '获取活跃任务失败'));
-        }
+            if (!response.ok) {
+                throw new Error(result.error || (typeof window.t === 'function' ? window.t('tasks.loadActiveTasksFailed') : '获取活跃任务失败'));
+            }
 
-        renderActiveTasks(result.tasks || []);
-    } catch (error) {
-        console.error('获取活跃任务失败:', error);
-        if (showErrors && bar) {
-            bar.style.display = 'block';
-            const cannotGetStatus = typeof window.t === 'function' ? window.t('tasks.cannotGetTaskStatus') : '无法获取任务状态：';
-            bar.innerHTML = `<div class="active-task-error">${escapeHtml(cannotGetStatus)}${escapeHtml(error.message)}</div>`;
+            renderActiveTasks(result.tasks || []);
+            if (pendingResponse && pendingResponse.ok) {
+                const pendingResult = await pendingResponse.json().catch(function () { return {}; });
+                reconcilePendingHitlState(pendingResult.items || []);
+            }
+        } catch (error) {
+            // 服务停止、重启或登录失效时，旧进程任务不可能仍可审批。
+            // 立即清空本地运行/审批缓存，防止倒计时和按钮继续保持可用。
+            renderActiveTasks([]);
+            hitlPendingInterruptTracker.update([]);
+            syncHitlApprovalTaskAvailability();
+            syncHitlApprovalSidebarState([]);
+            if (typeof window.syncProjectConversationApprovalStatuses === 'function') {
+                window.syncProjectConversationApprovalStatuses([]);
+            }
+            console.error('获取活跃任务失败:', error);
+            if (showErrors && bar) {
+                bar.style.display = 'block';
+                const cannotGetStatus = typeof window.t === 'function' ? window.t('tasks.cannotGetTaskStatus') : '无法获取任务状态：';
+                bar.innerHTML = `<div class="active-task-error">${escapeHtml(cannotGetStatus)}${escapeHtml(error.message)}</div>`;
+            }
         }
+    })().finally(function () {
+        activeTasksLoadPromise = null;
+    });
+    return activeTasksLoadPromise;
+}
+
+function syncVisibleConversationTaskReplay(tasks) {
+    const conversationId = String(window.currentConversationId ||
+        (typeof currentConversationId === 'string' ? currentConversationId : '') || '').trim();
+    if (!conversationId) return false;
+    const active = (Array.isArray(tasks) ? tasks : []).some(function (task) {
+        return task && String(task.conversationId || '').trim() === conversationId &&
+            !TASK_FINAL_STATUSES.has(String(task.status || '').toLowerCase());
+    });
+    if (!active) {
+        if (visibleConversationReplaySyncId === conversationId && !visibleConversationReplaySyncPromise) {
+            visibleConversationReplaySyncId = '';
+        }
+        return false;
     }
+    if (shouldSkipTaskEventReplayAttach(conversationId)) return false;
+    if (
+        taskEventReplayAttachState.conversationId === conversationId &&
+        taskEventReplayAttachState.inFlightPromise
+    ) {
+        return true;
+    }
+    if (visibleConversationReplaySyncPromise && visibleConversationReplaySyncId === conversationId) {
+        return true;
+    }
+    visibleConversationReplaySyncId = conversationId;
+    visibleConversationReplaySyncPromise = Promise.resolve()
+        .then(async function () {
+            // 另一标签页已新增用户消息和运行中助手轮次；先重载轻量历史，避免把补流挂到旧助手消息上。
+            if (typeof window.loadConversation === 'function') {
+                await window.loadConversation(conversationId);
+            }
+            if (
+                String(window.currentConversationId || '') === conversationId &&
+                typeof attachRunningTaskEventStream === 'function' &&
+                !shouldSkipTaskEventReplayAttach(conversationId)
+            ) {
+                return attachRunningTaskEventStream(conversationId);
+            }
+            return false;
+        })
+        .catch(function (error) {
+            console.warn('同步其他标签页的运行中对话失败:', error);
+            return false;
+        })
+        .finally(function () {
+            if (visibleConversationReplaySyncId === conversationId) {
+                visibleConversationReplaySyncPromise = null;
+            }
+        });
+    return true;
 }
 
 function getActiveTaskDisplayName(task) {
@@ -5066,9 +6504,18 @@ function renderActiveTasks(tasks) {
 
     const normalizedTasks = Array.isArray(tasks) ? tasks : [];
     conversationExecutionTracker.update(normalizedTasks);
+    syncHitlApprovalTaskAvailability();
+    reconcileHitlApprovalStateWithActiveTasks(normalizedTasks);
+    if (typeof window.updateChatPrimaryActionState === 'function') {
+        window.updateChatPrimaryActionState();
+    }
+    if (typeof window.updateProjectFolderTaskStatuses === 'function') {
+        window.updateProjectFolderTaskStatuses(normalizedTasks);
+    }
     if (typeof updateAttackChainAvailability === 'function') {
         updateAttackChainAvailability();
     }
+    syncVisibleConversationTaskReplay(normalizedTasks);
 
     if (normalizedTasks.length === 0) {
         bar.style.display = 'none';
@@ -5155,6 +6602,27 @@ function renderActiveTasks(tasks) {
 
         bar.appendChild(item);
     });
+}
+
+function reconcileHitlApprovalStateWithActiveTasks(tasks) {
+    const activeIds = new Set(
+        (Array.isArray(tasks) ? tasks : [])
+            .filter((task) => task && task.conversationId && !TASK_FINAL_STATUSES.has(String(task.status || '').toLowerCase()))
+            .map((task) => String(task.conversationId))
+    );
+    hitlSidebarApprovalState.forEach(function (_data, conversationId) {
+        if (activeIds.has(String(conversationId))) return;
+        hitlSidebarApprovalState.delete(conversationId);
+        removeDirectHitlSidebarApproval(conversationId);
+        if (typeof window.setProjectConversationApprovalStatus === 'function') {
+            window.setProjectConversationApprovalStatus(conversationId, false);
+        }
+    });
+    const dock = document.getElementById('chat-hitl-approval-dock');
+    const dockConversationId = dock && String(dock.dataset.conversationId || '').trim();
+    if (dockConversationId && !activeIds.has(dockConversationId)) {
+        clearChatHitlApprovalDock();
+    }
 }
 
 function cancelActiveTask(conversationId) {
@@ -7438,8 +8906,8 @@ function refreshProgressAndTimelineI18n() {
     });
     document.querySelectorAll('.progress-message').forEach(function (msgEl) {
         const raw = msgEl.dataset.progressRawMessage;
-        const titleEl = msgEl.querySelector('.progress-title');
-        if (titleEl && raw) {
+        const stageEl = msgEl.querySelector('.progress-stage');
+        if (stageEl && raw) {
             let pdata = null;
             if (msgEl.dataset.progressRawData) {
                 try {
@@ -7448,13 +8916,9 @@ function refreshProgressAndTimelineI18n() {
                     pdata = null;
                 }
             }
-            titleEl.textContent = '\uD83D\uDD0D ' + translateProgressMessage(raw, pdata);
+            stageEl.textContent = translateProgressMessage(raw, pdata);
         }
-    });
-    // 转换后的详情区顶栏「任务执行详情」：仅刷新不在 .progress-message 内的 progress 标题
-    document.querySelectorAll('.progress-container .progress-header .progress-title').forEach(function (titleEl) {
-        if (titleEl.closest('.progress-message')) return;
-        titleEl.textContent = '\uD83D\uDCCB ' + _t('chat.penetrationTestDetail');
+        if (msgEl.id) syncProgressElapsedSummary(msgEl.id);
     });
 
     // 时间线项：按类型重算标题，并重绘时间戳
@@ -7515,6 +8979,9 @@ function refreshProgressAndTimelineI18n() {
                 ? formatToolCallTimelineTitle(name, index, total)
                 : _t('chat.callTool', { name: name, index: index, total: total });
             titleSpan.textContent = ap + '\uD83D\uDD27 ' + callTitle;
+            if (item.dataset.toolDisplayStatus) {
+                applyToolCallStatus(item, item.dataset.toolDisplayStatus);
+            }
         } else if (type === 'tool_result' && (item.dataset.toolName !== undefined || item.dataset.toolSuccess !== undefined)) {
             const name = (item.dataset.toolName != null && item.dataset.toolName !== '') ? item.dataset.toolName : _t('chat.unknownTool');
             const displayStatus = item.dataset.toolDisplayStatus || '';
@@ -7558,6 +9025,9 @@ function refreshProgressAndTimelineI18n() {
     });
 
     document.querySelectorAll('#chat-messages .message.assistant').forEach(function (msgEl) {
+        if (typeof window.syncAssistantTurnSummary === 'function') {
+            window.syncAssistantTurnSummary(msgEl);
+        }
         if (typeof window.syncMcpToolsToggleButton === 'function') {
             window.syncMcpToolsToggleButton(msgEl);
         }
