@@ -106,7 +106,170 @@ CREATE TABLE IF NOT EXISTS hitl_conversation_configs (
 	} else if n, _ := res.RowsAffected(); n > 0 {
 		m.logger.Info("cancelled orphaned HITL interrupts from previous process", zap.Int64("count", n))
 	}
+	if err := m.reconcileRestartInterruptedMessages(); err != nil {
+		m.logger.Warn("failed to finalize assistant messages interrupted by process restart", zap.Error(err))
+	}
 	return nil
+}
+
+// reconcileRestartInterruptedMessages completes durable terminal state for
+// historical assistant placeholders that have explicit evidence of being over:
+// a terminal HITL/process event, or a later message in the same conversation.
+// The evidence requirement avoids rewriting a placeholder that could still be
+// recoverable by another runtime.
+func (m *HITLManager) reconcileRestartInterruptedMessages() error {
+	rows, err := m.db.Query(`
+SELECT msg.id, msg.conversation_id,
+       COALESCE((
+           SELECT pd.event_type
+           FROM process_details pd
+           WHERE pd.message_id = msg.id
+             AND pd.event_type IN ('cancelled', 'timeout', 'error')
+           ORDER BY pd.created_at DESC LIMIT 1
+       ), '') AS terminal_event,
+       COALESCE((
+           SELECT hi.status
+           FROM hitl_interrupts hi
+           WHERE hi.message_id = msg.id
+           ORDER BY COALESCE(hi.decided_at, hi.created_at) DESC LIMIT 1
+       ), '') AS hitl_status,
+       COALESCE((
+           SELECT hi.decision
+           FROM hitl_interrupts hi
+           WHERE hi.message_id = msg.id
+           ORDER BY COALESCE(hi.decided_at, hi.created_at) DESC LIMIT 1
+       ), '') AS hitl_decision,
+       COALESCE((
+           SELECT hi.decision_comment
+           FROM hitl_interrupts hi
+           WHERE hi.message_id = msg.id
+           ORDER BY COALESCE(hi.decided_at, hi.created_at) DESC LIMIT 1
+       ), '') AS decision_comment,
+       COALESCE((
+           SELECT MAX(COALESCE(hi.decided_at, hi.created_at))
+           FROM hitl_interrupts hi
+           WHERE hi.message_id = msg.id
+       ), (
+           SELECT MIN(later.created_at)
+           FROM messages later
+           WHERE later.conversation_id = msg.conversation_id
+             AND later.created_at > msg.created_at
+       ), (
+           SELECT MAX(pd.created_at)
+           FROM process_details pd
+           WHERE pd.message_id = msg.id
+       ), msg.updated_at, msg.created_at) AS interrupted_at
+FROM messages msg
+WHERE msg.role = 'assistant'
+  AND TRIM(msg.content) IN ('处理中...', 'Processing...')
+  AND (
+      EXISTS (
+          SELECT 1 FROM hitl_interrupts hi
+          WHERE hi.message_id = msg.id
+            AND (hi.status IN ('cancelled', 'timeout')
+                 OR (hi.status = 'decided' AND hi.decision = 'reject'))
+      )
+      OR EXISTS (
+          SELECT 1 FROM process_details pd
+          WHERE pd.message_id = msg.id
+            AND pd.event_type IN ('cancelled', 'timeout', 'error')
+      )
+      OR EXISTS (
+          SELECT 1 FROM messages later
+          WHERE later.conversation_id = msg.conversation_id
+            AND later.created_at > msg.created_at
+      )
+  )`)
+	if err != nil {
+		return err
+	}
+	type interruptedMessage struct {
+		messageID       string
+		conversationID  string
+		terminalEvent   string
+		hitlStatus      string
+		hitlDecision    string
+		decisionComment string
+		interruptedAt   string
+	}
+	var interrupted []interruptedMessage
+	for rows.Next() {
+		var item interruptedMessage
+		if err := rows.Scan(&item.messageID, &item.conversationID, &item.terminalEvent,
+			&item.hitlStatus, &item.hitlDecision, &item.decisionComment, &item.interruptedAt); err != nil {
+			rows.Close()
+			return err
+		}
+		interrupted = append(interrupted, item)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if len(interrupted) == 0 {
+		return nil
+	}
+
+	tx, err := m.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, item := range interrupted {
+		eventType := strings.ToLower(strings.TrimSpace(item.terminalEvent))
+		decision := strings.ToLower(strings.TrimSpace(item.hitlDecision))
+		comment := strings.ToLower(strings.TrimSpace(item.decisionComment))
+		if eventType == "" {
+			if strings.EqualFold(strings.TrimSpace(item.hitlStatus), "timeout") || strings.Contains(comment, "timeout") {
+				eventType = "timeout"
+			} else {
+				eventType = "cancelled"
+			}
+		}
+
+		notice := "任务因服务重启已中断。"
+		reason := "process_restarted"
+		switch eventType {
+		case "timeout":
+			notice = "任务等待审批超时，已自动拒绝。"
+			reason = "hitl_timeout"
+		case "error":
+			notice = "任务执行失败，已停止。"
+			reason = "execution_error"
+		case "cancelled":
+			if decision == "reject" && comment != "process restarted" {
+				notice = "任务审批已拒绝，执行已停止。"
+				reason = "hitl_rejected"
+			} else if comment == "process restarted" {
+				notice = "任务因服务重启已中断，审批已取消。"
+			}
+		default:
+			eventType = "cancelled"
+		}
+		detailData, _ := json.Marshal(map[string]string{"reason": reason, "status": eventType})
+		result, err := tx.Exec(`
+UPDATE messages
+SET content = ?, updated_at = ?
+WHERE id = ? AND TRIM(content) IN ('处理中...', 'Processing...')`,
+			notice, item.interruptedAt, item.messageID)
+		if err != nil {
+			return err
+		}
+		updated, _ := result.RowsAffected()
+		if updated == 0 {
+			continue
+		}
+		if _, err := tx.Exec(`
+INSERT INTO process_details (id, message_id, conversation_id, event_type, message, data, created_at)
+SELECT ?, ?, ?, ?, ?, ?, ?
+WHERE NOT EXISTS (
+    SELECT 1 FROM process_details
+    WHERE message_id = ? AND event_type IN ('cancelled', 'timeout', 'error')
+)`, uuid.NewString(), item.messageID, item.conversationID, eventType, notice, string(detailData),
+			item.interruptedAt, item.messageID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func normalizeHitlMode(mode string) string {

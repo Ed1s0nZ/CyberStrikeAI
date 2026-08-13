@@ -1492,7 +1492,29 @@ func (db *DB) GetProcessDetailsSummary(messageID string) (*ProcessDetailsSummary
 			summary.StartedAt = &startedAt
 		}
 	}
-	if strings.TrimSpace(messageContent) == "处理中..." || strings.TrimSpace(messageContent) == "Processing..." {
+	var terminalEvent, terminalCreatedAt string
+	terminalErr := db.QueryRow(`
+SELECT event_type, created_at
+FROM process_details
+WHERE message_id = ? AND event_type IN ('cancelled', 'timeout', 'error')
+ORDER BY created_at DESC, rowid DESC
+LIMIT 1`, messageID).Scan(&terminalEvent, &terminalCreatedAt)
+	if terminalErr != nil && !errors.Is(terminalErr, sql.ErrNoRows) {
+		return nil, fmt.Errorf("查询过程详情终态失败: %w", terminalErr)
+	}
+	if terminalEvent != "" {
+		switch terminalEvent {
+		case "cancelled":
+			summary.Status = "cancelled"
+		case "timeout":
+			summary.Status = "timeout"
+		default:
+			summary.Status = "failed"
+		}
+		if completedAt := parseDBTime(terminalCreatedAt); !completedAt.IsZero() {
+			summary.CompletedAt = &completedAt
+		}
+	} else if strings.TrimSpace(messageContent) == "处理中..." || strings.TrimSpace(messageContent) == "Processing..." {
 		summary.Status = "running"
 	} else {
 		summary.Status = "completed"
@@ -1501,9 +1523,9 @@ func (db *DB) GetProcessDetailsSummary(messageID string) (*ProcessDetailsSummary
 				summary.CompletedAt = &completedAt
 			}
 		}
-		if summary.StartedAt != nil && summary.CompletedAt != nil && !summary.CompletedAt.Before(*summary.StartedAt) {
-			summary.DurationMs = summary.CompletedAt.Sub(*summary.StartedAt).Milliseconds()
-		}
+	}
+	if summary.StartedAt != nil && summary.CompletedAt != nil && !summary.CompletedAt.Before(*summary.StartedAt) {
+		summary.DurationMs = summary.CompletedAt.Sub(*summary.StartedAt).Milliseconds()
 	}
 	if total == 0 {
 		return summary, nil

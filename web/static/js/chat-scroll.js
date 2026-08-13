@@ -7,10 +7,12 @@
 
     /** 距底部在此范围内才继续自动跟随（宜小，避免“差一点也被拽回去”） */
     const CHAT_SCROLL_FOLLOW_THRESHOLD_PX = 48;
+    /** 只有真正到达底部才恢复跟随；2px 用于兼容高分屏的亚像素滚动。 */
+    const CHAT_SCROLL_FOLLOW_RESUME_THRESHOLD_PX = 2;
     /** 到达此范围视为位于最后一轮 */
     const CHAT_SCROLL_NAV_BOTTOM_THRESHOLD_PX = 120;
     /** 用户上滑后的短暂锁，防止 SSE 与 scroll 事件竞态抢滚动 */
-    const DETACH_LOCK_MS = 280;
+    const DETACH_LOCK_MS = 900;
     /** 刷新恢复会跨越历史消息、过程详情、字体与流订阅等多轮异步布局。 */
     const CONVERSATION_RESTORE_SETTLE_MIN_MS = 3000;
     const CONVERSATION_RESTORE_SETTLE_MAX_MS = 6000;
@@ -346,7 +348,7 @@
         if (Date.now() < detachLockUntil) return false;
         const threshold = Number.isFinite(Number(thresholdPx))
             ? Math.max(0, Number(thresholdPx))
-            : CHAT_SCROLL_FOLLOW_THRESHOLD_PX;
+            : CHAT_SCROLL_FOLLOW_RESUME_THRESHOLD_PX;
         if (!isNearBottom(threshold)) return false;
         if (scrollMode === 'detached') setScrollFollowing();
         return true;
@@ -354,7 +356,6 @@
 
     function captureScrollPinState() {
         if (Date.now() < detachLockUntil) return false;
-        if (resumeFollowingIfAtBottom()) return true;
         return scrollMode === 'following';
     }
 
@@ -449,7 +450,6 @@
 
     function canAutoScrollNow(wasPinnedBeforeDomUpdate) {
         if (Date.now() < detachLockUntil) return false;
-        if (resumeFollowingIfAtBottom()) return true;
         if (scrollMode === 'detached') return false;
         if (wasPinnedBeforeDomUpdate === true) return true;
         return isNearBottom(CHAT_SCROLL_FOLLOW_THRESHOLD_PX);
@@ -662,11 +662,12 @@
 
         if (scrolledUp && (scrollMode === 'detached' || Date.now() <= upwardScrollIntentUntil)) {
             setScrollDetached();
-        } else if (scrolledDown && resumeFollowingIfAtBottom(CHAT_SCROLL_FOLLOW_THRESHOLD_PX)) {
-            // 仅在用户确实滚到最底部附近时恢复跟随，不主动改写 scrollTop。
+        } else if (scrolledDown && isNearBottom(CHAT_SCROLL_FOLLOW_RESUME_THRESHOLD_PX)) {
+            // 用户明确向下滚到真实底部时立即恢复，不受上滑防抢锁影响。
+            // 否则快速“上滑查看 → 立刻滚回底部”会在锁结束后仍卡在 detached。
+            setScrollFollowing();
+            // 仅在用户确实滚到最底部时恢复跟随，不主动改写 scrollTop。
             // 后续新增内容再按 following 状态自然粘底，避免接近底部时突然跳动。
-        } else if (resumeFollowingIfAtBottom()) {
-            /* 已经精确到底部时也恢复跟随 */
         }
 
         lastScrollTop = st;
@@ -683,7 +684,7 @@
         lastScrollHeight = el.scrollHeight;
 
         el.addEventListener('wheel', function (e) {
-            if (e.deltaY < -1) {
+            if (e.deltaY < 0) {
                 upwardScrollIntentUntil = Date.now() + 1200;
                 setScrollDetached();
             }

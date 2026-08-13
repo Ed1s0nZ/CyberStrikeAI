@@ -1,11 +1,13 @@
 const fs = require('node:fs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const vm = require('node:vm');
 
 const scroll = fs.readFileSync('web/static/js/chat-scroll.js', 'utf8');
 const monitor = fs.readFileSync('web/static/js/monitor.js', 'utf8');
 const chat = fs.readFileSync('web/static/js/chat.js', 'utf8');
 const router = fs.readFileSync('web/static/js/router.js', 'utf8');
+const auth = fs.readFileSync('web/static/js/auth.js', 'utf8');
 const html = fs.readFileSync('web/templates/index.html', 'utf8');
 
 function functionSource(source, name, nextName) {
@@ -16,14 +18,132 @@ function functionSource(source, name, nextName) {
     return source.slice(start, end);
 }
 
+function createScrollRuntime() {
+    const listeners = new Map();
+    const buttonListeners = new Map();
+    const classList = { add() {}, remove() {}, toggle() {}, contains() { return false; } };
+    const chatEl = {
+        scrollTop: 500,
+        scrollHeight: 1000,
+        clientHeight: 500,
+        children: [],
+        classList,
+        addEventListener(type, handler) { listeners.set(type, handler); },
+        scrollTo(options) { this.scrollTop = Number(options && options.top) || 0; },
+        getBoundingClientRect() { return { right: 1000 }; },
+    };
+    const returnLatest = {
+        hidden: true,
+        classList,
+        addEventListener(type, handler) { buttonListeners.set(type, handler); },
+        blur() {},
+    };
+    const rafQueue = new Map();
+    let rafId = 0;
+    const requestAnimationFrame = (handler) => {
+        const id = ++rafId;
+        rafQueue.set(id, handler);
+        return id;
+    };
+    const cancelAnimationFrame = (id) => rafQueue.delete(id);
+    const document = {
+        readyState: 'complete',
+        getElementById(id) {
+            if (id === 'chat-messages') return chatEl;
+            if (id === 'chat-return-latest') return returnLatest;
+            return null;
+        },
+        querySelectorAll() { return []; },
+        addEventListener() {},
+    };
+    const window = {
+        document,
+        addEventListener() {},
+        setTimeout,
+        clearTimeout,
+        requestAnimationFrame,
+        cancelAnimationFrame,
+        innerWidth: 1440,
+        innerHeight: 900,
+    };
+    const context = {
+        window,
+        document,
+        requestAnimationFrame,
+        cancelAnimationFrame,
+        setTimeout,
+        clearTimeout,
+        console,
+    };
+    vm.runInNewContext(scroll, context);
+    return {
+        api: window.CyberStrikeChatScroll,
+        chatEl,
+        listeners,
+        flushAnimationFrames() {
+            while (rafQueue.size) {
+                const pending = Array.from(rafQueue.values());
+                rafQueue.clear();
+                pending.forEach((handler) => handler(Date.now()));
+            }
+        },
+    };
+}
+
+test('向上滚动立即解除粘底，只有滚到真实底部才恢复', () => {
+    const runtime = createScrollRuntime();
+    runtime.flushAnimationFrames();
+
+    runtime.listeners.get('wheel')({ deltaY: -20 });
+    runtime.chatEl.scrollTop = 480;
+    runtime.listeners.get('scroll')();
+    assert.equal(runtime.api.captureScrollPinState(), false);
+
+    runtime.chatEl.scrollHeight = 1100;
+    runtime.api.scrollIfPinned(true);
+    runtime.flushAnimationFrames();
+    assert.equal(runtime.chatEl.scrollTop, 480, '新输出不能抢回用户的阅读位置');
+
+    runtime.chatEl.scrollTop = 597;
+    runtime.listeners.get('scroll')();
+    assert.equal(runtime.api.captureScrollPinState(), false, '距底部 2px 以上仍保持脱离');
+
+    runtime.chatEl.scrollTop = 600;
+    runtime.listeners.get('scroll')();
+    assert.equal(runtime.api.captureScrollPinState(), true, '用户滚到真实底部后立即恢复跟随');
+
+    runtime.chatEl.scrollHeight = 1200;
+    runtime.api.scrollIfPinned(true);
+    runtime.flushAnimationFrames();
+    assert.equal(runtime.chatEl.scrollTop, 1200, '恢复后新增输出继续请求滚到最底部');
+});
+
+test('登录成功后重新加载曾因未授权失败的项目侧栏', () => {
+    const refreshSource = functionSource(auth, 'refreshAppData', 'bootstrapApp');
+    const conversationsIndex = refreshSource.indexOf('loadConversations()');
+    const projectRetryIndex = refreshSource.indexOf('window.refreshChatProjectSelector({ reloadFolders: true })');
+
+    assert.notEqual(conversationsIndex, -1);
+    assert.ok(projectRetryIndex > conversationsIndex);
+    assert.match(refreshSource, /typeof window\.refreshChatProjectSelector === 'function'/);
+    assert.match(html, /\/static\/js\/auth\.js\?v=20260813-1/);
+});
+
 test('用户真正滑到底部后恢复自动跟随且不会提前强制跳底', () => {
     const resumeSource = functionSource(scroll, 'resumeFollowingIfAtBottom', 'captureScrollPinState');
+    const captureSource = functionSource(scroll, 'captureScrollPinState', 'setScrollFollowing');
+    const autoSource = functionSource(scroll, 'canAutoScrollNow', 'scheduleChatScrollToBottomIfFollowing');
     const scrollSource = functionSource(scroll, 'onChatMessagesScroll', 'bindChatScrollListeners');
 
     assert.match(resumeSource, /thresholdPx/);
+    assert.match(scroll, /CHAT_SCROLL_FOLLOW_RESUME_THRESHOLD_PX = 2/);
+    assert.doesNotMatch(captureSource, /resumeFollowingIfAtBottom/);
+    assert.doesNotMatch(autoSource, /resumeFollowingIfAtBottom/);
     assert.match(scrollSource, /scrolledDown/);
-    assert.match(scrollSource, /resumeFollowingIfAtBottom\(CHAT_SCROLL_FOLLOW_THRESHOLD_PX\)/);
+    assert.match(scrollSource, /scrolledDown && isNearBottom\(CHAT_SCROLL_FOLLOW_RESUME_THRESHOLD_PX\)/);
+    assert.match(scrollSource, /setScrollFollowing\(\)/);
     assert.doesNotMatch(scrollSource, /resumeFollowingIfAtBottom\(CHAT_SCROLL_NAV_BOTTOM_THRESHOLD_PX\)/);
+    assert.doesNotMatch(scrollSource, /else if \(resumeFollowingIfAtBottom\(\)\)/);
     assert.doesNotMatch(scrollSource, /scheduleChatScrollToBottomIfFollowing\(true\)/);
     assert.match(scrollSource, /contentShrank/);
     assert.match(scrollSource, /sh < lastScrollHeight - 1/);
@@ -63,9 +183,13 @@ test('刷新后迭代思考区独立跟随最新内容且允许用户上滑解�
     assert.match(startSource, /characterData: true/);
     assert.match(startSource, /new ResizeObserver\(scheduleFollowLatest\)/);
     assert.match(startSource, /scrollProcessDetailsToLatest\(String\(assistantMessageId \|\| ''\), false\)/);
-    assert.match(startSource, /event\.deltaY < -1/);
+    assert.match(startSource, /event\.deltaY < 0/);
     assert.match(startSource, /event\.clientX >= rect\.right - PROCESS_DETAILS_FOLLOW_SCROLLBAR_GUTTER_PX/);
     assert.match(startSource, /event\.key === 'ArrowUp'/);
+    assert.match(startSource, /cancelAnimationFrame\(state\.rafId\)/);
+    assert.match(startSource, /const scrolledUp = currentTop < state\.lastScrollTop - 0\.5/);
+    assert.match(startSource, /state\.detached && scrolledDown && distance <= PROCESS_DETAILS_FOLLOW_RESUME_THRESHOLD_PX/);
+    assert.match(monitor, /PROCESS_DETAILS_FOLLOW_RESUME_THRESHOLD_PX = 2/);
     assert.match(startSource, /distance <= PROCESS_DETAILS_FOLLOW_RESUME_THRESHOLD_PX/);
     assert.match(startSource, /state\.detached = false/);
     assert.match(loadSource, /startProcessDetailsLatestFollow\(assistantMessageId/);
@@ -126,14 +250,14 @@ test('消息气泡内部流式增高时仅在跟随模式继续粘底', () => {
     assert.match(bindSource, /new ResizeObserver/);
     assert.match(bindSource, /chatMessagesResizeObserver\.observe\(el\)/);
     assert.match(bindSource, /改变消息区 clientHeight/);
-    assert.match(bindSource, /e\.deltaY < -1/);
+    assert.match(bindSource, /e\.deltaY < 0/);
     assert.match(bindSource, /e\.clientX >= rect\.right - 18/);
     assert.match(bindSource, /e\.key === 'ArrowUp'/);
 });
 
 test('页面在任务补流脚本之前加载智能滚动控制器', () => {
-    const scrollIndex = html.indexOf('/static/js/chat-scroll.js?v=20260813-3');
-    const monitorIndex = html.indexOf('/static/js/monitor.js?v=20260813-5');
+    const scrollIndex = html.indexOf('/static/js/chat-scroll.js?v=20260813-4');
+    const monitorIndex = html.indexOf('/static/js/monitor.js?v=20260813-7');
 
     assert.notEqual(scrollIndex, -1);
     assert.notEqual(monitorIndex, -1);
@@ -167,7 +291,7 @@ test('刷新指定对话时立即恢复且加载完成前不闪出无项目状�
     assert.match(css, /\.chat-container\.is-conversation-restoring #chat-messages/);
     assert.match(css, /\.chat-container\.is-conversation-restoring #chat-input-container/);
     assert.match(html, /router\.js\?v=20260813-2/);
-    assert.match(html, /chat\.js\?v=20260813-2/);
+    assert.match(html, /chat\.js\?v=20260813-3/);
 });
 
 test('刷新运行中回复会复用已持久化 planning 并继续追加未来增量', () => {

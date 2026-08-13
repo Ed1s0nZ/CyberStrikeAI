@@ -94,3 +94,25 @@ test('已完成任务仍优先使用持久化耗时', () => {
     assert.equal(message.dataset.turnDurationMs, '65000');
     assert.match(message.label.innerHTML, /耗时 1 分钟 5 秒/);
 });
+
+test('已中断任务使用固定终态耗时且不再按当前时间增长', () => {
+    const context = createHarness(Date.parse('2026-08-13T12:00:00.000Z'));
+    const message = createMessage();
+
+    context.setAssistantTurnTiming(message, {
+        startedAt: '2026-08-11T09:47:14.000Z',
+        completedAt: '2026-08-11T09:51:39.000Z',
+        durationMs: 265_000,
+        status: 'cancelled',
+    });
+
+    assert.equal(message.dataset.turnDurationMs, '265000');
+    assert.match(message.label.innerHTML, /已中断 · 耗时 4 分钟 25 秒/);
+    assert.doesNotMatch(message.label.innerHTML, /已处理/);
+});
+
+test('历史占位消息存在取消事件时不会再判定为运行中', () => {
+    assert.match(chat, /function assistantTurnTerminalState\(processDetails\)/);
+    assert.match(chat, /const isRunning = isAssistantPlaceholder && !terminalState/);
+    assert.match(chat, /status: status/);
+});

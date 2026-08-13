@@ -1678,8 +1678,7 @@ function getAssistantId() {
     return null;
 }
 
-// 将进度详情集成到工具调用区域（流式阶段助手消息不挂 mcp 条，结束时在此创建，避免图二整行 MCP 芯片样式）
-function integrateProgressToMCPSection(progressId, assistantMessageId, mcpExecutionIds) {
+function applyAssistantTurnTimingFromProgress(progressId, assistantElement, terminalStatus) {
     const progressElement = document.getElementById(progressId);
     const progressStartedAt = progressElement && progressElement.dataset
         ? (progressElement.dataset.turnStartedAt || new Date(Number(progressElement.dataset.turnStartedAtMs) || Date.now()).toISOString())
@@ -1688,6 +1687,18 @@ function integrateProgressToMCPSection(progressId, assistantMessageId, mcpExecut
         ? Number(progressElement.dataset.turnStartedAtMs)
         : Date.now();
     const completedAt = new Date();
+    stopProgressElapsedClock(progressId);
+    if (!assistantElement || typeof window.setAssistantTurnTiming !== 'function') return;
+    window.setAssistantTurnTiming(assistantElement, {
+        startedAt: progressStartedAt,
+        completedAt: completedAt.toISOString(),
+        durationMs: Math.max(0, completedAt.getTime() - (Number.isFinite(progressStartedAtMs) ? progressStartedAtMs : completedAt.getTime())),
+        status: terminalStatus || 'completed'
+    });
+}
+
+// 将进度详情集成到工具调用区域（流式阶段助手消息不挂 mcp 条，结束时在此创建，避免图二整行 MCP 芯片样式）
+function integrateProgressToMCPSection(progressId, assistantMessageId, mcpExecutionIds, terminalStatus) {
     stopProgressElapsedClock(progressId);
 
     // 只 flush 终态标题/正文；完成后的详情回看统一走后端分页，不再复制实时 DOM 快照。
@@ -1715,14 +1726,7 @@ function integrateProgressToMCPSection(progressId, assistantMessageId, mcpExecut
     if (typeof window.ensureMcpCallSectionChrome === 'function') {
         window.ensureMcpCallSectionChrome(assistantElement, assistantMessageId);
     }
-    if (typeof window.setAssistantTurnTiming === 'function') {
-        window.setAssistantTurnTiming(assistantElement, {
-            startedAt: progressStartedAt,
-            completedAt: completedAt.toISOString(),
-            durationMs: Math.max(0, completedAt.getTime() - (Number.isFinite(progressStartedAtMs) ? progressStartedAtMs : completedAt.getTime())),
-            status: 'completed'
-        });
-    }
+    applyAssistantTurnTimingFromProgress(progressId, assistantElement, terminalStatus || 'completed');
     const mcpSection = assistantElement.querySelector('.mcp-call-section');
     if (!mcpSection) {
         removeMessage(progressId);
@@ -1794,7 +1798,8 @@ const processDetailsAutoLoadObservers = new WeakMap();
 const processDetailsLatestFollowStates = new Map();
 const PROCESS_DETAILS_RESTORE_FOLLOW_MS = 6000;
 const PROCESS_DETAILS_FOLLOW_SCROLLBAR_GUTTER_PX = 18;
-const PROCESS_DETAILS_FOLLOW_RESUME_THRESHOLD_PX = 32;
+// 只有用户真正滚到底部才恢复自动跟随；保留 2px 兼容亚像素滚动。
+const PROCESS_DETAILS_FOLLOW_RESUME_THRESHOLD_PX = 2;
 
 function processDetailsContinuousLabel(kind) {
     if (kind === 'older') {
@@ -1983,6 +1988,8 @@ function startProcessDetailsLatestFollow(assistantMessageId, options) {
         stopped: false,
         detached: false,
         persistent: persistent,
+        lastScrollTop: timeline.scrollTop,
+        upwardIntentUntil: 0,
         rafId: 0,
         timeoutId: 0,
         observer: null,
@@ -1993,9 +2000,16 @@ function startProcessDetailsLatestFollow(assistantMessageId, options) {
 
     const detachForUserNavigation = function () {
         state.detached = true;
+        if (state.rafId) {
+            cancelAnimationFrame(state.rafId);
+            state.rafId = 0;
+        }
     };
     const onWheel = function (event) {
-        if (event && event.deltaY < -1) detachForUserNavigation();
+        if (event && event.deltaY < 0) {
+            state.upwardIntentUntil = Date.now() + 1200;
+            detachForUserNavigation();
+        }
     };
     const onPointerDown = function (event) {
         if (!event) return;
@@ -2014,12 +2028,18 @@ function startProcessDetailsLatestFollow(assistantMessageId, options) {
         detachForUserNavigation();
     };
     const onScroll = function () {
-        if (!state.detached || state.stopped) return;
+        if (state.stopped) return;
+        const currentTop = timeline.scrollTop;
+        const scrolledUp = currentTop < state.lastScrollTop - 0.5;
+        const scrolledDown = currentTop > state.lastScrollTop + 0.5;
         const distance = Math.max(0, timeline.scrollHeight - timeline.clientHeight - timeline.scrollTop);
-        if (distance <= PROCESS_DETAILS_FOLLOW_RESUME_THRESHOLD_PX) {
+        if (scrolledUp && (state.detached || Date.now() <= state.upwardIntentUntil)) {
+            detachForUserNavigation();
+        } else if (state.detached && scrolledDown && distance <= PROCESS_DETAILS_FOLLOW_RESUME_THRESHOLD_PX) {
             state.detached = false;
             scheduleFollowLatest();
         }
+        state.lastScrollTop = currentTop;
     };
     timeline.addEventListener('wheel', onWheel, { passive: true });
     timeline.addEventListener('pointerdown', onPointerDown, { passive: true });
@@ -2044,6 +2064,7 @@ function startProcessDetailsLatestFollow(assistantMessageId, options) {
         } else {
             scrollProcessDetailsToLatest(String(assistantMessageId || ''), false);
         }
+        state.lastScrollTop = timeline.scrollTop;
         // 内层迭代区与外层对话区分别粘底；用户上滑内层后，本状态会暂停两者的自动跟随。
         if (window.CyberStrikeChatScroll &&
             typeof window.CyberStrikeChatScroll.scrollIfPinned === 'function') {
@@ -3439,8 +3460,9 @@ function handleStreamEvent(event, progressElement, progressId,
                 if (assistantElement) {
                     const detailsId = 'process-details-' + assistantId;
                     if (!document.getElementById(detailsId)) {
-                        integrateProgressToMCPSection(progressId, assistantId, typeof getMcpIds === 'function' ? (getMcpIds() || []) : []);
+                        integrateProgressToMCPSection(progressId, assistantId, typeof getMcpIds === 'function' ? (getMcpIds() || []) : [], 'cancelled');
                     } else if (preferredMessageId) {
+                        applyAssistantTurnTimingFromProgress(progressId, assistantElement, 'cancelled');
                         maybeReloadLazyProcessDetails(assistantId);
                     }
                     setTimeout(() => {
@@ -3722,8 +3744,11 @@ function handleStreamEvent(event, progressElement, progressId,
                 if (assistantElement) {
                     const detailsId = 'process-details-' + assistantId;
                     if (!document.getElementById(detailsId)) {
-                        integrateProgressToMCPSection(progressId, assistantId, typeof getMcpIds === 'function' ? (getMcpIds() || []) : []);
+                        const terminalStatus = event.data && event.data.errorType === 'timeout' ? 'timeout' : 'failed';
+                        integrateProgressToMCPSection(progressId, assistantId, typeof getMcpIds === 'function' ? (getMcpIds() || []) : [], terminalStatus);
                     } else if (preferredMessageId) {
+                        const terminalStatus = event.data && event.data.errorType === 'timeout' ? 'timeout' : 'failed';
+                        applyAssistantTurnTimingFromProgress(progressId, assistantElement, terminalStatus);
                         maybeReloadLazyProcessDetails(assistantId);
                     }
                     setTimeout(() => {

@@ -4592,6 +4592,24 @@ function assistantTurnTimestamp(value) {
     return Number.isFinite(n) ? n : NaN;
 }
 
+function assistantTurnTerminalState(processDetails) {
+    if (!Array.isArray(processDetails)) return null;
+    for (let i = processDetails.length - 1; i >= 0; i--) {
+        const detail = processDetails[i] || {};
+        const eventType = String(detail.eventType || '').trim().toLowerCase();
+        if (eventType === 'cancelled') {
+            return { status: 'cancelled', completedAt: detail.createdAt || null, detail: detail };
+        }
+        if (eventType === 'timeout') {
+            return { status: 'timeout', completedAt: detail.createdAt || null, detail: detail };
+        }
+        if (eventType === 'error') {
+            return { status: 'failed', completedAt: detail.createdAt || null, detail: detail };
+        }
+    }
+    return null;
+}
+
 let assistantTurnElapsedTimer = null;
 
 function syncRunningAssistantTurnSummaries() {
@@ -4666,9 +4684,18 @@ function syncAssistantTurnSummary(messageElementOrId) {
             : 0;
     }
     const duration = formatAssistantTurnDuration(durationMs);
-    const text = status === 'running'
-        ? (typeof window.t === 'function' ? window.t('chat.turnElapsedRunning', { duration: duration }) : '已处理 ' + duration)
-        : (typeof window.t === 'function' ? window.t('chat.turnElapsedComplete', { duration: duration }) : '耗时 ' + duration);
+    let text;
+    if (status === 'running') {
+        text = typeof window.t === 'function' ? window.t('chat.turnElapsedRunning', { duration: duration }) : '已处理 ' + duration;
+    } else if (status === 'cancelled') {
+        text = typeof window.t === 'function' ? window.t('chat.turnElapsedCancelled', { duration: duration }) : '已中断 · 耗时 ' + duration;
+    } else if (status === 'timeout') {
+        text = typeof window.t === 'function' ? window.t('chat.turnElapsedTimeout', { duration: duration }) : '已超时 · 耗时 ' + duration;
+    } else if (status === 'failed') {
+        text = typeof window.t === 'function' ? window.t('chat.turnElapsedFailed', { duration: duration }) : '执行失败 · 耗时 ' + duration;
+    } else {
+        text = typeof window.t === 'function' ? window.t('chat.turnElapsedComplete', { duration: duration }) : '耗时 ' + duration;
+    }
     label.innerHTML = `
         <span class="turn-process-leading">
             <span class="turn-process-status-dot${status === 'running' ? ' is-running' : ''}" aria-hidden="true"></span>
@@ -5982,15 +6009,14 @@ async function loadConversation(conversationId) {
                 if (msg.role === 'user' && isInterruptContinueInjectChatMessage(msg.content)) {
                     return;
                 }
+                const assistantContent = String(msg && msg.content != null ? msg.content : '').trim();
+                const terminalState = msg && msg.role === 'assistant'
+                    ? assistantTurnTerminalState(msg.processDetails)
+                    : null;
                 let displayContent = msg.content;
-                if (msg.role === 'assistant' && msg.content === '处理中...' && msg.processDetails && msg.processDetails.length > 0) {
-                    for (let i = msg.processDetails.length - 1; i >= 0; i--) {
-                        const detail = msg.processDetails[i];
-                        if (detail.eventType === 'error' || detail.eventType === 'cancelled') {
-                            displayContent = detail.message || msg.content;
-                            break;
-                        }
-                    }
+                if (msg.role === 'assistant' &&
+                    (assistantContent === '处理中...' || assistantContent === 'Processing...') && terminalState) {
+                    displayContent = terminalState.detail.message || msg.content;
                 }
 
                 // 消息时间口径：
@@ -5998,7 +6024,6 @@ async function loadConversation(conversationId) {
                 // - assistant: 如果后端提供 updatedAt（任务完成时写回），优先用它，避免占位消息“任务开始时间”误导
                 const msgTime = (msg && msg.role === 'assistant' && msg.updatedAt) ? msg.updatedAt : (msg ? msg.createdAt : null);
                 const mcpIds = (msg.mcpExecutionIds && Array.isArray(msg.mcpExecutionIds)) ? msg.mcpExecutionIds : [];
-                const assistantContent = String(msg && msg.content != null ? msg.content : '').trim();
                 const isAssistantPlaceholder = msg.role === 'assistant' && (
                     assistantContent === '处理中...' || assistantContent === 'Processing...'
                 );
@@ -6017,17 +6042,20 @@ async function loadConversation(conversationId) {
                 if (msg.role === 'assistant') {
                     if (messageEl && typeof window.setAssistantTurnTiming === 'function') {
                         const startedAt = msg && msg.createdAt ? msg.createdAt : null;
-                        const completedAt = msg && msg.updatedAt ? msg.updatedAt : startedAt;
+                        const completedAt = terminalState && terminalState.completedAt
+                            ? terminalState.completedAt
+                            : (msg && msg.updatedAt ? msg.updatedAt : startedAt);
                         const startedMs = assistantTurnTimestamp(startedAt);
                         const completedMs = assistantTurnTimestamp(completedAt);
-                        const isRunning = String(msg.content || '').trim() === '处理中...' || String(msg.content || '').trim() === 'Processing...';
+                        const isRunning = isAssistantPlaceholder && !terminalState;
+                        const status = terminalState ? terminalState.status : (isRunning ? 'running' : 'completed');
                         window.setAssistantTurnTiming(messageEl, {
                             startedAt: startedAt,
                             completedAt: isRunning ? null : completedAt,
                             durationMs: (!isRunning && Number.isFinite(startedMs) && Number.isFinite(completedMs))
                                 ? Math.max(0, completedMs - startedMs)
                                 : undefined,
-                            status: isRunning ? 'running' : 'completed'
+                            status: status
                         });
                     }
                     if (messageEl && msg.reasoningContent) {

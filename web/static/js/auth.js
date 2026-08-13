@@ -333,6 +333,15 @@ async function refreshAppData(showTaskErrors = false) {
         loadConversations(),
         loadActiveTasks(showTaskErrors),
     ]);
+    // 未登录首屏的项目侧栏可能先收到 401 并显示失败；认证完成后必须主动重试。
+    // 放在对话/任务刷新之后，确保最终渲染一定使用有效登录态且不会被早期失败覆盖。
+    if (typeof window.refreshChatProjectSelector === 'function') {
+        try {
+            await window.refreshChatProjectSelector({ reloadFolders: true });
+        } catch (error) {
+            console.warn('刷新项目侧栏失败:', error);
+        }
+    }
 }
 
 async function bootstrapApp() {
