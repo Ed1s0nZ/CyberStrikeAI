@@ -45421,8 +45421,12 @@ html[data-theme="dark"] .conversation-sidebar .recent-conversations-section {
 }
 
 .chat-hitl-shortcut > span {
+    display: block;
+    min-width: 0;
+    padding-block: 1px;
     overflow: hidden;
     text-overflow: ellipsis;
+    line-height: 1.4;
 }
 
 .chat-session-shortcut-chevron {
