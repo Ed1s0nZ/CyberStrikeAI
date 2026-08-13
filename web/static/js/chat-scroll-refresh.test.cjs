@@ -118,6 +118,20 @@ test('向上滚动立即解除粘底，只有滚到真实底部才恢复', () =>
     assert.equal(runtime.chatEl.scrollTop, 1200, '恢复后新增输出继续请求滚到最底部');
 });
 
+test('刷新重建详情引起的布局上移不会误判为用户上滑', () => {
+    const runtime = createScrollRuntime();
+    runtime.flushAnimationFrames();
+
+    runtime.chatEl.scrollTop = 460;
+    runtime.listeners.get('scroll')();
+    assert.equal(runtime.api.captureScrollPinState(), true, '没有用户输入的布局滚动仍应保持跟随');
+
+    runtime.chatEl.scrollHeight = 1100;
+    runtime.api.scrollIfPinned(true);
+    runtime.flushAnimationFrames();
+    assert.equal(runtime.chatEl.scrollTop, 1100, '刷新恢复后的后续增量应继续粘底');
+});
+
 test('登录成功后重新加载曾因未授权失败的项目侧栏', () => {
     const refreshSource = functionSource(auth, 'refreshAppData', 'bootstrapApp');
     const conversationsIndex = refreshSource.indexOf('loadConversations()');
@@ -149,8 +163,8 @@ test('用户真正滑到底部后恢复自动跟随且不会提前强制跳底',
     assert.doesNotMatch(scrollSource, /else if \(resumeFollowingIfAtBottom\(\)\)/);
     assert.match(scrollSource, /contentShrank/);
     assert.match(scrollSource, /sh < lastScrollHeight - 1/);
-    assert.match(scrollSource, /if \(scrolledUp\) \{[\s\S]*?setScrollDetached\(\)/);
-    assert.match(scrollSource, /if \(programmaticScroll\) \{[\s\S]*?st < lastScrollTop - 1[\s\S]*?setScrollDetached\(\)/);
+    assert.match(scrollSource, /if \(scrolledUp && \(scrollMode === 'detached' \|\| hasUserScrollIntent\)\) \{[\s\S]*?setScrollDetached\(\)/);
+    assert.match(scrollSource, /if \(programmaticScroll\) \{[\s\S]*?st < lastScrollTop - 1 && \(scrollMode === 'detached' \|\| hasUserScrollIntent\)[\s\S]*?setScrollDetached\(\)/);
 });
 
 test('切换对话模式引起的布局滚动不会重新开启粘底', () => {
@@ -205,7 +219,7 @@ test('刷新后迭代思考区独立跟随最新内容且允许用户上滑解�
     assert.match(startSource, /event\.clientX >= rect\.right - PROCESS_DETAILS_FOLLOW_SCROLLBAR_GUTTER_PX/);
     assert.match(startSource, /event\.key === 'ArrowUp'/);
     assert.match(startSource, /cancelAnimationFrame\(state\.rafId\)/);
-    assert.match(startSource, /if \(scrolledUp\) \{[\s\S]*?detachForUserNavigation\(\)/);
+    assert.match(startSource, /if \(scrolledUp && \(state\.detached \|\| Date\.now\(\) <= state\.userScrollIntentUntil\)\) \{[\s\S]*?detachForUserNavigation\(\)/);
     assert.match(startSource, /state\.detached &&[\s\S]*?scrolledDown &&[\s\S]*?Date\.now\(\) <= state\.userScrollIntentUntil/);
     assert.match(monitor, /PROCESS_DETAILS_FOLLOW_RESUME_THRESHOLD_PX = 2/);
     assert.match(startSource, /distance <= PROCESS_DETAILS_FOLLOW_RESUME_THRESHOLD_PX/);
@@ -293,8 +307,8 @@ test('消息气泡内部流式增高时仅在跟随模式继续粘底', () => {
 });
 
 test('页面在任务补流脚本之前加载智能滚动控制器', () => {
-    const scrollIndex = html.indexOf('/static/js/chat-scroll.js?v=20260813-5');
-    const monitorIndex = html.indexOf('/static/js/monitor.js?v=20260813-8');
+    const scrollIndex = html.indexOf('/static/js/chat-scroll.js?v=20260813-6');
+    const monitorIndex = html.indexOf('/static/js/monitor.js?v=20260813-9');
 
     assert.notEqual(scrollIndex, -1);
     assert.notEqual(monitorIndex, -1);

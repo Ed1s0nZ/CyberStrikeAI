@@ -2055,7 +2055,9 @@ function startProcessDetailsLatestFollow(assistantMessageId, options) {
 
         // 第一次小幅上滑时仍可能处在“距底部 32px”阈值内，不能在同一个 scroll
         // 事件里刚脱离又立即恢复，否则持续输出会把视口反复拉回底部。
-        if (scrolledUp) {
+        // 刷新后重建历史迭代会引起无用户输入的滚动锚定变化；这种布局滚动
+        // 不能停止内层最新内容跟随，只有明确用户意图或已分离状态才保持分离。
+        if (scrolledUp && (state.detached || Date.now() <= state.userScrollIntentUntil)) {
             detachForUserNavigation();
         } else if (
             state.detached &&

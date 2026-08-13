@@ -647,11 +647,12 @@
 
         const st = el.scrollTop;
         const sh = el.scrollHeight;
+        const hasUserScrollIntent = Date.now() <= userScrollIntentUntil;
 
         if (programmaticScroll) {
             // 正在执行恢复/流式粘底时，用户仍可能反向滚轮或拖动滚动条。
             // 脚本滚底只会让 scrollTop 增大；此处出现减小必定是用户在中断跟随。
-            if (st < lastScrollTop - 1) {
+            if (st < lastScrollTop - 1 && (scrollMode === 'detached' || hasUserScrollIntent)) {
                 setScrollDetached();
             }
             lastScrollTop = st;
@@ -663,7 +664,6 @@
         const scrolledUp = st < lastScrollTop - 1;
         const scrolledDown = st > lastScrollTop + 1;
         const contentShrank = sh < lastScrollHeight - 1;
-        const hasUserScrollIntent = Date.now() <= userScrollIntentUntil;
 
         // 刷新/终态重绘会先清空或折叠旧 DOM，浏览器会被动把 scrollTop 压小。
         // 这不是用户上滑，不应错误退出 following。
@@ -674,7 +674,9 @@
             return;
         }
 
-        if (scrolledUp) {
+        // 刷新恢复会重建消息和详情，滚动锚定可能在没有用户输入时让 scrollTop
+        // 暂时减小。只有明确的滚轮、触控、键盘或滚动条意图才解除粘底。
+        if (scrolledUp && (scrollMode === 'detached' || hasUserScrollIntent)) {
             setScrollDetached();
         } else if (
             scrolledDown &&
