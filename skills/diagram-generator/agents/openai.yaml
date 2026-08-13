@@ -1,0 +1,3 @@
+interface:
+  display_name: "Diagram Generator"
+  short_description: "Generate and render Mermaid, Graphviz, PlantUML, and SVG diagrams."

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Template Render Path"
+  short_description: "Trace SSR loaders, templates, hydration, and render trust gaps"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-template-render-path to trace route loaders, template context, hydration payloads, and the render boundary that creates the decisive behavior."
+
+policy:
+  allow_implicit_invocation: false

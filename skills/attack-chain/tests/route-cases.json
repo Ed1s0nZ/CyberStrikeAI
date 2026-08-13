@@ -1,0 +1,502 @@
+{
+  "version": 1,
+  "description": "attack-chain 路由夹具。context 为确定化路由输入（阶段、WSTG 域、vuln_class、平台、工具、前置），expect 为机械可比对的期望。覆盖：多阶段 Web/云/AD、单阶段排除、WSTG 分类、失败场景与交接字段。",
+  "cases": [
+    {
+      "id": "case:multi-stage-web-sqli",
+      "description": "多阶段 Web 评估中的 SQLi 验证 Task",
+      "context": {
+        "multi_stage": true,
+        "single_stage": false,
+        "report_only": false,
+        "method_phase": "vulnerability-analysis",
+        "target_kind": "web",
+        "platform": "Linux",
+        "techniques": ["T1190"],
+        "wstg_categories": ["WSTG-INPV"],
+        "tools": ["bash", "web_fetch", "artifact_write", "task_result_submit"],
+        "capabilities": [],
+        "evidence": ["recon-baseline"],
+        "task": { "action": true, "vuln_class": "sqli" }
+      },
+      "expect": {
+        "load_attack_chain": true,
+        "status": "routed",
+        "route": "route:web-inpv-sqli",
+        "specialist": "offensive-sqli",
+        "router": null,
+        "execution_class": "standard",
+        "must_not_route": ["offensive-xss", "ctf-web", "offensive-skill-router"]
+      }
+    },
+    {
+      "id": "case:multi-stage-web-category-unclear",
+      "description": "多阶段 Web 任务但测试域不清楚，先经 offensive-skill-router 分类",
+      "context": {
+        "multi_stage": true,
+        "single_stage": false,
+        "report_only": false,
+        "method_phase": "vulnerability-analysis",
+        "target_kind": "web",
+        "platform": "Linux",
+        "techniques": ["T1190"],
+        "tools": ["web_fetch"],
+        "capabilities": [],
+        "evidence": [],
+        "task": { "action": true, "category_unclear": true }
+      },
+      "expect": {
+        "load_attack_chain": true,
+        "status": "routed",
+        "route": "route:web-classify-router",
+        "router": "offensive-skill-router",
+        "specialist": null,
+        "execution_class": "fast",
+        "must_not_route": ["offensive-sqli", "offensive-xss"]
+      }
+    },
+    {
+      "id": "case:multi-stage-cloud-metadata-pivot",
+      "description": "云到主机链：SSRF 证据后验证元数据凭据可得性",
+      "context": {
+        "multi_stage": true,
+        "single_stage": false,
+        "report_only": false,
+        "method_phase": "controlled-exploitation",
+        "target_kind": "cloud",
+        "platform": "IaaS",
+        "techniques": ["T1552"],
+        "tools": ["bash", "web_fetch"],
+        "capabilities": [],
+        "evidence": ["ssrf-or-metadata-reachability"],
+        "task": { "action": true }
+      },
+      "expect": {
+        "load_attack_chain": true,
+        "status": "routed",
+        "route": "route:cloud-metadata-credential",
+        "specialist": "offensive-cloud",
+        "execution_class": "standard",
+        "must_not_route": ["offensive-ssrf", "security-passwords"]
+      }
+    },
+    {
+      "id": "case:multi-stage-ad-lateral",
+      "description": "外到内链：已持域凭据后的 SMB 横向",
+      "context": {
+        "multi_stage": true,
+        "single_stage": false,
+        "report_only": false,
+        "method_phase": "post-exploitation",
+        "target_kind": "ad",
+        "platform": "Windows",
+        "techniques": ["T1021"],
+        "tools": ["bash", "route_open"],
+        "capabilities": ["domain-credential", "route-or-network-access"],
+        "evidence": ["domain-inventory"],
+        "task": { "action": true, "success_criteria": true }
+      },
+      "expect": {
+        "load_attack_chain": true,
+        "status": "routed",
+        "route": "route:ad-lateral-smb",
+        "specialist": "offensive-active-directory",
+        "execution_class": "standard",
+        "must_not_route": ["windows-ad", "offensive-rce"]
+      }
+    },
+    {
+      "id": "case:multi-stage-ctf",
+      "description": "多阶段隔离 CTF：经编排器下选，不直接加载 competition-*",
+      "context": {
+        "multi_stage": true,
+        "single_stage": false,
+        "report_only": false,
+        "method_phase": "vulnerability-analysis",
+        "target_kind": "ctf",
+        "tools": ["bash"],
+        "capabilities": [],
+        "evidence": [],
+        "task": { "action": true, "ctf_mode": true }
+      },
+      "expect": {
+        "load_attack_chain": true,
+        "status": "routed",
+        "route": "route:ctf-orchestrated",
+        "router": "ctf-sandbox-orchestrator",
+        "specialist": null,
+        "execution_class": "standard",
+        "must_not_route": ["ctf-web", "offensive-sqli"]
+      }
+    },
+    {
+      "id": "case:recon-port-scan-multi",
+      "description": "多阶段评估中的端口基线 Task，heavy 类",
+      "context": {
+        "multi_stage": true,
+        "single_stage": false,
+        "report_only": false,
+        "method_phase": "recon-discovery",
+        "target_kind": "network",
+        "platform": "Network",
+        "techniques": ["T1595"],
+        "tools": ["bash"],
+        "capabilities": [],
+        "evidence": [],
+        "task": { "action": true }
+      },
+      "expect": {
+        "load_attack_chain": true,
+        "status": "routed",
+        "route": "route:recon-service-scan",
+        "specialist": "recon-port-scan",
+        "execution_class": "heavy",
+        "must_not_route": ["offensive-fast-checking"]
+      }
+    },
+    {
+      "id": "case:wstg-athz-idor",
+      "description": "WSTG 授权域：IDOR 双角色对照",
+      "context": {
+        "multi_stage": true,
+        "single_stage": false,
+        "report_only": false,
+        "method_phase": "vulnerability-analysis",
+        "target_kind": "api",
+        "platform": "Linux",
+        "techniques": ["T1190"],
+        "wstg_categories": ["WSTG-ATHZ"],
+        "tools": ["web_fetch", "browser_render"],
+        "capabilities": ["two-roles-or-accounts"],
+        "evidence": [],
+        "task": { "action": true, "vuln_class": "idor" }
+      },
+      "expect": {
+        "load_attack_chain": true,
+        "status": "routed",
+        "route": "route:web-athz-idor",
+        "specialist": "offensive-idor",
+        "execution_class": "standard",
+        "must_not_route": ["api-security", "offensive-business-logic"]
+      }
+    },
+    {
+      "id": "case:wstg-sess-jwt",
+      "description": "WSTG 会话域：JWT 弱密钥/伪造验证",
+      "context": {
+        "multi_stage": true,
+        "single_stage": false,
+        "report_only": false,
+        "method_phase": "vulnerability-analysis",
+        "target_kind": "api",
+        "platform": "Linux",
+        "techniques": ["T1190"],
+        "wstg_categories": ["WSTG-SESS"],
+        "tools": ["bash", "web_fetch"],
+        "capabilities": [],
+        "evidence": [],
+        "task": { "action": true, "vuln_class": "jwt" }
+      },
+      "expect": {
+        "load_attack_chain": true,
+        "status": "routed",
+        "route": "route:web-sess-jwt",
+        "specialist": "offensive-jwt",
+        "execution_class": "standard",
+        "must_not_route": ["offensive-oauth", "identity-federation"]
+      }
+    },
+    {
+      "id": "case:wstg-busl-file-upload",
+      "description": "WSTG 业务逻辑域：文件上传绕过",
+      "context": {
+        "multi_stage": true,
+        "single_stage": false,
+        "report_only": false,
+        "method_phase": "vulnerability-analysis",
+        "target_kind": "web",
+        "platform": "Linux",
+        "techniques": ["T1190"],
+        "wstg_categories": ["WSTG-BUSL"],
+        "tools": ["bash", "web_fetch"],
+        "capabilities": [],
+        "evidence": [],
+        "task": { "action": true, "vuln_class": "file-upload" }
+      },
+      "expect": {
+        "load_attack_chain": true,
+        "status": "routed",
+        "route": "route:web-busl-file-upload",
+        "specialist": "offensive-file-upload",
+        "execution_class": "standard",
+        "must_not_route": ["offensive-rce", "offensive-business-logic"]
+      }
+    },
+    {
+      "id": "case:single-stage-sqli-bypass",
+      "description": "单漏洞验证：绕过 attack-chain 直达 offensive-sqli",
+      "context": {
+        "multi_stage": false,
+        "single_stage": true,
+        "report_only": false,
+        "method_phase": "vulnerability-analysis",
+        "target_kind": "web",
+        "platform": "Linux",
+        "techniques": ["T1190"],
+        "wstg_categories": ["WSTG-INPV"],
+        "tools": ["bash", "web_fetch"],
+        "capabilities": [],
+        "evidence": [],
+        "task": { "action": true, "vuln_class": "sqli" }
+      },
+      "expect": {
+        "load_attack_chain": false,
+        "specialist": "offensive-sqli"
+      }
+    },
+    {
+      "id": "case:single-stage-port-scan-bypass",
+      "description": "单端口扫描：绕过 attack-chain 直达 recon-port-scan",
+      "context": {
+        "multi_stage": false,
+        "single_stage": true,
+        "report_only": false,
+        "method_phase": "recon-discovery",
+        "target_kind": "network",
+        "platform": "Network",
+        "techniques": ["T1595"],
+        "tools": ["bash"],
+        "capabilities": [],
+        "evidence": [],
+        "task": { "action": true }
+      },
+      "expect": {
+        "load_attack_chain": false,
+        "specialist": "recon-port-scan"
+      }
+    },
+    {
+      "id": "case:single-stage-apk-reverse-bypass",
+      "description": "单逆向任务：绕过 attack-chain 直达 apk-reverse（mobile overlay）",
+      "context": {
+        "multi_stage": false,
+        "single_stage": true,
+        "report_only": false,
+        "method_phase": "vulnerability-analysis",
+        "target_kind": "mobile",
+        "tools": ["bash"],
+        "capabilities": [],
+        "evidence": [],
+        "task": { "action": true }
+      },
+      "expect": {
+        "load_attack_chain": false,
+        "specialist": "apk-reverse"
+      }
+    },
+    {
+      "id": "case:report-only-bypass",
+      "description": "仅报告任务：直达 offensive-reporting，攻击 route 全部被 report_only 排除",
+      "context": {
+        "multi_stage": false,
+        "single_stage": false,
+        "report_only": true,
+        "method_phase": "reporting",
+        "target_kind": "report",
+        "tools": ["artifact_read", "artifact_write"],
+        "capabilities": [],
+        "evidence": ["confirmed-and-negative-findings"],
+        "task": { "action": true, "report_style": "assessment" }
+      },
+      "expect": {
+        "load_attack_chain": false,
+        "specialist": "offensive-reporting"
+      }
+    },
+    {
+      "id": "case:fail-missing-capability",
+      "description": "失败场景：AD 横向缺 domain-credential 前置，返回 routing gap 而非虚构",
+      "context": {
+        "multi_stage": true,
+        "single_stage": false,
+        "report_only": false,
+        "method_phase": "post-exploitation",
+        "target_kind": "ad",
+        "platform": "Windows",
+        "techniques": ["T1021"],
+        "tools": ["bash", "route_open"],
+        "capabilities": [],
+        "evidence": ["domain-inventory"],
+        "task": { "action": true, "success_criteria": true }
+      },
+      "expect": {
+        "load_attack_chain": true,
+        "status": "gap"
+      }
+    },
+    {
+      "id": "case:fail-tool-unavailable",
+      "description": "失败场景：XSS 验证缺 browser_render/web_fetch 任一可用工具，返回 routing gap",
+      "context": {
+        "multi_stage": true,
+        "single_stage": false,
+        "report_only": false,
+        "method_phase": "vulnerability-analysis",
+        "target_kind": "web",
+        "platform": "Linux",
+        "techniques": ["T1190"],
+        "wstg_categories": ["WSTG-CLNT"],
+        "tools": ["bash"],
+        "capabilities": [],
+        "evidence": [],
+        "task": { "action": true, "vuln_class": "xss" }
+      },
+      "expect": {
+        "load_attack_chain": true,
+        "status": "gap"
+      }
+    },
+    {
+      "id": "case:fail-single-stage-lateral-excluded",
+      "description": "失败场景：横向 route 被 excludes.single_stage 排除，单阶段上下文返回 gap",
+      "context": {
+        "multi_stage": false,
+        "single_stage": true,
+        "report_only": false,
+        "method_phase": "post-exploitation",
+        "target_kind": "ad",
+        "platform": "Windows",
+        "techniques": ["T1021"],
+        "tools": ["bash", "route_open"],
+        "capabilities": ["domain-credential", "route-or-network-access"],
+        "evidence": ["domain-inventory"],
+        "task": { "action": true, "success_criteria": true }
+      },
+      "expect": {
+        "load_attack_chain": true,
+        "status": "gap"
+      }
+    },
+    {
+      "id": "case:fail-report-only-attack-excluded",
+      "description": "失败场景：report_only 上下文不匹配任何攻击 route",
+      "context": {
+        "multi_stage": false,
+        "single_stage": false,
+        "report_only": true,
+        "method_phase": "vulnerability-analysis",
+        "target_kind": "web",
+        "platform": "Linux",
+        "techniques": ["T1190"],
+        "wstg_categories": ["WSTG-INPV"],
+        "tools": ["bash", "web_fetch"],
+        "capabilities": [],
+        "evidence": [],
+        "task": { "action": true, "vuln_class": "sqli" }
+      },
+      "expect": {
+        "load_attack_chain": true,
+        "status": "gap"
+      }
+    },
+    {
+      "id": "case:fail-no-mapping",
+      "description": "失败场景：C2 通道诉求无真实技能映射（TA0011 为显式 gap）",
+      "context": {
+        "multi_stage": true,
+        "single_stage": false,
+        "report_only": false,
+        "method_phase": "post-exploitation",
+        "target_kind": "host",
+        "platform": "Linux",
+        "techniques": ["T1090"],
+        "tools": ["bash"],
+        "capabilities": ["local-session"],
+        "evidence": [],
+        "task": { "action": true }
+      },
+      "expect": {
+        "load_attack_chain": true,
+        "status": "gap"
+      }
+    },
+    {
+      "id": "case:legacy-skill-preferred",
+      "description": "同类备选：显式 preferred_skill 时才选中 exploit-sqli",
+      "context": {
+        "multi_stage": true,
+        "single_stage": false,
+        "report_only": false,
+        "method_phase": "vulnerability-analysis",
+        "target_kind": "web",
+        "platform": "Linux",
+        "techniques": ["T1190"],
+        "wstg_categories": ["WSTG-INPV"],
+        "tools": ["bash", "web_fetch"],
+        "capabilities": [],
+        "evidence": [],
+        "task": { "action": true, "vuln_class": "sqli", "preferred_skill": "exploit-sqli" }
+      },
+      "expect": {
+        "load_attack_chain": true,
+        "status": "routed",
+        "route": "route:web-inpv-sqli-legacy",
+        "specialist": "exploit-sqli",
+        "execution_class": "standard",
+        "must_not_route": ["offensive-sqli"]
+      }
+    },
+    {
+      "id": "case:cleanup-phase",
+      "description": "P7 清理：不加载专项，仅 Runtime route 工具",
+      "context": {
+        "multi_stage": true,
+        "single_stage": false,
+        "report_only": false,
+        "method_phase": "cleanup-verification",
+        "target_kind": "network",
+        "tools": ["route_status", "route_stop", "artifact_write"],
+        "capabilities": [],
+        "evidence": [],
+        "task": { "action": true }
+      },
+      "expect": {
+        "load_attack_chain": true,
+        "status": "routed",
+        "route": "route:cleanup-managed-routes",
+        "router": null,
+        "specialist": null,
+        "execution_class": "fast"
+      }
+    },
+    {
+      "id": "case:handoff-shape",
+      "description": "交接：suggestedNextGoal 为字符串并保留 tactic/前置 Ref/负结果/清理状态",
+      "context": {
+        "multi_stage": true,
+        "single_stage": false,
+        "report_only": false,
+        "method_phase": "vulnerability-analysis",
+        "target_kind": "web",
+        "platform": "Linux",
+        "techniques": ["T1190"],
+        "wstg_categories": ["WSTG-INPV"],
+        "tools": ["bash", "web_fetch"],
+        "capabilities": [],
+        "evidence": [],
+        "task": { "action": true, "vuln_class": "ssrf" }
+      },
+      "expect": {
+        "load_attack_chain": true,
+        "status": "routed",
+        "route": "route:web-inpv-ssrf",
+        "specialist": "offensive-ssrf",
+        "execution_class": "standard"
+      },
+      "handoff_sample": {
+        "status": "partial",
+        "suggestedNextGoal": "验证云元数据凭据可得性（TA0006/T1552.005）：前置 evidence=<ssrf-positive-ref>, artifact=<poc-ref>；已确认负结果：内网直连不可达；本 Task 未创建受管 route，无待清理项；验收：凭据可得性对照可复现"
+      }
+    }
+  ]
+}

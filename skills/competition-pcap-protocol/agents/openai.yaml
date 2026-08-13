@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Pcap Protocol"
+  short_description: "Rebuild sessions, decode protocols, and tie packets to behavior"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-pcap-protocol to reconstruct sessions from this PCAP, decode the application protocol, and tie packet evidence to the challenge behavior."
+
+policy:
+  allow_implicit_invocation: false

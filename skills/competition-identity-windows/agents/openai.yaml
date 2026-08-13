@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Identity Windows"
+  short_description: "Trace tickets, tokens, mailbox rules, and Windows pivot paths"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-identity-windows to trace tickets, tokens, Windows host evidence, mailbox rules, or lateral movement in this challenge."
+
+policy:
+  allow_implicit_invocation: false

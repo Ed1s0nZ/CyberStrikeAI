@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Lsass Ticket Material"
+  short_description: "Trace LSASS secrets, tickets, caches, and replayable material"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-lsass-ticket-material to trace LSASS-resident secrets, ticket material, cache artifacts, and the replayable credential edge in this challenge."
+
+policy:
+  allow_implicit_invocation: false

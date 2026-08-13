@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Ssrf Metadata Pivot"
+  short_description: "Trace SSRF paths, metadata pivots, and accepted credential edges"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-ssrf-metadata-pivot to trace SSRF reachability, metadata pivots, and the accepted credential edge."
+
+policy:
+  allow_implicit_invocation: false

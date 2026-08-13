@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Ios Runtime"
+  short_description: "Hook IPA signers, keychain access, pinning checks, and requests"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-ios-runtime to inspect this IPA, trace iOS signer or keychain logic, bypass trust checks, and replay the accepted request path."
+
+policy:
+  allow_implicit_invocation: false

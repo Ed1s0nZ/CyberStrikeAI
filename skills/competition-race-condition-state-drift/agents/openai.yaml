@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Race Condition State Drift"
+  short_description: "Reproduce races, ordering bugs, and state drift under contention"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-race-condition-state-drift to reproduce race windows, ordering bugs, and decisive state drift."
+
+policy:
+  allow_implicit_invocation: false

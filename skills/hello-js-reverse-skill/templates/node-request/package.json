@@ -1,0 +1,14 @@
+{
+  "name": "camoufox-reverse-node-request",
+  "version": "1.0.0",
+  "description": "Camoufox逆向 - 纯Node.js算法还原模板",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js",
+    "test": "node main.js --test"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "crypto-js": "^4.2.0"
+  }
+}

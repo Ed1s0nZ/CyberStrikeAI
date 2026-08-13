@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Container Runtime"
+  short_description: "Explain runtime-vs-manifest drift, mounts, sidecars, and routes"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-container-runtime to explain why the live container differs from manifests and where mounts, sidecars, or namespaces change runtime state."
+
+policy:
+  allow_implicit_invocation: false

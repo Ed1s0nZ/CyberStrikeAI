@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Reverse Pwn"
+  short_description: "Reverse binaries, inspect crashes, and prove exploit paths"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-reverse-pwn to reverse this binary, inspect crash or dump evidence, and prove the exploit or decoded behavior."
+
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition K8s Control Plane"
+  short_description: "Trace kube API, service accounts, secrets, and workload drift"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-k8s-control-plane to trace this Kubernetes control-plane path, service-account edge, secret exposure, or workload drift in the sandbox."
+
+policy:
+  allow_implicit_invocation: false

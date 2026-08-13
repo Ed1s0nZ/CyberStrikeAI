@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition File Parser Chain"
+  short_description: "Trace upload parsing, converters, archives, and deserialization"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-file-parser-chain to trace this upload or import through parsing, extraction, conversion, deserialization, and the decisive backend effect."
+
+policy:
+  allow_implicit_invocation: false

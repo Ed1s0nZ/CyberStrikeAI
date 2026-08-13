@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Stego Media"
+  short_description: "Inspect media channels, trailers, and hidden payload boundaries"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-stego-media to inspect this media file for metadata tricks, hidden channels, trailers, or recoverable embedded payloads."
+
+policy:
+  allow_implicit_invocation: false

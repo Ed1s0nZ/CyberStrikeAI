@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Custom Protocol Replay"
+  short_description: "Replay custom framing, message order, and accepted state"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-custom-protocol-replay to recover this custom protocol framing, replay message order, and reproduce the accepted protocol state."
+
+policy:
+  allow_implicit_invocation: false

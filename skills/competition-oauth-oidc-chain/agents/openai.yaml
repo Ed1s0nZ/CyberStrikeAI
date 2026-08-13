@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Oauth Oidc Chain"
+  short_description: "Trace OAuth redirects, tokens, scopes, and accepted login flow"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-oauth-oidc-chain to trace redirects, scopes, tokens, claims, and the accepted OAuth or OIDC login path in this challenge."
+
+policy:
+  allow_implicit_invocation: false

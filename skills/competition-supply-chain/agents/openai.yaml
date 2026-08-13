@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Supply Chain"
+  short_description: "Trace dependency drift, CI output, and shipped artifact lineage"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-supply-chain to trace dependency drift, CI behavior, release tampering, and which artifact the runtime really consumes."
+
+policy:
+  allow_implicit_invocation: false

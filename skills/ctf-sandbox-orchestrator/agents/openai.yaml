@@ -1,0 +1,7 @@
+interface:
+  display_name: "CTF Sandbox Orchestrator"
+  short_description: "Primary sandbox router for CTF and high-grade challenge ops"
+  default_prompt: "Use $ctf-sandbox-orchestrator as the default entrypoint, enforce sandbox assumptions, and self-route to the right specialist path for this challenge."
+
+policy:
+  allow_implicit_invocation: true

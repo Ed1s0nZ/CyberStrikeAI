@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Web Runtime"
+  short_description: "Inspect live web requests, routing, auth, and worker flow"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-web-runtime to inspect live browser requests, routing, auth state, uploads, and worker flow in this challenge."
+
+policy:
+  allow_implicit_invocation: false

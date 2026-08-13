@@ -1,0 +1,159 @@
+# CMS Fingerprinting Patterns
+# Common CMS detection patterns for fingerprinting
+
+# WordPress
+/wp-admin/
+/wp-login.php
+/wp-content/
+/wp-includes/
+/wp-json/
+xmlrpc.php
+wp-config.php
+wp-comments-post.php
+wp-cron.php
+wp-settings.php
+readme.html
+license.txt
+wordpress
+wp-
+wp-includes
+wp-content
+wp-json
+wp-json
+wp-json
+/wp-content/uploads/
+
+# Drupal
+/user/login
+/admin
+/drupal
+/sites/all/
+/modules/
+/themes/
+/includes/
+/misc/
+/profiles/
+/scripts/
+Drupal.settings
+drupal.settings
+css/drupal
+sites/default/files
+
+# Joomla
+/administrator/
+/components/
+/modules/
+/plugins/
+/templates/
+/cache/
+/includes/
+configuration.php
+Joomla!
+joomla
+com_content
+com_users
+com_wrapper
+
+# Magento
+/admin/
+/app/
+/skin/
+/js/media/
+/checkout/
+/downloader/
+magento
+Mage.Cookies
+Mage.Cookies.path
+
+# TYPO3
+/typo3/
+/typo3conf/
+/typo3temp/
+/typo3_src/
+/t3lib/
+fileadmin
+typo3
+
+# vBulletin
+/forum/
+/forums/
+/clientscript/
+/includes/
+/customprofile/
+vbseo_
+
+# SMF
+/smf/
+/index.php?action=admin
+/Themes/
+/Sources/
+/Smileys/
+
+# XenForo
+/forums/
+/xenforo/
+/threads/
+/posts/
+/community/
+
+# phpBB
+/phpBB/
+/memberlist.php
+search.php
+viewforum.php
+phpbb
+
+# Ghost
+/ghost/
+/ghost/api/
+/content/images/
+ghost-url
+
+# Shopify
+/s/
+/collections/
+/products/
+/shopify.shopifycdn
+cdn.shopify.com
+
+# Squarespace
+.squarespace
+/static1.squarespace.com
+
+# Wix
+wix.com
+wix-static
+.files.wix
+
+# Weebly
+weebly
+weebly-analytics
+
+# PrestaShop
+/prestashop-
+/modules/
+/admin/
+/shop/
+
+# OpenCart
+/opencart/
+/catalog/
+/system/
+/admin/
+
+# OsCommerce
+/oscommerce/
+/includes/
+/admin/
+
+# Nextcloud
+/nextcloud/
+/nextcloud/remote.php
+/status.php
+apps/
+
+# OwnCloud
+/owncloud/
+/remote.php
+/status.php
+apps/

@@ -1,0 +1,143 @@
+# Common TCP Services and Ports
+# Format: Port/Protocol		Service Name		Description
+
+# Data Transmission
+21/tcp	ftp		File Transfer Protocol (Control)
+22/tcp	ssh		Secure Shell
+23/tcp	telnet		Telnet Remote Login
+69/udp	tftp		Trivial File Transfer Protocol
+139/tcp	netbios-ssn	NetBIOS Session Service
+445/tcp	smb		Server Message Block (SMB over TCP)
+548/tcp	afp		Apple Filing Protocol
+1521/tcp	oracle		Oracle Database
+3306/tcp	mysql		MySQL Database
+3389/tcp	rdp		Remote Desktop Protocol
+5432/tcp	postgresql	PostgreSQL Database
+5900/tcp	vnc		Virtual Network Computing
+6379/tcp	redis		Redis Database
+27017/tcp	mongodb	MongoDB Database
+
+# Email
+25/tcp	smtp		Simple Mail Transfer Protocol
+109/tcp	pop2		Post Office Protocol v2
+110/tcp	pop3		Post Office Protocol v3
+143/tcp	imap		Internet Message Access Protocol
+993/tcp	imaps		IMAP over SSL
+995/tcp	pop3s		POP3 over SSL
+
+# Web Services
+80/tcp	http		Hypertext Transfer Protocol
+443/tcp	https		HTTP over SSL/TLS
+8000/tcp	http-alt	HTTP Alternate
+8008/tcp	http		HTTP Alternate
+8080/tcp	http-proxy	HTTP Proxy
+8443/tcp	https-alt	HTTPS Alternate
+8888/tcp	http		HTTP Alternate
+
+# DNS
+53/tcp	dns		Domain Name System (TCP)
+53/udp	dns		Domain Name System (UDP)
+
+# Directory Services
+389/tcp	ldap		Lightweight Directory Access Protocol
+636/tcp	ldaps		LDAP over SSL
+3268/tcp	ldap-gc	LDAP Global Catalog
+3269/tcp	ldap-gc-s	LDAP Global Catalog over SSL
+
+# Authentication and Identity
+88/tcp	kerberos	Kerberos
+88/udp	kerberos	Kerberos
+464/tcp	kpasswd5	Kerberos Password Change
+494/tcp	tacacs	TACACS+ with TLS
+1812/udp	radius		RADIUS Authentication
+1813/udp	radius-acct	RADIUS Accounting
+
+# Network Management
+161/udp	snmp		Simple Network Management Protocol
+162/udp	snmptrap	SNMP Trap
+514/udp	syslog		Syslog
+
+# Remote Procedure Call
+111/tcp	rpcbind	Sun RPC Portmapper
+135/tcp	msrpc		Microsoft RPC
+2049/tcp	nfs		Network File System
+
+# Time Services
+37/tcp	time		Time Protocol
+123/udp	ntp		Network Time Protocol
+
+# Real-Time Communications
+5060/tcp	sip		Session Initiation Protocol
+5061/tcp	sips		SIP over TLS
+5222/tcp	xmpp		XMPP Client Connection
+5269/tcp	xmpp-server	XMPP Server Connection
+
+# Database Clustering
+1189/tcp	oracle-ems	Oracle Event Management
+1434/tcp	ms-sql-s	Microsoft SQL Server monitor
+1433/tcp	ms-sql-s	Microsoft SQL Server
+50000/tcp	db2	DB2 Database
+9042/tcp	cassandra	Cassandra Database
+9200/tcp	elasticsearch	Elasticsearch HTTP
+9300/tcp	elasticsearch	Elasticsearch Transport
+
+# Messaging and Queuing
+5672/tcp	amqp		Advanced Message Queuing Protocol
+61616/tcp	activemq	ActiveMQ Message Broker
+9092/tcp	kafka		Apache Kafka
+5671/tcp	amqps		AMQP over SSL
+
+# Container and Orchestration
+2375/tcp	docker		Docker Daemon HTTP
+2376/tcp	docker		Docker Daemon HTTPS
+2379/tcp	etcd-client	etcd Client API
+2380/tcp	etcd-server	etcd Server API
+6443/tcp	kube-apiserver	Kubernetes API Server
+10250/tcp	kubelet	Kubelet API
+10255/tcp	kubelet	Kubelet Read-only API
+
+# File Sharing
+445/tcp	smb		Server Message Block
+514/udp	syslog		Syslog
+
+# Virtualization
+5900-5910/tcp	vnc		VNC (Virtual Network Computing)
+5985/tcp	wsman		WinRM HTTP
+5986/tcp	wsman		WinRM HTTPS
+16509/tcp	libvirt	Libvirt API
+16514/tcp	libvirt	Libvirt SSL
+
+# Infrastructure and Monitoring
+9100/tcp	printer		PHP System Manager
+9200/tcp	elasticsearch	Elasticsearch
+9300/tcp	elasticsearch	Elasticsearch
+15672/tcp	rabbitmq	RabbitMQ Management UI
+15674/tcp	rabbitmq	RabbitMQ STOMP over WebSockets
+
+# VPN and Tunneling
+1194/tcp	openvpn	OpenVPN
+500/udp	ike		IKE IPsec VPN
+1701/tcp	l2tp		L2TP
+1723/tcp	pptp		Point-to-Point Tunneling Protocol
+4500/udp	ike-nat	IKE NAT Traversal
+
+# Certificate Services
+80/tcp	ocsp		OCSP (Online Certificate Status Protocol)
+
+# Proxy Services
+3128/tcp	squid		Squid Proxy
+1080/tcp	socks		SOCKS Proxy
+8080/tcp	http-proxy	HTTP Proxy
+8443/tcp	https-proxy	HTTPS Proxy
+
+# Common Backdoor Ports (Security Awareness)
+12345/tcp	netbus		NetBus
+31337/tcp	back-orifice	Back Orifice
+54321/tcp	back-orifice	Back Orifice 2000
+
+# IoT and Embedded Devices
+1883/tcp	mqtt		Message Queuing Telemetry Transport
+8883/tcp	mqtts		MQTT over SSL
+23/tcp	telnet		Telnet (common in IoT)
+2323/tcp	telnet		Telnet alternate IoT port
+8080/tcp	http		IoT web interface

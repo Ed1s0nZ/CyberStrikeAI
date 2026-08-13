@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Relay Coercion Chain"
+  short_description: "Trace coercion, relay targets, and accepted auth edges"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-relay-coercion-chain to trace the coercion step, relay target, and accepted authentication edge in this challenge."
+
+policy:
+  allow_implicit_invocation: false

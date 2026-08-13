@@ -1,0 +1,5 @@
+requests>=2.31.0
+pycryptodome>=3.20.0
+# execjs>=1.5.1
+# curl_cffi>=0.6.0
+# httpx[http2]>=0.27.0

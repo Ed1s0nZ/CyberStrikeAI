@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Ad Certificate Abuse"
+  short_description: "Trace templates, EKUs, enrollment paths, and cert privilege"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-ad-certificate-abuse to trace certificate templates, enrollment rights, EKUs, and cert-based privilege in this AD challenge."
+
+policy:
+  allow_implicit_invocation: false

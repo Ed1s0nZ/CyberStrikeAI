@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Crypto Mobile"
+  short_description: "Decode blobs, inspect stego, and hook mobile signers"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-crypto-mobile to decode this blob, recover the transform chain, inspect stego payloads, or hook the mobile signing path."
+
+policy:
+  allow_implicit_invocation: false

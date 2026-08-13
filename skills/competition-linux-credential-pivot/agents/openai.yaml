@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Linux Credential Pivot"
+  short_description: "Trace Linux creds, tokens, sockets, and host-to-host pivots"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-linux-credential-pivot to trace Linux credential artifacts, accepted replay points, and pivot chains."
+
+policy:
+  allow_implicit_invocation: false

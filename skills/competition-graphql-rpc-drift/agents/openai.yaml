@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Graphql Rpc Drift"
+  short_description: "Trace GraphQL or RPC contracts, drift, and hidden operations"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-graphql-rpc-drift to compare client contracts, schemas, persisted queries, and live handlers to find the decisive drift."
+
+policy:
+  allow_implicit_invocation: false

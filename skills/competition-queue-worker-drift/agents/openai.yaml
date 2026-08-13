@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Queue Worker Drift"
+  short_description: "Trace queue payloads, worker state, retries, and async drift"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-queue-worker-drift to trace queued payloads, worker execution, retries, and the async state drift that creates the decisive behavior."
+
+policy:
+  allow_implicit_invocation: false

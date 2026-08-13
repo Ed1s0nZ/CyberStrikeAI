@@ -1,0 +1,13 @@
+.DS_Store
+node_modules/
+*.log
+.idea/
+
+# 私有域名映射（不纳入版本控制）
+cases/_private_mapping.json
+
+# 域级 Session 档案（含运行时状态，不纳入版本控制）
+cases/_session_archives/
+
+# Claude 配置目录
+.claude/

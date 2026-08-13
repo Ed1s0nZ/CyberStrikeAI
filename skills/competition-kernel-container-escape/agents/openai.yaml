@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Kernel Container Escape"
+  short_description: "Map kernel and container boundaries to prove escape primitives"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-kernel-container-escape to map kernel and container boundaries and prove the decisive escape primitive."
+
+policy:
+  allow_implicit_invocation: false

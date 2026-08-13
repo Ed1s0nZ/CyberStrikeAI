@@ -1,0 +1,86 @@
+{
+  "active-directory": [
+    "offensive-active-directory"
+  ],
+  "ai": [
+    "offensive-ai-security"
+  ],
+  "auth": [
+    "offensive-jwt",
+    "offensive-oauth"
+  ],
+  "cloud": [
+    "offensive-cloud"
+  ],
+  "exploit-dev": [
+    "offensive-basic-exploitation",
+    "offensive-crash-analysis",
+    "offensive-exploit-dev-course",
+    "offensive-exploit-development",
+    "offensive-mitigations",
+    "offensive-toctou"
+  ],
+  "fuzzing": [
+    "offensive-bug-identification",
+    "offensive-fuzzing",
+    "offensive-fuzzing-course",
+    "offensive-vuln-classes"
+  ],
+  "infrastructure": [
+    "offensive-advanced-redteam",
+    "offensive-edr-evasion",
+    "offensive-initial-access",
+    "offensive-keylogger-arch",
+    "offensive-shellcode",
+    "offensive-windows-boundaries",
+    "offensive-windows-mitigations"
+  ],
+  "iot": [
+    "offensive-iot"
+  ],
+  "mobile": [
+    "offensive-mobile"
+  ],
+  "recon": [
+    "offensive-osint",
+    "offensive-osint-methodology"
+  ],
+  "utility": [
+    "offensive-fast-checking",
+    "offensive-reporting"
+  ],
+  "web": [
+    "offensive-business-logic",
+    "offensive-deserialization",
+    "offensive-file-upload",
+    "offensive-graphql",
+    "offensive-idor",
+    "offensive-open-redirect",
+    "offensive-parameter-pollution",
+    "offensive-race-condition",
+    "offensive-rce",
+    "offensive-request-smuggling",
+    "offensive-sqli",
+    "offensive-ssrf",
+    "offensive-ssti",
+    "offensive-waf-bypass",
+    "offensive-xss",
+    "offensive-xxe"
+  ],
+  "wireless": [
+    "offensive-bluetooth-ble",
+    "offensive-bluetooth-classic",
+    "offensive-deauth-disassoc",
+    "offensive-evil-twin",
+    "offensive-krack-fragattacks",
+    "offensive-lorawan-sub-ghz",
+    "offensive-wifi",
+    "offensive-wifi-recon",
+    "offensive-wpa-enterprise",
+    "offensive-wpa2-psk",
+    "offensive-wpa3-sae",
+    "offensive-wps",
+    "offensive-z-wave",
+    "offensive-zigbee-thread-matter"
+  ]
+}

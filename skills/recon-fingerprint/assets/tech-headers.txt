@@ -1,0 +1,137 @@
+# Technology Header Signatures
+# HTTP headers and patterns for technology detection
+
+# Web Servers
+Server: nginx
+Server: Apache
+Server: IIS
+Server: cloudflare
+Server: Microsoft-IIS
+Server: Jetty
+Server: Undertow
+Server: Netty
+Server: Gunicorn
+Server: uWSGI
+Server: Werkzeug
+Server: Caddy
+
+# Backend Technologies
+X-Powered-By: PHP
+X-Powered-By: Express
+X-Powered-By: Next.js
+X-Powered-By: ASP.NET
+X-Powered-By: Mono
+X-Powered-By: Python
+X-Powered-By: Django
+X-Powered-By: Flask
+X-Powered-By: Ruby
+X-Powered-By: Rails
+X-Powered-By: Phusion Passenger
+X-Powered-By: Servlet
+X-Powered-By: JSP
+X-Powered-By: JSF
+X-Powered-By: Java
+X-Powered-By: Go
+X-Powered-By: Undertow
+X-Powered-By: Vert.x
+X-Powered-By: Kestrel
+X-Powered-By: HHVM
+X-Powered-By: Zend
+X-Powered-By: Craft
+
+# ASP.NET Specific
+X-AspNet-Version
+X-AspNet-Version: 4.0.30319
+X-AspNet-Version: 2.0.50727
+
+# Frontend Frameworks (in responses)
+__NEXT_DATA__
+__NUXT__
+__NUXT_PATH__
+__INITIAL_STATE__
+_N_G_
+
+# Framework-Specific Headers
+X-Laravel
+X-Runtime
+X-Request-Id
+X-Varnish
+X-Haproxy
+X-Drupal
+X-WordPress
+X-Joomla
+X-Magento
+X-Shopify
+
+# Laravel
+laravel-session
+X-CSRF-TOKEN
+
+# Django
+csrftoken
+
+# Ruby on Rails
+X-Runtime:
+X-Request-Id:
+X-Mid
+
+# Next.js
+x-vercel-id
+x-nextjs-data
+
+# React
+x-react
+
+# Express
+x-express
+
+# Security Headers (for analysis)
+Strict-Transport-Security
+X-Frame-Options
+X-Content-Type-Options
+X-XSS-Protection
+Content-Security-Policy
+Referrer-Policy
+Permissions-Policy
+
+# CDN Headers
+Via
+X-Cache
+X-CDN
+X-Edge
+X-Amz-Cf-Id
+Cf-Cache-Status
+Cf-Ray
+X-Served-By
+X-Google-Cache-Control
+
+# Load Balancers
+X-Haproxy
+X-Forwarded-For
+X-Real-Ip
+X-Server
+
+# API Gateways
+X-Amzn-Requestid
+X-Azure-Ref
+Apigw-Requestid
+X-Fastly-Request-Id
+
+# Monitoring
+X-NewRelic-App-Data
+X-NewRelic-ID
+X-NewRelic-Synthetics
+X-Application-Context
+
+# Serverless
+X-Amzn-Trace-Id
+X-Amz-Invocation-Type
+X-Invoke-Function
+X-OpenStack-Request-Id
+
+# WAF/Security
+X-Sucuri-Id
+X-Firewall
+X-ModSecurity
+X-WAF-Status
+X-DDos-Status

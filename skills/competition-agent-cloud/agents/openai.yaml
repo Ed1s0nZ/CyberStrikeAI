@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Agent Cloud"
+  short_description: "Trace prompt-to-tool flow, deployment drift, and provenance"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-agent-cloud to trace prompt-to-tool flow, deployment drift, mounted secrets, or artifact provenance in this challenge."
+
+policy:
+  allow_implicit_invocation: false

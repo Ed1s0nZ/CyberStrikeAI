@@ -42,3 +42,9 @@ vendor/
 .DS_Store
 .idea/
 .vscode/
+
+# Skill runtime caches (never commit)
+skills/.eino/
+skills/.serena/
+skills/**/.eino/
+skills/**/.serena/

@@ -1,0 +1,106 @@
+# WAF/CDN Signatures
+# Patterns for detecting WAF and CDN providers
+
+# Cloudflare
+cf-ray
+cf-cache-status
+cf-challenge
+cloudflare
+__cfduid
+cf_clearance
+__cf_bm
+
+# AWS WAF / CloudFront / ALB
+x-amz-cf-id
+x-amzn-requestid
+x-amz-cf-pop
+x-amz-cf-instance
+awselb
+awsalb
+awsalbcors
+x-azure-ref
+x-azurefdid
+
+# Akamai
+x-akamai-transformed
+akamai-origin
+akamaighost
+
+# Fastly
+x-served-by
+fastly-ssl
+fastly-request-id
+fastly-ff
+
+# Imperva / Incapsula
+x-iinfo
+x-cdn
+incapula
+x-incapula-id
+
+# F5 ASM / BIG-IP
+bigipserver
+bigipserverpool
+ltv
+persist
+f5
+
+# ModSecurity
+mod_security
+modsec
+modsecurity
+
+# Barracuda
+barra_counter_session
+barracuda
+
+# Sucuri
+x-sucuri-id
+sucuri
+
+# Azure Front Door
+x-azure-ref
+x-azurefdid
+x-ms-ref
+
+# Google CDN / App Engine
+x-google-cache-control
+sacssid
+sid
+
+# Varnish Cache
+x-varnish
+via varnish
+
+# Squid Proxy
+x-squid
+x-cache-lookup
+via squid
+
+# QUIC.cloud
+x-qic
+
+# Wordfence
+wordfence
+
+# Sucuri CloudProxy
+sucuri
+
+# Shield (Cloudflare Enterprise)
+shield
+
+# Reblaze (Incapsula)
+reblaze
+
+# Radware
+radware
+
+# Airee (CloudArmor)
+x-amzn-requestid
+
+# ThreatX
+threatx
+
+# Signal Sciences
+x-sigsci
+sigsci-*

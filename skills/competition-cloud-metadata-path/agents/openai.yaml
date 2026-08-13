@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Cloud Metadata Path"
+  short_description: "Trace metadata services, instance creds, and trust edges"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-cloud-metadata-path to trace metadata-service access, instance credentials, and the trust path they unlock in this challenge."
+
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Jwt Claim Confusion"
+  short_description: "Trace JWT headers, claims, key selection, and acceptance logic"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-jwt-claim-confusion to trace JWT headers, claims, key lookup, validation decisions, and the point where a token becomes accepted identity."
+
+policy:
+  allow_implicit_invocation: false

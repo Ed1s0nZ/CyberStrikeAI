@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Mailbox Abuse"
+  short_description: "Trace mailbox rules, OAuth consent, and mail-flow abuse"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-mailbox-abuse to trace how mailbox rules, OAuth consent, forwarding, or transport actions create the decisive mail-flow effect."
+
+policy:
+  allow_implicit_invocation: false

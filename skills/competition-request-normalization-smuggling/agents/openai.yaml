@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Request Normalization Smuggling"
+  short_description: "Trace parser drift, header ambiguity, and request smuggling"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-request-normalization-smuggling to trace parser differentials, header ambiguity, and route smuggling in this challenge."
+
+policy:
+  allow_implicit_invocation: false

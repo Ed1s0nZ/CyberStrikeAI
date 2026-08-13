@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Bundle Sourcemap Recovery"
+  short_description: "Recover source maps, chunk loaders, and hidden runtime structure"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-bundle-sourcemap-recovery to reconstruct served bundles, source maps, chunk loading, and the hidden runtime structure behind this challenge."
+
+policy:
+  allow_implicit_invocation: false

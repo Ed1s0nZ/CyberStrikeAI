@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Windows Pivot"
+  short_description: "Trace Kerberos replay, Windows pivots, and ticket acceptance"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-windows-pivot to trace the Kerberos or Windows host pivot chain and prove which service accepted the credential or ticket."
+
+policy:
+  allow_implicit_invocation: false

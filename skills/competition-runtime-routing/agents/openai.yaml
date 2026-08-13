@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Runtime Routing"
+  short_description: "Trace proxy rules, Host headers, and route-to-service resolution"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-runtime-routing to map how this hostname, proxy rule, or path prefix resolves to the live sandbox service."
+
+policy:
+  allow_implicit_invocation: false

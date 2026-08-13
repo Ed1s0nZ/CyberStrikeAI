@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Kerberos Delegation"
+  short_description: "Trace S4U, RBCD, delegation edges, and ticket acceptance"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-kerberos-delegation to trace delegation edges, minted tickets, and the service that accepts them."
+
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Websocket Runtime"
+  short_description: "Trace WebSocket handshakes, frames, subscriptions, and state"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-websocket-runtime to trace this WebSocket or SSE handshake, subscription flow, frame stream, and resulting runtime state."
+
+policy:
+  allow_implicit_invocation: false

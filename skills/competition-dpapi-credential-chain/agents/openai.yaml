@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Dpapi Credential Chain"
+  short_description: "Trace DPAPI masterkeys, blobs, stores, and replayable secrets"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-dpapi-credential-chain to trace DPAPI masterkeys, protected blobs, browser stores, and the replayable secret edge in this challenge."
+
+policy:
+  allow_implicit_invocation: false

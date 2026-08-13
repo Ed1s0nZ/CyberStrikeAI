@@ -1,0 +1,13 @@
+{
+  "name": "camoufox-reverse-browser-auto",
+  "version": "1.0.0",
+  "description": "Camoufox逆向 - Camoufox浏览器自动化模板",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js",
+    "test": "node main.js --test"
+  },
+  "dependencies": {
+    "playwright-core": "^1.45.0"
+  }
+}

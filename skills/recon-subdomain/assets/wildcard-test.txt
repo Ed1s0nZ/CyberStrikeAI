@@ -1,0 +1,35 @@
+# Wildcard Subdomain Testing Patterns
+# Used to detect wildcard DNS configurations
+
+# Random strings for wildcard testing
+randomtest12345
+randomtest54321
+xyzabc123
+abcxyz987
+testwildcard1234
+wildcardtest9876
+nonexistenttest123
+fake-subdomain-test
+testing456random
+check789wildcard
+
+# Common patterns to test
+*.test
+*.dev
+*.stage
+*.prod
+*.random
+*.nonexistent
+*.temp
+*.tmp
+
+# Time-based patterns
+test1600000000
+test1700000000
+test1800000000
+test1900000000
+test2000000000
+
+# UUID-like patterns
+00000000-0000-0000-0000-000000000000
+11111111-1111-1111-1111-111111111111

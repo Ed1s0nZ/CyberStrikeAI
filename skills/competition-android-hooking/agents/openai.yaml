@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Android Hooking"
+  short_description: "Hook APK signers, JNI bridges, pinning checks, and requests"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-android-hooking to hook this APK, trace signer logic, inspect JNI or Java boundaries, and replay the accepted request path."
+
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Prompt Injection"
+  short_description: "Analyze retrieval poisoning, planner drift, and tool abuse"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-prompt-injection to trace how untrusted content poisons prompts, memory, planning, or tool arguments."
+
+policy:
+  allow_implicit_invocation: false

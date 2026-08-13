@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Forensic Timeline"
+  short_description: "Correlate host, mail, memory, and network evidence over time"
+  default_prompt: "After $ctf-sandbox-orchestrator is active, use $competition-forensic-timeline to reconstruct the attack timeline across logs, disk, memory, mail, and network artifacts in this challenge."
+
+policy:
+  allow_implicit_invocation: false

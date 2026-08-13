@@ -1,0 +1,5 @@
+{
+  "sign_key": "your_sign_key_here",
+  "encrypt_key": "1234567890abcdef",
+  "iv": "abcdef1234567890"
+}

@@ -1,0 +1,220 @@
+{
+  "version": 1,
+  "snapshot": "enterprise-attack-19",
+  "generated_by": "scripts/validate-routes.mjs --write-coverage",
+  "tactics": [
+    {
+      "id": "TA0001",
+      "name": "Initial Access",
+      "status": "supported",
+      "techniques": [
+        "T1078",
+        "T1078.004",
+        "T1190"
+      ],
+      "routes": [
+        "route:cloud-iam-privesc",
+        "route:tm-web-attack-surface",
+        "route:web-apit-security",
+        "route:web-athn-oauth",
+        "route:web-athz-idor",
+        "route:web-busl-file-upload",
+        "route:web-busl-logic",
+        "route:web-busl-race",
+        "route:web-classify-router",
+        "route:web-clnt-open-redirect",
+        "route:web-clnt-xss",
+        "route:web-clnt-xss-legacy",
+        "route:web-idnt-federation",
+        "route:web-inpv-deserialization",
+        "route:web-inpv-file-download",
+        "route:web-inpv-file-inclusion",
+        "route:web-inpv-parameter-pollution",
+        "route:web-inpv-rce",
+        "route:web-inpv-request-smuggling",
+        "route:web-inpv-sqli",
+        "route:web-inpv-sqli-legacy",
+        "route:web-inpv-ssrf",
+        "route:web-inpv-ssti",
+        "route:web-inpv-xxe",
+        "route:web-sess-jwt",
+        "route:web-triage-fast"
+      ]
+    },
+    {
+      "id": "TA0002",
+      "name": "Execution",
+      "status": "supported",
+      "techniques": [
+        "T1059"
+      ],
+      "routes": [
+        "route:exec-command-validation"
+      ]
+    },
+    {
+      "id": "TA0003",
+      "name": "Persistence",
+      "status": "gap",
+      "reason": "不自动执行 Persistence；技能库无自动路由"
+    },
+    {
+      "id": "TA0004",
+      "name": "Privilege Escalation",
+      "status": "supported",
+      "techniques": [
+        "T1068",
+        "T1078",
+        "T1078.004",
+        "T1611"
+      ],
+      "routes": [
+        "route:cloud-iam-privesc",
+        "route:privesc-container-escape",
+        "route:privesc-windows-boundary",
+        "route:privesc-windows-mitigation-check"
+      ]
+    },
+    {
+      "id": "TA0005",
+      "name": "Stealth",
+      "status": "gap",
+      "reason": "不自动执行 Stealth；技能库无自动路由"
+    },
+    {
+      "id": "TA0006",
+      "name": "Credential Access",
+      "status": "supported",
+      "techniques": [
+        "T1110",
+        "T1552",
+        "T1552.005",
+        "T1558",
+        "T1558.003"
+      ],
+      "routes": [
+        "route:ad-kerberoast",
+        "route:cloud-metadata-credential",
+        "route:cred-dictionary-attack",
+        "route:cred-username-wordlist"
+      ]
+    },
+    {
+      "id": "TA0007",
+      "name": "Discovery",
+      "status": "supported",
+      "techniques": [
+        "T1069",
+        "T1069.002",
+        "T1087",
+        "T1087.002",
+        "T1482",
+        "T1526",
+        "T1613"
+      ],
+      "routes": [
+        "route:ad-domain-discovery",
+        "route:ad-domain-discovery-reference",
+        "route:cloud-service-discovery",
+        "route:k8s-resource-discovery"
+      ]
+    },
+    {
+      "id": "TA0008",
+      "name": "Lateral Movement",
+      "status": "supported",
+      "techniques": [
+        "T1021",
+        "T1021.002",
+        "T1550",
+        "T1550.002",
+        "T1550.003"
+      ],
+      "routes": [
+        "route:ad-alternate-auth-material",
+        "route:ad-lateral-smb"
+      ]
+    },
+    {
+      "id": "TA0009",
+      "name": "Collection",
+      "status": "supported",
+      "techniques": [
+        "T1530"
+      ],
+      "routes": [
+        "route:cloud-storage-collection"
+      ]
+    },
+    {
+      "id": "TA0010",
+      "name": "Exfiltration",
+      "status": "gap",
+      "reason": "不自动执行 Exfiltration；技能库无自动路由"
+    },
+    {
+      "id": "TA0011",
+      "name": "Command and Control",
+      "status": "gap",
+      "reason": "不自动执行 Command and Control；技能库无自动路由"
+    },
+    {
+      "id": "TA0040",
+      "name": "Impact",
+      "status": "gap",
+      "reason": "不自动执行 Impact；技能库无自动路由"
+    },
+    {
+      "id": "TA0042",
+      "name": "Resource Development",
+      "status": "supported",
+      "techniques": [
+        "T1587",
+        "T1587.004"
+      ],
+      "routes": [
+        "route:resdev-exploit-course",
+        "route:resdev-patch-to-exploit"
+      ]
+    },
+    {
+      "id": "TA0043",
+      "name": "Reconnaissance",
+      "status": "supported",
+      "techniques": [
+        "T1590",
+        "T1592",
+        "T1592.002",
+        "T1593",
+        "T1595",
+        "T1595.001",
+        "T1596"
+      ],
+      "routes": [
+        "route:recon-fingerprint",
+        "route:recon-open-source",
+        "route:recon-osint-planning",
+        "route:recon-service-scan",
+        "route:recon-subdomain-enum",
+        "route:recon-web-content"
+      ]
+    },
+    {
+      "id": "TA0112",
+      "name": "Defense Impairment",
+      "status": "supported",
+      "techniques": [
+        "T1685"
+      ],
+      "routes": [
+        "route:defimp-waf-bypass"
+      ]
+    }
+  ],
+  "summary": {
+    "total": 15,
+    "supported": 10,
+    "gap": 5,
+    "note": "gap 不计为已覆盖"
+  }
+}
