@@ -218,10 +218,11 @@ func RunDeepAgent(
 				}
 			}
 
-			subModel, err := einoopenai.NewChatModel(ctx, baseModelCfg)
+			baseSubModel, err := einoopenai.NewChatModel(ctx, baseModelCfg)
 			if err != nil {
 				return nil, fmt.Errorf("子代理 %q ChatModel: %w", id, err)
 			}
+			subModel := newStreamToolCallIndexRepairModel(baseSubModel)
 
 			subDefs := ag.ToolsForRole(roleTools)
 			subTools, err := einomcp.ToolsFromDefinitions(ag, holder, subDefs, recorder, nil, toolInvokeNotify, id)
@@ -308,10 +309,11 @@ func RunDeepAgent(
 		}
 	}
 
-	mainModel, err := einoopenai.NewChatModel(ctx, baseModelCfg)
+	baseMainModel, err := einoopenai.NewChatModel(ctx, baseModelCfg)
 	if err != nil {
 		return nil, fmt.Errorf("多代理主模型: %w", err)
 	}
+	mainModel := newStreamToolCallIndexRepairModel(baseMainModel)
 
 	mainSumMw, err := newEinoSummarizationMiddleware(ctx, mainModel, appCfg, &ma.EinoMiddleware, conversationID, db, projectID, logger)
 	if err != nil {
@@ -481,19 +483,21 @@ func RunDeepAgent(
 			MaxCompletionTokens: &maxCompletionTokens,
 		}
 		reasoning.ApplyPlanExecutePlannerModelConfig(plannerModelCfg, &appCfg.OpenAI)
-		peMainModel, perr := einoopenai.NewChatModel(ctx, plannerModelCfg)
+		basePEMainModel, perr := einoopenai.NewChatModel(ctx, plannerModelCfg)
 		if perr != nil {
 			return nil, fmt.Errorf("plan_execute 规划模型: %w", perr)
 		}
+		peMainModel := newStreamToolCallIndexRepairModel(basePEMainModel)
 		if logger != nil {
 			logger.Info("plan_execute: planner/replanner 使用无 reasoning 的独立 ChatModel（ToolChoiceForced 兼容）",
 				zap.String("model", appCfg.OpenAI.Model),
 			)
 		}
-		execModel, perr := einoopenai.NewChatModel(ctx, baseModelCfg)
+		baseExecModel, perr := einoopenai.NewChatModel(ctx, baseModelCfg)
 		if perr != nil {
 			return nil, fmt.Errorf("plan_execute 执行器模型: %w", perr)
 		}
+		execModel := newStreamToolCallIndexRepairModel(baseExecModel)
 		// 构建 filesystem 中间件（与 Deep sub-agent 一致）
 		var peFsMw adk.ChatModelAgentMiddleware
 		if einoSkillMW != nil && einoFSTools && einoLoc != nil {

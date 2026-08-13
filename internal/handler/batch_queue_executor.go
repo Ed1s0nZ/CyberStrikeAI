@@ -13,6 +13,7 @@ import (
 	"cyberstrike-ai/internal/audit"
 	"cyberstrike-ai/internal/authctx"
 	"cyberstrike-ai/internal/config"
+	"cyberstrike-ai/internal/database"
 	"cyberstrike-ai/internal/mcp"
 	"cyberstrike-ai/internal/multiagent"
 
@@ -118,8 +119,7 @@ func (h *AgentHandler) executeOneBatchSubTask(queueID string, queue *BatchTaskQu
 	}
 	principal := authctx.NewPrincipalWithScopes(access.User.ID, access.User.Username, access.Scope, access.Permissions, access.PermissionScopes)
 	title := safeTruncateString(task.Message, 50)
-	batchMeta := audit.ConversationCreateMeta("batch_task")
-	batchMeta.ProjectID = effectiveProjectID(h.config, queue.ProjectID)
+	batchMeta := batchSubTaskConversationMeta(h.config, queue)
 	conv, err := h.db.CreateConversation(title, batchMeta)
 	if err != nil {
 		h.logger.Error("创建对话失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(err))
@@ -319,6 +319,17 @@ func (h *AgentHandler) executeOneBatchSubTask(queueID string, queue *BatchTaskQu
 		return
 	}
 	h.batchTaskManager.UpdateTaskStatusWithConversationID(queueID, task.ID, BatchTaskStatusCompleted, resText, "", conversationID)
+}
+
+func batchSubTaskConversationMeta(cfg *config.Config, queue *BatchTaskQueue) database.ConversationCreateMeta {
+	meta := audit.ConversationCreateMeta("batch_task")
+	if queue == nil {
+		meta.ProjectID = effectiveProjectID(cfg, "")
+		return meta
+	}
+	meta.ProjectID = effectiveProjectID(cfg, queue.ProjectID)
+	meta.RoleName = strings.TrimSpace(queue.Role)
+	return meta
 }
 
 func (h *AgentHandler) handleBatchSubTaskRunError(

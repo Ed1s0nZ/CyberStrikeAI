@@ -45,14 +45,19 @@ func TestMergeHitlExemptMetaTools_includesToolSearch(t *testing.T) {
 	if !found {
 		t.Fatalf("tool_search missing from %v", merged)
 	}
-	foundProjectFact := false
+	foundProjectFactTools := map[string]bool{
+		"upsert_project_fact": false,
+		"get_project_fact":    false,
+	}
 	for _, name := range merged {
-		if strings.EqualFold(strings.TrimSpace(name), "upsert_project_fact") {
-			foundProjectFact = true
-			break
+		normalized := strings.ToLower(strings.TrimSpace(name))
+		if _, ok := foundProjectFactTools[normalized]; ok {
+			foundProjectFactTools[normalized] = true
 		}
 	}
-	if !foundProjectFact {
-		t.Fatalf("upsert_project_fact missing from %v", merged)
+	for name, found := range foundProjectFactTools {
+		if !found {
+			t.Fatalf("%s missing from %v", name, merged)
+		}
 	}
 }
