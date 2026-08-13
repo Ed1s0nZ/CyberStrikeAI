@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"cyberstrike-ai/internal/audit"
 	"cyberstrike-ai/internal/database"
@@ -18,12 +19,20 @@ type ConversationTaskStopper interface {
 	CancelRunningTaskForConversation(conversationID string)
 }
 
+// ConversationTaskStateProvider reports whether the in-memory agent task for
+// a conversation is still genuinely running. Plan files may survive a service
+// restart or cancellation, so their status alone is not authoritative.
+type ConversationTaskStateProvider interface {
+	ConversationTaskRuntimeState(conversationID string) (running bool, startedAt time.Time)
+}
+
 // ConversationHandler 对话处理器
 type ConversationHandler struct {
 	db          *database.DB
 	logger      *zap.Logger
 	audit       *audit.Service
 	taskStopper ConversationTaskStopper
+	taskState   ConversationTaskStateProvider
 }
 
 // SetAudit wires platform audit logging.
@@ -34,6 +43,12 @@ func (h *ConversationHandler) SetAudit(s *audit.Service) {
 // SetTaskStopper wires cancellation of in-flight agent tasks on conversation delete.
 func (h *ConversationHandler) SetTaskStopper(stopper ConversationTaskStopper) {
 	h.taskStopper = stopper
+}
+
+// SetTaskStateProvider wires the live agent task registry used by supplemental
+// conversation UI such as the agent-maintained plan list.
+func (h *ConversationHandler) SetTaskStateProvider(provider ConversationTaskStateProvider) {
+	h.taskState = provider
 }
 
 // NewConversationHandler 创建新的对话处理器
@@ -204,6 +219,70 @@ func (h *ConversationHandler) GetConversation(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, conv)
+}
+
+// GetConversationPlanTasks returns the task list maintained by the agent's
+// TaskCreate/TaskUpdate tools for this conversation.
+func (h *ConversationHandler) GetConversationPlanTasks(c *gin.Context) {
+	id := strings.TrimSpace(c.Param("id"))
+	session, ok := security.CurrentSession(c)
+	if !ok || !h.db.UserCanAccessResource(session.UserID, session.Scope, "conversation", id) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问该对话"})
+		return
+	}
+	if _, err := h.db.GetConversationLite(id); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "对话不存在"})
+		return
+	}
+	running := false
+	startedAt := time.Time{}
+	if h.taskState != nil {
+		running, startedAt = h.taskState.ConversationTaskRuntimeState(id)
+	}
+	if !running {
+		c.JSON(http.StatusOK, gin.H{
+			"tasks": []database.ConversationPlanTask{}, "total": 0,
+			"completed": 0, "activeStep": 0, "running": false,
+		})
+		return
+	}
+	tasks, err := h.db.ListConversationPlanTasksSince(id, startedAt)
+	if err != nil {
+		h.logger.Error("获取对话任务列表失败", zap.String("conversationId", id), zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取任务列表失败"})
+		return
+	}
+
+	completed := 0
+	activeStep := 0
+	for i, task := range tasks {
+		status := strings.ToLower(strings.TrimSpace(task.Status))
+		if status == "completed" {
+			completed++
+		}
+		if activeStep == 0 && status == "in_progress" {
+			activeStep = i + 1
+		}
+	}
+	if activeStep == 0 {
+		for i, task := range tasks {
+			if strings.ToLower(strings.TrimSpace(task.Status)) != "completed" {
+				activeStep = i + 1
+				break
+			}
+		}
+	}
+	if activeStep == 0 && len(tasks) > 0 {
+		activeStep = len(tasks)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"tasks":      tasks,
+		"total":      len(tasks),
+		"completed":  completed,
+		"activeStep": activeStep,
+		"running":    true,
+	})
 }
 
 const (

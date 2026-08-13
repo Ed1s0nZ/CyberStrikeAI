@@ -314,6 +314,16 @@ function mountChatSessionSettingsPopover() {
         composerSurface.appendChild(wrap);
     }
     wrap.classList.add('chat-session-settings-popover');
+    syncChatSessionSettingsLayerState();
+}
+
+function syncChatSessionSettingsLayerState() {
+    const wrap = document.getElementById('chat-reasoning-wrapper');
+    const inputBar = document.getElementById('chat-input-container');
+    if (!inputBar) return;
+    const open = !!wrap && wrap.style.display !== 'none' &&
+        !wrap.classList.contains('conversation-reasoning-collapsed');
+    inputBar.classList.toggle('is-session-settings-open', open);
 }
 
 function initChatReasoningBarHeightSync() {
@@ -1574,6 +1584,7 @@ function openChatSessionSettings(section, event) {
     if (!wrap || !toggle || wrap.style.display === 'none') return;
     syncChatReasoningBarHeight();
     wrap.classList.remove('conversation-reasoning-collapsed');
+    syncChatSessionSettingsLayerState();
     toggle.setAttribute('aria-expanded', 'true');
     if (typeof closeAgentModePanel === 'function') closeAgentModePanel();
     if (typeof closeRoleSelectionPanel === 'function') closeRoleSelectionPanel();
@@ -1732,6 +1743,7 @@ function closeChatReasoningPanel() {
     const wrap = document.getElementById('chat-reasoning-wrapper');
     const toggle = document.getElementById('conversation-reasoning-toggle');
     if (wrap) wrap.classList.add('conversation-reasoning-collapsed');
+    syncChatSessionSettingsLayerState();
     if (toggle) toggle.setAttribute('aria-expanded', 'false');
 }
 
@@ -1741,6 +1753,7 @@ function toggleConversationReasoningCard() {
     if (!wrap || !toggle) return;
     syncChatReasoningBarHeight();
     wrap.classList.toggle('conversation-reasoning-collapsed');
+    syncChatSessionSettingsLayerState();
     const collapsed = wrap.classList.contains('conversation-reasoning-collapsed');
     toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
     if (!collapsed) {
@@ -5434,6 +5447,7 @@ async function startNewConversation(options = {}) {
     try {
         window.currentConversationId = '';
     } catch (e) { /* ignore */ }
+    window.dispatchEvent(new CustomEvent('conversation-changed', { detail: { conversationId: '' } }));
     updateChatPrimaryActionState();
     currentConversationGroupId = null; // 新对话不属于任何分组
     // 顶部“新任务”继承当前文件夹；文件夹内的“+”仍可显式指定（包括无项目）。
@@ -5945,6 +5959,7 @@ async function loadConversation(conversationId) {
         try {
             window.currentConversationId = conversationId;
         } catch (e) { /* ignore */ }
+        window.dispatchEvent(new CustomEvent('conversation-changed', { detail: { conversationId: conversationId } }));
         updateChatPrimaryActionState();
         if (typeof refreshChatProjectSelector === 'function') {
             refreshChatProjectSelector({ reloadFolders: false, renderFolders: false });

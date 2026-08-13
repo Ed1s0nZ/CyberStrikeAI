@@ -3489,6 +3489,7 @@ html[data-theme="dark"] .sidebar-content:hover::-webkit-scrollbar-thumb:hover {
 .chat-container.is-conversation-restoring #chat-messages,
 .chat-container.is-conversation-restoring #chat-turn-rail,
 .chat-container.is-conversation-restoring #chat-return-latest,
+.chat-container.is-conversation-restoring #agent-plan-progress,
 .chat-container.is-conversation-restoring #chat-input-container {
     visibility: hidden;
 }
@@ -3546,7 +3547,6 @@ html[data-theme="dark"] .sidebar-content:hover::-webkit-scrollbar-thumb:hover {
 .chat-messages:hover::-webkit-scrollbar-thumb:hover {
     background: color-mix(in srgb, var(--text-muted) 80%, transparent);
 }
-
 .chat-welcome-empty-state {
     flex: 1 0 auto;
     width: 100%;
@@ -45314,6 +45314,12 @@ html[data-theme="dark"] .conversation-sidebar .recent-conversations-section {
     box-sizing: border-box;
     container-name: chat-composer;
     container-type: inline-size;
+}
+
+/* The composer is an isolated stacking context. Lift that whole context while the
+   settings popover is open so the turn rail and its preview cannot paint above it. */
+.chat-input-container.is-session-settings-open {
+    z-index: 121;
 }
 
 .chat-composer-context {

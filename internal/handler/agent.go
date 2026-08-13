@@ -230,6 +230,20 @@ func (h *AgentHandler) CancelRunningTaskForConversation(conversationID string) {
 	}
 }
 
+// ConversationTaskRuntimeState exposes the authoritative live state and start
+// time used to scope persisted TaskCreate files to the current run. A task
+// already entering cancellation must stop driving progress UI immediately.
+func (h *AgentHandler) ConversationTaskRuntimeState(conversationID string) (bool, time.Time) {
+	if h == nil || h.tasks == nil || strings.TrimSpace(conversationID) == "" {
+		return false, time.Time{}
+	}
+	task := h.tasks.GetTaskSnapshot(strings.TrimSpace(conversationID))
+	if task == nil || !strings.EqualFold(strings.TrimSpace(task.Status), "running") {
+		return false, time.Time{}
+	}
+	return true, task.StartedAt
+}
+
 func (h *AgentHandler) cancelRunningMCPToolsForConversation(conversationID string) {
 	if h == nil || h.agent == nil {
 		return
