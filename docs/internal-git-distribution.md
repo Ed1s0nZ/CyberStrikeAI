@@ -12,10 +12,15 @@ origin (GitHub, 公开上游)
   └── main            # 上游主干（Ed1s0nZ/CyberStrikeAI，发布式提交）
 
 本地/内部远端
-  └── cairn-canonical # 本地增强主干：v1.7.12 + Cairn canonical + 历史本地改动
+  └── cairn-canonical # 本地增强主干：v1.7.12 + Cairn canonical + 历史本地改动 + skills
        ├── 3bb8ec5    v1.7.12（上游基线）
        ├── 414e82b    cairn: SQLite canonical state cutover (phase 1/2)
-       └── e488089    chore: accumulate verified local agent/role/tool/web changes
+       ├── e488089    chore: accumulate verified local agent/role/tool/web changes
+       ├── 28f6557    merge: upstream origin/main (b170f2c)
+       ├── 0785243    fix: CairnRootArgs ToolCallingChatModel 接口适配
+       ├── 936ef29    chore: sync/env scripts + internal distribution doc
+       ├── 729f9fe    chore: track skills/ in version control (937 files)
+       └── 1c44714    chore: ignore IDE tool caches
 ```
 
 - **永远在 `cairn-canonical` 上工作**，不要提交到 `main`、不要留在 detached HEAD。
@@ -70,7 +75,7 @@ scripts/sync-upstream.sh --dry-run  # 只看差异不 merge
 - 用 **merge**，不用 rebase（本地 commit 不被重写，冲突好解）。
 - 脚本会自动 tar 备份到 `~/skill-backups/`，冲突时给出文件清单并退出。
 - **两个永久红线**：
-  1. 绝不要 `git clean -fd` —— `skills/`、`knowledge_base/` 是 untracked 运行资产，clean 会全删。
+  1. 绝不要 `git clean -fd` —— `knowledge_base/`、`state/`、`sessions/` 等 untracked 运行资产，clean 会全删（skills/ 已入库不受影响，但同步脚本的备份排除规则仍把大目录排除在外）。
   2. 绝不要提交 `config.yaml`（含密钥，已在 .gitignore）。
 
 ## 4. 冲突处理指南
@@ -106,18 +111,19 @@ scripts/sync-upstream.sh --dry-run  # 只看差异不 merge
 # 1. 系统依赖（apt + Go 1.25+ + GOPROXY）
 scripts/setup-deps.sh
 
-# 2. 工作区初始化（config 生成 + skills 同步 + 构建）
+# 2. 工作区初始化（config 生成 + 构建）
 scripts/init-workspace.sh          # 只初始化
 scripts/init-workspace.sh --start  # 初始化并启动服务
 
-# 3. 技能包（source of truth）
+# 3. 技能包（可选：从 pack 更新运行时 skills/）
 git clone <内部git>/cyberstrike-skill-kb-pack ~/cyberstrike-skill-kb-pack
-scripts/init-workspace.sh          # 会自动从 pack 同步到 skills/
+scripts/init-workspace.sh          # 检测到 pack 时自动同步到 skills/
 ```
 
 注意：
-- `skills/` 由 `~/cyberstrike-skill-kb-pack` 的 `install_into_cyberstrike.py --mode merge` 同步，
-  **不要直接改运行时 skills/ 再期望入库**；改 pack 再同步（`--mode merge` 不覆盖已存在文件，需手动 cp 验证）。
+- `skills/` 已入库（2026-08-13 起）。新机器 clone 即带完整技能集，**无需先拉 pack**。
+- pack 仓库仍是技能**内容源头**：改技能 → 改 pack → `install_into_cyberstrike.py --mode merge` 同步 → 同步结果 diff 后提交到本仓库。
+- `--mode merge` 不覆盖已存在文件，因此同步后需 `git status` 检查变化并主动提交；skills 的 `.eino/`/`.serena/` 缓存不入库（已忽略）。
 - 服务是 `nohup ./cyberstrike-ai --http`，不是 systemd；重启见 `init-workspace.sh --start`。
 
 ## 6. 目录约定（哪些入库、哪些不入库）
@@ -125,10 +131,11 @@ scripts/init-workspace.sh          # 会自动从 pack 同步到 skills/
 | 路径 | 状态 | 说明 |
 |---|---|---|
 | `internal/` `agents/` `roles/` `tools/` `web/` `scripts/` `docs/` `cmd/` | ✅ 入库 | 产品源码与资产 |
-| `skills/` | ❌ untracked | 由 pack 仓库同步；**git clean 会删** |
-| `knowledge_base/` | ❌ untracked | 按场次生成的检索知识，体积大 |
+| `skills/` | ✅ 入库 | 技能集（937 文件/19MB）；`.eino/` `.serena/` 缓存已忽略；内容源头 = cyberstrike-skill-kb-pack |
+| `knowledge_base/` | ❌ untracked | 按场次生成的检索知识，体积大；**git clean 会删** |
 | `state/` `sessions/` `workspace*/` `reports/` `evals/` | ❌ untracked | 运行时产物 |
 | `config.yaml` `*.key` `*.pem` `.env*` | ❌ 忽略 | 密钥，禁止入库 |
+| `.glasswing/` `.serena/` | ❌ 忽略 | IDE 工具缓存 |
 | `tmp/` | ❌ 忽略 | 探针/临时分析文件（注意 `go build ./...` 会误扫其中的 .go 文件，构建用 `./cmd/... ./internal/...`） |
 
 ## 7. 回滚
