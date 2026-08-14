@@ -205,6 +205,44 @@ func TestReasoningToolChoiceCompatRoundTripperDeepSeek(t *testing.T) {
 	}
 }
 
+func TestReasoningToolChoiceCompatRoundTripperDeepSeekEndpointWinsOverProfile(t *testing.T) {
+	var gotBody string
+	rt := &reasoningToolChoiceCompatRoundTripper{
+		cfg: &config.OpenAIConfig{
+			BaseURL: "https://api.deepseek.com/v1",
+			Model:   "deepseek-v4-flash",
+			Reasoning: config.OpenAIReasoningConfig{
+				Profile: "openai_compat",
+			},
+		},
+		base: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			b, _ := io.ReadAll(req.Body)
+			gotBody = string(b)
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"ok"}}]}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+			}, nil
+		}),
+	}
+	req, err := http.NewRequest(http.MethodPost, "https://api.deepseek.com/v1/chat/completions", strings.NewReader(
+		`{"model":"deepseek-v4-flash","tool_choice":"required","tools":[],"messages":[]}`,
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = rt.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(gotBody, "tool_choice") {
+		t.Fatalf("expected DeepSeek tool_choice stripped despite openai_compat profile, got %s", gotBody)
+	}
+	if !strings.Contains(gotBody, "tools") {
+		t.Fatalf("expected tools preserved for DeepSeek, got %s", gotBody)
+	}
+}
+
 type roundTripperFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {

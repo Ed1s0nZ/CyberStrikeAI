@@ -38,6 +38,7 @@ type Params struct {
 	ConversationID   string
 	OrchMode         string
 	OrchestratorName string
+	RunID            string
 }
 
 // AttachAgentRunCallbacks returns ctx wrapped with callbacks.InitCallbacks when enabled.
@@ -53,7 +54,10 @@ func AttachAgentRunCallbacks(ctx context.Context, cfg *config.MultiAgentEinoCall
 	if mode == "off" {
 		return ctx
 	}
-	runID := uuid.New().String()
+	runID := strings.TrimSpace(p.RunID)
+	if runID == "" {
+		runID = uuid.New().String()
+	}
 	if p.Progress != nil && cfg.ShouldEmitEinoTraceSSE(mode) {
 		p.Progress("eino_trace_run", "Eino callbacks session", map[string]interface{}{
 			"runId":            runID,
@@ -206,7 +210,7 @@ func (h *runHandler) onStart(ctx context.Context, info *callbacks.RunInfo, input
 			"spanId":         spanID,
 			"parentSpanId":   parentID,
 			"conversationId": strings.TrimSpace(h.params.ConversationID),
-			"orchestration":    strings.TrimSpace(h.params.OrchMode),
+			"orchestration":  strings.TrimSpace(h.params.OrchMode),
 			"component":      string(ri.Component),
 			"name":           ri.Name,
 			"type":           ri.Type,
@@ -255,7 +259,7 @@ func (h *runHandler) onEnd(ctx context.Context, info *callbacks.RunInfo, output 
 			"runId":          h.runID,
 			"spanId":         spanID,
 			"conversationId": strings.TrimSpace(h.params.ConversationID),
-			"orchestration":    strings.TrimSpace(h.params.OrchMode),
+			"orchestration":  strings.TrimSpace(h.params.OrchMode),
 			"component":      string(ri.Component),
 			"name":           ri.Name,
 			"type":           ri.Type,
@@ -301,7 +305,7 @@ func (h *runHandler) onError(ctx context.Context, info *callbacks.RunInfo, err e
 			"runId":          h.runID,
 			"spanId":         spanID,
 			"conversationId": strings.TrimSpace(h.params.ConversationID),
-			"orchestration":    strings.TrimSpace(h.params.OrchMode),
+			"orchestration":  strings.TrimSpace(h.params.OrchMode),
 			"component":      string(ri.Component),
 			"name":           ri.Name,
 			"type":           ri.Type,
