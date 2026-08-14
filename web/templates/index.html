@@ -58,6 +58,15 @@
                     <label for="login-password" data-i18n="login.passwordLabel">密码</label>
                     <input type="password" id="login-password" placeholder="输入登录密码" required autocomplete="current-password" data-i18n="login.passwordPlaceholder" data-i18n-attr="placeholder" />
                 </div>
+                <div id="login-captcha-row" class="form-group" style="display: none;">
+                    <label for="login-captcha" data-i18n="login.captchaLabel">验证码</label>
+                    <div class="captcha-input-row">
+                        <input type="text" id="login-captcha" placeholder="请输入验证码" autocomplete="off" maxlength="8" data-i18n="login.captchaPlaceholder" data-i18n-attr="placeholder" />
+                        <button type="button" class="captcha-refresh-btn" onclick="refreshLoginCaptcha()" title="刷新验证码" aria-label="刷新验证码">
+                            <img id="login-captcha-img" src="" alt="验证码" class="captcha-img" />
+                        </button>
+                    </div>
+                </div>
                 <div id="login-error" class="login-error" role="alert" style="display: none;"></div>
                 <button type="submit" class="btn-primary login-submit">
                     <span data-i18n="login.submit">登录</span>
@@ -4961,6 +4970,20 @@
                                     <h3 data-i18n="settings.nav.security">安全设置</h3>
                                 </div>
                                 
+                                <div class="settings-subsection">
+                                    <h4>登录验证码</h4>
+                                    <p class="settings-description">开启后，登录时需要输入图形验证码，可有效防止暴力破解。默认关闭。</p>
+                                    <div class="settings-form">
+                                        <div class="form-group">
+                                            <label class="checkbox-label" data-require-permission="config:write">
+                                                <input type="checkbox" id="security-captcha-enabled" class="modern-checkbox" onchange="saveCaptchaSetting(this.checked)" />
+                                                <span class="checkbox-custom"></span>
+                                                <span class="checkbox-text">启用登录验证码</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div class="settings-subsection">
                                     <h4 data-i18n="settingsSecurity.changePasswordTitle">修改密码</h4>
                                     <p class="settings-description" data-i18n="settingsSecurity.changePasswordDesc">修改登录密码后，需要使用新密码重新登录。</p>

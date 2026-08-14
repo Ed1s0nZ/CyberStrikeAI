@@ -6549,6 +6549,42 @@ html[data-theme="dark"] .chat-input-container .send-btn:disabled::before {
     font-size: 0.8125rem;
 }
 
+.captcha-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.captcha-input-row input {
+    flex: 1;
+}
+
+.captcha-refresh-btn {
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 2px;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    transition: border-color 0.2s;
+}
+
+.captcha-refresh-btn:hover {
+    border-color: var(--accent-color);
+}
+
+.captcha-img {
+    display: block;
+    height: 40px;
+    width: auto;
+    max-width: 120px;
+    border-radius: 6px;
+}
+
 .login-card .login-submit {
     width: 100%;
     justify-content: center;

@@ -1126,6 +1126,12 @@ async function loadConfig(loadTools = true, options = {}) {
         initSettingsCustomSelects();
         refreshSettingsCustomSelects();
         
+        // 初始化验证码开关
+        const captchaEnabledCb = document.getElementById('security-captcha-enabled');
+        if (captchaEnabledCb) {
+            captchaEnabledCb.checked = currentConfig.auth?.captcha_enabled === true;
+        }
+
         // 只有在需要时才加载工具列表（MCP管理页面需要，系统设置页面不需要）
         if (loadTools) {
             // 设置每页显示数量（会在分页控件渲染时设置）
@@ -3893,6 +3899,33 @@ function resetPasswordForm() {
             input.classList.remove('error');
         }
     });
+}
+
+async function saveCaptchaSetting(enabled) {
+    if (typeof requirePermission === 'function' && !requirePermission('config:write')) {
+        // 恢复开关状态
+        const cb = document.getElementById('security-captcha-enabled');
+        if (cb) cb.checked = !enabled;
+        return;
+    }
+    try {
+        const response = await apiFetch('/api/config', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ auth: { captcha_enabled: enabled } }),
+        });
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            if (typeof notifyApiError === 'function') notifyApiError(data.error || '保存失败');
+            const cb = document.getElementById('security-captcha-enabled');
+            if (cb) cb.checked = !enabled;
+            return;
+        }
+    } catch (error) {
+        console.error('保存验证码设置失败:', error);
+        const cb = document.getElementById('security-captcha-enabled');
+        if (cb) cb.checked = !enabled;
+    }
 }
 
 async function changePassword() {

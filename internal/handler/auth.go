@@ -15,16 +15,22 @@ import (
 
 // AuthHandler handles authentication-related endpoints.
 type AuthHandler struct {
-	manager    *security.AuthManager
-	config     *config.Config
-	configPath string
-	logger     *zap.Logger
-	audit      *audit.Service
+	manager     *security.AuthManager
+	config      *config.Config
+	configPath  string
+	logger      *zap.Logger
+	audit       *audit.Service
+	captchaSvc  *CaptchaService
 }
 
 // SetAudit wires platform audit logging.
 func (h *AuthHandler) SetAudit(s *audit.Service) {
 	h.audit = s
+}
+
+// SetCaptchaService 注入验证码服务。
+func (h *AuthHandler) SetCaptchaService(svc *CaptchaService) {
+	h.captchaSvc = svc
 }
 
 // NewAuthHandler creates a new AuthHandler.
@@ -38,8 +44,10 @@ func NewAuthHandler(manager *security.AuthManager, cfg *config.Config, configPat
 }
 
 type loginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password" binding:"required"`
+	Username   string `json:"username"`
+	Password   string `json:"password" binding:"required"`
+	CaptchaID  string `json:"captcha_id"`
+	CaptchaVal string `json:"captcha"`
 }
 
 type changePasswordRequest struct {
@@ -53,6 +61,18 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "密码不能为空"})
 		return
+	}
+
+	// 若开启验证码，则先校验验证码
+	if h.config.Auth.CaptchaEnabled && h.captchaSvc != nil {
+		if strings.TrimSpace(req.CaptchaID) == "" || strings.TrimSpace(req.CaptchaVal) == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "请输入验证码", "captcha_required": true})
+			return
+		}
+		if !h.captchaSvc.Verify(req.CaptchaID, req.CaptchaVal) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "验证码错误或已过期", "captcha_required": true})
+			return
+		}
 	}
 
 	token, expiresAt, err := h.manager.Authenticate(req.Username, req.Password)
@@ -223,6 +243,27 @@ func (h *AuthHandler) Validate(c *gin.Context) {
 		"permissions":       permissionKeys(session.Permissions),
 		"permission_scopes": session.PermissionScopes,
 		"scope":             session.Scope,
+	})
+}
+
+// GetCaptcha 返回验证码状态及图片（公开接口，无需认证）。
+// 若验证码功能未开启，仅返回 enabled:false。
+func (h *AuthHandler) GetCaptcha(c *gin.Context) {
+	if !h.config.Auth.CaptchaEnabled || h.captchaSvc == nil {
+		c.JSON(http.StatusOK, gin.H{"enabled": false})
+		return
+	}
+
+	id, b64s, err := h.captchaSvc.Generate()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成验证码失败"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"enabled": true,
+		"id":      id,
+		"b64s":    b64s,
 	})
 }
 
