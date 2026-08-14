@@ -19,7 +19,7 @@ import (
 // PlanExecuteRootArgs 构建 Eino adk/prebuilt/planexecute 根 Agent 所需参数。
 type PlanExecuteRootArgs struct {
 	MainToolCallingModel model.ToolCallingChatModel
-	ExecModel            model.ToolCallingChatModel
+	AgenticExecModel     model.AgenticModel
 	OrchInstruction      string
 	ToolsCfg             adk.ToolsConfig
 	ExecMaxIter          int
@@ -34,17 +34,16 @@ type PlanExecuteRootArgs struct {
 	Logger         *zap.Logger
 	// ModelName is used for model input token estimation logs.
 	ModelName string
-	// ExecPreMiddlewares 是由 prependEinoMiddlewares 构建的前置中间件（patchtoolcalls, reduction, toolsearch, plantask），
-	// 与 Deep/Supervisor 主代理的 mainOrchestratorPre 一致。
-	ExecPreMiddlewares []adk.ChatModelAgentMiddleware
-	// SkillMiddleware 是 Eino 官方 skill 渐进式披露中间件（可选）。
-	SkillMiddleware adk.ChatModelAgentMiddleware
-	// FilesystemMiddleware 是 Eino filesystem 中间件，当 eino_skills.filesystem_tools 启用时提供本机文件读写与 Shell 能力（可选）。
-	FilesystemMiddleware adk.ChatModelAgentMiddleware
+	// AgenticExecPreMiddlewares 是由 prependEinoAgenticMiddlewares 构建的前置中间件。
+	AgenticExecPreMiddlewares   []adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]
+	AgenticSkillMiddleware      adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]
+	AgenticFilesystemMiddleware adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]
 	// PlannerReplannerRewriteHandlers applies BeforeModelRewriteState pipeline for planner/replanner input.
 	PlannerReplannerRewriteHandlers []adk.ChatModelAgentMiddleware
 	// ModelFacingTrace 可选：由 Executor Handlers 链末尾写入，供 last_react 与 summarization 后上下文对齐。
-	ModelFacingTrace *modelFacingTraceHolder
+	ModelFacingTrace           *modelFacingTraceHolder
+	AgenticModelRetryConfig    *adk.TypedModelRetryConfig[*schema.AgenticMessage]
+	AgenticModelFailoverConfig *adk.ModelFailoverConfig[*schema.AgenticMessage]
 }
 
 // NewPlanExecuteRoot 返回 plan → execute → replan 预置编排根节点（与 Deep / Supervisor 并列）。
@@ -52,7 +51,7 @@ func NewPlanExecuteRoot(ctx context.Context, a *PlanExecuteRootArgs) (adk.Resuma
 	if a == nil {
 		return nil, fmt.Errorf("plan_execute: args 为空")
 	}
-	if a.MainToolCallingModel == nil || a.ExecModel == nil {
+	if a.MainToolCallingModel == nil || a.AgenticExecModel == nil {
 		return nil, fmt.Errorf("plan_execute: 模型为空")
 	}
 	tcm, ok := interface{}(a.MainToolCallingModel).(model.ToolCallingChatModel)
@@ -79,16 +78,16 @@ func NewPlanExecuteRoot(ctx context.Context, a *PlanExecuteRootArgs) (adk.Resuma
 		return nil, fmt.Errorf("plan_execute replanner: %w", err)
 	}
 
-	execHandlers, err := buildPlanExecuteExecutorHandlers(ctx, a)
-	if err != nil {
-		return nil, err
+	var executor adk.Agent
+	agenticExecHandlers, herr := buildPlanExecuteAgenticExecutorHandlers(ctx, a)
+	if herr != nil {
+		return nil, herr
 	}
-	executor, err := newPlanExecuteExecutor(ctx, &planexecute.ExecutorConfig{
-		Model:         a.ExecModel,
+	executor, err = newPlanExecuteAgenticExecutor(ctx, &planexecute.ExecutorConfig{
 		ToolsConfig:   a.ToolsCfg,
 		MaxIterations: a.ExecMaxIter,
 		GenInputFn:    planExecuteExecutorGenInput(a.OrchInstruction, a.AppCfg, a.MwCfg, a.Logger, a.ModelName, a.ConversationID),
-	}, execHandlers)
+	}, a.AgenticExecModel, agenticExecHandlers, a.AgenticModelRetryConfig, a.AgenticModelFailoverConfig)
 	if err != nil {
 		return nil, fmt.Errorf("plan_execute executor: %w", err)
 	}
@@ -104,37 +103,35 @@ func NewPlanExecuteRoot(ctx context.Context, a *PlanExecuteRootArgs) (adk.Resuma
 	})
 }
 
-// buildPlanExecuteExecutorHandlers 组装 Executor 中间件栈（outermost first），与 Deep/Supervisor 主代理对齐：
-// ExecPreMiddlewares（patch / reduction / toolsearch / plantask）→ filesystem → skill → summarization tail。
-func buildPlanExecuteExecutorHandlers(ctx context.Context, a *PlanExecuteRootArgs) ([]adk.ChatModelAgentMiddleware, error) {
+func buildPlanExecuteAgenticExecutorHandlers(ctx context.Context, a *PlanExecuteRootArgs) ([]adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage], error) {
 	if a == nil {
 		return nil, fmt.Errorf("plan_execute: args 为空")
 	}
-	var execHandlers []adk.ChatModelAgentMiddleware
-	if len(a.ExecPreMiddlewares) > 0 {
-		execHandlers = append(execHandlers, a.ExecPreMiddlewares...)
+	var execHandlers []adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]
+	if len(a.AgenticExecPreMiddlewares) > 0 {
+		execHandlers = append(execHandlers, a.AgenticExecPreMiddlewares...)
 	}
-	if a.FilesystemMiddleware != nil {
-		execHandlers = append(execHandlers, a.FilesystemMiddleware)
+	if a.AgenticFilesystemMiddleware != nil {
+		execHandlers = append(execHandlers, a.AgenticFilesystemMiddleware)
 	}
-	if a.SkillMiddleware != nil {
-		execHandlers = append(execHandlers, a.SkillMiddleware)
+	if a.AgenticSkillMiddleware != nil {
+		execHandlers = append(execHandlers, a.AgenticSkillMiddleware)
 	}
 	if a.AppCfg != nil {
-		sumMw, sumErr := newEinoSummarizationMiddleware(ctx, a.ExecModel, a.AppCfg, a.MwCfg, a.ConversationID, a.DB, a.ProjectID, a.Logger)
+		sumMw, sumErr := newEinoAgenticSummarizationMiddleware(ctx, a.AgenticExecModel, a.AppCfg, a.MwCfg, a.ConversationID, a.DB, a.ProjectID, a.Logger)
 		if sumErr != nil {
-			return nil, fmt.Errorf("plan_execute executor summarization: %w", sumErr)
+			return nil, fmt.Errorf("plan_execute agentic executor summarization: %w", sumErr)
 		}
-		execHandlers = appendEinoChatModelTailMiddlewares(execHandlers, einoChatModelTailConfig{
-			logger:           a.Logger,
-			phase:            "plan_execute_executor",
-			summarization:    sumMw,
-			modelName:        a.ModelName,
-			maxTotalTokens:   a.AppCfg.OpenAI.MaxTotalTokens,
-			toolMaxBytes:     toolMaxBytesFromMW(a.MwCfg),
-			conversationID:   a.ConversationID,
-			trace:            a.ModelFacingTrace,
-			middlewareConfig: a.MwCfg,
+		execHandlers = appendEinoAgenticChatModelTailMiddlewares(execHandlers, einoChatModelTailConfig{
+			logger:               a.Logger,
+			phase:                "plan_execute_executor",
+			agenticSummarization: sumMw,
+			modelName:            a.ModelName,
+			maxTotalTokens:       a.AppCfg.OpenAI.MaxTotalTokens,
+			toolMaxBytes:         toolMaxBytesFromMW(a.MwCfg),
+			conversationID:       a.ConversationID,
+			trace:                a.ModelFacingTrace,
+			middlewareConfig:     a.MwCfg,
 		})
 	}
 	return execHandlers, nil
