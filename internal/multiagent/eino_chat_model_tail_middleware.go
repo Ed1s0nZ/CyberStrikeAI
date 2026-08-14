@@ -4,6 +4,7 @@ import (
 	"cyberstrike-ai/internal/config"
 
 	"github.com/cloudwego/eino/adk"
+	"github.com/cloudwego/eino/schema"
 	"go.uber.org/zap"
 )
 
@@ -24,18 +25,19 @@ import (
 //  11. telemetry
 //  12. model-facing trace snapshot
 type einoChatModelTailConfig struct {
-	logger           *zap.Logger
-	phase            string
-	summarization    adk.ChatModelAgentMiddleware
-	modelName        string
-	maxTotalTokens   int
-	toolMaxBytes     int
-	conversationID   string
-	trace            *modelFacingTraceHolder
-	middlewareConfig *config.MultiAgentEinoMiddlewareConfig
-	skipOrphanPruner bool
-	skipTelemetry    bool
-	skipTrace        bool
+	logger               *zap.Logger
+	phase                string
+	summarization        adk.ChatModelAgentMiddleware
+	agenticSummarization adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]
+	modelName            string
+	maxTotalTokens       int
+	toolMaxBytes         int
+	conversationID       string
+	trace                *modelFacingTraceHolder
+	middlewareConfig     *config.MultiAgentEinoMiddlewareConfig
+	skipOrphanPruner     bool
+	skipTelemetry        bool
+	skipTrace            bool
 }
 
 func appendEinoChatModelTailMiddlewares(handlers []adk.ChatModelAgentMiddleware, cfg einoChatModelTailConfig) []adk.ChatModelAgentMiddleware {
@@ -65,7 +67,6 @@ func appendEinoChatModelTailMiddlewares(handlers []adk.ChatModelAgentMiddleware,
 			handlers = append(handlers, capMw)
 		}
 	}
-	handlers = append(handlers, newModelOutputGuardMiddleware(cfg.middlewareConfig, cfg.logger, cfg.phase))
 	return handlers
 }
 
