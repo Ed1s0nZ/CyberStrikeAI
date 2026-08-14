@@ -1,0 +1,54 @@
+package security
+
+import (
+	"errors"
+	"os/exec"
+	"strings"
+	"testing"
+)
+
+func TestFormatCommandFailureResult(t *testing.T) {
+	got := FormatCommandFailureResult(1, "sudo: password required")
+	want := "命令执行失败: exit status 1\n输出: sudo: password required"
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+	if FormatCommandFailureResult(2, "") != "命令执行失败: exit status 2" {
+		t.Fatal("empty output format")
+	}
+	if FormatCommandFailureResult(1, "命令执行失败: exit status 1") != "命令执行失败: exit status 1" {
+		t.Fatal("should not double-wrap")
+	}
+}
+
+func TestIsCommandFailureResult(t *testing.T) {
+	if !IsCommandFailureResult("sudo: err\n命令执行失败: exit status 1") {
+		t.Fatal("expected true")
+	}
+	if IsCommandFailureResult("sudo: err only") {
+		t.Fatal("expected false")
+	}
+}
+
+func TestFormatCommandFailureFromErr(t *testing.T) {
+	cmd := exec.Command("sh", "-c", "exit 42")
+	err := cmd.Run()
+	got := FormatCommandFailureFromErr(err, "oops")
+	if got != "命令执行失败: exit status 42\n输出: oops" {
+		t.Fatalf("got %q", got)
+	}
+	timeoutErr := errors.New("shell inactivity timeout (300s)")
+	got2 := FormatCommandFailureFromErr(timeoutErr, "already timed out")
+	if !strings.Contains(got2, "shell inactivity timeout") || !strings.Contains(got2, "already timed out") {
+		t.Fatalf("got %q", got2)
+	}
+}
+
+func TestIsLegacyShellExitNoise(t *testing.T) {
+	if !IsLegacyShellExitNoise("command exited with non-zero code 1\n") {
+		t.Fatal("expected legacy noise")
+	}
+	if IsLegacyShellExitNoise("sudo: failed") {
+		t.Fatal("unexpected noise")
+	}
+}
