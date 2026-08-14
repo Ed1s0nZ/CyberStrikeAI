@@ -8,6 +8,7 @@ const monitor = fs.readFileSync('web/static/js/monitor.js', 'utf8');
 const chat = fs.readFileSync('web/static/js/chat.js', 'utf8');
 const router = fs.readFileSync('web/static/js/router.js', 'utf8');
 const auth = fs.readFileSync('web/static/js/auth.js', 'utf8');
+const webshell = fs.readFileSync('web/static/js/webshell.js', 'utf8');
 const html = fs.readFileSync('web/templates/index.html', 'utf8');
 
 function functionSource(source, name, nextName) {
@@ -79,6 +80,7 @@ function createScrollRuntime() {
     return {
         api: window.CyberStrikeChatScroll,
         chatEl,
+        returnLatest,
         listeners,
         flushAnimationFrames() {
             while (rafQueue.size) {
@@ -116,6 +118,21 @@ test('向上滚动立即解除粘底，只有滚到真实底部才恢复', () =>
     runtime.api.scrollIfPinned(true);
     runtime.flushAnimationFrames();
     assert.equal(runtime.chatEl.scrollTop, 1200, '恢复后新增输出继续请求滚到最底部');
+});
+
+test('用户离开最新位置后回到底部按钮稳定显示到真实底部', () => {
+    const runtime = createScrollRuntime();
+    runtime.flushAnimationFrames();
+
+    runtime.listeners.get('wheel')({ deltaY: -20 });
+    runtime.chatEl.scrollTop = 455;
+    runtime.listeners.get('scroll')();
+    assert.equal(runtime.returnLatest.hidden, false, '120px 阈值内仍应显示回到最新入口');
+
+    runtime.listeners.get('wheel')({ deltaY: 20 });
+    runtime.chatEl.scrollTop = 499;
+    runtime.listeners.get('scroll')();
+    assert.equal(runtime.returnLatest.hidden, true, '滚到真实底部后才隐藏');
 });
 
 test('刷新重建详情引起的布局上移不会误判为用户上滑', () => {
@@ -307,8 +324,8 @@ test('消息气泡内部流式增高时仅在跟随模式继续粘底', () => {
 });
 
 test('页面在任务补流脚本之前加载智能滚动控制器', () => {
-    const scrollIndex = html.indexOf('/static/js/chat-scroll.js?v=20260813-6');
-    const monitorIndex = html.indexOf('/static/js/monitor.js?v=20260813-9');
+    const scrollIndex = html.indexOf('/static/js/chat-scroll.js?v=20260815-1');
+    const monitorIndex = html.indexOf('/static/js/monitor.js?v=20260815-1');
 
     assert.notEqual(scrollIndex, -1);
     assert.notEqual(monitorIndex, -1);
@@ -325,6 +342,30 @@ test('直接点击项目对话也会写入 hash 以便刷新后恢复并补流',
     assert.match(syncSource, /window\.history\.replaceState/);
     assert.match(loadSource, /syncChatConversationHash\(conversationId\)/);
     assert.match(streamSource, /window\.syncChatConversationHash\(cid\)/);
+});
+
+test('任务计划进度按事件唤醒，空闲时不固定轮询 plan-tasks', () => {
+    const planSource = fs.readFileSync('web/static/js/chat-plan-progress.js', 'utf8');
+    assert.doesNotMatch(planSource, /setInterval\(fetchPlanTasks/);
+    assert.match(planSource, /ACTIVE_POLL_INTERVAL_MS = 1500/);
+    assert.match(planSource, /function shouldContinuePolling\(payload\)/);
+    assert.match(planSource, /payload && payload\.running === false/);
+    assert.match(planSource, /payload && payload\.running === true[\s\S]*?state\.tasks\.length > 0/);
+    assert.match(planSource, /isCurrentConversationRunning\(\) && state\.tasks\.length > 0/);
+    assert.match(planSource, /conversation-task-state-changed/);
+    assert.match(monitor, /window\.dispatchEvent\(new CustomEvent\('conversation-task-state-changed'/);
+    assert.match(monitor, /window\.isConversationTaskRunning = isConversationTaskRunning/);
+    assert.match(html, /chat-plan-progress\.js\?v=20260815-1/);
+});
+
+test('任务计划进度事件在活跃任务列表变化和新任务开始时发出', () => {
+    const notifySource = functionSource(monitor, 'notifyConversationTaskStarted', 'initChatTaskSyncChannel');
+    const renderSource = functionSource(monitor, 'renderActiveTasks', 'reconcileHitlApprovalStateWithActiveTasks');
+
+    assert.match(notifySource, /conversation-task-state-changed/);
+    assert.match(notifySource, /detail: \{ conversationId: id, running: true \}/);
+    assert.match(renderSource, /conversationExecutionTracker\.update\(normalizedTasks\)/);
+    assert.match(renderSource, /detail: \{ tasks: normalizedTasks \}/);
 });
 
 test('刷新指定对话时立即恢复且加载完成前不闪出无项目状态', () => {
@@ -354,6 +395,18 @@ test('刷新运行中回复会复用已持久化 planning 并继续追加未来�
     assert.match(handleSource, /case 'response_start':[\s\S]*?findRestoredMainResponseStreamItem/);
     assert.match(handleSource, /case 'response_delta':[\s\S]*?responseStreamStateFromRestoredItem/);
     assert.match(monitor, /item\.dataset\.responseStreamId = String\(options\.data\.streamId\)/);
+});
+
+test('Eino 原生模型 retry/failover 事件在主聊天和 WebShell 中可见', () => {
+    const handleSource = functionSource(monitor, 'handleStreamEvent', 'hitlApprovalTranslate');
+    assert.match(handleSource, /case 'eino_model_retry'/);
+    assert.match(handleSource, /formatEinoModelRetryTitle/);
+    assert.match(handleSource, /case 'eino_model_failover'/);
+    assert.match(handleSource, /formatEinoModelFailoverTitle/);
+    assert.match(monitor, /function formatEinoModelRetryMessage/);
+    assert.match(monitor, /function formatEinoModelFailoverMessage/);
+    assert.match(webshell, /_et === 'eino_model_retry'/);
+    assert.match(webshell, /_et === 'eino_model_failover'/);
 });
 
 test('非仪表盘 hash 首屏在路由确定前隐藏默认仪表盘', () => {

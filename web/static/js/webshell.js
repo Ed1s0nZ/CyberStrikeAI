@@ -2168,6 +2168,46 @@ function webshellAgentPx(data) {
     return s ? ('[' + s + '] ') : '';
 }
 
+function formatWebshellCompactInteger(value) {
+    var n = Number(value || 0);
+    if (!Number.isFinite(n)) return '0';
+    try {
+        var locale = (typeof getCurrentTimeLocale === 'function') ? getCurrentTimeLocale() : undefined;
+        return Math.max(0, Math.trunc(n)).toLocaleString(locale);
+    } catch (e) {
+        return String(Math.max(0, Math.trunc(n)));
+    }
+}
+
+function formatWebshellEinoUsageSummaryTitle(data) {
+    var d = data && typeof data === 'object' ? data : {};
+    var base = wsTOr('chat.einoUsageSummaryTitle', 'Token 用量汇总');
+    var total = Number(d.totalTokens || 0);
+    if (Number.isFinite(total) && total > 0) {
+        return base + ' · ' + formatWebshellCompactInteger(total);
+    }
+    return base;
+}
+
+function formatWebshellEinoUsageSummaryMessage(data) {
+    var d = data && typeof data === 'object' ? data : {};
+    var rows = [
+        [wsTOr('chat.einoUsageModelCalls', '模型调用'), d.modelCalls],
+        [wsTOr('chat.einoUsagePromptTokens', '输入 tokens'), d.promptTokens],
+        [wsTOr('chat.einoUsageCompletionTokens', '输出 tokens'), d.completionTokens],
+        [wsTOr('chat.einoUsageTotalTokens', '总 tokens'), d.totalTokens]
+    ];
+    if (Number(d.cachedTokens || 0) > 0) {
+        rows.push([wsTOr('chat.einoUsageCachedTokens', '缓存 tokens'), d.cachedTokens]);
+    }
+    if (Number(d.reasoningTokens || 0) > 0) {
+        rows.push([wsTOr('chat.einoUsageReasoningTokens', '推理 tokens'), d.reasoningTokens]);
+    }
+    return rows.map(function (row) {
+        return row[0] + ': ' + formatWebshellCompactInteger(row[1]);
+    }).join('\n');
+}
+
 // 根据后端保存的 processDetail 构建一条时间线项的 HTML（与 appendTimelineItem 展示一致）
 function buildWebshellTimelineItemFromDetail(detail) {
     var eventType = detail.eventType || '';
@@ -2207,12 +2247,17 @@ function buildWebshellTimelineItemFromDetail(detail) {
         title = ap + wsIcon + wsLabel;
     } else if (eventType === 'eino_agent_reply') {
         title = ap + '💬 ' + ((typeof window.t === 'function') ? window.t('chat.einoAgentReplyTitle') : '子代理回复');
+    } else if (eventType === 'eino_usage_summary') {
+        title = ap + '📊 ' + formatWebshellEinoUsageSummaryTitle(data);
     } else if (eventType === 'progress') {
         title = (typeof window.translateProgressMessage === 'function') ? window.translateProgressMessage(detail.message || '') : (detail.message || '');
     }
     var html = '<span class="webshell-ai-timeline-title">' + escapeHtml(title || '') + '</span>';
     if (eventType === 'eino_agent_reply' && detail.message) {
         html += '<div class="webshell-ai-timeline-msg"><pre style="white-space:pre-wrap;">' + escapeHtml(detail.message) + '</pre></div>';
+    }
+    if (eventType === 'eino_usage_summary') {
+        html += '<div class="webshell-ai-timeline-msg"><pre style="white-space:pre-wrap;">' + escapeHtml(formatWebshellEinoUsageSummaryMessage(data)) + '</pre></div>';
     }
     if (eventType === 'tool_call' && data && (data.argumentsObj || data.arguments)) {
         try {
@@ -2243,7 +2288,7 @@ function buildWebshellTimelineItemFromDetail(detail) {
         var execIdLabel = (typeof window.t === 'function') ? window.t('timeline.executionId') : '执行ID:';
         var sectionClass = displayState.kind === 'background_running' ? 'pending' : (displayState.isError ? 'error' : 'success');
         html += '<div class="webshell-ai-timeline-msg"><div class="tool-result-section ' + sectionClass + '"><strong>' + escapeHtml(execResultLabel) + '</strong><pre class="tool-result">' + escapeHtml(resultStr) + '</pre>' + (data.executionId ? '<div class="tool-execution-id"><span>' + escapeHtml(execIdLabel) + '</span> <code>' + escapeHtml(String(data.executionId)) + '</code></div>' : '') + '</div></div>';
-    } else if (detail.message && detail.message !== title) {
+    } else if (eventType !== 'eino_usage_summary' && detail.message && detail.message !== title) {
         html += '<div class="webshell-ai-timeline-msg">' + escapeHtml(detail.message) + '</div>';
     }
     return html;
@@ -3396,6 +3441,9 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
             }
         } else if (type === 'eino_agent_reply' && message) {
             html += '<div class="webshell-ai-timeline-msg"><pre style="white-space:pre-wrap;">' + escapeHtml(message) + '</pre></div>';
+        } else if (type === 'eino_usage_summary') {
+            var usageText = message || formatWebshellEinoUsageSummaryMessage(data);
+            html += '<div class="webshell-ai-timeline-msg"><pre style="white-space:pre-wrap;">' + escapeHtml(usageText) + '</pre></div>';
         } else if (type === 'tool_result' && data) {
             // 工具调用出参
             var noResultText = (typeof window.t === 'function') ? window.t('timeline.noResult') : '无结果';
@@ -3569,6 +3617,20 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                         appendTimelineItem('finalization_check', finalizationOk ? '最终回复检查通过' : '最终回复检查未通过', finalizationOk ? (_em || '最终回复检查通过。') : webshellFinalizationNotice(_ed || {}, _em, true), _ed);
                     } else if (_et === 'finalization_auto_continue') {
                         appendTimelineItem('progress', '继续验证', _em, _ed);
+                    } else if (_et === 'eino_model_retry') {
+                        var retryAttempt = _ed && _ed.attempt ? ('（' + _ed.attempt + '）') : '';
+                        var retryMsg = _em || '模型调用遇到临时问题，Eino 正在原生重试…';
+                        if (_ed && _ed.reason) retryMsg += '\n原因：' + _ed.reason;
+                        if (_ed && _ed.error) retryMsg += '\n错误详情：' + _ed.error;
+                        appendTimelineItem('warning', '🔁 模型调用重试' + retryAttempt, retryMsg, _ed);
+                    } else if (_et === 'eino_model_failover') {
+                        var failoverAttempt = _ed && _ed.attempt ? ('（' + _ed.attempt + '）') : '';
+                        var failoverMsg = _em || '主模型重试耗尽，正在切换备用模型。';
+                        if (_ed && _ed.channel) failoverMsg += '\n通道：' + _ed.channel;
+                        if (_ed && _ed.model) failoverMsg += '\n模型：' + _ed.model;
+                        appendTimelineItem('warning', '🔀 切换备用模型' + failoverAttempt, failoverMsg, _ed);
+                    } else if (_et === 'eino_usage_summary') {
+                        appendTimelineItem('eino_usage_summary', '📊 ' + formatWebshellEinoUsageSummaryTitle(_ed), formatWebshellEinoUsageSummaryMessage(_ed), _ed);
                     } else if (_et === 'error' && _em) {
                         streamingTypingId += 1;
                         var errLabel = wsTOr('chat.error', '错误');

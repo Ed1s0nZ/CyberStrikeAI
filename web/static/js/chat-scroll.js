@@ -328,6 +328,22 @@
         }
     }
 
+    function isVisibleConversationTaskActive() {
+        if (isStreamActive()) return true;
+        try {
+            const visibleConversationId = typeof window.currentConversationId === 'string'
+                ? window.currentConversationId.trim()
+                : '';
+            if (!visibleConversationId) return false;
+            const taskChecker = typeof window.isConversationTaskRunning === 'function'
+                ? window.isConversationTaskRunning
+                : (typeof isConversationTaskRunning === 'function' ? isConversationTaskRunning : null);
+            return !!(taskChecker && taskChecker(visibleConversationId));
+        } catch (e) {
+            return false;
+        }
+    }
+
     function distanceFromBottom(el) {
         if (!el) return 0;
         const { scrollTop, scrollHeight, clientHeight } = el;
@@ -427,8 +443,11 @@
         const messagesEl = getChatMessagesEl();
         if (!button || !messagesEl) return;
         const scrollable = messagesEl.scrollHeight > messagesEl.clientHeight + 2;
-        const shouldShow = scrollable && !isNearBottom(CHAT_SCROLL_NAV_BOTTOM_THRESHOLD_PX);
-        const streaming = shouldShow && isStreamActive();
+        const atLatest = isNearBottom(CHAT_SCROLL_FOLLOW_RESUME_THRESHOLD_PX);
+        const readingDetachedHistory = scrollMode === 'detached' && !atLatest;
+        const farFromLatestFallback = !isNearBottom(CHAT_SCROLL_NAV_BOTTOM_THRESHOLD_PX);
+        const shouldShow = scrollable && (readingDetachedHistory || farFromLatestFallback);
+        const streaming = shouldShow && isVisibleConversationTaskActive();
         button.hidden = !shouldShow;
         button.classList.toggle('is-streaming', streaming);
         button.classList.toggle('has-pending-new', shouldShow && hasPendingNewBelow);

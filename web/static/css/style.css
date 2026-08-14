@@ -7712,6 +7712,11 @@ html[data-theme="dark"] .login-card .login-submit:disabled {
     background: rgba(96, 125, 139, 0.08);
 }
 
+.timeline-item-eino_usage_summary {
+    border-left-color: #0f766e;
+    background: rgba(20, 184, 166, 0.07);
+}
+
 .timeline-item-warning {
     border-left-color: #f57c00;
     background: rgba(245, 124, 0, 0.09);
@@ -23333,6 +23338,12 @@ tr.mcp-stats-tool-row[data-tool-name]:focus-visible {
     font-weight: 600;
 }
 
+.webshell-ai-timeline-eino_usage_summary {
+    border-left: 3px solid #0f766e;
+    padding-left: 10px;
+    background: rgba(20, 184, 166, 0.06);
+}
+
 .webshell-ai-timeline-msg {
     margin-top: 4px;
     padding-left: 0;
@@ -23483,6 +23494,14 @@ tr.mcp-stats-tool-row[data-tool-name]:focus-visible {
 }
 .webshell-ai-process-block .webshell-ai-timeline-error {
     border-left-color: var(--error-color);
+}
+.webshell-ai-process-block .webshell-ai-timeline-warning {
+    border-left-color: #f57c00;
+    background: rgba(245, 124, 0, 0.08);
+}
+.webshell-ai-process-block .webshell-ai-timeline-eino_usage_summary {
+    border-left-color: #0f766e;
+    background: rgba(20, 184, 166, 0.06);
 }
 .webshell-ai-messages {
     flex: 1;
@@ -36561,6 +36580,11 @@ html[data-theme="dark"] .timeline-item-progress {
     background: rgba(148, 163, 184, 0.075);
 }
 
+html[data-theme="dark"] .timeline-item-eino_usage_summary {
+    border-left-color: #2dd4bf;
+    background: rgba(45, 212, 191, 0.085);
+}
+
 html[data-theme="dark"] .timeline-item-eino_agent_reply {
     background: rgba(168, 85, 247, 0.1);
 }
@@ -36650,6 +36674,12 @@ html[data-theme="dark"] .timeline-item-finalization_check {
 html[data-theme="dark"] .timeline-item-finalization_check .timeline-item-title,
 html[data-theme="dark"] .webshell-ai-timeline-finalization_check .webshell-ai-timeline-title {
     color: #fbbf24;
+}
+
+html[data-theme="dark"] .webshell-ai-timeline-eino_usage_summary,
+html[data-theme="dark"] .webshell-ai-process-block .webshell-ai-timeline-eino_usage_summary {
+    border-left-color: #2dd4bf;
+    background: rgba(45, 212, 191, 0.08);
 }
 
 html[data-theme="dark"] .message.assistant:not(.progress-message):not(.assistant-turn-with-process) .message-bubble {

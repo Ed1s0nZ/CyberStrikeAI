@@ -1104,6 +1104,9 @@ function notifyConversationTaskStarted(conversationId) {
     const id = String(conversationId || '').trim();
     if (!id) return false;
     conversationExecutionTracker.markRunning(id);
+    window.dispatchEvent(new CustomEvent('conversation-task-state-changed', {
+        detail: { conversationId: id, running: true }
+    }));
     if (typeof window.updateChatPrimaryActionState === 'function') {
         window.updateChatPrimaryActionState();
     }
@@ -1171,6 +1174,7 @@ const hitlPendingInterruptTracker = {
 function isConversationTaskRunning(conversationId) {
     return conversationExecutionTracker.isRunning(conversationId);
 }
+window.isConversationTaskRunning = isConversationTaskRunning;
 
 function setHitlApprovalInterruptedVisualState(panel, interrupted) {
     if (!panel || panel.classList.contains('hitl-inline-done')) return;
@@ -2592,6 +2596,104 @@ function formatEinoRunRetryTitle(data) {
     return base;
 }
 
+function formatEinoModelRetryTitle(data) {
+    const d = data && typeof data === 'object' ? data : {};
+    const base = typeof window.t === 'function'
+        ? window.t('chat.einoModelRetryTitle')
+        : '🔁 模型调用重试';
+    const attempt = Number(d.attempt || 0);
+    if (Number.isFinite(attempt) && attempt > 0) {
+        return base + '（' + attempt + '）';
+    }
+    return base;
+}
+
+function formatEinoModelRetryMessage(message, data) {
+    const d = data && typeof data === 'object' ? data : {};
+    const lines = [];
+    const base = String(message || '').trim();
+    if (base) lines.push(base);
+    if (d.reason != null && String(d.reason).trim() !== '') {
+        lines.push('原因：' + String(d.reason).trim());
+    }
+    if (d.error != null && String(d.error).trim() !== '') {
+        lines.push('错误详情：' + String(d.error).trim());
+    }
+    return lines.join('\n');
+}
+
+function formatEinoModelFailoverTitle(data) {
+    const d = data && typeof data === 'object' ? data : {};
+    const base = typeof window.t === 'function'
+        ? window.t('chat.einoModelFailoverTitle')
+        : '🔀 切换备用模型';
+    const attempt = Number(d.attempt || 0);
+    if (Number.isFinite(attempt) && attempt > 0) {
+        return base + '（' + attempt + '）';
+    }
+    return base;
+}
+
+function formatEinoModelFailoverMessage(message, data) {
+    const d = data && typeof data === 'object' ? data : {};
+    const lines = [];
+    const base = String(message || '').trim();
+    if (base) lines.push(base);
+    if (d.channel != null && String(d.channel).trim() !== '') {
+        lines.push('通道：' + String(d.channel).trim());
+    }
+    if (d.model != null && String(d.model).trim() !== '') {
+        lines.push('模型：' + String(d.model).trim());
+    }
+    return lines.join('\n');
+}
+
+function formatCompactInteger(value) {
+    const n = Number(value || 0);
+    if (!Number.isFinite(n)) return '0';
+    try {
+        return Math.max(0, Math.trunc(n)).toLocaleString(getCurrentTimeLocale());
+    } catch (e) {
+        return String(Math.max(0, Math.trunc(n)));
+    }
+}
+
+function formatEinoUsageSummaryTitle(data) {
+    const d = data && typeof data === 'object' ? data : {};
+    const base = typeof window.t === 'function'
+        ? window.t('chat.einoUsageSummaryTitle')
+        : 'Token 用量汇总';
+    const total = Number(d.totalTokens || 0);
+    if (Number.isFinite(total) && total > 0) {
+        return base + ' · ' + formatCompactInteger(total);
+    }
+    return base;
+}
+
+function formatEinoUsageSummaryMessage(data) {
+    const d = data && typeof data === 'object' ? data : {};
+    const label = function (key, fallback) {
+        if (typeof window.t !== 'function') return fallback;
+        const translated = window.t(key);
+        return translated && translated !== key ? translated : fallback;
+    };
+    const rows = [
+        [label('chat.einoUsageModelCalls', '模型调用'), d.modelCalls],
+        [label('chat.einoUsagePromptTokens', '输入 tokens'), d.promptTokens],
+        [label('chat.einoUsageCompletionTokens', '输出 tokens'), d.completionTokens],
+        [label('chat.einoUsageTotalTokens', '总 tokens'), d.totalTokens]
+    ];
+    if (Number(d.cachedTokens || 0) > 0) {
+        rows.push([label('chat.einoUsageCachedTokens', '缓存 tokens'), d.cachedTokens]);
+    }
+    if (Number(d.reasoningTokens || 0) > 0) {
+        rows.push([label('chat.einoUsageReasoningTokens', '推理 tokens'), d.reasoningTokens]);
+    }
+    return rows.map(function (row) {
+        return row[0] + ': ' + formatCompactInteger(row[1]);
+    }).join('\n');
+}
+
 function dispatchAgentPlanTaskEvent(event, fallbackConversationId) {
     if (!event || (event.type !== 'tool_call' && event.type !== 'tool_result')) return;
     const data = event.data && typeof event.data === 'object' ? event.data : {};
@@ -3226,6 +3328,37 @@ function handleStreamEvent(event, progressElement, progressId,
                 title: formatEinoRunRetryTitle(d),
                 message: msg,
                 data: d
+            });
+            break;
+        }
+
+        case 'eino_model_retry': {
+            const d = event.data || {};
+            addTimelineItem(timeline, 'warning', {
+                title: formatEinoModelRetryTitle(d),
+                message: formatEinoModelRetryMessage(event.message, d),
+                data: d
+            });
+            break;
+        }
+
+        case 'eino_model_failover': {
+            const d = event.data || {};
+            addTimelineItem(timeline, 'warning', {
+                title: formatEinoModelFailoverTitle(d),
+                message: formatEinoModelFailoverMessage(event.message, d),
+                data: d
+            });
+            break;
+        }
+
+        case 'eino_usage_summary': {
+            const d = event.data || {};
+            addTimelineItem(timeline, 'eino_usage_summary', {
+                title: formatEinoUsageSummaryTitle(d),
+                message: formatEinoUsageSummaryMessage(d),
+                data: d,
+                expanded: false
             });
             break;
         }
@@ -6209,6 +6342,14 @@ function addTimelineItem(timeline, type, options) {
         item.dataset.toolSuccess = (!displayState.isError && displayState.kind !== 'background_running') ? '1' : '0';
         item.dataset.toolDisplayStatus = displayState.kind === 'background_running' ? 'background_running' : (displayState.isError ? 'failed' : 'completed');
     }
+    if (type === 'eino_usage_summary' && options.data) {
+        const d = options.data;
+        ['modelCalls', 'promptTokens', 'completionTokens', 'totalTokens', 'cachedTokens', 'reasoningTokens'].forEach(function (key) {
+            if (d[key] != null) {
+                item.dataset[key] = String(d[key]);
+            }
+        });
+    }
     if (options.data && options.data.einoAgent != null && String(options.data.einoAgent).trim() !== '') {
         item.dataset.einoAgent = String(options.data.einoAgent).trim();
     }
@@ -6285,7 +6426,7 @@ function addTimelineItem(timeline, type, options) {
             resultData: merged || null,
             pending: !merged && !hasHistoricalStatus && !options.skipPendingResult,
             processDetailId: options.processDetailId || '',
-            resultDetailId: data._mergedResultDetailId || '',
+            resultDetailId: data._mergedResultDetailId || (merged && merged.processDetailId) || '',
             payloadDeferred: data._payloadDeferred === true || (merged && merged._payloadDeferred === true),
             payloadLoaded: !(data._payloadDeferred === true || (merged && merged._payloadDeferred === true))
         });
@@ -6348,6 +6489,8 @@ function addTimelineItem(timeline, type, options) {
             ? formatTimelineStreamBody(options.message, options.data)
             : options.message;
         content += `<div class="timeline-item-content timeline-stream-plain">${formatTimelinePlainTextHtml(streamBody)}</div>`;
+    } else if (type === 'eino_usage_summary' && options.message) {
+        content += `<div class="timeline-item-content timeline-stream-plain timeline-usage-summary">${formatTimelinePlainTextHtml(options.message)}</div>`;
     } else if (type === 'progress' && options.message) {
         content += `<div class="timeline-item-content timeline-eino-trace"><pre class="tool-result">${escapeHtml(options.message)}</pre></div>`;
     } else if (type === 'user_interrupt_continue' && options.message) {
@@ -6522,6 +6665,9 @@ function renderActiveTasks(tasks) {
 
     const normalizedTasks = Array.isArray(tasks) ? tasks : [];
     conversationExecutionTracker.update(normalizedTasks);
+    window.dispatchEvent(new CustomEvent('conversation-task-state-changed', {
+        detail: { tasks: normalizedTasks }
+    }));
     syncHitlApprovalTaskAvailability();
     reconcileHitlApprovalStateWithActiveTasks(normalizedTasks);
     if (typeof window.updateChatPrimaryActionState === 'function') {
@@ -9009,6 +9155,20 @@ function refreshProgressAndTimelineI18n() {
             titleSpan.textContent = ap + icon + (backgroundRunning ? (getBackgroundRunningToolLabel() + ': ' + name) : (success ? _t('chat.toolExecComplete', { name: name }) : _t('chat.toolExecFailed', { name: name })));
         } else if (type === 'eino_agent_reply') {
             titleSpan.textContent = ap + '\uD83D\uDCAC ' + _t('chat.einoAgentReplyTitle');
+        } else if (type === 'eino_usage_summary') {
+            const usageData = {
+                modelCalls: item.dataset.modelCalls,
+                promptTokens: item.dataset.promptTokens,
+                completionTokens: item.dataset.completionTokens,
+                totalTokens: item.dataset.totalTokens,
+                cachedTokens: item.dataset.cachedTokens,
+                reasoningTokens: item.dataset.reasoningTokens
+            };
+            titleSpan.textContent = formatEinoUsageSummaryTitle(usageData);
+            const contentEl = item.querySelector('.timeline-usage-summary');
+            if (contentEl) {
+                setTimelineItemContentStreamPlain(contentEl, formatEinoUsageSummaryMessage(usageData));
+            }
         } else if (type === 'cancelled') {
             titleSpan.textContent = '\u26D4 ' + _t('chat.taskCancelled');
         } else if (type === 'user_interrupt_continue') {

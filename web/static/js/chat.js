@@ -3648,10 +3648,71 @@ function isEinoAgentHeartbeatProgress(detail) {
     return /^\[Eino\]\s+\S/.test(msg);
 }
 
+function hasModelOutputRecoveryMarker(value) {
+    if (!value) return false;
+    let obj = value;
+    if (typeof obj === 'string') {
+        const text = obj.trim();
+        if (!text || text.indexOf('_cyberstrike_model_output_recovery') === -1) return false;
+        try {
+            obj = JSON.parse(text);
+        } catch (e) {
+            return false;
+        }
+    }
+    return !!(obj && typeof obj === 'object' && obj._cyberstrike_model_output_recovery);
+}
+
+function isModelOutputRecoveryToolCallDetail(detail) {
+    if (!detail || detail.eventType !== 'tool_call') return false;
+    const data = detail.data && typeof detail.data === 'object' ? detail.data : {};
+    return hasModelOutputRecoveryMarker(data.argumentsObj) || hasModelOutputRecoveryMarker(data.arguments);
+}
+
+function isAnonymousTaskFragmentToolCallDetail(detail) {
+    if (!detail || detail.eventType !== 'tool_call') return false;
+    const data = detail.data && typeof detail.data === 'object' ? detail.data : {};
+    const toolName = String(data.toolName || '').trim().toLowerCase();
+    if (toolName && toolName !== 'task' && toolName !== 'unknown') return false;
+
+    let raw = null;
+    const argsObj = data.argumentsObj && typeof data.argumentsObj === 'object' ? data.argumentsObj : null;
+    if (argsObj) {
+        const keys = Object.keys(argsObj);
+        if (keys.length === 1 && keys[0] === '_raw') {
+            raw = String(argsObj._raw != null ? argsObj._raw : '').trim();
+        }
+    }
+    if (raw == null && typeof data.arguments === 'string') {
+        raw = data.arguments.trim();
+    }
+    if (raw == null) return false;
+    if (!raw) return true;
+    return !(raw.startsWith('{') && raw.endsWith('}'));
+}
+
+function isInternalEinoDiagnosticDetail(detail) {
+    if (!detail) return false;
+    if (detail.eventType === 'model_output_rejected') return true;
+    if (detail.eventType !== 'progress') return false;
+    const msg = String(detail.message != null ? detail.message : '').trim();
+    if (msg === 'Eino TurnLoop 常驻多轮 runtime 已接管本轮会话。' ||
+        msg === 'Eino TurnLoop 已在安全点切换到用户补充后的下一轮。' ||
+        msg === '已将用户补充推入 Eino TurnLoop，正在等待安全点切换…') {
+        return true;
+    }
+    const data = detail.data && typeof detail.data === 'object' ? detail.data : {};
+    const kind = String(data.kind || '').trim();
+    return kind === 'turn_loop_takeover' || kind === 'turn_loop_preempted';
+}
+
 function filterNoiseProcessDetails(details) {
     if (!Array.isArray(details)) return details;
     return details.filter(function (d) {
         if (isEinoAgentHeartbeatProgress(d)) return false;
+        if (isModelOutputRecoveryToolCallDetail(d)) return false;
+        if (isAnonymousTaskFragmentToolCallDetail(d)) return false;
+        if (isInternalEinoDiagnosticDetail(d)) return false;
         return !(d && d.eventType === 'tool_calls_detected');
     });
 }
@@ -4130,11 +4191,12 @@ function renderProcessDetails(messageId, processDetails, options) {
             }
         }
 
+        const processDetailId = detail.id || data.processDetailId || '';
         const timelineOpts = {
             title: itemTitle,
             message: detail.message || '',
             data: data,
-            processDetailId: detail.id || '',
+            processDetailId: processDetailId,
             createdAt: detail.createdAt
         };
         if (eventType === 'tool_call' && data._mergedResult) {

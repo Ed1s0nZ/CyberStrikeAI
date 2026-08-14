@@ -3847,9 +3847,29 @@
                                             <summary data-i18n="settingsBasic.agentAdvanced">高级设置</summary>
                                             <div class="settings-form" style="margin-top: 0.75rem;">
                                                 <div class="form-group">
-                                                    <label for="summarization-user-ledger-max-runes" data-i18n="settingsBasic.userLedgerMaxRunes">用户原文账本总字符上限</label>
-                                                    <input type="number" id="summarization-user-ledger-max-runes" min="0" step="1000" placeholder="96000" />
-                                                    <small class="form-hint" data-i18n="settingsBasic.userLedgerMaxRunesHint">压缩后注入模型上下文的原始用户输入账本总上限；0 使用后端默认值。DB 原始消息不裁剪。</small>
+                                                    <label for="eino-model-retry-max-retries" data-i18n="settingsBasic.einoModelRetryMaxRetries">Eino 原生模型最大重试次数</label>
+                                                    <input type="number" id="eino-model-retry-max-retries" min="0" step="1" placeholder="0" />
+                                                    <small class="form-hint" data-i18n="settingsBasic.einoModelRetryMaxRetriesHint">ChatModelAgent 原生 ModelRetry 次数；0 使用后端默认 4。用于 429/5xx/网络抖动和空模型输出。</small>
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="eino-model-retry-max-backoff-sec" data-i18n="settingsBasic.einoModelRetryMaxBackoffSec">Eino 原生模型最大退避秒数</label>
+                                                    <input type="number" id="eino-model-retry-max-backoff-sec" min="0" step="1" placeholder="0" />
+                                                    <small class="form-hint" data-i18n="settingsBasic.einoModelRetryMaxBackoffSecHint">模型原生重试的指数退避上限；0 使用后端默认 30 秒。</small>
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="eino-model-failover-channels" data-i18n="settingsBasic.einoModelFailoverChannels">Eino 模型 Failover 备用通道</label>
+                                                    <textarea id="eino-model-failover-channels" rows="3" placeholder="backup-openai&#10;backup-claude" data-i18n="settingsBasic.einoModelFailoverChannelsPlaceholder" data-i18n-attr="placeholder"></textarea>
+                                                    <small class="form-hint" data-i18n="settingsBasic.einoModelFailoverChannelsHint">主通道原生重试耗尽后按顺序切换 ai.channels 中的通道 ID；每行一个，也支持逗号分隔。</small>
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="eino-model-failover-max-retries" data-i18n="settingsBasic.einoModelFailoverMaxRetries">Eino 模型 Failover 最大切换次数</label>
+                                                    <input type="number" id="eino-model-failover-max-retries" min="0" step="1" placeholder="0" />
+                                                    <small class="form-hint" data-i18n="settingsBasic.einoModelFailoverMaxRetriesHint">0 表示尝试全部已配置备用通道；大于 0 时限制最多切换几个通道。</small>
+                                                </div>
+	                                                <div class="form-group">
+	                                                    <label for="summarization-user-ledger-max-runes" data-i18n="settingsBasic.userLedgerMaxRunes">用户原文账本总字符上限</label>
+	                                                    <input type="number" id="summarization-user-ledger-max-runes" min="0" step="1000" placeholder="96000" />
+	                                                    <small class="form-hint" data-i18n="settingsBasic.userLedgerMaxRunesHint">压缩后注入模型上下文的原始用户输入账本总上限；0 使用后端默认值。DB 原始消息不裁剪。</small>
                                                 </div>
                                                 <div class="form-group">
                                                     <label for="summarization-user-ledger-entry-max-runes" data-i18n="settingsBasic.userLedgerEntryMaxRunes">单条用户原文字符上限</label>
@@ -6820,10 +6840,10 @@
     <script src="/static/js/assets.js?v=20260717-7"></script>
     <script src="/static/js/agents.js"></script>
     <script src="/static/js/dashboard.js"></script>
-    <script src="/static/js/chat-scroll.js?v=20260813-6"></script>
-    <script src="/static/js/monitor.js?v=20260813-9"></script>
+    <script src="/static/js/chat-scroll.js?v=20260815-1"></script>
+    <script src="/static/js/monitor.js?v=20260815-1"></script>
     <script src="/static/js/chat.js?v=20260813-4"></script>
-    <script src="/static/js/chat-plan-progress.js?v=20260813-3"></script>
+    <script src="/static/js/chat-plan-progress.js?v=20260815-1"></script>
     <script src="/static/js/hitl.js?v=20260811-4"></script>
     <script src="/static/js/settings.js?v=20260717-1"></script>
     <script src="/static/js/audit-datetime-picker.js"></script>

@@ -2,7 +2,8 @@
     'use strict';
 
     const PLAN_TOOL_NAMES = new Set(['taskcreate', 'taskupdate', 'tasklist', 'taskget']);
-    const POLL_INTERVAL_MS = 1500;
+    const ACTIVE_POLL_INTERVAL_MS = 1500;
+    const ERROR_RETRY_INTERVAL_MS = 4000;
     const FINAL_STATE_HOLD_MS = 2400;
 
     function normalizeTask(raw, index) {
@@ -62,7 +63,6 @@
         expanded: false,
         requestSequence: 0,
         abortController: null,
-        pollTimer: null,
         refreshTimer: null,
         finalHoldUntil: 0,
         taskCalls: new Map()
@@ -208,6 +208,28 @@
         return String(root.currentConversationId || '').trim();
     }
 
+    function isCurrentConversationRunning() {
+        const conversationId = currentConversationId();
+        if (!conversationId) return false;
+        try {
+            const checker = typeof root.isConversationTaskRunning === 'function'
+                ? root.isConversationTaskRunning
+                : (typeof isConversationTaskRunning === 'function' ? isConversationTaskRunning : null);
+            return !!(checker && checker(conversationId));
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function shouldContinuePolling(payload) {
+        if (!currentConversationId() || root.document.hidden) return false;
+        if (payload && payload.running === false) return false;
+        if (payload && payload.running === true) {
+            return state.tasks.length > 0 || Date.now() < state.finalHoldUntil;
+        }
+        return isCurrentConversationRunning() && state.tasks.length > 0;
+    }
+
     function setConversation(conversationId) {
         const next = String(conversationId || '').trim();
         if (next === state.conversationId) return false;
@@ -233,13 +255,15 @@
         if (state.abortController) state.abortController.abort();
         const controller = new AbortController();
         state.abortController = controller;
+        let payload = null;
+        let retryAfterError = false;
         try {
             const fetcher = typeof root.apiFetch === 'function' ? root.apiFetch : root.fetch.bind(root);
             const response = await fetcher('/api/conversations/' + encodeURIComponent(conversationId) + '/plan-tasks', {
                 signal: controller.signal
             });
             if (!response.ok) throw new Error('HTTP ' + response.status);
-            const payload = await response.json();
+            payload = await response.json();
             if (sequence !== state.requestSequence || conversationId !== state.conversationId) return;
             if (payload && payload.running === false) {
                 state.tasks = [];
@@ -254,10 +278,16 @@
             render(false);
         } catch (error) {
             if (error && error.name === 'AbortError') return;
+            retryAfterError = true;
             // A task list is supplemental UI; a transient poll failure must not
             // interfere with the chat or erase the last known task state.
         } finally {
-            if (sequence === state.requestSequence) state.abortController = null;
+            if (sequence === state.requestSequence) {
+                state.abortController = null;
+                if (shouldContinuePolling(payload)) {
+                    scheduleRefresh(retryAfterError ? ERROR_RETRY_INTERVAL_MS : ACTIVE_POLL_INTERVAL_MS);
+                }
+            }
         }
     }
 
@@ -291,13 +321,24 @@
         scheduleRefresh(100);
     }
 
+    function handleConversationTaskStateChanged(event) {
+        const detail = event && event.detail && typeof event.detail === 'object' ? event.detail : {};
+        const conversationId = String(detail.conversationId || '').trim();
+        const currentId = currentConversationId();
+        if (conversationId && conversationId !== currentId) return;
+        if (isCurrentConversationRunning() || state.tasks.length) {
+            scheduleRefresh(0);
+        }
+    }
+
     root.addEventListener('agent-plan-task-event', handlePlanToolEvent);
+    root.addEventListener('conversation-task-state-changed', handleConversationTaskStateChanged);
     root.addEventListener('conversation-changed', (event) => {
         setConversation(event && event.detail ? event.detail.conversationId : currentConversationId());
         scheduleRefresh(0);
     });
     root.document.addEventListener('visibilitychange', () => {
-        if (!root.document.hidden) scheduleRefresh(0);
+        if (!root.document.hidden && (isCurrentConversationRunning() || state.tasks.length)) scheduleRefresh(0);
     });
     root.document.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape' || !state.expanded) return;
@@ -312,5 +353,4 @@
 
     setConversation(currentConversationId());
     fetchPlanTasks();
-    state.pollTimer = root.setInterval(fetchPlanTasks, POLL_INTERVAL_MS);
 })(typeof window !== 'undefined' ? window : globalThis);

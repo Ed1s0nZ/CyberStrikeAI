@@ -859,6 +859,26 @@ async function loadConfig(loadTools = true, options = {}) {
             maRobotMode.value = mode;
             syncRobotAgentModeSelectOptions(ma.enabled === true);
         }
+        const modelRetryMaxEl = document.getElementById('eino-model-retry-max-retries');
+        if (modelRetryMaxEl) {
+            const v = ma.model_retry_max_retries;
+            modelRetryMaxEl.value = (v !== undefined && v !== null && !Number.isNaN(Number(v))) ? String(Number(v)) : '0';
+        }
+        const modelRetryBackoffEl = document.getElementById('eino-model-retry-max-backoff-sec');
+        if (modelRetryBackoffEl) {
+            const v = ma.model_retry_max_backoff_sec;
+            modelRetryBackoffEl.value = (v !== undefined && v !== null && !Number.isNaN(Number(v))) ? String(Number(v)) : '0';
+        }
+        const modelFailoverChannelsEl = document.getElementById('eino-model-failover-channels');
+        if (modelFailoverChannelsEl) {
+            const channels = ma.model_failover_channels;
+            modelFailoverChannelsEl.value = Array.isArray(channels) ? channels.join('\n') : '';
+        }
+        const modelFailoverMaxEl = document.getElementById('eino-model-failover-max-retries');
+        if (modelFailoverMaxEl) {
+            const v = ma.model_failover_max_retries;
+            modelFailoverMaxEl.value = (v !== undefined && v !== null && !Number.isNaN(Number(v))) ? String(Number(v)) : '0';
+        }
         const userLedgerMaxEl = document.getElementById('summarization-user-ledger-max-runes');
         if (userLedgerMaxEl) {
             const v = ma.summarization_user_intent_ledger_max_runes;
@@ -2044,11 +2064,24 @@ async function applySettings() {
                 if (!maEnabled && ['deep', 'plan_execute', 'supervisor'].indexOf(robotMode) >= 0) {
                     robotMode = 'eino_single';
                 }
+                const parseNonNegativeInt = function (id) {
+                    const raw = document.getElementById(id)?.value;
+                    const parsed = parseInt(raw, 10);
+                    return Number.isNaN(parsed) ? 0 : Math.max(0, parsed);
+                };
+                const failoverChannelsRaw = document.getElementById('eino-model-failover-channels')?.value || '';
+                const failoverChannels = Array.from(new Set(
+                    failoverChannelsRaw.split(/[\n,，]/).map(s => s.trim()).filter(Boolean)
+                ));
                 return {
                     enabled: maEnabled,
                     robot_default_agent_mode: robotMode,
                     batch_use_multi_agent: currentConfig?.multi_agent?.batch_use_multi_agent === true,
                     plan_execute_loop_max_iterations: peLoop,
+                    model_retry_max_retries: parseNonNegativeInt('eino-model-retry-max-retries'),
+                    model_retry_max_backoff_sec: parseNonNegativeInt('eino-model-retry-max-backoff-sec'),
+                    model_failover_channels: failoverChannels,
+                    model_failover_max_retries: parseNonNegativeInt('eino-model-failover-max-retries'),
                     summarization_user_intent_ledger_max_runes: ledgerMax,
                     summarization_user_intent_ledger_entry_max_runes: ledgerEntryMax,
                     latest_user_message_max_runes: latestMax,
