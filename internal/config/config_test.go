@@ -169,18 +169,11 @@ func TestSummarizationOutputReserveTokensEffective(t *testing.T) {
 	}
 }
 
-func TestModelOutputLimitDefaultsAndValidation(t *testing.T) {
+func TestOpenAIOutputLimitValidation(t *testing.T) {
 	if got := (OpenAIConfig{}).MaxCompletionTokensEffective(); got != DefaultMaxCompletionTokens {
 		t.Fatalf("max completion default=%d", got)
 	}
-	mw := MultiAgentEinoMiddlewareConfig{}
-	if mw.MaxToolArgumentsBytesEffective() != 65536 || mw.MaxShellCommandBytesEffective() != 65536 || mw.ModelOutputRepairMaxAttemptsEffective() != 1 {
-		t.Fatalf("unexpected guard defaults: %+v", mw)
-	}
-	if err := validateModelOutputLimits(OpenAIConfig{}, MultiAgentEinoMiddlewareConfig{MaxShellCommandBytes: 100, MaxToolArgumentsBytes: 99}); err == nil {
-		t.Fatal("shell limit greater than generic limit must fail")
-	}
-	if err := validateModelOutputLimits(OpenAIConfig{MaxCompletionTokens: -1}, MultiAgentEinoMiddlewareConfig{}); err == nil {
+	if err := validateOpenAIOutputLimits(OpenAIConfig{MaxCompletionTokens: -1}); err == nil {
 		t.Fatal("negative completion limit must fail")
 	}
 }
