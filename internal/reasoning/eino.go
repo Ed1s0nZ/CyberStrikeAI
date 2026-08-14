@@ -36,7 +36,7 @@ func ApplyPlanExecutePlannerModelConfig(cfg *einoopenai.ChatModelConfig, oa *con
 	}
 	mergeExtraRequestFields(cfg, oa.Reasoning.ExtraRequestFields)
 	clearReasoningFromChatModelConfig(cfg)
-	if resolveWireProfile(oa, &oa.Reasoning) == wireDeepseek {
+	if resolveWireProfile(oa, &oa.Reasoning) == wireDeepseek || oa.IsDeepSeekEndpointOrModel() {
 		// DeepSeek enables thinking by default, so omission would not actually
 		// disable it for the planner's forced tool-choice requests.
 		applyThinkingDisabled(cfg)
@@ -88,8 +88,9 @@ func ApplyToEinoChatModelConfig(cfg *einoopenai.ChatModelConfig, oa *config.Open
 		clearReasoningFromChatModelConfig(cfg)
 		// Strict OpenAI endpoints reject unknown `thinking` fields, whereas the
 		// DeepSeek API enables thinking by default and requires an explicit
-		// thinking.type=disabled switch. Keep that wire difference profile-scoped.
-		if resolveWireProfile(oa, sr) == wireDeepseek {
+		// thinking.type=disabled switch. Detect the actual DeepSeek target even
+		// when the configured reasoning profile was left as openai_compat.
+		if resolveWireProfile(oa, sr) == wireDeepseek || oa.IsDeepSeekEndpointOrModel() {
 			applyThinkingDisabled(cfg)
 		}
 		return
@@ -115,6 +116,107 @@ func ApplyToEinoChatModelConfig(cfg *einoopenai.ChatModelConfig, oa *config.Open
 		applyOutputConfigEffort(cfg, mode, effort)
 	default: // wireOpenAI
 		applyOpenAICompat(cfg, mode, effort)
+	}
+}
+
+// AgenticOpenAIExtraFields returns reasoning-related request fields for
+// agenticopenai.ChatConfig. The agentic chat backend currently exposes provider
+// extensions through ExtraFields instead of typed ReasoningEffort fields.
+func AgenticOpenAIExtraFields(oa *config.OpenAIConfig, client *ClientIntent) map[string]any {
+	if oa == nil {
+		return nil
+	}
+	sr := &oa.Reasoning
+	allowClient := sr.AllowClientReasoningEffective()
+	mode := effectiveMode(sr, client, allowClient)
+	fields := cloneExtraRequestFields(sr.ExtraRequestFields)
+	if mode == "off" {
+		clearReasoningExtraFields(fields)
+		if resolveWireProfile(oa, sr) == wireDeepseek || oa.IsDeepSeekEndpointOrModel() {
+			if fields == nil {
+				fields = make(map[string]any)
+			}
+			fields["thinking"] = map[string]any{"type": "disabled"}
+		}
+		return fields
+	}
+	if strings.EqualFold(strings.TrimSpace(oa.Provider), "claude") ||
+		strings.EqualFold(strings.TrimSpace(oa.Provider), "anthropic") {
+		return fields
+	}
+	effort := effectiveEffort(sr, client, allowClient)
+	switch resolveWireProfile(oa, sr) {
+	case wireDeepseek:
+		if mode == "auto" || mode == "on" {
+			if fields == nil {
+				fields = make(map[string]any)
+			}
+			fields["thinking"] = map[string]any{"type": "enabled"}
+		}
+		if effort != "" {
+			if fields == nil {
+				fields = make(map[string]any)
+			}
+			fields["reasoning_effort"] = effortStringForAPI(effort)
+		}
+	case wireOutputConfig:
+		e := effort
+		if mode == "on" && e == "" {
+			e = "high"
+		}
+		if e != "" {
+			if fields == nil {
+				fields = make(map[string]any)
+			}
+			fields["output_config"] = map[string]any{"effort": effortStringForAPI(e)}
+		}
+	default:
+		e := effort
+		if mode == "on" && e == "" {
+			e = "medium"
+		}
+		if e != "" {
+			if fields == nil {
+				fields = make(map[string]any)
+			}
+			fields["reasoning_effort"] = effortStringForAPI(e)
+		}
+	}
+	return fields
+}
+
+// AgenticOpenAIPlannerExtraFields mirrors ApplyPlanExecutePlannerModelConfig for
+// agenticopenai.ChatConfig: keep admin extras, strip reasoning controls, and
+// explicitly disable DeepSeek thinking where omission would still think.
+func AgenticOpenAIPlannerExtraFields(oa *config.OpenAIConfig) map[string]any {
+	if oa == nil {
+		return nil
+	}
+	fields := cloneExtraRequestFields(oa.Reasoning.ExtraRequestFields)
+	clearReasoningExtraFields(fields)
+	if resolveWireProfile(oa, &oa.Reasoning) == wireDeepseek || oa.IsDeepSeekEndpointOrModel() {
+		if fields == nil {
+			fields = make(map[string]any)
+		}
+		fields["thinking"] = map[string]any{"type": "disabled"}
+	}
+	return fields
+}
+
+func cloneExtraRequestFields(fields map[string]interface{}) map[string]any {
+	if len(fields) == 0 {
+		return nil
+	}
+	out := make(map[string]any, len(fields))
+	for k, v := range fields {
+		out[k] = v
+	}
+	return out
+}
+
+func clearReasoningExtraFields(fields map[string]any) {
+	for _, key := range []string{"thinking", "reasoning_effort", "output_config", "reasoning"} {
+		delete(fields, key)
 	}
 }
 
@@ -240,9 +342,7 @@ func resolveWireProfile(oa *config.OpenAIConfig, sr *config.OpenAIReasoningConfi
 	case "deepseek", "deepseek_compat":
 		return wireDeepseek
 	case "auto", "":
-		bu := strings.ToLower(oa.BaseURL)
-		mo := strings.ToLower(oa.Model)
-		if strings.Contains(bu, "deepseek") || strings.Contains(mo, "deepseek") {
+		if oa.IsDeepSeekEndpointOrModel() {
 			return wireDeepseek
 		}
 		return wireOpenAI
