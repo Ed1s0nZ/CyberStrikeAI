@@ -10,7 +10,7 @@
 # ============================================
 
 # 前端显示的版本号（可选，不填则显示默认版本）
-version: "v1.7.13"
+version: "v1.7.12"
 # 服务器配置
 server:
   host: 0.0.0.0 # 监听地址，0.0.0.0 表示监听所有网络接口
@@ -76,6 +76,14 @@ ai:
         allow_client_reasoning: true # false 时忽略对话请求体 reasoning，仅以下方为准
         profile: openai_compat # auto | deepseek_compat | openai_compat | output_config_effort
         # extra_request_fields: {} # 可选：管理员自定义根级 JSON 片段（高级）
+    # qwen-plus:
+    #   name: Qwen Plus Fallback
+    #   provider: openai_compatible
+    #   base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    #   api_key: sk-xxxxxxx
+    #   model: qwen-plus
+    #   max_total_tokens: 120000
+    #   max_completion_tokens: 32768
 # 视觉分析（analyze_image MCP 工具；图片仅在单次 VL 调用中出现，Agent 上下文只保留文字摘要）
 vision:
   enabled: false # true 且 model 非空时注册 analyze_image
@@ -271,9 +279,6 @@ multi_agent:
   # Eino ADK 中间件与 Deep/Supervisor/plan_execute Executor 调参（结构体见 internal/config/config.go → MultiAgentEinoMiddlewareConfig）
   # plan_execute：下列 patch/reduction/tool_search/plantask 等同样作用于 Executor（经 ExecPreMiddlewares）；Planner/Replanner 不挂 MCP 前置中间件。
   eino_middleware:
-    max_tool_arguments_bytes: 65536 # 单个工具 arguments 硬上限；超出时禁止执行并要求模型改写
-    max_shell_command_bytes: 65536 # exec/execute.command 硬上限；与普通工具 arguments 上限一致
-    model_output_repair_max_attempts: 1 # 非法/截断模型输出最多自动修复一次，避免循环
     patch_tool_calls: true # true：修补历史中无 tool_result 的悬空 tool_call（流式中断/重试后更稳）；false：关闭；字段省略时默认等同 true
     tool_search_enable: true # true：工具数 ≥ min 时启用 tool_search，仅前 N 个工具常驻，其余按正则按需解锁，省 token、减误选；false：全量工具进上下文
     tool_search_min_tools: 20 # 达到该数量才启用 tool_search（避免工具很少时多此一举）；与 always_visible 配合使用
@@ -300,11 +305,12 @@ multi_agent:
     plan_execute_max_step_result_runes: 4000 # plan_execute 每步结果最大字符数（超出截断）
     plan_execute_keep_last_steps: 8 # plan_execute 仅保留最近 N 步正文，早期步骤折叠为标题
     checkpoint_dir: data/eino-checkpoints # P0：进程崩溃/OOM 后同会话自动 ADK Resume；正常结束会删 .ckpt；与「中断并继续」(last_react_*) 是两套机制
-    run_retry_max_attempts: 0 # 408/409/425/429/5xx/网络抖动时可退避重试次数；0=默认 4（永久性 4xx 不重试）
-    run_retry_max_backoff_sec: 0 # 单次退避上限秒数；0=默认 30
+    model_retry_max_retries: 0 # Eino 原生 ChatModel retry；408/409/425/429/5xx/网络抖动/空流式输出会重试；0=默认 4（永久性 4xx 不重试）
+    model_retry_max_backoff_sec: 0 # Eino 原生 ChatModel retry 单次退避上限秒数；0=默认 30
+    model_failover_channels: [] # Eino 原生 ChatModel failover；填写 ai.channels ID，例如 [qwen-plus]；retry 耗尽后按顺序切换
+    model_failover_max_retries: 0 # 备用通道最多尝试数；0=尝试全部 model_failover_channels
     empty_response_continue_max_attempts: 0 # Run 成功但未捕获助手正文（含流式中断）时 Handler 退避续跑次数；0=默认 5
     deep_output_key: final_answer # P0：Eino session 写入最终助手结论（框架内部；Deep/Supervisor 主/eino_single）
-    deep_model_retry_max_retries: 0 # 已废弃，请用 run_retry_max_attempts；保留字段仅为兼容旧配置
     task_tool_description_prefix: "" # 非空：仅 Deep 的 task 工具使用自定义描述前缀，运行时会拼接子代理名称；空则走 Eino 默认生成逻辑
   # Eino callbacks + OpenTelemetry：框架级 span（与 Zap 对齐）；默认不向终端用户 UI 推 eino_trace_*（见 sse_trace_to_client）
   eino_callbacks:
