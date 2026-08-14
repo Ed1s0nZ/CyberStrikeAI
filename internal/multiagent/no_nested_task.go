@@ -6,6 +6,7 @@ import (
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/schema"
 )
 
 // noNestedTaskMiddleware 禁止在已经处于 task(sub-agent) 执行链中再次调用 task，
@@ -23,7 +24,33 @@ func newNoNestedTaskMiddleware() adk.ChatModelAgentMiddleware {
 	return &noNestedTaskMiddleware{}
 }
 
+type noNestedAgenticTaskMiddleware struct {
+	*adk.TypedBaseChatModelAgentMiddleware[*schema.AgenticMessage]
+}
+
+func newNoNestedAgenticTaskMiddleware() adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage] {
+	return &noNestedAgenticTaskMiddleware{
+		TypedBaseChatModelAgentMiddleware: &adk.TypedBaseChatModelAgentMiddleware[*schema.AgenticMessage]{},
+	}
+}
+
 func (m *noNestedTaskMiddleware) WrapInvokableToolCall(
+	ctx context.Context,
+	endpoint adk.InvokableToolCallEndpoint,
+	tCtx *adk.ToolContext,
+) (adk.InvokableToolCallEndpoint, error) {
+	return wrapNoNestedTaskCall(ctx, endpoint, tCtx)
+}
+
+func (m *noNestedAgenticTaskMiddleware) WrapInvokableToolCall(
+	ctx context.Context,
+	endpoint adk.InvokableToolCallEndpoint,
+	tCtx *adk.ToolContext,
+) (adk.InvokableToolCallEndpoint, error) {
+	return wrapNoNestedTaskCall(ctx, endpoint, tCtx)
+}
+
+func wrapNoNestedTaskCall(
 	ctx context.Context,
 	endpoint adk.InvokableToolCallEndpoint,
 	tCtx *adk.ToolContext,

@@ -15,19 +15,16 @@ import (
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/adk/middlewares/filesystem"
 	"github.com/cloudwego/eino/adk/middlewares/skill"
+	"github.com/cloudwego/eino/schema"
 	"go.uber.org/zap"
 )
 
-// prepareEinoSkills builds Eino official skill backend + middleware, and a shared local disk backend.
-// The local backend is also required by reduction, so reduction must not silently disappear merely
-// because Skills are disabled or skills_dir is unavailable.
-// skillsRoot is the absolute skills directory (empty when skills are not active).
-func prepareEinoSkills(
+func prepareEinoAgenticSkills(
 	ctx context.Context,
 	skillsDir string,
 	ma *config.MultiAgentConfig,
 	logger *zap.Logger,
-) (loc *localbk.Local, skillMW adk.ChatModelAgentMiddleware, fsTools bool, skillsRoot string, err error) {
+) (loc *localbk.Local, skillMW adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage], fsTools bool, skillsRoot string, err error) {
 	if ma == nil {
 		return nil, nil, false, "", nil
 	}
@@ -49,7 +46,7 @@ func prepareEinoSkills(
 	root := strings.TrimSpace(skillsDir)
 	if root == "" {
 		if logger != nil {
-			logger.Warn("eino skills: skills_dir empty, skip")
+			logger.Warn("eino agentic skills: skills_dir empty, skip")
 		}
 		if !needLocalBackend {
 			return nil, nil, false, "", nil
@@ -63,7 +60,7 @@ func prepareEinoSkills(
 	}
 	if st, err := os.Stat(abs); err != nil || !st.IsDir() {
 		if logger != nil {
-			logger.Warn("eino skills: directory missing, skip", zap.String("dir", abs), zap.Error(err))
+			logger.Warn("eino agentic skills: directory missing, skip", zap.String("dir", abs), zap.Error(err))
 		}
 		if !needLocalBackend {
 			return nil, nil, false, "", nil
@@ -82,26 +79,23 @@ func prepareEinoSkills(
 		BaseDir: abs,
 	})
 	if err != nil {
-		return nil, nil, false, "", fmt.Errorf("eino skill filesystem backend: %w", err)
+		return nil, nil, false, "", fmt.Errorf("eino agentic skill filesystem backend: %w", err)
 	}
 
-	sc := &skill.Config{Backend: skillBE}
+	sc := &skill.TypedConfig[*schema.AgenticMessage]{Backend: skillBE}
 	if name := strings.TrimSpace(ma.EinoSkills.SkillToolName); name != "" {
 		sc.SkillToolName = &name
 	}
-	skillMW, err = skill.NewMiddleware(ctx, sc)
+	skillMW, err = skill.NewTyped[*schema.AgenticMessage](ctx, sc)
 	if err != nil {
-		return nil, nil, false, "", fmt.Errorf("eino skill middleware: %w", err)
+		return nil, nil, false, "", fmt.Errorf("eino agentic skill middleware: %w", err)
 	}
 
 	fsTools = ma.EinoSkills.EinoSkillFilesystemToolsEffective()
 	return loc, skillMW, fsTools, abs, nil
 }
 
-// subAgentFilesystemMiddleware returns filesystem middleware for a sub-agent when Deep itself
-// does not set Backend (fsTools false on orchestrator) but we still want tools on subs — not used;
-// when orchestrator has Backend, builtin FS is only on outer agent; subs need explicit FS for parity.
-func subAgentFilesystemMiddleware(
+func subAgentAgenticFilesystemMiddleware(
 	ctx context.Context,
 	loc *localbk.Local,
 	invokeNotify *einomcp.ToolInvokeNotifyHolder,
@@ -115,11 +109,11 @@ func subAgentFilesystemMiddleware(
 	toolWaitTimeoutSeconds int,
 	shellNoOutputTimeoutSec int,
 	outputChunk func(toolName, toolCallID, chunk string),
-) (adk.ChatModelAgentMiddleware, error) {
+) (adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage], error) {
 	if loc == nil {
 		return nil, nil
 	}
-	return filesystem.New(ctx, &filesystem.MiddlewareConfig{
+	return filesystem.NewTyped[*schema.AgenticMessage](ctx, &filesystem.MiddlewareConfig{
 		Backend: loc,
 		StreamingShell: &einoStreamingShellWrap{
 			inner:                   security.NewEinoStreamingShell(),

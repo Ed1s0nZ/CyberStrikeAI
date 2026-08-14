@@ -10,6 +10,7 @@ import (
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/schema"
 )
 
 const userContextSupplementHeader = "\n\n## 用户历史输入（原文，子代理必读）\n"
@@ -47,7 +48,51 @@ func newTaskContextEnrichMiddleware(userMessage string, history []agent.ChatMess
 	return &taskContextEnrichMiddleware{supplement: supplement}
 }
 
+type agenticTaskContextEnrichMiddleware struct {
+	*adk.TypedBaseChatModelAgentMiddleware[*schema.AgenticMessage]
+	supplement string
+}
+
+func newAgenticTaskContextEnrichMiddleware(userMessage string, history []agent.ChatMessage, maxRunes int, projectBlackboard string) adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage] {
+	supplement := buildUserContextSupplement(userMessage, history, maxRunes)
+	if bb := strings.TrimSpace(projectBlackboard); bb != "" {
+		if supplement != "" {
+			supplement += "\n\n" + bb
+		} else {
+			supplement = "\n\n" + bb
+		}
+	}
+	if supplement == "" {
+		return nil
+	}
+	return &agenticTaskContextEnrichMiddleware{
+		TypedBaseChatModelAgentMiddleware: &adk.TypedBaseChatModelAgentMiddleware[*schema.AgenticMessage]{},
+		supplement:                        supplement,
+	}
+}
+
 func (m *taskContextEnrichMiddleware) WrapInvokableToolCall(
+	ctx context.Context,
+	endpoint adk.InvokableToolCallEndpoint,
+	tCtx *adk.ToolContext,
+) (adk.InvokableToolCallEndpoint, error) {
+	return wrapTaskContextEnrichCall(m, ctx, endpoint, tCtx)
+}
+
+func (m *agenticTaskContextEnrichMiddleware) WrapInvokableToolCall(
+	ctx context.Context,
+	endpoint adk.InvokableToolCallEndpoint,
+	tCtx *adk.ToolContext,
+) (adk.InvokableToolCallEndpoint, error) {
+	return wrapTaskContextEnrichCall(m, ctx, endpoint, tCtx)
+}
+
+type taskContextEnricher interface {
+	enrichTaskDescription(argsJSON string) string
+}
+
+func wrapTaskContextEnrichCall(
+	m taskContextEnricher,
 	ctx context.Context,
 	endpoint adk.InvokableToolCallEndpoint,
 	tCtx *adk.ToolContext,
@@ -65,6 +110,14 @@ func (m *taskContextEnrichMiddleware) WrapInvokableToolCall(
 // to the "description" field, and re-serializes. Falls back to the original
 // JSON if parsing fails or no description field exists.
 func (m *taskContextEnrichMiddleware) enrichTaskDescription(argsJSON string) string {
+	return enrichTaskDescriptionWithSupplement(argsJSON, m.supplement)
+}
+
+func (m *agenticTaskContextEnrichMiddleware) enrichTaskDescription(argsJSON string) string {
+	return enrichTaskDescriptionWithSupplement(argsJSON, m.supplement)
+}
+
+func enrichTaskDescriptionWithSupplement(argsJSON, supplement string) string {
 	var raw map[string]interface{}
 	if err := json.Unmarshal([]byte(argsJSON), &raw); err != nil {
 		return argsJSON
@@ -73,7 +126,7 @@ func (m *taskContextEnrichMiddleware) enrichTaskDescription(argsJSON string) str
 	if !ok {
 		return argsJSON
 	}
-	raw["description"] = desc + m.supplement
+	raw["description"] = desc + supplement
 	enriched, err := json.Marshal(raw)
 	if err != nil {
 		return argsJSON

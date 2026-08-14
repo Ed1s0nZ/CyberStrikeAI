@@ -9,37 +9,41 @@ import (
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/schema"
 )
 
-type stubChatModelAgentMiddleware struct {
-	adk.BaseChatModelAgentMiddleware
+type stubAgenticChatModelAgentMiddleware struct {
+	*adk.TypedBaseChatModelAgentMiddleware[*schema.AgenticMessage]
 	tag string
 }
 
-func stubMW(tag string) adk.ChatModelAgentMiddleware {
-	return &stubChatModelAgentMiddleware{tag: tag}
+func stubAgenticMW(tag string) adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage] {
+	return &stubAgenticChatModelAgentMiddleware{
+		TypedBaseChatModelAgentMiddleware: &adk.TypedBaseChatModelAgentMiddleware[*schema.AgenticMessage]{},
+		tag:                               tag,
+	}
 }
 
-func TestBuildPlanExecuteExecutorHandlers_IncludesExecPreMiddlewares(t *testing.T) {
+func TestBuildPlanExecuteAgenticExecutorHandlers_IncludesExecPreMiddlewares(t *testing.T) {
 	t.Parallel()
-	pre := []adk.ChatModelAgentMiddleware{
-		stubMW("patch"),
-		stubMW("reduction"),
+	pre := []adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]{
+		stubAgenticMW("patch"),
+		stubAgenticMW("reduction"),
 	}
 
-	got, err := buildPlanExecuteExecutorHandlers(context.Background(), &PlanExecuteRootArgs{
-		ExecPreMiddlewares:   pre,
-		FilesystemMiddleware: stubMW("filesystem"),
-		SkillMiddleware:      stubMW("skill"),
+	got, err := buildPlanExecuteAgenticExecutorHandlers(context.Background(), &PlanExecuteRootArgs{
+		AgenticExecPreMiddlewares:   pre,
+		AgenticFilesystemMiddleware: stubAgenticMW("filesystem"),
+		AgenticSkillMiddleware:      stubAgenticMW("skill"),
 	})
 	if err != nil {
-		t.Fatalf("buildPlanExecuteExecutorHandlers: %v", err)
+		t.Fatalf("buildPlanExecuteAgenticExecutorHandlers: %v", err)
 	}
 	if len(got) != 4 {
 		t.Fatalf("expected 4 pre-tail handlers (2 pre + fs + skill), got %d", len(got))
 	}
 	for i, want := range []string{"patch", "reduction", "filesystem", "skill"} {
-		st, ok := got[i].(*stubChatModelAgentMiddleware)
+		st, ok := got[i].(*stubAgenticChatModelAgentMiddleware)
 		if !ok || st.tag != want {
 			t.Fatalf("handler[%d]: got %#v want tag %q", i, got[i], want)
 		}
@@ -54,9 +58,9 @@ func stubTools(n int) []tool.BaseTool {
 	return out
 }
 
-func TestBuildPlanExecuteExecutorHandlers_NilArgs(t *testing.T) {
+func TestBuildPlanExecuteAgenticExecutorHandlers_NilArgs(t *testing.T) {
 	t.Parallel()
-	if _, err := buildPlanExecuteExecutorHandlers(context.Background(), nil); err == nil {
+	if _, err := buildPlanExecuteAgenticExecutorHandlers(context.Background(), nil); err == nil {
 		t.Fatal("expected error for nil args")
 	}
 }

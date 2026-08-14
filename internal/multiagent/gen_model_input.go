@@ -21,3 +21,12 @@ func literalInstructionGenModelInput(ctx context.Context, instruction string, in
 	msgs = append(msgs, input.Messages...)
 	return msgs, nil
 }
+
+func literalAgenticInstructionGenModelInput(ctx context.Context, instruction string, input *adk.TypedAgentInput[*schema.AgenticMessage]) ([]*schema.AgenticMessage, error) {
+	msgs := make([]*schema.AgenticMessage, 0, len(input.Messages)+1)
+	if instruction != "" {
+		msgs = append(msgs, schema.SystemAgenticMessage(instruction))
+	}
+	msgs = append(msgs, input.Messages...)
+	return msgs, nil
+}

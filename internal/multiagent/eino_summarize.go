@@ -124,11 +124,6 @@ func newEinoSummarizationMiddleware(
 			trigger = 4096
 		}
 	}
-	preserveMax := trigger / 3
-	if preserveMax < 2048 {
-		preserveMax = 2048
-	}
-
 	modelName := strings.TrimSpace(appCfg.OpenAI.Model)
 	if modelName == "" {
 		modelName = "gpt-4o"
@@ -238,10 +233,6 @@ func newEinoSummarizationMiddleware(
 		UserInstruction:    einoSummarizeUserInstruction,
 		EmitInternalEvents: emitInternalEvents,
 		TranscriptFilePath: transcriptPath,
-		PreserveUserMessages: &summarization.PreserveUserMessages{
-			Enabled:   true,
-			MaxTokens: preserveMax,
-		},
 		Retry: &summarization.RetryConfig{
 			MaxRetries: &retryMax,
 			ShouldRetry: func(_ context.Context, _ adk.Message, err error) bool {
@@ -265,9 +256,17 @@ func newEinoSummarizationMiddleware(
 			},
 		},
 		Finalize: func(ctx context.Context, originalMessages []adk.Message, summary adk.Message) ([]adk.Message, error) {
+			compactionMessages := stripOriginalUserIntentLedgerFromMessages(originalMessages)
+			defaultFinalized, derr := summarization.DefaultFinalize(ctx, compactionMessages, summary)
+			if derr != nil {
+				return nil, derr
+			}
+			if len(defaultFinalized) == 0 {
+				return nil, fmt.Errorf("summarization default finalize returned no messages")
+			}
+			summary = appendTranscriptPathToSummarizationMessage(defaultFinalized[len(defaultFinalized)-1], transcriptPath)
 			summary = stripAnalysisFromSummarizationMessage(summary)
 			userLedger := buildOriginalUserIntentLedgerMessage(originalMessages, userLedgerMaxRunes, userLedgerEntryMaxRunes)
-			compactionMessages := stripOriginalUserIntentLedgerFromMessages(originalMessages)
 			out, ferr := summarizeFinalizeWithRecentAssistantToolTrail(ctx, compactionMessages, summary, tokenCounter, recentTrailMax)
 			if ferr != nil {
 				return nil, ferr

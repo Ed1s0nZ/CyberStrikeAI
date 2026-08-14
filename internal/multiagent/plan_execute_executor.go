@@ -6,29 +6,29 @@ import (
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/adk/prebuilt/planexecute"
+	"github.com/cloudwego/eino/components/model"
+	"github.com/cloudwego/eino/schema"
 )
 
-// newPlanExecuteExecutor builds the Plan-Execute Executor as an Eino ChatModelAgent.
-//
-// Eino's planexecute.Config accepts any adk.Agent as Executor; this implementation
-// keeps the official Executor contract (Plan/UserInput/ExecutedSteps session keys
-// and ExecutedStepSessionKey output) while using ChatModelAgentConfig.Handlers so
-// the executor can run the same ADK middleware stack as Deep/Supervisor. As of
-// Eino v0.9.12/v0.10.0-alpha.10, planexecute.NewExecutor still does not expose a
-// Handlers field, so this custom Executor is the best-practice extension point
-// that preserves middleware without forking the whole planexecute loop.
-func newPlanExecuteExecutor(ctx context.Context, cfg *planexecute.ExecutorConfig, handlers []adk.ChatModelAgentMiddleware) (adk.Agent, error) {
+func newPlanExecuteAgenticExecutor(
+	ctx context.Context,
+	cfg *planexecute.ExecutorConfig,
+	agenticModel model.AgenticModel,
+	handlers []adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage],
+	modelRetryCfg *adk.TypedModelRetryConfig[*schema.AgenticMessage],
+	modelFailoverCfg *adk.ModelFailoverConfig[*schema.AgenticMessage],
+) (adk.Agent, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("plan_execute: ExecutorConfig 为空")
 	}
-	if cfg.Model == nil {
-		return nil, fmt.Errorf("plan_execute: Executor Model 为空")
+	if agenticModel == nil {
+		return nil, fmt.Errorf("plan_execute: Executor AgenticModel 为空")
 	}
 	genInputFn := cfg.GenInputFn
 	if genInputFn == nil {
 		genInputFn = planExecuteDefaultGenExecutorInput
 	}
-	genInput := func(ctx context.Context, instruction string, _ *adk.AgentInput) ([]adk.Message, error) {
+	genInput := func(ctx context.Context, instruction string, _ *adk.TypedAgentInput[*schema.AgenticMessage]) ([]*schema.AgenticMessage, error) {
 		plan, ok := adk.GetSessionValue(ctx, planexecute.PlanSessionKey)
 		if !ok {
 			return nil, fmt.Errorf("plan_execute executor: session value %q missing (possible session corruption)", planexecute.PlanSessionKey)
@@ -61,22 +61,29 @@ func newPlanExecuteExecutor(ctx context.Context, cfg *planexecute.ExecutorConfig
 			Plan:          plan_,
 			ExecutedSteps: executedSteps_,
 		}
-		return genInputFn(ctx, in)
+		msgs, err := genInputFn(ctx, in)
+		if err != nil {
+			return nil, err
+		}
+		if instruction != "" {
+			msgs = normalizeSingleLeadingSystemMessage(msgs, instruction)
+		}
+		return EinoMessagesToAgentic(msgs), nil
 	}
 
-	agentCfg := &adk.ChatModelAgentConfig{
-		Name:          "executor",
-		Description:   "an executor agent",
-		Model:         cfg.Model,
-		ToolsConfig:   cfg.ToolsConfig,
-		GenModelInput: genInput,
-		MaxIterations: cfg.MaxIterations,
-		OutputKey:     planexecute.ExecutedStepSessionKey,
+	agentCfg := einoAgenticChatModelAgentConfig{
+		Name:                "executor",
+		Description:         "an executor agent",
+		Model:               agenticModel,
+		ToolsConfig:         cfg.ToolsConfig,
+		GenModelInput:       genInput,
+		MaxIterations:       cfg.MaxIterations,
+		OutputKey:           planexecute.ExecutedStepSessionKey,
+		Handlers:            handlers,
+		ModelRetryConfig:    modelRetryCfg,
+		ModelFailoverConfig: modelFailoverCfg,
 	}
-	if len(handlers) > 0 {
-		agentCfg.Handlers = handlers
-	}
-	return adk.NewChatModelAgent(ctx, agentCfg)
+	return newEinoAgenticChatModelAgentAdapter(ctx, agentCfg)
 }
 
 // planExecuteDefaultGenExecutorInput 对齐 Eino planexecute.defaultGenExecutorInputFn（包外不可引用默认实现）。
