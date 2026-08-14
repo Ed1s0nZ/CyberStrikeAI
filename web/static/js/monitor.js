@@ -32,6 +32,7 @@ function setCurrentConversationIdFromStream(cid) {
     currentConversationId = cid;
     try {
         window.currentConversationId = cid;
+        window.dispatchEvent(new CustomEvent('conversation-changed', { detail: { conversationId: cid } }));
         if (typeof window.syncChatConversationHash === 'function') {
             window.syncChatConversationHash(cid);
         }
@@ -2591,6 +2592,22 @@ function formatEinoRunRetryTitle(data) {
     return base;
 }
 
+function dispatchAgentPlanTaskEvent(event, fallbackConversationId) {
+    if (!event || (event.type !== 'tool_call' && event.type !== 'tool_result')) return;
+    const data = event.data && typeof event.data === 'object' ? event.data : {};
+    const toolName = String(data.toolName || '').trim().toLowerCase();
+    if (!['taskcreate', 'taskupdate', 'tasklist', 'taskget'].includes(toolName)) return;
+    const conversationId = String(data.conversationId || fallbackConversationId || window.currentConversationId || '').trim();
+    if (!conversationId) return;
+    window.dispatchEvent(new CustomEvent('agent-plan-task-event', {
+        detail: {
+            eventType: event.type,
+            conversationId: conversationId,
+            data: data
+        }
+    }));
+}
+
 // 处理流式事件
 function handleStreamEvent(event, progressElement, progressId, 
                           getAssistantId, setAssistantId, getMcpIds, setMcpIds, options) {
@@ -2619,6 +2636,7 @@ function handleStreamEvent(event, progressElement, progressId,
             return;
         }
     }
+    dispatchAgentPlanTaskEvent(event, expectedConversationId || eventConversationId);
     const streamScrollWasPinned = typeof window.captureScrollPinState === 'function'
         ? window.captureScrollPinState()
         : (typeof window.isChatMessagesPinnedToBottom === 'function' ? window.isChatMessagesPinnedToBottom() : true);

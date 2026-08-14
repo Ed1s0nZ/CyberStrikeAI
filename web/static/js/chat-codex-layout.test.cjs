@@ -42,3 +42,10 @@ test('欢迎语随项目和无项目状态更新', () => {
     assert.equal(zh.chat.welcomeSubtitle, '请输入您的测试需求，系统将自动执行相应的安全测试。');
     assert.equal(typeof en.chat.projectWelcomeMessage, 'string');
 });
+
+test('会话设置打开时提升整个输入区层级并遮住轮次导航', () => {
+    assert.match(chat, /function syncChatSessionSettingsLayerState\(\)/);
+    assert.match(chat, /inputBar\.classList\.toggle\('is-session-settings-open', open\)/);
+    assert.match(styles, /\.chat-input-container\.is-session-settings-open\s*\{[\s\S]*?z-index:\s*121/);
+    assert.match(styles, /\.chat-turn-rail\s*\{[\s\S]*?z-index:\s*20/);
+});

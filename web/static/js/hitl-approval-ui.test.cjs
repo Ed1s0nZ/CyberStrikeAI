@@ -246,8 +246,8 @@ test('多对话并发时释放隐藏主流且旧请求不能覆盖新对话状�
     assert.match(chat, /signal: conversationLoadController\.signal/);
     assert.match(template, /monitor\.js\?v=20260813-9/);
     assert.match(template, /chat-scroll\.js\?v=20260813-6/);
-    assert.match(template, /chat\.js\?v=20260813-3/);
-    assert.match(template, /style\.css\?v=20260813-5/);
+    assert.match(template, /chat\.js\?v=20260813-4/);
+    assert.match(template, /style\.css\?v=20260813-6/);
 });
 
 test('输入区 Agent 审查文字保留足够行高且不会裁切字形', () => {
