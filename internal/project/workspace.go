@@ -64,5 +64,6 @@ func BuildWorkspaceBlock(absPath string) string {
 
 - **禁止**使用系统 `+"`/tmp`"+` 或其它全局临时目录（多项目/多会话会互窜遗留文件）。
 - 下载示例：`+"`curl -o '%s/page.html' 'https://target/'`"+`；exec 时可将 `+"`workdir`"+` 设为该目录。
-- 读取前用 glob/grep/read_file **限定在该目录**下搜索，勿在 `+"`/tmp`"+` 盲目检索。`, absPath, absPath)
+- 读取下载产物或临时分析文件前，用 glob/grep/read_file **限定在该目录**下搜索，勿在 `+"`/tmp`"+` 盲目检索。
+- 当用户询问“当前目录”“项目根目录”或应用自身文件时，优先按服务进程当前工作目录理解；不要把空的会话工作目录误当成项目根目录。`, absPath, absPath)
 }
