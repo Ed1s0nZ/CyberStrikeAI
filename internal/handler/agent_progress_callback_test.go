@@ -80,6 +80,53 @@ func TestCreateProgressCallback_MirrorsWebStreamEvents(t *testing.T) {
 	}
 }
 
+func TestCreateProgressCallback_HidesInternalEinoDiagnostics(t *testing.T) {
+	tmp := t.TempDir()
+	db, err := database.NewDB(filepath.Join(tmp, "test.sqlite"), zap.NewNop())
+	if err != nil {
+		t.Fatalf("NewDB: %v", err)
+	}
+	conv, err := db.CreateConversation("diag-hidden", database.ConversationCreateMeta{})
+	if err != nil {
+		t.Fatalf("CreateConversation: %v", err)
+	}
+	asst, err := db.AddMessage(conv.ID, "assistant", "处理中...", nil)
+	if err != nil {
+		t.Fatalf("AddMessage: %v", err)
+	}
+	bus := NewTaskEventBus()
+	h := &AgentHandler{logger: zap.NewNop(), db: db, taskEventBus: bus}
+	_, events := bus.Subscribe(conv.ID)
+	primaryCalls := 0
+	cb := h.createProgressCallback(
+		context.Background(), nil, conv.ID, asst.ID,
+		func(string, string, interface{}) { primaryCalls++ },
+	)
+
+	cb("model_output_rejected", "模型工具调用不完整或参数不安全，已阻止执行并要求重写。", map[string]interface{}{
+		"reason": "invalid_tool_arguments_json",
+	})
+	cb("progress", "Eino TurnLoop 常驻多轮 runtime 已接管本轮会话。", map[string]interface{}{
+		"kind": "turn_loop_takeover",
+	})
+
+	if primaryCalls != 0 {
+		t.Fatalf("primary SSE calls = %d, want hidden diagnostics", primaryCalls)
+	}
+	select {
+	case payload := <-events:
+		t.Fatalf("unexpected mirrored diagnostic event: %s", string(payload))
+	default:
+	}
+	details, err := db.GetProcessDetails(asst.ID)
+	if err != nil {
+		t.Fatalf("GetProcessDetails: %v", err)
+	}
+	if len(details) != 0 {
+		t.Fatalf("process details = %+v, want no diagnostics persisted", details)
+	}
+}
+
 func TestCreateProgressCallback_PersistsRunningResponseBeforeDone(t *testing.T) {
 	tmp := t.TempDir()
 	db, err := database.NewDB(filepath.Join(tmp, "test.sqlite"), zap.NewNop())

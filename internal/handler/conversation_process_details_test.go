@@ -6,8 +6,10 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"cyberstrike-ai/internal/database"
+	"cyberstrike-ai/internal/mcp"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -71,5 +73,69 @@ func TestProcessDetailsPageIncludesTerminalToolStatusAcrossPageBoundary(t *testi
 		if execution.Status != "completed" {
 			t.Fatalf("execution %d status = %q, want completed", i, execution.Status)
 		}
+	}
+}
+
+func TestProcessDetailsFullBackfillsEmptyToolCallArgumentsFromExecution(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db, err := database.NewDB(filepath.Join(t.TempDir(), "process-details-args.db"), zap.NewNop())
+	if err != nil {
+		t.Fatalf("NewDB: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	conversation, err := db.CreateConversation("empty args", database.ConversationCreateMeta{})
+	if err != nil {
+		t.Fatalf("CreateConversation: %v", err)
+	}
+	message, err := db.AddMessage(conversation.ID, "assistant", "done", nil)
+	if err != nil {
+		t.Fatalf("AddMessage: %v", err)
+	}
+	if err := db.AddProcessDetail(message.ID, conversation.ID, "tool_call", "calling exec", map[string]interface{}{
+		"toolName": "exec", "toolCallId": "call-empty", "arguments": "", "argumentsObj": nil,
+	}); err != nil {
+		t.Fatalf("AddProcessDetail(tool_call): %v", err)
+	}
+	if err := db.SaveToolExecution(&mcp.ToolExecution{
+		ID:             "exec-whoami",
+		ToolName:       "exec",
+		Arguments:      map[string]interface{}{"command": "whoami"},
+		Status:         "completed",
+		StartTime:      time.Now(),
+		ConversationID: conversation.ID,
+	}); err != nil {
+		t.Fatalf("SaveToolExecution: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("GET", "/api/messages/"+message.ID+"/process-details?full=1", nil)
+	c.Params = gin.Params{{Key: "id", Value: message.ID}}
+	NewConversationHandler(db, zap.NewNop()).GetMessageProcessDetails(c)
+	if w.Code != 200 {
+		t.Fatalf("status = %d: %s", w.Code, w.Body.String())
+	}
+	var response struct {
+		ProcessDetails []map[string]interface{} `json:"processDetails"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(response.ProcessDetails) != 1 {
+		t.Fatalf("process details = %d, want 1", len(response.ProcessDetails))
+	}
+	data, ok := response.ProcessDetails[0]["data"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("data = %#v", response.ProcessDetails[0]["data"])
+	}
+	args, ok := data["argumentsObj"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("argumentsObj = %#v", data["argumentsObj"])
+	}
+	if args["command"] != "whoami" {
+		t.Fatalf("command = %#v, want whoami", args["command"])
+	}
+	if data["executionId"] != "exec-whoami" {
+		t.Fatalf("executionId = %#v, want exec-whoami", data["executionId"])
 	}
 }

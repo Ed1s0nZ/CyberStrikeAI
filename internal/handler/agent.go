@@ -911,6 +911,32 @@ func (h *AgentHandler) publishProgressToTaskEventBus(conversationID, eventType, 
 	h.taskEventBus.Publish(conversationID, sseLine)
 }
 
+func isInternalEinoDiagnosticProgress(eventType, message string, data interface{}) bool {
+	switch eventType {
+	case "model_output_rejected":
+		return true
+	case "progress":
+		msg := strings.TrimSpace(message)
+		if msg == "Eino TurnLoop 常驻多轮 runtime 已接管本轮会话。" ||
+			msg == "Eino TurnLoop 已在安全点切换到用户补充后的下一轮。" ||
+			msg == "已将用户补充推入 Eino TurnLoop，正在等待安全点切换…" {
+			return true
+		}
+		m, ok := data.(map[string]interface{})
+		if !ok {
+			return false
+		}
+		switch strings.TrimSpace(fmt.Sprint(m["kind"])) {
+		case "turn_loop_takeover", "turn_loop_preempted":
+			return true
+		default:
+			return false
+		}
+	default:
+		return false
+	}
+}
+
 // enrichProgressEventData 为 SSE / taskEventBus 事件补齐 conversationId、messageId，便于前端懒加载过程详情。
 func enrichProgressEventData(data interface{}, conversationID, assistantMessageID string) interface{} {
 	if strings.TrimSpace(conversationID) == "" && strings.TrimSpace(assistantMessageID) == "" {
@@ -1075,6 +1101,10 @@ func (h *AgentHandler) createProgressCallback(runCtx context.Context, cancelRun 
 	return func(eventType, message string, data interface{}) {
 		progressMu.Lock()
 		defer progressMu.Unlock()
+
+		if isInternalEinoDiagnosticProgress(eventType, message, data) {
+			return
+		}
 
 		// 上游在重试/补偿时可能重复回调相同 tool_call/tool_result。
 		// 这里做幂等过滤，保证前端展示和 process_details 都以唯一事件为准。

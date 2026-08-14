@@ -227,6 +227,12 @@ func (h *AgentHandler) EinoSingleAgentLoopStream(c *gin.Context) {
 		taskCtxLoop := mcp.WithMCPConversationID(taskCtx, conversationID)
 		taskCtxLoop = mcp.WithToolRunRegistry(taskCtxLoop, h.tasks)
 		taskCtxLoop = mcp.WithEinoExecuteRunRegistry(taskCtxLoop, h.tasks)
+		taskCtxLoop = multiagent.WithAgentRuntimeCancelRegistrar(taskCtxLoop, func(cancel func(error) bool) func() {
+			return h.tasks.BindAgentRuntimeCancel(conversationID, cancel)
+		})
+		taskCtxLoop = multiagent.WithAgentTurnLoopInterruptRegistrar(taskCtxLoop, func(push func(string) bool) func() {
+			return h.tasks.BindAgentTurnLoopInterrupt(conversationID, push)
+		})
 		taskCtxLoop = multiagent.WithHITLToolInterceptor(taskCtxLoop, func(ctx context.Context, toolName, arguments string) (string, error) {
 			return h.interceptHITLForEinoTool(ctx, cancelWithCause, conversationID, assistantMessageID, sendEvent, toolName, arguments)
 		})
@@ -273,6 +279,14 @@ func (h *AgentHandler) EinoSingleAgentLoopStream(c *gin.Context) {
 		}
 
 		cause := context.Cause(baseCtx)
+		if cause == nil {
+			switch {
+			case errors.Is(runErr, multiagent.ErrInterruptContinue):
+				cause = multiagent.ErrInterruptContinue
+			case errors.Is(runErr, ErrTaskCancelled):
+				cause = ErrTaskCancelled
+			}
+		}
 		if errors.Is(cause, multiagent.ErrInterruptContinue) {
 			if shouldPersistEinoAgentTraceAfterRunError(baseCtx) {
 				h.persistEinoAgentTraceForResume(conversationID, result)

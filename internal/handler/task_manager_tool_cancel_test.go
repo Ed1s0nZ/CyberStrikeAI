@@ -32,6 +32,78 @@ func TestCancelTaskInvokesToolCancelerOnFullStop(t *testing.T) {
 	}
 }
 
+func TestCancelTaskUsesAgentRuntimeCancelAsPrimaryPath(t *testing.T) {
+	tm := NewAgentTaskManager()
+	var order []string
+	tm.SetToolCanceler(func(conversationID string) {
+		if conversationID == "conv-native" {
+			order = append(order, "tool")
+		}
+	})
+
+	_, cancel := context.WithCancelCause(context.Background())
+	if _, err := tm.StartTask("conv-native", "hello", func(err error) {
+		order = append(order, "context")
+		cancel(err)
+	}); err != nil {
+		t.Fatalf("StartTask: %v", err)
+	}
+	unregister := tm.BindAgentRuntimeCancel("conv-native", func(err error) bool {
+		if !errors.Is(err, ErrTaskCancelled) {
+			t.Fatalf("runtime cancel got %v", err)
+		}
+		order = append(order, "runtime")
+		return true
+	})
+	defer unregister()
+
+	ok, err := tm.CancelTask("conv-native", ErrTaskCancelled)
+	if err != nil || !ok {
+		t.Fatalf("CancelTask: ok=%v err=%v", ok, err)
+	}
+	want := []string{"runtime", "tool"}
+	if len(order) != len(want) {
+		t.Fatalf("order length got %d want %d: %#v", len(order), len(want), order)
+	}
+	for i := range want {
+		if order[i] != want[i] {
+			t.Fatalf("order[%d] got %q want %q; full=%#v", i, order[i], want[i], order)
+		}
+	}
+}
+
+func TestCancelTaskFallsBackToContextWhenAgentRuntimeCancelMisses(t *testing.T) {
+	tm := NewAgentTaskManager()
+	var order []string
+
+	_, cancel := context.WithCancelCause(context.Background())
+	if _, err := tm.StartTask("conv-fallback", "hello", func(err error) {
+		order = append(order, "context")
+		cancel(err)
+	}); err != nil {
+		t.Fatalf("StartTask: %v", err)
+	}
+	unregister := tm.BindAgentRuntimeCancel("conv-fallback", func(err error) bool {
+		order = append(order, "runtime")
+		return false
+	})
+	defer unregister()
+
+	ok, err := tm.CancelTask("conv-fallback", ErrTaskCancelled)
+	if err != nil || !ok {
+		t.Fatalf("CancelTask: ok=%v err=%v", ok, err)
+	}
+	want := []string{"runtime", "context"}
+	if len(order) != len(want) {
+		t.Fatalf("order length got %d want %d: %#v", len(order), len(want), order)
+	}
+	for i := range want {
+		if order[i] != want[i] {
+			t.Fatalf("order[%d] got %q want %q; full=%#v", i, order[i], want[i], order)
+		}
+	}
+}
+
 func TestCancelTaskSkipsToolCancelerOnInterruptContinue(t *testing.T) {
 	tm := NewAgentTaskManager()
 	called := false
@@ -51,6 +123,80 @@ func TestCancelTaskSkipsToolCancelerOnInterruptContinue(t *testing.T) {
 	}
 	if called {
 		t.Fatal("tool canceler must not run for interrupt-continue")
+	}
+}
+
+func TestCancelTaskPushesInterruptContinueToTurnLoopFirst(t *testing.T) {
+	tm := NewAgentTaskManager()
+	ctx, cancel := context.WithCancelCause(context.Background())
+	if _, err := tm.StartTask("conv-turn", "hello", cancel); err != nil {
+		t.Fatalf("StartTask: %v", err)
+	}
+	tm.SetInterruptContinueNote("conv-turn", "focus ssh")
+
+	var gotNote string
+	unregister := tm.BindAgentTurnLoopInterrupt("conv-turn", func(note string) bool {
+		gotNote = note
+		return true
+	})
+	defer unregister()
+
+	ok, err := tm.CancelTask("conv-turn", multiagent.ErrInterruptContinue)
+	if err != nil || !ok {
+		t.Fatalf("CancelTask: ok=%v err=%v", ok, err)
+	}
+	if gotNote != "focus ssh" {
+		t.Fatalf("turn loop note = %q, want focus ssh", gotNote)
+	}
+	if cause := context.Cause(ctx); cause != nil {
+		t.Fatalf("context should not be cancelled when turn loop accepted interrupt, got %v", cause)
+	}
+	if note := tm.TakeInterruptContinueNote("conv-turn"); note != "" {
+		t.Fatalf("interrupt note should be consumed after turn loop push, got %q", note)
+	}
+}
+
+func TestCancelTaskFallsBackWhenTurnLoopInterruptRejects(t *testing.T) {
+	tm := NewAgentTaskManager()
+	var order []string
+
+	_, cancel := context.WithCancelCause(context.Background())
+	if _, err := tm.StartTask("conv-turn-fallback", "hello", func(err error) {
+		order = append(order, "context")
+		cancel(err)
+	}); err != nil {
+		t.Fatalf("StartTask: %v", err)
+	}
+	tm.SetInterruptContinueNote("conv-turn-fallback", "fallback note")
+	unregisterTurn := tm.BindAgentTurnLoopInterrupt("conv-turn-fallback", func(note string) bool {
+		order = append(order, "turn")
+		if note != "fallback note" {
+			t.Fatalf("turn loop note = %q, want fallback note", note)
+		}
+		return false
+	})
+	defer unregisterTurn()
+	unregisterRuntime := tm.BindAgentRuntimeCancel("conv-turn-fallback", func(err error) bool {
+		order = append(order, "runtime")
+		return false
+	})
+	defer unregisterRuntime()
+
+	ok, err := tm.CancelTask("conv-turn-fallback", multiagent.ErrInterruptContinue)
+	if err != nil || !ok {
+		t.Fatalf("CancelTask: ok=%v err=%v", ok, err)
+	}
+	want := []string{"turn", "runtime", "context"}
+	if len(order) != len(want) {
+		t.Fatalf("order length got %d want %d: %#v", len(order), len(want), order)
+	}
+	for i := range want {
+		if order[i] != want[i] {
+			t.Fatalf("order[%d] got %q want %q; full=%#v", i, order[i], want[i], order)
+		}
+	}
+	if note := tm.TakeInterruptContinueNote("conv-turn-fallback"); note != "fallback note" {
+		t.Fatalf("interrupt note should remain for fallback rerun, got %q", note)
 	}
 }
 

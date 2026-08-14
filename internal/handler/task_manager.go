@@ -46,6 +46,14 @@ type AgentTask struct {
 	// hitlCognition 本轮运行中供 HITL/审计 Agent 读取的上下文（用户原话 + 思考，不含会话历史）
 	hitlCognition *hitlCognitionState
 
+	// agentRuntimeCancel 当前 Eino ADK 原生 AgentCancelFunc 包装；取消任务时先触发它，再走 context 兜底。
+	agentRuntimeCancel        func(error) bool
+	agentRuntimeCancelVersion uint64
+
+	// agentTurnLoopInterrupt 当前 Eino TurnLoop 用户补充 push hook；中断并继续时优先将补充作为新 turn item 入队。
+	agentTurnLoopInterrupt        func(string) bool
+	agentTurnLoopInterruptVersion uint64
+
 	cancel func(error)
 }
 
@@ -216,6 +224,58 @@ func (m *AgentTaskManager) BindTaskCancel(conversationID string, cancel context.
 	if t, ok := m.tasks[conversationID]; ok && t != nil {
 		t.cancel = func(err error) {
 			cancel(err)
+		}
+	}
+}
+
+// BindAgentRuntimeCancel 登记当前运行段的 Eino 原生 cancel hook。
+func (m *AgentTaskManager) BindAgentRuntimeCancel(conversationID string, cancel func(error) bool) func() {
+	conversationID = strings.TrimSpace(conversationID)
+	if conversationID == "" || cancel == nil {
+		return func() {}
+	}
+	m.mu.Lock()
+	t, ok := m.tasks[conversationID]
+	if !ok || t == nil {
+		m.mu.Unlock()
+		return func() {}
+	}
+	t.agentRuntimeCancelVersion++
+	version := t.agentRuntimeCancelVersion
+	t.agentRuntimeCancel = cancel
+	m.mu.Unlock()
+
+	return func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		if cur, exists := m.tasks[conversationID]; exists && cur != nil && cur.agentRuntimeCancelVersion == version {
+			cur.agentRuntimeCancel = nil
+		}
+	}
+}
+
+// BindAgentTurnLoopInterrupt 登记当前运行任务的 Eino TurnLoop 用户补充入队 hook。
+func (m *AgentTaskManager) BindAgentTurnLoopInterrupt(conversationID string, push func(string) bool) func() {
+	conversationID = strings.TrimSpace(conversationID)
+	if conversationID == "" || push == nil {
+		return func() {}
+	}
+	m.mu.Lock()
+	t, ok := m.tasks[conversationID]
+	if !ok || t == nil {
+		m.mu.Unlock()
+		return func() {}
+	}
+	t.agentTurnLoopInterruptVersion++
+	version := t.agentTurnLoopInterruptVersion
+	t.agentTurnLoopInterrupt = push
+	m.mu.Unlock()
+
+	return func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		if cur, exists := m.tasks[conversationID]; exists && cur != nil && cur.agentTurnLoopInterruptVersion == version {
+			cur.agentTurnLoopInterrupt = nil
 		}
 	}
 }
@@ -402,13 +462,29 @@ func (m *AgentTaskManager) CancelTask(conversationID string, cause error) (bool,
 	if cause == nil {
 		cause = ErrTaskCancelled
 	}
+	interruptPush := task.agentTurnLoopInterrupt
+	interruptNote := task.InterruptContinueNote
+	runtimeCancel := task.agentRuntimeCancel
 	var toolCanceler func(string)
 	if errors.Is(cause, ErrTaskCancelled) {
 		toolCanceler = m.toolCanceler
 	}
 	m.mu.Unlock()
 
-	if cancel != nil {
+	if errors.Is(cause, multiagent.ErrInterruptContinue) && interruptPush != nil && interruptPush(interruptNote) {
+		m.mu.Lock()
+		if cur, exists := m.tasks[conversationID]; exists && cur != nil {
+			cur.InterruptContinueNote = ""
+		}
+		m.mu.Unlock()
+		return true, nil
+	}
+
+	runtimeHandled := false
+	if runtimeCancel != nil {
+		runtimeHandled = runtimeCancel(cause)
+	}
+	if cancel != nil && !runtimeHandled {
 		cancel(cause)
 	}
 	if toolCanceler != nil {

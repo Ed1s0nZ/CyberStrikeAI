@@ -356,6 +356,10 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 		LatestUserMessageMaxRunes:                  h.config.MultiAgent.EinoMiddleware.LatestUserMessageMaxRunesEffective(),
 		LatestUserMessageHeadRunes:                 h.config.MultiAgent.EinoMiddleware.LatestUserMessageHeadRunesEffective(),
 		LatestUserMessageTailRunes:                 h.config.MultiAgent.EinoMiddleware.LatestUserMessageTailRunesEffective(),
+		ModelRetryMaxRetries:                       h.config.MultiAgent.EinoMiddleware.ModelRetryMaxRetries,
+		ModelRetryMaxBackoffSec:                    h.config.MultiAgent.EinoMiddleware.ModelRetryMaxBackoffSec,
+		ModelFailoverChannels:                      append([]string(nil), h.config.MultiAgent.EinoMiddleware.ModelFailoverChannels...),
+		ModelFailoverMaxRetries:                    h.config.MultiAgent.EinoMiddleware.ModelFailoverMaxRetries,
 		ToolSearchAlwaysVisibleTools:               append([]string(nil), h.config.MultiAgent.EinoMiddleware.ToolSearchAlwaysVisibleTools...),
 		ToolSearchAlwaysVisibleEffectiveTools: mergeToolNameLists(
 			h.config.MultiAgent.EinoMiddleware.ToolSearchAlwaysVisibleTools,
@@ -1002,6 +1006,30 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 			}
 			h.config.MultiAgent.EinoMiddleware.LatestUserMessageTailRunes = v
 		}
+		if req.MultiAgent.ModelRetryMaxRetries != nil {
+			v := *req.MultiAgent.ModelRetryMaxRetries
+			if v < 0 {
+				v = 0
+			}
+			h.config.MultiAgent.EinoMiddleware.ModelRetryMaxRetries = v
+		}
+		if req.MultiAgent.ModelRetryMaxBackoffSec != nil {
+			v := *req.MultiAgent.ModelRetryMaxBackoffSec
+			if v < 0 {
+				v = 0
+			}
+			h.config.MultiAgent.EinoMiddleware.ModelRetryMaxBackoffSec = v
+		}
+		if req.MultiAgent.ModelFailoverChannels != nil {
+			h.config.MultiAgent.EinoMiddleware.ModelFailoverChannels = dedupeTrimmedStringList(*req.MultiAgent.ModelFailoverChannels)
+		}
+		if req.MultiAgent.ModelFailoverMaxRetries != nil {
+			v := *req.MultiAgent.ModelFailoverMaxRetries
+			if v < 0 {
+				v = 0
+			}
+			h.config.MultiAgent.EinoMiddleware.ModelFailoverMaxRetries = v
+		}
 		if req.MultiAgent.ToolSearchAlwaysVisibleTools != nil {
 			h.config.MultiAgent.EinoMiddleware.ToolSearchAlwaysVisibleTools = dedupeToolNameList(*req.MultiAgent.ToolSearchAlwaysVisibleTools)
 		}
@@ -1015,6 +1043,10 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 			zap.Int("latest_user_message_max_runes", h.config.MultiAgent.EinoMiddleware.LatestUserMessageMaxRunesEffective()),
 			zap.Int("latest_user_message_head_runes", h.config.MultiAgent.EinoMiddleware.LatestUserMessageHeadRunesEffective()),
 			zap.Int("latest_user_message_tail_runes", h.config.MultiAgent.EinoMiddleware.LatestUserMessageTailRunesEffective()),
+			zap.Int("model_retry_max_retries", h.config.MultiAgent.EinoMiddleware.ModelRetryMaxRetries),
+			zap.Int("model_retry_max_backoff_sec", h.config.MultiAgent.EinoMiddleware.ModelRetryMaxBackoffSec),
+			zap.Int("model_failover_channels", len(h.config.MultiAgent.EinoMiddleware.ModelFailoverChannels)),
+			zap.Int("model_failover_max_retries", h.config.MultiAgent.EinoMiddleware.ModelFailoverMaxRetries),
 			zap.Int("tool_search_always_visible_tools", len(h.config.MultiAgent.EinoMiddleware.ToolSearchAlwaysVisibleTools)),
 		)
 	}
@@ -2191,10 +2223,18 @@ func updateMultiAgentConfig(doc *yaml.Node, cfg config.MultiAgentConfig) {
 	setIntInMap(mwNode, "latest_user_message_max_runes", cfg.EinoMiddleware.LatestUserMessageMaxRunesEffective())
 	setIntInMap(mwNode, "latest_user_message_head_runes", cfg.EinoMiddleware.LatestUserMessageHeadRunesEffective())
 	setIntInMap(mwNode, "latest_user_message_tail_runes", cfg.EinoMiddleware.LatestUserMessageTailRunesEffective())
+	setIntInMap(mwNode, "model_retry_max_retries", cfg.EinoMiddleware.ModelRetryMaxRetries)
+	setIntInMap(mwNode, "model_retry_max_backoff_sec", cfg.EinoMiddleware.ModelRetryMaxBackoffSec)
+	setFlowStringSliceInMap(mwNode, "model_failover_channels", dedupeTrimmedStringList(cfg.EinoMiddleware.ModelFailoverChannels))
+	setIntInMap(mwNode, "model_failover_max_retries", cfg.EinoMiddleware.ModelFailoverMaxRetries)
 	setFlowStringSliceInMap(mwNode, "tool_search_always_visible_tools", dedupeToolNameList(cfg.EinoMiddleware.ToolSearchAlwaysVisibleTools))
 }
 
 func dedupeToolNameList(in []string) []string {
+	return dedupeTrimmedStringList(in)
+}
+
+func dedupeTrimmedStringList(in []string) []string {
 	if len(in) == 0 {
 		return []string{}
 	}

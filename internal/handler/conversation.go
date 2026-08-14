@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -325,7 +326,7 @@ func (h *ConversationHandler) GetMessageProcessDetails(c *gin.Context) {
 		}
 
 		details = database.DedupeConsecutiveProcessDetails(details)
-		out := processDetailsToJSON(h.logger, details, true)
+		out := processDetailsToJSON(h.logger, h.db, details, true)
 		c.JSON(http.StatusOK, gin.H{
 			"processDetails": out,
 			"total":          len(out),
@@ -374,7 +375,7 @@ func (h *ConversationHandler) GetMessageProcessDetails(c *gin.Context) {
 		return
 	}
 	details = database.DedupeConsecutiveProcessDetails(details)
-	out := processDetailsToJSON(h.logger, details, false)
+	out := processDetailsToJSON(h.logger, h.db, details, false)
 	// A page may end between tool_call and tool_result. Return the full-history
 	// execution summary so the UI can render terminal status without pretending
 	// that an unloaded result is still running.
@@ -409,7 +410,7 @@ func (h *ConversationHandler) GetProcessDetail(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "过程详情不存在"})
 		return
 	}
-	out := processDetailsToJSON(h.logger, []database.ProcessDetail{*detail}, true)
+	out := processDetailsToJSON(h.logger, h.db, []database.ProcessDetail{*detail}, true)
 	if len(out) == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "过程详情不存在"})
 		return
@@ -417,7 +418,7 @@ func (h *ConversationHandler) GetProcessDetail(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"processDetail": out[0]})
 }
 
-func processDetailsToJSON(logger *zap.Logger, details []database.ProcessDetail, includeToolPayload bool) []map[string]interface{} {
+func processDetailsToJSON(logger *zap.Logger, db *database.DB, details []database.ProcessDetail, includeToolPayload bool) []map[string]interface{} {
 	out := make([]map[string]interface{}, 0, len(details))
 	for _, d := range details {
 		var data interface{}
@@ -425,6 +426,9 @@ func processDetailsToJSON(logger *zap.Logger, details []database.ProcessDetail, 
 			if err := json.Unmarshal([]byte(d.Data), &data); err != nil {
 				logger.Warn("解析过程详情数据失败", zap.Error(err))
 			}
+		}
+		if m, ok := data.(map[string]interface{}); ok {
+			enrichEmptyToolCallArgumentsFromExecution(logger, db, d, m)
 		}
 		if !includeToolPayload {
 			data = summarizeProcessDetailData(d.EventType, data)
@@ -442,6 +446,50 @@ func processDetailsToJSON(logger *zap.Logger, details []database.ProcessDetail, 
 	return out
 }
 
+func enrichEmptyToolCallArgumentsFromExecution(logger *zap.Logger, db *database.DB, detail database.ProcessDetail, data map[string]interface{}) {
+	if db == nil || detail.EventType != "tool_call" || !toolCallArgumentsEmpty(data) {
+		return
+	}
+	toolName := strings.TrimSpace(fmt.Sprint(data["toolName"]))
+	if toolName == "" || detail.ConversationID == "" || detail.CreatedAt.IsZero() {
+		return
+	}
+	execID, args, err := db.FindNearestToolExecutionArguments(detail.ConversationID, toolName, detail.CreatedAt, 5*time.Second)
+	if err != nil {
+		if logger != nil {
+			logger.Debug("未能从工具执行记录补全过程详情参数",
+				zap.Error(err),
+				zap.String("processDetailId", detail.ID),
+				zap.String("toolName", toolName))
+		}
+		return
+	}
+	if len(args) == 0 {
+		return
+	}
+	data["argumentsObj"] = args
+	if b, err := json.Marshal(args); err == nil {
+		data["arguments"] = string(b)
+	}
+	if strings.TrimSpace(execID) != "" {
+		data["executionId"] = strings.TrimSpace(execID)
+	}
+}
+
+func toolCallArgumentsEmpty(data map[string]interface{}) bool {
+	if data == nil {
+		return true
+	}
+	if args, ok := data["argumentsObj"].(map[string]interface{}); ok && len(args) > 0 {
+		return false
+	}
+	if raw, ok := data["arguments"]; ok {
+		s := strings.TrimSpace(fmt.Sprint(raw))
+		return s == "" || s == "{}" || s == "null"
+	}
+	return true
+}
+
 func summarizeProcessDetailData(eventType string, data interface{}) interface{} {
 	m, ok := data.(map[string]interface{})
 	if !ok || (eventType != "tool_call" && eventType != "tool_result") {
@@ -452,7 +500,7 @@ func summarizeProcessDetailData(eventType string, data interface{}) interface{} 
 		"success": true, "isError": true, "executionId": true,
 		"einoAgent": true, "einoRole": true, "einoScope": true, "orchestration": true,
 		"agentFacing": true,
-		"status": true, "modelFacingIsError": true, "resultPreview": true,
+		"status":      true, "modelFacingIsError": true, "resultPreview": true,
 	}
 	out := make(map[string]interface{}, len(allow)+1)
 	for k, v := range m {
