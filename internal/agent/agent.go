@@ -820,6 +820,19 @@ func (a *Agent) UpdateMCPExecutionDisplayResult(executionID, resultText string) 
 	}
 }
 
+// MCPExecutionResultText returns the monitor-facing result text after storage
+// guards such as large-output spilling have been applied.
+func (a *Agent) MCPExecutionResultText(executionID string) string {
+	if a == nil || a.mcpServer == nil || strings.TrimSpace(executionID) == "" {
+		return ""
+	}
+	exec, ok := a.mcpServer.GetExecution(executionID)
+	if !ok || exec == nil || exec.Result == nil {
+		return ""
+	}
+	return mcp.ToolResultPlainText(exec.Result)
+}
+
 // CancelMCPToolExecutionWithNote 取消一次进行中的 MCP 工具（先内部后外部），与监控页「终止工具」一致；note 非空时合并进返回给模型的文本。
 func (a *Agent) CancelMCPToolExecutionWithNote(executionID, note string) bool {
 	executionID = strings.TrimSpace(executionID)
