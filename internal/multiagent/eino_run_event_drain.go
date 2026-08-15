@@ -228,6 +228,7 @@ func (d *einoRunEventDrain) markPendingWithMonitor(tc toolCallPendingInfo) {
 		d.cfg.MCPExecutionBinder,
 		tc.ToolCallID,
 		tc.ToolName,
+		tc.Arguments,
 	)
 }
 

@@ -64,6 +64,17 @@ func toolCallArgsFromAccumulated(msgs []adk.Message, toolCallID, expectToolName 
 	return map[string]interface{}{}
 }
 
+func mustMarshalToolArguments(args map[string]interface{}) string {
+	if len(args) == 0 {
+		return "{}"
+	}
+	raw, err := json.Marshal(args)
+	if err != nil {
+		return "{}"
+	}
+	return string(raw)
+}
+
 // beginEinoADKFilesystemToolMonitor 在 Eino ADK filesystem 工具开始调用时写入 running 状态。
 func beginEinoADKFilesystemToolMonitor(
 	ctx context.Context,
@@ -71,6 +82,7 @@ func beginEinoADKFilesystemToolMonitor(
 	rec einomcp.ExecutionRecorder,
 	binder *MCPExecutionBinder,
 	toolCallID, toolName string,
+	args map[string]interface{},
 ) {
 	if ag == nil || rec == nil {
 		return
@@ -87,7 +99,7 @@ func beginEinoADKFilesystemToolMonitor(
 		return
 	}
 	storedName := "eino_fs::" + strings.ToLower(name)
-	id := ag.BeginLocalToolExecution(ctx, storedName, map[string]interface{}{})
+	id := ag.BeginLocalToolExecution(ctx, storedName, args)
 	if id == "" {
 		return
 	}
@@ -108,18 +120,21 @@ func recordEinoADKFilesystemToolMonitor(
 	msgs []adk.Message,
 	resultText string,
 	isErr bool,
-) {
+) string {
 	if ag == nil || rec == nil {
-		return
+		return ""
 	}
 	name := strings.TrimSpace(toolName)
 	if name == "" || strings.EqualFold(name, "execute") {
-		return
+		return ""
 	}
 	if !isBuiltinEinoADKFilesystemToolName(name) {
-		return
+		return ""
 	}
 	args := toolCallArgsFromAccumulated(msgs, toolCallID, name)
+	if len(args) == 0 && binder != nil {
+		args = binder.Arguments(toolCallID)
+	}
 	storedName := "eino_fs::" + strings.ToLower(name)
 	var invErr error
 	if isErr {
@@ -138,4 +153,5 @@ func recordEinoADKFilesystemToolMonitor(
 	if id != "" && execID == "" {
 		rec(id, toolCallID)
 	}
+	return id
 }
