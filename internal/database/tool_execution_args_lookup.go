@@ -20,16 +20,20 @@ func (db *DB) FindNearestToolExecutionArguments(conversationID, toolName string,
 	if window <= 0 {
 		window = 5 * time.Second
 	}
+	names := []string{toolName}
+	if !strings.Contains(toolName, "::") {
+		names = append(names, "eino_fs::"+toolName)
+	}
 	start := at.Add(-window)
 	end := at.Add(window)
 	rows, err := db.Query(`
 SELECT id, arguments
 FROM tool_executions
 WHERE conversation_id = ?
-  AND tool_name = ?
+  AND tool_name IN (?, ?)
   AND julianday(start_time) BETWEEN julianday(?) AND julianday(?)
 ORDER BY ABS(julianday(start_time) - julianday(?)) ASC, start_time ASC
-LIMIT 1`, conversationID, toolName, start, end, at)
+LIMIT 1`, conversationID, names[0], names[len(names)-1], start, end, at)
 	if err != nil {
 		return "", nil, err
 	}
