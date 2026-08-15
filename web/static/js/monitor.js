@@ -5819,6 +5819,13 @@ function parseToolCallArgsFromData(data) {
     return args;
 }
 
+function toolCallArgsEmpty(args) {
+    if (args == null) return true;
+    if (typeof args !== 'object') return false;
+    if (Array.isArray(args)) return args.length === 0;
+    return Object.keys(args).length === 0;
+}
+
 function formatToolCallTimelineTitle(toolName, index, total) {
     const name = toolName || (typeof window.t === 'function' ? window.t('chat.unknownTool') : '未知工具');
     const idx = index || 0;
@@ -6110,6 +6117,10 @@ function mergeToolResultIntoCallItem(item, data, options) {
 
     if (item.classList.contains('tool-call-collapsible')) {
         const state = toolCallDetailStateByItemId.get(item.id) || {};
+        const resultArgs = parseToolCallArgsFromData(data);
+        if (toolCallArgsEmpty(state.args) && !toolCallArgsEmpty(resultArgs)) {
+            state.args = resultArgs;
+        }
         state.resultData = data;
         state.rawText = text;
         state.resultDetailId = data.processDetailId || state.resultDetailId || '';
@@ -6214,6 +6225,13 @@ function coalesceProcessDetailsToolPairs(details) {
     function absorbResult(targetDetail, resultDetail) {
         const rd = resultDetail.data || {};
         targetDetail.data = targetDetail.data || {};
+        if (toolCallArgsEmpty(parseToolCallArgsFromData(targetDetail.data))) {
+            const resultArgs = parseToolCallArgsFromData(rd);
+            if (!toolCallArgsEmpty(resultArgs)) {
+                targetDetail.data.argumentsObj = resultArgs;
+                targetDetail.data.arguments = JSON.stringify(resultArgs);
+            }
+        }
         targetDetail.data._mergedResult = Object.assign({}, rd);
         if (resultDetail.id) {
             targetDetail.data._mergedResultDetailId = resultDetail.id;
