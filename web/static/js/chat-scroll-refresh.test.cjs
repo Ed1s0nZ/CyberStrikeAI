@@ -226,10 +226,21 @@ test('刷新后迭代思考区独立跟随最新内容且允许用户上滑解�
     const startSource = functionSource(monitor, 'startProcessDetailsLatestFollow', 'loadProcessDetailsPaginated');
     const loadSource = functionSource(monitor, 'loadProcessDetailsPaginated', 'shouldInitiallyOpenProcessDetailsAtLatest');
     const attachSource = functionSource(monitor, 'attachRunningTaskEventStream', 'parseToolCallArgsFromData');
+    const returnLatestSource = functionSource(monitor, 'ensureProcessDetailsReturnLatestControl', 'scrollProcessDetailsToLatest');
 
+    assert.match(monitor, /const processDetailsReturnLatestControls = new WeakMap\(\)/);
+    assert.match(returnLatestSource, /className = 'process-details-return-latest'/);
+    assert.match(monitor, /function getProcessDetailsLatestFollowStateForTimeline\(timeline\)/);
+    assert.match(monitor, /const followingLatest = !!\(followState && !followState\.detached\)/);
+    assert.match(monitor, /const shouldShow = !followingLatest && expanded && scrollable && awayFromLatest/);
+    assert.match(returnLatestSource, /timeline\.scrollTo\(\{ top: targetTop, behavior: 'smooth' \}\)/);
+    assert.match(returnLatestSource, /timeline\.addEventListener\('scroll', onScroll/);
+    assert.match(returnLatestSource, /window\.ensureProcessDetailsReturnLatestControl = ensureProcessDetailsReturnLatestControl/);
     assert.match(startSource, /new MutationObserver\(scheduleFollowLatest\)/);
     assert.match(startSource, /characterData: true/);
     assert.match(startSource, /new ResizeObserver\(scheduleFollowLatest\)/);
+    assert.match(startSource, /ensureProcessDetailsReturnLatestControl\(timeline\)/);
+    assert.match(startSource, /markProcessDetailsReturnLatestPending\(timeline\)/);
     assert.match(startSource, /scrollProcessDetailsToLatest\(String\(assistantMessageId \|\| ''\), false\)/);
     assert.match(startSource, /event\.deltaY < -1/);
     assert.match(startSource, /state\.userScrollIntentUntil = Date\.now\(\) \+ 1200/);
@@ -245,6 +256,8 @@ test('刷新后迭代思考区独立跟随最新内容且允许用户上滑解�
     assert.match(loadSource, /startProcessDetailsLatestFollow\(assistantMessageId/);
     assert.match(attachSource, /startProcessDetailsLatestFollow\(asEl\.id, \{ persistent: true \}\)/);
     assert.match(attachSource, /stopProcessDetailsLatestFollow\(asEl\.id\)/);
+    assert.match(chat, /window\.ensureProcessDetailsReturnLatestControl\(timeline\)/);
+    assert.doesNotMatch(returnLatestSource, /chat-return-latest/);
 });
 
 test('刷新后的工具调用恢复与实时一致的成功失败徽标', () => {
@@ -271,6 +284,8 @@ test('首次实时输出与刷新恢复都保留独立迭代滚动并跟随最�
 
     assert.match(css, /\.progress-container\.is-streaming \.progress-timeline\.expanded,[\s\S]{0,360}max-height: min\(64vh, 720px\);[\s\S]{0,180}overflow-y: auto;/);
     assert.match(css, /\.message\.progress-message \.progress-timeline\.expanded \{[\s\S]{0,260}max-height: min\(64vh, 720px\);[\s\S]{0,160}overflow-y: auto;/);
+    assert.match(css, /\.process-details-return-latest \{[\s\S]{0,260}position: absolute;[\s\S]{0,260}border-radius: 50%;/);
+    assert.match(css, /\.process-details-return-latest\.has-pending-new::after,/);
     assert.doesNotMatch(css, /流式执行中[\s\S]{0,320}overflow-y: visible;/);
     assert.match(addSource, /startLiveProgressLatestFollow\(id\)/);
     assert.match(liveSource, /stateKey: liveProgressLatestFollowKey\(id\)/);
@@ -325,7 +340,7 @@ test('消息气泡内部流式增高时仅在跟随模式继续粘底', () => {
 
 test('页面在任务补流脚本之前加载智能滚动控制器', () => {
     const scrollIndex = html.indexOf('/static/js/chat-scroll.js?v=20260815-1');
-    const monitorIndex = html.indexOf('/static/js/monitor.js?v=20260815-1');
+    const monitorIndex = html.indexOf('/static/js/monitor.js?v=20260815-2');
 
     assert.notEqual(scrollIndex, -1);
     assert.notEqual(monitorIndex, -1);
@@ -383,7 +398,7 @@ test('刷新指定对话时立即恢复且加载完成前不闪出无项目状�
     assert.match(css, /\.chat-container\.is-conversation-restoring #chat-messages/);
     assert.match(css, /\.chat-container\.is-conversation-restoring #chat-input-container/);
     assert.match(html, /router\.js\?v=20260813-2/);
-    assert.match(html, /chat\.js\?v=20260813-4/);
+    assert.match(html, /chat\.js\?v=20260815-2/);
 });
 
 test('刷新运行中回复会复用已持久化 planning 并继续追加未来增量', () => {
@@ -447,5 +462,5 @@ test('暗色模式对话三点悬浮不会触发浅色父行背景', () => {
     const css = fs.readFileSync('web/static/css/style.css', 'utf8');
     assert.match(css, /html\[data-theme="dark"\] \.project-conversation-row:hover \.project-conversation-item/);
     assert.match(css, /html\[data-theme="dark"\] \.project-folder-action:hover,[\s\S]*?background: rgba\(71, 85, 105, 0\.28\);[\s\S]*?box-shadow: none;/);
-    assert.match(html, /style\.css\?v=20260813-6/);
+    assert.match(html, /style\.css\?v=20260815-2/);
 });

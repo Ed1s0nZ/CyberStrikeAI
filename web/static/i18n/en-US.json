@@ -562,6 +562,7 @@
     "conversationPreviewViewed": "Viewed",
     "conversationPreviewConversation": "Conversation",
     "returnToLatest": "Jump to latest message",
+    "returnToLatestProcessDetail": "Jump to latest iteration",
     "taskProgressStep": "Step {{current}} of {{total}}",
     "taskProgressOpen": "View task progress",
     "taskProgressDetails": "Task progress details",

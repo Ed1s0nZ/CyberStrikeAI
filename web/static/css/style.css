@@ -4448,9 +4448,14 @@ html[data-theme="dark"] .sidebar-content:hover::-webkit-scrollbar-thumb:hover {
 }
 
 .process-details-content {
+    position: relative;
     width: 100%;
     min-width: 0;
     max-width: 100%;
+}
+
+.process-details-return-latest-host {
+    position: relative;
 }
 
 .process-details-content .progress-timeline {
@@ -4471,6 +4476,71 @@ html[data-theme="dark"] .sidebar-content:hover::-webkit-scrollbar-thumb:hover {
        继续把滚轮自然传给外层 #chat-messages，避免鼠标悬停卡片后“滚不动”。 */
     overscroll-behavior: auto;
     scrollbar-gutter: stable;
+}
+
+.process-details-return-latest {
+    position: absolute;
+    right: 18px;
+    bottom: 16px;
+    z-index: 7;
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid rgba(15, 23, 42, 0.14);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.96);
+    color: #5f6875;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.14), 0 1px 3px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(10px);
+    cursor: pointer;
+    transition: color 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.process-details-return-latest[hidden] {
+    display: none !important;
+}
+
+.process-details-return-latest:hover {
+    border-color: rgba(37, 99, 235, 0.3);
+    background: #ffffff;
+    color: var(--accent-color, #0b6cff);
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.18), 0 2px 5px rgba(15, 23, 42, 0.1);
+    transform: translateY(-1px);
+}
+
+.process-details-return-latest:focus-visible {
+    outline: 2px solid rgba(37, 99, 235, 0.42);
+    outline-offset: 3px;
+}
+
+.process-details-return-latest svg {
+    width: 18px;
+    height: 18px;
+}
+
+.process-details-return-latest.has-pending-new::after,
+.process-details-return-latest.is-streaming::after {
+    content: "";
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 7px;
+    height: 7px;
+    border: 2px solid rgba(255, 255, 255, 0.96);
+    border-radius: 50%;
+    background: var(--accent-color, #0b6cff);
+}
+
+.process-details-return-latest.is-streaming svg {
+    animation: process-details-return-latest-nudge 1.1s ease-in-out infinite;
+}
+
+@keyframes process-details-return-latest-nudge {
+    0%, 65%, 100% { transform: translateY(0); }
+    35% { transform: translateY(2px); }
 }
 
 .process-details-auto-sentinel {
@@ -36504,6 +36574,24 @@ html[data-theme="dark"] .chat-return-latest:hover {
     border-color: rgba(148, 163, 184, 0.42);
     background: #172033;
     color: #ffffff;
+}
+
+html[data-theme="dark"] .process-details-return-latest {
+    border-color: rgba(148, 163, 184, 0.28);
+    background: rgba(15, 23, 42, 0.96);
+    color: #cbd5e1;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38), 0 1px 3px rgba(0, 0, 0, 0.28);
+}
+
+html[data-theme="dark"] .process-details-return-latest:hover {
+    border-color: rgba(96, 165, 250, 0.42);
+    background: #172033;
+    color: #93c5fd;
+}
+
+html[data-theme="dark"] .process-details-return-latest.has-pending-new::after,
+html[data-theme="dark"] .process-details-return-latest.is-streaming::after {
+    border-color: rgba(15, 23, 42, 0.96);
 }
 
 html[data-theme="dark"] .process-details-container {

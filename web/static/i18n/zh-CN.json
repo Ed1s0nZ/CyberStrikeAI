@@ -550,6 +550,7 @@
     "conversationPreviewViewed": "已查看",
     "conversationPreviewConversation": "对话",
     "returnToLatest": "回到最新消息",
+    "returnToLatestProcessDetail": "回到最新迭代",
     "taskProgressStep": "第 {{current}} / {{total}} 步",
     "taskProgressOpen": "查看任务进度",
     "taskProgressDetails": "任务进度详情",

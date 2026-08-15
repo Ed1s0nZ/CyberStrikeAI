@@ -3890,6 +3890,9 @@ function renderProcessDetails(messageId, processDetails, options) {
         contentDiv.appendChild(timeline);
         detailsContainer.appendChild(contentDiv);
     }
+    if (typeof window.ensureProcessDetailsReturnLatestControl === 'function') {
+        window.ensureProcessDetailsReturnLatestControl(timeline);
+    }
     
     // processDetails === null 表示“尚未加载（懒加载）”；messages.reasoningContent 可先展示
     const isLazyNotLoaded = isLazyRequest;
@@ -3901,6 +3904,9 @@ function renderProcessDetails(messageId, processDetails, options) {
         timeline.innerHTML = '<div class="progress-timeline-empty">' + lazyHint + '</div>';
         bindProcessDetailsLazyHint(timeline, messageId);
         timeline.classList.remove('expanded');
+        if (typeof window.updateProcessDetailsReturnLatestControl === 'function') {
+            window.updateProcessDetailsReturnLatestControl(timeline);
+        }
         prefetchProcessDetailsSummaryHint(messageId, messageElement);
         return;
     }
@@ -3933,6 +3939,9 @@ function renderProcessDetails(messageId, processDetails, options) {
             timeline.innerHTML = '<div class="progress-timeline-empty">' + (typeof window.t === 'function' ? window.t('chat.noProcessDetail') : '暂无过程详情（可能执行过快或未触发详细事件）') + '</div>';
             if (!isProcessDetailsUserExpanded(messageId)) {
                 timeline.classList.remove('expanded');
+            }
+            if (typeof window.updateProcessDetailsReturnLatestControl === 'function') {
+                window.updateProcessDetailsReturnLatestControl(timeline);
             }
         }
         return;
@@ -4298,6 +4307,12 @@ function finishProcessDetailsRender(messageElement, processDetails, isLazyNotLoa
         if (convId && typeof window.restoreWorkflowHitlInlineForConversation === 'function') {
             window.restoreWorkflowHitlInlineForConversation(convId);
         }
+    }
+    if (typeof window.ensureProcessDetailsReturnLatestControl === 'function') {
+        window.ensureProcessDetailsReturnLatestControl(timeline);
+    }
+    if (typeof window.updateProcessDetailsReturnLatestControl === 'function') {
+        window.updateProcessDetailsReturnLatestControl(timeline);
     }
 }
 
