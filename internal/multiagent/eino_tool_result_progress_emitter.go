@@ -115,7 +115,22 @@ func (e *einoToolResultProgressEmitter) Emit(ctx context.Context, toolName, cont
 	if e.executeStdoutDup != nil {
 		e.executeStdoutDup.Record(toolName, content, displayIsErr)
 	}
-	recordEinoADKFilesystemToolMonitor(ctx, e.filesystemMonitorAgent, e.filesystemMonitorRecord, e.mcpExecutionBinder, toolName, toolCallID, e.messages(), content, displayIsErr)
+	if args := e.toolCallArguments(toolCallID, toolName); len(args) > 0 {
+		data["argumentsObj"] = args
+		data["arguments"] = mustMarshalToolArguments(args)
+	}
+	if execID := recordEinoADKFilesystemToolMonitor(ctx, e.filesystemMonitorAgent, e.filesystemMonitorRecord, e.mcpExecutionBinder, toolName, toolCallID, e.messages(), content, displayIsErr); execID != "" {
+		if stored := e.filesystemMonitorAgent.MCPExecutionResultText(execID); strings.TrimSpace(stored) != "" {
+			content = stored
+			if len(content) > 200 {
+				preview = content[:200] + "..."
+			} else {
+				preview = content
+			}
+			data["result"] = content
+			data["resultPreview"] = preview
+		}
+	}
 	if e.filesystemMonitorAgent != nil && e.mcpExecutionBinder != nil {
 		if execID := e.mcpExecutionBinder.ExecutionID(toolCallID); execID != "" {
 			e.filesystemMonitorAgent.UpdateMCPExecutionDisplayResult(execID, content)
@@ -151,4 +166,16 @@ func (e *einoToolResultProgressEmitter) messages() []adk.Message {
 		return nil
 	}
 	return e.runMessages.Messages()
+}
+
+func (e *einoToolResultProgressEmitter) toolCallArguments(toolCallID, toolName string) map[string]interface{} {
+	if e == nil {
+		return nil
+	}
+	if e.mcpExecutionBinder != nil {
+		if args := e.mcpExecutionBinder.Arguments(toolCallID); len(args) > 0 {
+			return args
+		}
+	}
+	return toolCallArgsFromAccumulated(e.messages(), toolCallID, toolName)
 }

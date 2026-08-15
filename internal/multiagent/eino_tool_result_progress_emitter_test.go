@@ -1,6 +1,11 @@
 package multiagent
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/cloudwego/eino/adk"
+	"github.com/cloudwego/eino/schema"
+)
 
 func TestEinoToolResultProgressEmitterInfersPendingAndDedupes(t *testing.T) {
 	var events []map[string]interface{}
@@ -133,5 +138,46 @@ func TestEinoToolResultProgressEmitterTruncatesPreview(t *testing.T) {
 	}
 	if got, _ := data["resultPreview"].(string); len(got) != 203 || got[200:] != "..." {
 		t.Fatalf("preview = %q len=%d", got, len(got))
+	}
+}
+
+func TestEinoToolResultProgressEmitterBackfillsArgumentsFromRunMessages(t *testing.T) {
+	var data map[string]interface{}
+	progress := func(eventType, _ string, raw interface{}) {
+		if eventType == "tool_result" {
+			data, _ = raw.(map[string]interface{})
+		}
+	}
+	runMessages := newEinoRunMessageAccumulator([]adk.Message{
+		&schema.Message{
+			Role: schema.Assistant,
+			ToolCalls: []schema.ToolCall{{
+				ID:   "call-read",
+				Type: "function",
+				Function: schema.FunctionCall{
+					Name:      "read_file",
+					Arguments: `{"path":"/tmp/requirements.txt"}`,
+				},
+			}},
+		},
+	})
+	emitter := newEinoToolResultProgressEmitter(einoToolResultProgressEmitterConfig{
+		ConversationID: "conv-1",
+		Progress:       progress,
+		RunMessages:    runMessages,
+	})
+
+	if !emitter.Emit(nil, "read_file", "ok", "call-read", false, "lead") {
+		t.Fatal("expected tool result emit")
+	}
+	args, ok := data["argumentsObj"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("argumentsObj = %#v", data["argumentsObj"])
+	}
+	if args["path"] != "/tmp/requirements.txt" {
+		t.Fatalf("path = %#v, want /tmp/requirements.txt", args["path"])
+	}
+	if data["arguments"] != `{"path":"/tmp/requirements.txt"}` {
+		t.Fatalf("arguments = %#v", data["arguments"])
 	}
 }

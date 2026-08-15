@@ -2,6 +2,7 @@ package multiagent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,11 +11,13 @@ import (
 	"cyberstrike-ai/internal/config"
 	"cyberstrike-ai/internal/einomcp"
 	"cyberstrike-ai/internal/security"
+	"cyberstrike-ai/internal/tooloutput"
 
 	localbk "github.com/cloudwego/eino-ext/adk/backend/local"
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/adk/middlewares/filesystem"
 	"github.com/cloudwego/eino/adk/middlewares/skill"
+	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
 	"go.uber.org/zap"
 )
@@ -100,6 +103,11 @@ func subAgentAgenticFilesystemMiddleware(
 	loc *localbk.Local,
 	invokeNotify *einomcp.ToolInvokeNotifyHolder,
 	einoAgentName string,
+	conversationID string,
+	projectID string,
+	reductionRootDir string,
+	toolMaxBytes int,
+	binder *MCPExecutionBinder,
 	beginMonitor func(toolCallID, command string) string,
 	appendPartialMonitor func(executionID, toolCallID, chunk string),
 	registerCancelMonitor func(executionID string, cancel context.CancelFunc),
@@ -113,7 +121,7 @@ func subAgentAgenticFilesystemMiddleware(
 	if loc == nil {
 		return nil, nil
 	}
-	return filesystem.NewTyped[*schema.AgenticMessage](ctx, &filesystem.MiddlewareConfig{
+	mw, err := filesystem.NewTyped[*schema.AgenticMessage](ctx, &filesystem.MiddlewareConfig{
 		Backend: loc,
 		StreamingShell: &einoStreamingShellWrap{
 			inner:                   security.NewEinoStreamingShell(),
@@ -130,6 +138,71 @@ func subAgentAgenticFilesystemMiddleware(
 			shellNoOutputTimeoutSec: shellNoOutputTimeoutSec,
 		},
 	})
+	if err != nil {
+		return nil, err
+	}
+	return &einoAgenticFilesystemToolMiddleware{
+		TypedChatModelAgentMiddleware: mw,
+		conversationID:                conversationID,
+		projectID:                     projectID,
+		reductionRootDir:              reductionRootDir,
+		toolMaxBytes:                  toolMaxBytes,
+		binder:                        binder,
+	}, nil
+}
+
+type einoAgenticFilesystemToolMiddleware struct {
+	adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]
+	conversationID   string
+	projectID        string
+	reductionRootDir string
+	toolMaxBytes     int
+	binder           *MCPExecutionBinder
+}
+
+func (m *einoAgenticFilesystemToolMiddleware) WrapInvokableToolCall(ctx context.Context, endpoint adk.InvokableToolCallEndpoint, tCtx *adk.ToolContext) (adk.InvokableToolCallEndpoint, error) {
+	wrapped, err := m.TypedChatModelAgentMiddleware.WrapInvokableToolCall(ctx, endpoint, tCtx)
+	if err != nil {
+		return nil, err
+	}
+	if tCtx == nil || !isBuiltinEinoADKFilesystemToolName(tCtx.Name) {
+		return wrapped, nil
+	}
+	return func(ctx context.Context, argumentsInJSON string, opts ...tool.Option) (string, error) {
+		args := parseToolArgumentsObject(argumentsInJSON)
+		if len(args) > 0 && m.binder != nil {
+			m.binder.BindArguments(tCtx.CallID, args)
+		}
+		result, runErr := wrapped(ctx, argumentsInJSON, opts...)
+		if runErr != nil {
+			return result, runErr
+		}
+		return m.boundToolResult(tCtx.CallID, result), nil
+	}, nil
+}
+
+func (m *einoAgenticFilesystemToolMiddleware) boundToolResult(toolCallID, result string) string {
+	if m == nil || m.toolMaxBytes <= 0 || len(result) <= m.toolMaxBytes {
+		return result
+	}
+	return tooloutput.BoundWithSpill(result, m.toolMaxBytes, tooloutput.SpillOpts{
+		RootDir:        m.reductionRootDir,
+		ProjectID:      m.projectID,
+		ConversationID: m.conversationID,
+		ExecutionID:    toolCallID,
+	})
+}
+
+func parseToolArgumentsObject(raw string) map[string]interface{} {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || raw == "{}" || raw == "null" {
+		return nil
+	}
+	var args map[string]interface{}
+	if err := json.Unmarshal([]byte(raw), &args); err != nil || len(args) == 0 {
+		return nil
+	}
+	return args
 }
 
 // agentToolTimeoutMinutes 返回 agent.tool_timeout_minutes（与 executeToolViaMCP 一致）；cfg 为 nil 时 0。

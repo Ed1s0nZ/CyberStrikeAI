@@ -52,6 +52,7 @@ type RunResult struct {
 type toolCallPendingInfo struct {
 	ToolCallID string
 	ToolName   string
+	Arguments  map[string]interface{}
 	EinoAgent  string
 	EinoRole   string
 }
@@ -232,7 +233,7 @@ func RunDeepAgent(
 			}
 			if agenticSkillMW != nil {
 				if agenticFSTools && agenticLoc != nil {
-					subFs, fsErr := subAgentAgenticFilesystemMiddleware(ctx, agenticLoc, toolInvokeNotify, id, einoExecBegin, einoExecAppendPartial, einoExecRegisterCancel, einoExecUnregisterCancel, einoExecFinish, agentToolTimeoutMinutes(appCfg), agentToolWaitTimeoutSeconds(appCfg), agentShellNoOutputTimeoutSeconds(appCfg), nil)
+					subFs, fsErr := subAgentAgenticFilesystemMiddleware(ctx, agenticLoc, toolInvokeNotify, id, conversationID, projectID, ma.EinoMiddleware.ReductionRootDir, toolMaxBytesFromMW(&ma.EinoMiddleware), mcpExecBinder, einoExecBegin, einoExecAppendPartial, einoExecRegisterCancel, einoExecUnregisterCancel, einoExecFinish, agentToolTimeoutMinutes(appCfg), agentToolWaitTimeoutSeconds(appCfg), agentShellNoOutputTimeoutSeconds(appCfg), nil)
 					if fsErr != nil {
 						return nil, fmt.Errorf("子代理 %q filesystem 中间件: %w", id, fsErr)
 					}
@@ -492,7 +493,7 @@ func RunDeepAgent(
 		}
 		var peFsMw adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]
 		if agenticSkillMW != nil && agenticFSTools && agenticLoc != nil {
-			peFsMw, err = subAgentAgenticFilesystemMiddleware(ctx, agenticLoc, toolInvokeNotify, "executor", einoExecBegin, einoExecAppendPartial, einoExecRegisterCancel, einoExecUnregisterCancel, einoExecFinish, agentToolTimeoutMinutes(appCfg), agentToolWaitTimeoutSeconds(appCfg), agentShellNoOutputTimeoutSeconds(appCfg), nil)
+			peFsMw, err = subAgentAgenticFilesystemMiddleware(ctx, agenticLoc, toolInvokeNotify, "executor", conversationID, projectID, ma.EinoMiddleware.ReductionRootDir, toolMaxBytesFromMW(&ma.EinoMiddleware), mcpExecBinder, einoExecBegin, einoExecAppendPartial, einoExecRegisterCancel, einoExecUnregisterCancel, einoExecFinish, agentToolTimeoutMinutes(appCfg), agentToolWaitTimeoutSeconds(appCfg), agentShellNoOutputTimeoutSeconds(appCfg), nil)
 			if err != nil {
 				return nil, fmt.Errorf("plan_execute agentic filesystem 中间件: %w", err)
 			}
@@ -994,6 +995,7 @@ func emitToolCallsFromMessage(
 			markPending(toolCallPendingInfo{
 				ToolCallID: toolCallID,
 				ToolName:   display,
+				Arguments:  argsObj,
 				EinoAgent:  agentName,
 				EinoRole:   role,
 			})
