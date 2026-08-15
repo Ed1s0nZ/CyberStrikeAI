@@ -497,6 +497,7 @@ func summarizeProcessDetailData(eventType string, data interface{}) interface{} 
 	}
 	allow := map[string]bool{
 		"toolName": true, "toolCallId": true, "index": true, "total": true,
+		"arguments": true, "argumentsObj": true,
 		"success": true, "isError": true, "executionId": true,
 		"einoAgent": true, "einoRole": true, "einoScope": true, "orchestration": true,
 		"agentFacing": true,

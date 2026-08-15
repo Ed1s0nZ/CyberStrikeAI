@@ -139,3 +139,67 @@ func TestProcessDetailsFullBackfillsEmptyToolCallArgumentsFromExecution(t *testi
 		t.Fatalf("executionId = %#v, want exec-whoami", data["executionId"])
 	}
 }
+
+func TestProcessDetailsPageBackfillsEinoFilesystemArgumentsFromPrefixedExecution(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db, err := database.NewDB(filepath.Join(t.TempDir(), "process-details-eino-fs-args.db"), zap.NewNop())
+	if err != nil {
+		t.Fatalf("NewDB: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	conversation, err := db.CreateConversation("eino fs args", database.ConversationCreateMeta{})
+	if err != nil {
+		t.Fatalf("CreateConversation: %v", err)
+	}
+	message, err := db.AddMessage(conversation.ID, "assistant", "done", nil)
+	if err != nil {
+		t.Fatalf("AddMessage: %v", err)
+	}
+	if err := db.AddProcessDetail(message.ID, conversation.ID, "tool_call", "calling read_file", map[string]interface{}{
+		"toolName": "read_file", "toolCallId": "call-read", "arguments": "", "argumentsObj": nil,
+	}); err != nil {
+		t.Fatalf("AddProcessDetail(tool_call): %v", err)
+	}
+	if err := db.SaveToolExecution(&mcp.ToolExecution{
+		ID:             "exec-read",
+		ToolName:       "eino_fs::read_file",
+		Arguments:      map[string]interface{}{"file_path": "/tmp/requirements.txt", "limit": float64(2000)},
+		Status:         "completed",
+		StartTime:      time.Now(),
+		ConversationID: conversation.ID,
+	}); err != nil {
+		t.Fatalf("SaveToolExecution: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("GET", "/api/messages/"+message.ID+"/process-details?limit=50&offset=0", nil)
+	c.Params = gin.Params{{Key: "id", Value: message.ID}}
+	NewConversationHandler(db, zap.NewNop()).GetMessageProcessDetails(c)
+	if w.Code != 200 {
+		t.Fatalf("status = %d: %s", w.Code, w.Body.String())
+	}
+	var response struct {
+		ProcessDetails []map[string]interface{} `json:"processDetails"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(response.ProcessDetails) != 1 {
+		t.Fatalf("process details = %d, want 1", len(response.ProcessDetails))
+	}
+	data, ok := response.ProcessDetails[0]["data"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("data = %#v", response.ProcessDetails[0]["data"])
+	}
+	args, ok := data["argumentsObj"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("argumentsObj = %#v", data["argumentsObj"])
+	}
+	if args["file_path"] != "/tmp/requirements.txt" {
+		t.Fatalf("file_path = %#v, want /tmp/requirements.txt", args["file_path"])
+	}
+	if data["arguments"] == nil {
+		t.Fatalf("arguments should be preserved in summarized page data: %#v", data)
+	}
+}
