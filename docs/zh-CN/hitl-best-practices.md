@@ -25,7 +25,7 @@ hitl:
     api_key: ""
     model: "" # 可填小模型；留空复用默认 AI 通道的模型
   retention_days: 90
-  tool_whitelist: [read_file, ls, glob, grep, tool_search, get_project_fact, list_project_facts, search_project_facts, list_vulnerabilities, get_vulnerability, get_asset, query_assets, list_knowledge_risk_types, get_tool_execution, wait_tool_execution, batch_task_list, batch_task_get, asm_list_resources, manage_webshell_list, c2_event, c2_file]
+  tool_whitelist: [read_file, ls, glob, grep, tool_search, get_project_fact, list_project_facts, search_project_facts, list_vulnerabilities, get_vulnerability, get_asset, query_assets, list_knowledge_risk_types, get_tool_execution, wait_tool_execution, batch_task_list, batch_task_get, manage_webshell_list, c2_event, c2_file]
 ```
 
 `audit_model` 的字段可以只填一部分。空字段会自动继承默认 AI 通道解析后的模型配置，因此常见做法是只填 `model`，让审计 Agent 使用更便宜的小模型。
@@ -98,7 +98,7 @@ hitl:
 - 项目与漏洞查询：`get_project_fact`、`list_project_facts`、`search_project_facts`、`list_vulnerabilities`、`get_vulnerability`
 - 资产与知识元数据查询：`get_asset`、`query_assets`、`list_knowledge_risk_types`
 - 执行与任务状态查询：`get_tool_execution`、`wait_tool_execution`、`batch_task_list`、`batch_task_get`
-- 本地管理元数据查询：`asm_list_resources`、`manage_webshell_list`、`c2_event`、`c2_file`
+- 本地管理元数据查询：`manage_webshell_list`、`c2_event`、`c2_file`
 
 上述内置 MCP 查询仍受 RBAC 和资源范围约束；白名单只跳过 HITL 审批，不扩大访问权限。`list_dir` 仅在实际工具名为该值时有效；Eino 文件系统的目录列表工具名是 `ls`。
 
@@ -108,7 +108,7 @@ hitl:
 - 文件写入/删除工具
 - C2 任务工具
 - WebShell 命令执行工具
-- 会向目标或外部服务发起请求的“只读”工具，例如 `webshell_file_read`、`webshell_file_list`、`search_knowledge_base` 和 ASM 远程任务查询
+- 会向目标或外部服务发起请求的“只读”工具，例如 `webshell_file_read`、`webshell_file_list` 和 `search_knowledge_base`
 - 同一工具名同时包含读写 action 的复合工具，例如 `c2_session`、`c2_listener`、`c2_profile`、`c2_task_manage`
 
 ## 模式选择

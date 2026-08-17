@@ -25,7 +25,7 @@ hitl:
     api_key: ""
     model: "" # set a small model here; blank reuses the default AI channel model
   retention_days: 90
-  tool_whitelist: [read_file, ls, glob, grep, tool_search, get_project_fact, list_project_facts, search_project_facts, list_vulnerabilities, get_vulnerability, get_asset, query_assets, list_knowledge_risk_types, get_tool_execution, wait_tool_execution, batch_task_list, batch_task_get, asm_list_resources, manage_webshell_list, c2_event, c2_file]
+  tool_whitelist: [read_file, ls, glob, grep, tool_search, get_project_fact, list_project_facts, search_project_facts, list_vulnerabilities, get_vulnerability, get_asset, query_assets, list_knowledge_risk_types, get_tool_execution, wait_tool_execution, batch_task_list, batch_task_get, manage_webshell_list, c2_event, c2_file]
 ```
 
 `audit_model` supports partial configuration. Empty fields inherit from the resolved default AI channel, so the common setup is to fill only `model` and run approvals on a cheaper small model.
@@ -98,7 +98,7 @@ Allowlisted tools skip approval, so keep the list stable and low-risk. Recommend
 - Project and vulnerability reads: `get_project_fact`, `list_project_facts`, `search_project_facts`, `list_vulnerabilities`, `get_vulnerability`
 - Asset and knowledge-metadata reads: `get_asset`, `query_assets`, `list_knowledge_risk_types`
 - Execution and task-state reads: `get_tool_execution`, `wait_tool_execution`, `batch_task_list`, `batch_task_get`
-- Local management-metadata reads: `asm_list_resources`, `manage_webshell_list`, `c2_event`, `c2_file`
+- Local management-metadata reads: `manage_webshell_list`, `c2_event`, `c2_file`
 
 These built-in MCP reads remain constrained by RBAC and resource scope; the allowlist only bypasses HITL approval and does not grant additional access. `list_dir` is effective only when that is the actual tool name; the Eino filesystem directory-listing tool is named `ls`.
 
@@ -108,7 +108,7 @@ Avoid globally allowlisting:
 - File write/delete tools
 - C2 task tools
 - WebShell command execution tools
-- Nominally read-only tools that send requests to a target or external service, such as `webshell_file_read`, `webshell_file_list`, `search_knowledge_base`, and remote ASM task queries
+- Nominally read-only tools that send requests to a target or external service, such as `webshell_file_read`, `webshell_file_list`, and `search_knowledge_base`
 - Multiplexed tools whose actions include both reads and writes, such as `c2_session`, `c2_listener`, `c2_profile`, and `c2_task_manage`
 
 ## Mode Selection
