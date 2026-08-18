@@ -10,7 +10,7 @@ CyberStrikeAI can run as a local testing tool, an internal team service, or a pr
 - Python for some MCP servers and tool scripts.
 - SQLite files under `data/`; no external DB is required by default.
 - Actual security tools installed in PATH. YAML files under `tools/` only describe commands.
-- At least one `ai.channels` entry. Use `provider: openai_compatible` for OpenAI-compatible endpoints, or `provider: claude` for the Claude bridge.
+- At least one `ai.channels` entry. Use `provider: openai_compatible` for OpenAI-compatible endpoints, or `provider: claude` for Eino's native Claude component.
 
 Important persistent paths:
 

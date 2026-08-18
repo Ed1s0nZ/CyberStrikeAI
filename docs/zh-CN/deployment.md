@@ -10,7 +10,7 @@
 - Python：部分 MCP 服务或工具脚本需要 Python 运行环境。
 - SQLite：默认使用文件型数据库，无需单独服务。
 - 安全工具：`tools/` 中的 YAML 只是工具定义，实际命令如 `nmap`、`sqlmap`、`nuclei` 仍需安装到系统 PATH。
-- 模型服务：至少配置一个 `ai.channels` 通道；`provider: openai_compatible` 适用于 OpenAI 兼容 API，`provider: claude` 会走 Claude 桥接。
+- 模型服务：至少配置一个 `ai.channels` 通道；`provider: openai_compatible` 适用于 OpenAI 兼容 API，`provider: claude` 使用 Eino 原生 Claude 组件。
 
 建议目录：
 
