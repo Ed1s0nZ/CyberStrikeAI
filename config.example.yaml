@@ -57,7 +57,7 @@ monitor:
 #   - DeepSeek: https://api.deepseek.com/v1
 #   - 其他兼容 OpenAI 协议的 API
 # 常用模型: gpt-4, gpt-3.5-turbo, deepseek-chat, claude-3-opus 等
-# provider: 可选值 openai_compatible(默认) | claude(自动桥接到 Anthropic Claude Messages API)
+# provider: 可选值 openai_compatible(默认) | claude(Eino 原生 Anthropic Messages API)
 ai:
   default_channel: qwen-max
   channels:
@@ -107,10 +107,10 @@ fofa:
   base_url: https://fofa.info/api/v1/search/all # 可选，留空则使用默认
   api_key: "" # FOFA API Key（可选，建议在系统设置中填写）
 zoomeye:
-  base_url: https://api.zoomeye.org/v2/search # 可选，留空则使用默认
+  base_url: https://api.zoomeye.ai/v2/search # 可选，留空则使用默认
   api_key: "" # ZoomEye API Key；也可通过 ZOOMEYE_API_KEY 环境变量配置
 quake:
-  base_url: https://quake.360.cn/api/v3/search/quake_service # 可选，留空则使用默认
+  base_url: https://quake.360.net/api/v3/search/quake_service # 可选，留空则使用默认
   api_key: "" # Quake API Token；也可通过 QUAKE_API_KEY 环境变量配置
 shodan:
   base_url: https://api.shodan.io # 可选，留空则使用默认
