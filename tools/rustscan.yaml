@@ -25,7 +25,6 @@ parameters:
     required: true
     flag: "-a"
     format: "flag"
-
   # -p, --ports；范围请用 range (-r)，勿把 1-1000 填进 ports
   - name: "ports"
     type: "string"
@@ -36,7 +35,6 @@ parameters:
     required: false
     flag: "-p"
     format: "flag"
-
   # -r, --range（与 ports 列表二选一或按官方说明组合）
   - name: "range"
     type: "string"
@@ -47,7 +45,6 @@ parameters:
     required: false
     flag: "-r"
     format: "flag"
-
   # -u, --ulimit
   - name: "ulimit"
     type: "int"
@@ -56,7 +53,6 @@ parameters:
     flag: "-u"
     format: "flag"
     default: 5000
-
   # --scripts：none | default | custom（CLI 默认 default）
   - name: "scripts"
     type: "string"
@@ -73,7 +69,6 @@ parameters:
       - "none"
       - "default"
       - "custom"
-
   # -g, --greppable：仅端口列表，无 Nmap 输出
   - name: "greppable"
     type: "bool"
@@ -82,7 +77,6 @@ parameters:
     flag: "-g"
     format: "flag"
     default: false
-
   # -b, --batch-size [default: 4500]
   - name: "batch_size"
     type: "int"
@@ -90,7 +84,6 @@ parameters:
     required: false
     flag: "-b"
     format: "flag"
-
   # -t, --timeout ms [default: 1500]
   - name: "timeout_ms"
     type: "int"
@@ -98,7 +91,6 @@ parameters:
     required: false
     flag: "-t"
     format: "flag"
-
   # --scan-order serial | random [default: serial]
   - name: "scan_order"
     type: "string"
@@ -109,7 +101,6 @@ parameters:
     options:
       - "serial"
       - "random"
-
   # --top：top 1000 端口
   - name: "top_ports"
     type: "bool"
@@ -118,7 +109,6 @@ parameters:
     flag: "--top"
     format: "flag"
     default: false
-
   # -e, --exclude-ports
   - name: "exclude_ports"
     type: "string"
@@ -126,7 +116,6 @@ parameters:
     required: false
     flag: "-e"
     format: "flag"
-
   # -x, --exclude-addresses
   - name: "exclude_addresses"
     type: "string"
@@ -134,7 +123,6 @@ parameters:
     required: false
     flag: "-x"
     format: "flag"
-
   # --tries [default: 1]
   - name: "tries"
     type: "int"
@@ -142,7 +130,6 @@ parameters:
     required: false
     flag: "--tries"
     format: "flag"
-
   - name: "additional_args"
     type: "string"
     description: |
