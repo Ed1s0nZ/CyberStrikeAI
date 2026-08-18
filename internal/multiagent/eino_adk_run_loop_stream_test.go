@@ -30,6 +30,29 @@ func TestRecvSchemaMessageStream_EOF(t *testing.T) {
 	}
 }
 
+func TestRecvSchemaToolResultMessages_SplitsParallelIDs(t *testing.T) {
+	sr, sw := schema.Pipe[*schema.Message](8)
+	_ = sw.Send(schema.ToolMessage("one-", "tc-1", schema.WithToolName("nmap")), nil)
+	_ = sw.Send(schema.ToolMessage("two-", "tc-2", schema.WithToolName("nmap")), nil)
+	_ = sw.Send(schema.ToolMessage("a", "tc-1", schema.WithToolName("nmap")), nil)
+	_ = sw.Send(schema.ToolMessage("b", "tc-2", schema.WithToolName("nmap")), nil)
+	sw.Close()
+
+	msgs, err := recvSchemaToolResultMessages(context.Background(), sr)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(msgs) != 2 {
+		t.Fatalf("msgs = %#v, want 2", msgs)
+	}
+	if msgs[0].ToolCallID != "tc-1" || msgs[0].Content != "one-a" {
+		t.Fatalf("msg 0 = %#v", msgs[0])
+	}
+	if msgs[1].ToolCallID != "tc-2" || msgs[1].Content != "two-b" {
+		t.Fatalf("msg 1 = %#v", msgs[1])
+	}
+}
+
 func TestRecvSchemaMessageStream_CapturesToolName(t *testing.T) {
 	sr, sw := schema.Pipe[*schema.Message](4)
 	_ = sw.Send(schema.ToolMessage("hello", "tc-1", schema.WithToolName("execute")), nil)

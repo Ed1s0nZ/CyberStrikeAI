@@ -1548,12 +1548,12 @@ LIMIT 1`, messageID).Scan(&terminalEvent, &terminalCreatedAt)
 	seenExecIDs := make(map[string]bool)
 	// A provider may reuse a fallback toolCallId across streaming rounds. Keep a
 	// FIFO per ID instead of a single index so every persisted call gets at most
-	// one result. Results without a stable ID are kept separate instead of being
-	// guessed by order; showing no link is safer than linking to the wrong tool.
+	// one result. ID-less results still attach to an unmatched call with the same
+	// tool name (parallel nmap 1/2, 2/2 often lose one ID); different tools stay
+	// unlinked so a leftover preview cannot steal another call's slot.
 	toolIndexesByCallID := make(map[string][]int)
 	lastMatchedToolIndexByCallID := make(map[string]int)
 	matchedToolIndexes := make([]bool, 0)
-	nextUnmatchedToolIdx := 0
 	for execRows.Next() {
 		var detailID string
 		var eventType string
@@ -1569,24 +1569,10 @@ LIMIT 1`, messageID).Scan(&terminalEvent, &terminalCreatedAt)
 		if err := json.Unmarshal([]byte(dataJSON), &payload); err != nil {
 			continue
 		}
-		toolName, _ := payload["toolName"].(string)
-		toolName = strings.TrimSpace(toolName)
-		toolCallID, _ := payload["toolCallId"].(string)
-		toolCallID = strings.TrimSpace(toolCallID)
-		execID, _ := payload["executionId"].(string)
-		execID = strings.TrimSpace(execID)
-		status := ""
-		if eventType == "tool_result" {
-			if success, ok := payload["success"].(bool); ok {
-				if success {
-					status = "completed"
-				} else {
-					status = "failed"
-				}
-			} else if isErr, ok := payload["isError"].(bool); ok && isErr {
-				status = "failed"
-			}
-		}
+		toolName := processDetailString(payload, "toolName")
+		toolCallID := processDetailString(payload, "toolCallId")
+		execID := processDetailString(payload, "executionId")
+		status := toolResultStatusFromPayload(payload, eventType)
 		if eventType == "tool_call" {
 			summary.ToolExecutions = append(summary.ToolExecutions, ProcessDetailsToolExecution{
 				ProcessDetailID: strings.TrimSpace(detailID),
@@ -1603,36 +1589,14 @@ LIMIT 1`, messageID).Scan(&terminalEvent, &terminalCreatedAt)
 			}
 		}
 		if eventType == "tool_result" {
-			idx := -1
-			if toolCallID != "" {
-				queue := toolIndexesByCallID[toolCallID]
-				for len(queue) > 0 {
-					candidate := queue[0]
-					queue = queue[1:]
-					if candidate >= 0 && candidate < len(matchedToolIndexes) && !matchedToolIndexes[candidate] {
-						idx = candidate
-						break
-					}
-				}
-				toolIndexesByCallID[toolCallID] = queue
-				if idx < 0 {
-					// Multiple persisted result events for one call (for example an
-					// agent-facing reduced result replacing an earlier preview) update
-					// that call instead of consuming an unrelated FIFO entry.
-					if previous, ok := lastMatchedToolIndexByCallID[toolCallID]; ok {
-						idx = previous
-					}
-				}
-			}
-			if idx < 0 && toolCallID != "" {
-				for nextUnmatchedToolIdx < len(matchedToolIndexes) && matchedToolIndexes[nextUnmatchedToolIdx] {
-					nextUnmatchedToolIdx++
-				}
-				if nextUnmatchedToolIdx < len(matchedToolIndexes) {
-					idx = nextUnmatchedToolIdx
-					nextUnmatchedToolIdx++
-				}
-			}
+			idx := matchToolExecutionIndex(
+				summary.ToolExecutions,
+				matchedToolIndexes,
+				toolCallID,
+				toolName,
+				toolIndexesByCallID,
+				lastMatchedToolIndexByCallID,
+			)
 			if idx >= 0 && idx < len(summary.ToolExecutions) {
 				matchedToolIndexes[idx] = true
 				if toolCallID != "" {
@@ -1648,6 +1612,8 @@ LIMIT 1`, messageID).Scan(&terminalEvent, &terminalCreatedAt)
 				summary.ToolExecutions[idx].ExecutionID = execID
 				if status != "" {
 					summary.ToolExecutions[idx].Status = status
+				} else {
+					summary.ToolExecutions[idx].Status = "completed"
 				}
 			} else {
 				summary.ToolExecutions = append(summary.ToolExecutions, ProcessDetailsToolExecution{
@@ -1702,6 +1668,82 @@ LIMIT 1`, messageID).Scan(&terminalEvent, &terminalCreatedAt)
 	summary.IterationCount = iterCount
 	summary.MaxIteration = maxIter
 	return summary, nil
+}
+
+func processDetailString(payload map[string]interface{}, key string) string {
+	if payload == nil {
+		return ""
+	}
+	v, ok := payload[key]
+	if !ok || v == nil {
+		return ""
+	}
+	s := strings.TrimSpace(fmt.Sprint(v))
+	if s == "" || s == "<nil>" {
+		return ""
+	}
+	return s
+}
+
+func toolResultStatusFromPayload(payload map[string]interface{}, eventType string) string {
+	if eventType != "tool_result" {
+		return ""
+	}
+	if status := processDetailString(payload, "status"); strings.EqualFold(status, "background_running") {
+		return "background_running"
+	}
+	if success, ok := payload["success"].(bool); ok {
+		if success {
+			return "completed"
+		}
+		return "failed"
+	}
+	if isErr, ok := payload["isError"].(bool); ok && isErr {
+		return "failed"
+	}
+	return "completed"
+}
+
+func matchToolExecutionIndex(
+	executions []ProcessDetailsToolExecution,
+	matched []bool,
+	toolCallID, toolName string,
+	toolIndexesByCallID map[string][]int,
+	lastMatchedToolIndexByCallID map[string]int,
+) int {
+	if toolCallID != "" {
+		queue := toolIndexesByCallID[toolCallID]
+		for len(queue) > 0 {
+			candidate := queue[0]
+			queue = queue[1:]
+			if candidate >= 0 && candidate < len(matched) && !matched[candidate] {
+				toolIndexesByCallID[toolCallID] = queue
+				return candidate
+			}
+		}
+		toolIndexesByCallID[toolCallID] = queue
+		if previous, ok := lastMatchedToolIndexByCallID[toolCallID]; ok {
+			return previous
+		}
+	}
+	if toolName != "" {
+		for i := range matched {
+			if matched[i] {
+				continue
+			}
+			if strings.EqualFold(strings.TrimSpace(executions[i].ToolName), toolName) {
+				return i
+			}
+		}
+	}
+	if toolCallID != "" {
+		for i := range matched {
+			if !matched[i] {
+				return i
+			}
+		}
+	}
+	return -1
 }
 
 // GetProcessDetailsPage 分页获取消息的过程详情（按时间升序）。

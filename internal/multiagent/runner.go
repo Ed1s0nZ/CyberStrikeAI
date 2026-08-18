@@ -908,8 +908,35 @@ func tryEmitToolCallsOnce(
 	if _, ok := seen[sig]; ok {
 		return
 	}
+	if idSig := toolCallsStableIDSignature(msg); idSig != "" {
+		idKey := agentName + "\x1eids\x1e" + idSig
+		if _, ok := seen[idKey]; ok {
+			return
+		}
+		seen[idKey] = struct{}{}
+	}
 	seen[sig] = struct{}{}
 	emitToolCallsFromMessage(msg, agentName, orchestratorName, conversationID, orchMode, progress, subAgentToolStep, mainAgentToolStep, markPending)
+}
+
+func toolCallsStableIDSignature(msg *schema.Message) string {
+	if msg == nil || len(msg.ToolCalls) == 0 {
+		return ""
+	}
+	visible := filterVisibleToolCallsForProgress(msg.ToolCalls)
+	ids := make([]string, 0, len(visible))
+	for _, tc := range visible {
+		id := strings.TrimSpace(tc.ID)
+		if id == "" {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return ""
+	}
+	sort.Strings(ids)
+	return strings.Join(ids, ";")
 }
 
 func emitToolCallsFromMessage(

@@ -443,22 +443,41 @@ func nextAgentEventWithContext(ctx context.Context, iter *adk.AsyncIterator[*adk
 
 // recvSchemaMessageStream 消费 ADK Tool 流式结果；ctx 取消时立即返回，避免 amass 等无输出时永久阻塞。
 func recvSchemaMessageStream(ctx context.Context, stream *schema.StreamReader[*schema.Message]) (content, toolCallID, toolName string, recvErr error) {
-	if stream == nil {
-		return "", "", "", nil
+	msgs, recvErr := recvSchemaToolResultMessages(ctx, stream)
+	if len(msgs) == 0 {
+		return "", "", "", recvErr
 	}
-	var buf strings.Builder
-	recvErr = recvEinoSchemaMessageStreamWithContext(ctx, stream, 8, func(chunk *schema.Message) {
-		if chunk.Content != "" {
-			buf.WriteString(chunk.Content)
+	parts := make([]string, 0, len(msgs))
+	for _, msg := range msgs {
+		if msg == nil {
+			continue
 		}
-		if tid := strings.TrimSpace(chunk.ToolCallID); tid != "" {
-			toolCallID = tid
+		parts = append(parts, msg.Content)
+		if id := strings.TrimSpace(msg.ToolCallID); id != "" {
+			toolCallID = id
 		}
-		if name := strings.TrimSpace(chunk.ToolName); name != "" {
+		if name := strings.TrimSpace(msg.ToolName); name != "" {
 			toolName = name
 		}
+	}
+	return strings.Join(parts, ""), toolCallID, toolName, recvErr
+}
+
+// recvSchemaToolResultMessages 先收齐 Tool 流，再用 Eino ConcatMessages 合并。
+// EventSender 一 call 一条流时走 ConcatMessages；并行结果被摊平进同一条流时按 CallID 分列再合并。
+func recvSchemaToolResultMessages(ctx context.Context, stream *schema.StreamReader[*schema.Message]) (msgs []*schema.Message, recvErr error) {
+	if stream == nil {
+		return nil, nil
+	}
+	var chunks []*schema.Message
+	recvErr = recvEinoSchemaMessageStreamWithContext(ctx, stream, 8, func(chunk *schema.Message) {
+		chunks = append(chunks, chunk)
 	})
-	return buf.String(), toolCallID, toolName, recvErr
+	msgs, concatErr := concatToolResultChunks(chunks)
+	if concatErr != nil && recvErr == nil {
+		return nil, concatErr
+	}
+	return msgs, recvErr
 }
 
 func buildEinoCheckpointID(orchMode string) string {

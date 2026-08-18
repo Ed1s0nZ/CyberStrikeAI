@@ -16,3 +16,10 @@ test('历史 process_details 合并时也会从 tool_result 补齐 tool_call 参
     assert.match(source, /targetDetail\.data\.argumentsObj = resultArgs;/);
     assert.match(source, /targetDetail\.data\.arguments = JSON\.stringify\(resultArgs\);/);
 });
+
+test('同一 toolCallId 的多次调用按 FIFO 合并结果，避免后一次覆盖导致结果记录缺失', () => {
+    const source = fs.readFileSync('web/static/js/monitor.js', 'utf8');
+    assert.match(source, /list\.push\(copy\)/);
+    assert.match(source, /const candidate = list\.shift\(\)/);
+    assert.match(source, /callName === resultName/);
+});

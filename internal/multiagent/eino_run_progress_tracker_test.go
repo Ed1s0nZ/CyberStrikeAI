@@ -98,6 +98,39 @@ func TestEinoRunProgressTrackerDedupesToolCalls(t *testing.T) {
 	}
 }
 
+func TestEinoRunProgressTrackerDedupesSameToolCallIDsWithDifferentArgs(t *testing.T) {
+	var toolCalls int
+	progress := func(eventType, _ string, _ interface{}) {
+		if eventType == "tool_call" {
+			toolCalls++
+		}
+	}
+	tracker := newEinoRunProgressTracker("deep", "lead", "conv-1", progress, nil, nil)
+	first := &schema.Message{ToolCalls: []schema.ToolCall{{
+		ID:   "call-1",
+		Type: "function",
+		Function: schema.FunctionCall{
+			Name:      "nmap",
+			Arguments: `{"host":"10.0.0.1"}`,
+		},
+	}}}
+	second := &schema.Message{ToolCalls: []schema.ToolCall{{
+		ID:   "call-1",
+		Type: "function",
+		Function: schema.FunctionCall{
+			Name:      "nmap",
+			Arguments: `{"host":"10.0.0.1","ports":"1-1024"}`,
+		},
+	}}}
+
+	tracker.EmitToolCalls(first, "lead", nil)
+	tracker.EmitToolCalls(second, "lead", nil)
+
+	if toolCalls != 1 {
+		t.Fatalf("tool call events = %d, want 1", toolCalls)
+	}
+}
+
 func TestEinoRunProgressTrackerHidesModelOutputRecoveryToolCalls(t *testing.T) {
 	var eventTypes []string
 	var marked []toolCallPendingInfo

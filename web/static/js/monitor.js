@@ -6255,20 +6255,43 @@ function coalesceProcessDetailsToolPairs(details) {
                 createdAt: detail.createdAt,
                 data: Object.assign({}, data)
             };
-            if (id) callsById.set(id, copy);
+            if (id) {
+                let list = callsById.get(id);
+                if (!list) {
+                    list = [];
+                    callsById.set(id, list);
+                }
+                list.push(copy);
+            }
             fifoCalls.push(copy);
             out.push(copy);
-        } else         if (et === 'tool_result') {
+        } else if (et === 'tool_result') {
             let target = null;
             if (id && callsById.has(id)) {
-                target = callsById.get(id);
-            } else {
+                const list = callsById.get(id);
+                while (list.length) {
+                    const candidate = list.shift();
+                    if (candidate && candidate.data && !candidate.data._mergedResult) {
+                        target = candidate;
+                        break;
+                    }
+                }
+            }
+            if (!target) {
+                const resultName = String(data.toolName || '').trim().toLowerCase();
+                let anyUnmatched = null;
                 for (let j = 0; j < fifoCalls.length; j++) {
                     const c = fifoCalls[j];
-                    if (c && c.data && !c.data._mergedResult) {
+                    if (!c || !c.data || c.data._mergedResult) continue;
+                    if (!anyUnmatched) anyUnmatched = c;
+                    const callName = String(c.data.toolName || '').trim().toLowerCase();
+                    if (!resultName || !callName || callName === resultName) {
                         target = c;
                         break;
                     }
+                }
+                if (!target && id) {
+                    target = anyUnmatched;
                 }
             }
             if (target) {
