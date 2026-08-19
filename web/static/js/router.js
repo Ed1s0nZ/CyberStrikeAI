@@ -18,6 +18,12 @@ function buildHashForPage(pageId) {
 
 let chatConversationFromHashSeq = 0;
 
+function cancelScheduledChatConversationFromHash() {
+    chatConversationFromHashSeq++;
+    setChatConversationRestorePending('', false);
+}
+window.cancelScheduledChatConversationFromHash = cancelScheduledChatConversationFromHash;
+
 function setChatConversationRestorePending(conversationId, pending) {
     const container = document.querySelector('.chat-container');
     if (!container) return;

@@ -251,7 +251,7 @@ test('多对话并发时释放隐藏主流且旧请求不能覆盖新对话状�
     assert.match(chat, /liveStream\.detached = true;[\s\S]{0,240}controller\.abort\(\)/);
     assert.match(chat, /const requestAbortController = new AbortController\(\)/);
     assert.match(chat, /signal: requestAbortController\.signal/);
-    assert.match(chat, /if \(!ownsLiveChatStream\(liveStreamState\) \|\| liveStreamState\.detached\)/);
+    assert.match(chat, /shouldIgnoreLiveChatStreamEvent\(liveStreamState\)/);
     assert.match(chat, /const clearedOwnedStream = clearLiveChatStreamIfOwned\(liveStreamState\)/);
     assert.match(chat, /detachLiveChatStreamForNavigation\(conversationId\)/);
     assert.match(chat, /detachLiveChatStreamForNavigation\('', true\)/);
@@ -264,7 +264,7 @@ test('多对话并发时释放隐藏主流且旧请求不能覆盖新对话状�
     assert.match(chat, /signal: conversationLoadController\.signal/);
     assert.match(template, /monitor\.js\?v=20260819-1/);
     assert.match(template, /chat-scroll\.js\?v=20260815-1/);
-    assert.match(template, /chat\.js\?v=20260818-3/);
+    assert.match(template, /chat\.js\?v=20260819-2/);
     assert.match(template, /style\.css\?v=20260818-3/);
 });
 

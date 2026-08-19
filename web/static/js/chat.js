@@ -10,8 +10,24 @@ function syncChatConversationHash(conversationId) {
     }
 }
 window.syncChatConversationHash = syncChatConversationHash;
+
+function clearChatConversationHash() {
+    if (window.location.hash.split('?')[0] !== '#chat' || window.location.hash === '#chat') return;
+    window.history.replaceState(null, '', '#chat');
+}
+window.clearChatConversationHash = clearChatConversationHash;
 let loadConversationRequestSeq = 0;
 let loadConversationAbortController = null;
+let chatConversationNavigationSeq = 0;
+
+function markChatConversationNavigation(nextConversationId, force = false) {
+    const nextId = String(nextConversationId || '').trim();
+    const visibleId = String(currentConversationId || '').trim();
+    if (force || nextId !== visibleId) {
+        chatConversationNavigationSeq++;
+    }
+    return chatConversationNavigationSeq;
+}
 
 /**
  * 轻量会话 LRU 缓存。
@@ -1754,6 +1770,18 @@ function ownsLiveChatStream(liveStream) {
     return !!liveStream && window.__csAgentLiveStream === liveStream;
 }
 
+function shouldIgnoreLiveChatStreamEvent(
+    liveStream,
+    activeLiveStream = window.__csAgentLiveStream,
+    navigationSeq = chatConversationNavigationSeq
+) {
+    return !liveStream ||
+        activeLiveStream !== liveStream ||
+        liveStream.active !== true ||
+        liveStream.detached === true ||
+        liveStream.navigationSeq !== navigationSeq;
+}
+
 function clearLiveChatStreamIfOwned(liveStream) {
     if (!ownsLiveChatStream(liveStream)) return false;
     liveStream.active = false;
@@ -2194,6 +2222,8 @@ async function sendMessage() {
     const input = document.getElementById('chat-input');
     let message = input.value.trim();
     const hasAttachments = chatAttachments && chatAttachments.length > 0;
+    const requestConversationId = currentConversationId;
+    const requestNavigationSeq = chatConversationNavigationSeq;
 
     if (!message && !hasAttachments) {
         return;
@@ -2238,6 +2268,12 @@ async function sendMessage() {
         message = CHAT_FILE_DEFAULT_PROMPT;
     }
 
+    // 发送前的任务状态/附件检查可能包含异步等待。若用户已主动切换会话，
+    // 保留当前页面，不再把这次尚未发出的请求写入新的可见对话。
+    if (requestNavigationSeq !== chatConversationNavigationSeq) {
+        return;
+    }
+
     // 显示用户消息（含附件名，便于用户确认）
     const displayMessage = hasAttachments
         ? message + '\n' + chatAttachments.map(a => '📎 ' + a.fileName).join('\n')
@@ -2273,7 +2309,7 @@ async function sendMessage() {
     // 构建请求体（含附件）
     const body = {
         message: message,
-        conversationId: currentConversationId,
+        conversationId: requestConversationId,
         role: typeof getCurrentRole === 'function' ? getCurrentRole() : ''
     };
     if (window.__csNextChatFinalizationPolicy && typeof window.__csNextChatFinalizationPolicy === 'object') {
@@ -2334,7 +2370,8 @@ async function sendMessage() {
         conversationId: streamConversationId || null,
         progressId: progressId,
         abortController: requestAbortController,
-        detached: false
+        detached: false,
+        navigationSeq: requestNavigationSeq
     };
     window.__csAgentLiveStream = liveStreamState;
     if (streamConversationId && typeof window.notifyConversationTaskStarted === 'function') {
@@ -2385,17 +2422,17 @@ async function sendMessage() {
                     if (streamConversationId && streamConversationId !== eventConvId) {
                         return;
                     }
-                    if (!streamConversationId && eventData.type === 'conversation') {
+                    if (!streamConversationId) {
                         streamConversationId = eventConvId;
                         liveStreamState.conversationId = eventConvId;
                         justBoundConversation = true;
-                        // 旧请求可能在用户切换对话后才收到 conversation 事件。
-                        // 只完成本地任务绑定，不允许它重新抢占当前对话或新的主流状态。
-                        if (!ownsLiveChatStream(liveStreamState) || liveStreamState.detached) {
-                            updateProgressConversation(progressId, eventConvId);
-                            return;
-                        }
                     }
+                }
+                // 切换对话后仍可能收到旧响应流中已缓冲的 conversation、response_start
+                // 或 response 事件。它们只能补齐后台任务归属，不能重新抢占当前对话。
+                if (shouldIgnoreLiveChatStreamEvent(liveStreamState)) {
+                    if (eventConvId) updateProgressConversation(progressId, eventConvId);
+                    return;
                 }
                 if (!justBoundConversation && !isStreamStillVisibleForRequest()) {
                     return;
@@ -5629,6 +5666,11 @@ async function startNewConversation(options = {}) {
     const requestedProjectId = hasExplicitProjectId
         ? String(options.projectId || '').trim()
         : String(inheritedProjectId || '').trim();
+    markChatConversationNavigation('', true);
+    if (typeof window.cancelScheduledChatConversationFromHash === 'function') {
+        window.cancelScheduledChatConversationFromHash();
+    }
+    clearChatConversationHash();
     cancelPendingConversationLoad();
     detachLiveChatStreamForNavigation('', true);
     if (typeof window.cancelRunningTaskEventStream === 'function') {
@@ -6074,6 +6116,10 @@ async function loadConversation(conversationId) {
     // router helper), so without this synchronization #chat loses the active
     // conversation and reload falls back to the welcome screen instead of
     // reconnecting the running task event stream.
+    markChatConversationNavigation(conversationId);
+    if (typeof window.cancelScheduledChatConversationFromHash === 'function') {
+        window.cancelScheduledChatConversationFromHash();
+    }
     syncChatConversationHash(conversationId);
     const seq = ++loadConversationRequestSeq;
     const previousConversationId = currentConversationId;
