@@ -20,7 +20,12 @@ func appendEinoAgenticChatModelTailMiddlewares(
 	handlers = append(handlers, newAgenticSystemMessageNormalizerMiddleware(cfg.logger, cfg.phase))
 	handlers = append(handlers, newAgenticContinuationUserDedupMiddleware(cfg.logger, cfg.phase))
 	if cfg.agenticSummarization != nil {
+		handlers = append(handlers, newAgenticToolPairReconcilerMiddleware(cfg.logger, cfg.phase+"_pre_summarization"))
 		handlers = append(handlers, cfg.agenticSummarization)
+	}
+	handlers = append(handlers, newAgenticToolPairReconcilerMiddleware(cfg.logger, cfg.phase))
+	if !cfg.skipOrphanPruner {
+		handlers = append(handlers, newAgenticOrphanToolPrunerMiddleware(cfg.logger, cfg.phase))
 	}
 	if !cfg.skipTrace && cfg.trace != nil {
 		if capMw := newAgenticModelFacingTraceMiddleware(cfg.trace); capMw != nil {
