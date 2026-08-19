@@ -46811,6 +46811,7 @@ html[data-theme="dark"] .chat-composer-surface > .chat-session-settings-popover 
     line-height: 1.5;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+    scrollbar-gutter: stable;
 }
 
 .hitl-approval-countdown {
@@ -46936,13 +46937,27 @@ html[data-theme="dark"] .chat-composer-surface > .chat-session-settings-popover 
     display: block;
     width: 100%;
     min-height: 158px;
-    padding: 18px 20px 16px;
+    max-height: min(62vh, 560px);
+    max-height: min(62dvh, 560px);
+    padding: 18px 20px 74px;
+    overflow: hidden;
+    overscroll-behavior: contain;
     border: 1px solid rgba(15, 23, 42, 0.14);
     border-radius: 24px;
     background: rgba(255, 255, 255, 0.985);
     box-shadow: 0 16px 40px rgba(15, 23, 42, 0.11), 0 2px 8px rgba(15, 23, 42, 0.05);
     box-sizing: border-box;
     outline: none;
+}
+
+.chat-hitl-approval-scroll-region {
+    min-height: 0;
+    max-height: max(76px, calc(min(62vh, 560px) - 94px));
+    max-height: max(76px, calc(min(62dvh, 560px) - 94px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scroll-padding-bottom: 12px;
+    scrollbar-gutter: stable;
 }
 
 .chat-hitl-approval-dock .hitl-codex-tool-row {
@@ -46958,8 +46973,12 @@ html[data-theme="dark"] .chat-composer-surface > .chat-session-settings-popover 
 }
 
 .chat-hitl-approval-dock .hitl-approval-heading h3 {
+    display: -webkit-box;
     max-width: 900px;
+    overflow: hidden;
     font-size: 1rem;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
 }
 
 .chat-hitl-approval-dock .hitl-inline-body {
@@ -46968,13 +46987,28 @@ html[data-theme="dark"] .chat-composer-surface > .chat-session-settings-popover 
     padding: 0;
 }
 
+.chat-hitl-approval-dock .hitl-edit-args {
+    max-height: min(28vh, 220px);
+    max-height: min(28dvh, 220px);
+    overflow: auto;
+    resize: vertical;
+}
+
 .chat-hitl-approval-dock .hitl-inline-actions {
+    position: absolute;
+    right: 20px;
+    bottom: 16px;
+    left: 20px;
+    z-index: 2;
+    min-height: 48px;
     justify-content: flex-end;
     gap: 8px;
-    margin-top: 12px;
-    padding: 0;
+    margin-top: 0;
+    padding: 10px 0 0;
     border: 0;
-    background: transparent;
+    border-top: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+    background: rgba(255, 255, 255, 0.985);
+    box-shadow: none;
 }
 
 .chat-hitl-approval-dock .hitl-inline-status {
@@ -47010,8 +47044,9 @@ html[data-theme="dark"] .chat-hitl-approval-dock {
 }
 
 html[data-theme="dark"] .chat-hitl-approval-dock .hitl-inline-actions {
-    border-color: transparent !important;
-    background: transparent !important;
+    border-color: color-mix(in srgb, var(--border-color) 70%, transparent) !important;
+    background: color-mix(in srgb, var(--bg-primary) 97%, transparent) !important;
+    box-shadow: none;
 }
 
 html[data-theme="dark"] .hitl-approval-primary code,
@@ -47136,8 +47171,13 @@ html[data-theme="dark"] .hitl-inline-approval.hitl-inline-approval--merged {
     }
 
     .chat-hitl-approval-dock {
-        padding: 16px;
+        padding: 16px 16px 116px;
         border-radius: 18px;
+    }
+
+    .chat-hitl-approval-scroll-region {
+        max-height: max(76px, calc(min(62vh, 560px) - 134px));
+        max-height: max(76px, calc(min(62dvh, 560px) - 134px));
     }
 
     .chat-hitl-approval-dock .hitl-approval-heading,
@@ -47149,6 +47189,9 @@ html[data-theme="dark"] .hitl-inline-approval.hitl-inline-approval--merged {
     }
 
     .chat-hitl-approval-dock .hitl-inline-actions {
+        right: 16px;
+        bottom: 16px;
+        left: 16px;
         flex-wrap: wrap;
     }
 

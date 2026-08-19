@@ -469,7 +469,7 @@ test('刷新指定对话时立即恢复且加载完成前不闪出无项目状�
     assert.match(css, /\.chat-container\.is-conversation-restoring #chat-messages/);
     assert.match(css, /\.chat-container\.is-conversation-restoring #chat-input-container/);
     assert.match(html, /router\.js\?v=20260819-3/);
-    assert.match(html, /chat\.js\?v=20260819-4/);
+    assert.match(html, /chat\.js\?v=20260819-5/);
 });
 
 test('刷新运行中回复会复用已持久化 planning 并继续追加未来增量', () => {
@@ -533,5 +533,5 @@ test('暗色模式对话三点悬浮不会触发浅色父行背景', () => {
     const css = fs.readFileSync('web/static/css/style.css', 'utf8');
     assert.match(css, /html\[data-theme="dark"\] \.project-conversation-row:hover \.project-conversation-item/);
     assert.match(css, /html\[data-theme="dark"\] \.project-folder-action:hover,[\s\S]*?background: rgba\(71, 85, 105, 0\.28\);[\s\S]*?box-shadow: none;/);
-    assert.match(html, /style\.css\?v=20260818-3/);
+    assert.match(html, /style\.css\?v=20260819-4/);
 });

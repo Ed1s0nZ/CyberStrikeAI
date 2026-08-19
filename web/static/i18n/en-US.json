@@ -878,6 +878,8 @@
     "approvalUrgencyWithinOne": "Earliest approval expires within 1 minute",
     "requestGeneric": "Allow CyberStrikeAI to call {{tool}}?",
     "requestVisitUrl": "Allow CyberStrikeAI to visit {{url}}?",
+    "requestVisitLongUrl": "Allow CyberStrikeAI to visit this address?",
+    "requestModifyLongPath": "Allow CyberStrikeAI to modify this file?",
     "requestBrowser": "Allow CyberStrikeAI to use the browser?",
     "requestCommand": "Allow CyberStrikeAI to run this command?",
     "requestFile": "Allow CyberStrikeAI to modify {{path}}?",

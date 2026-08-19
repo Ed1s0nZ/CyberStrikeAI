@@ -22,6 +22,35 @@ test('输入区提供独立审批入口并暴露可配置等待时限', () => {
     assert.match(chat, /body\.hitl = \{[\s\S]*?timeoutSeconds: normalizeHitlTimeoutForChat\(hitlCfg\.timeoutSeconds/);
 });
 
+test('超长人工审批内容在限高区域内滚动且操作按钮始终可见', () => {
+    assert.match(styles, /\.chat-hitl-approval-dock \{[\s\S]*?max-height: min\(62dvh, 560px\);[\s\S]*?padding: 18px 20px 74px;[\s\S]*?overflow: hidden;/);
+    assert.match(styles, /\.chat-hitl-approval-scroll-region \{[\s\S]*?max-height: max\(76px, calc\(min\(62dvh, 560px\) - 94px\)\);[\s\S]*?overflow-y: auto;[\s\S]*?overscroll-behavior: contain;/);
+    assert.match(styles, /\.chat-hitl-approval-dock \.hitl-edit-args \{[\s\S]*?max-height: min\(28dvh, 220px\);[\s\S]*?overflow: auto;/);
+    assert.match(styles, /\.chat-hitl-approval-dock \.hitl-inline-actions \{[\s\S]*?position: absolute;[\s\S]*?bottom: 16px;[\s\S]*?box-shadow: none;/);
+    assert.match(styles, /\.chat-hitl-approval-dock \.hitl-approval-heading h3 \{[\s\S]*?-webkit-line-clamp: 3;/);
+    assert.match(monitor, /function wrapChatHitlApprovalScrollRegion\(dock\)/);
+    assert.match(monitor, /while \(dock\.firstChild && dock\.firstChild !== actions\)/);
+    assert.match(monitor, /wrapChatHitlApprovalScrollRegion\(dock\);/);
+    assert.match(monitor, /url\.length > 160[\s\S]*?requestVisitLongUrl/);
+    assert.equal(zh.hitl.requestVisitLongUrl, '允许 CyberStrikeAI 访问此地址？');
+    assert.equal(en.hitl.requestVisitLongUrl, 'Allow CyberStrikeAI to visit this address?');
+});
+
+test('刷新恢复会话时先完成权威审批配置同步再允许发送', () => {
+    assert.match(chat, /function waitForHitlConfigReady\(conversationId\)/);
+    assert.match(chat, /await waitForHitlConfigReady\(hitlConversationAtSendStart\)/);
+    assert.match(chat, /hitlConfigSyncConversationId = conversationId;[\s\S]{0,240}await hitlConfigSyncPromise;/);
+    assert.match(chat, /await hitlConfigSyncPromise;[\s\S]{0,220}seq !== loadConversationRequestSeq/);
+    assert.match(fs.readFileSync('web/static/js/hitl.js', 'utf8'), /window\.csaiHitlDefaultReviewerReady = initHitlDefaultReviewerFromServer\(\)/);
+});
+
+test('同一会话的审批配置写入串行化以防止旧请求后到覆盖新选择', () => {
+    const hitlPage = fs.readFileSync('web/static/js/hitl.js', 'utf8');
+    assert.match(hitlPage, /const hitlConversationConfigSaveQueues = new Map\(\)/);
+    assert.match(hitlPage, /const previous = hitlConversationConfigSaveQueues\.get\(normalizedConversationId\) \|\| Promise\.resolve\(\)/);
+    assert.match(hitlPage, /const queued = previous\.catch\(function \(\) \{\}\)\.then\(async function \(\)/);
+});
+
 test('输入框可按会话通道获取模型并双向同步会话推理且审批模型只出现在审计 Agent 入口', () => {
     assert.match(chat, /function currentSystemModelLabel\(\)/);
     assert.match(chat, /chatDefaultAIChannel \? chatAIChannels\[chatDefaultAIChannel\]/);
@@ -264,8 +293,8 @@ test('多对话并发时释放隐藏主流且旧请求不能覆盖新对话状�
     assert.match(chat, /signal: conversationLoadController\.signal/);
     assert.match(template, /monitor\.js\?v=20260819-3/);
     assert.match(template, /chat-scroll\.js\?v=20260815-1/);
-    assert.match(template, /chat\.js\?v=20260819-4/);
-    assert.match(template, /style\.css\?v=20260818-3/);
+    assert.match(template, /chat\.js\?v=20260819-5/);
+    assert.match(template, /style\.css\?v=20260819-4/);
 });
 
 test('彻底停止始终使用弹窗锁定的会话且状态刷新后仍会取消', () => {
