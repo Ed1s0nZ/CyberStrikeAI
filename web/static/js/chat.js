@@ -30,6 +30,21 @@ function markChatConversationNavigation(nextConversationId, force = false) {
 }
 
 /**
+ * 离开聊天页时立即让尚在初始化的发送请求失去页面所有权。
+ * 后端任务仍会继续执行；这里只中止浏览器前台流，避免首个 conversation
+ * 事件在用户已经切到其他页面后再次抢占当前会话。
+ */
+function abandonChatConversationForPageNavigation() {
+    markChatConversationNavigation('', true);
+    if (typeof window.cancelScheduledChatConversationFromHash === 'function') {
+        window.cancelScheduledChatConversationFromHash();
+    }
+    cancelPendingConversationLoad();
+    detachLiveChatStreamForNavigation('', true);
+}
+window.abandonChatConversationForPageNavigation = abandonChatConversationForPageNavigation;
+
+/**
  * 轻量会话 LRU 缓存。
  *
  * 缓存只用作请求失败时的降级数据，不能先于服务端响应直接渲染：
@@ -5795,7 +5810,8 @@ function createConversationListItem(conversation) {
     item.onclick = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        loadConversation(conversation.id);
+        const targetConversationId = String(item.dataset.conversationId || '').trim();
+        if (targetConversationId) loadConversation(targetConversationId);
     };
     return item;
 }
@@ -10111,7 +10127,8 @@ function createConversationListItemWithMenu(conversation, isPinned) {
         if (currentGroupId) {
             exitGroupDetail();
         }
-        loadConversation(conversation.id);
+        const targetConversationId = String(item.dataset.conversationId || '').trim();
+        if (targetConversationId) loadConversation(targetConversationId);
     };
 
     return item;

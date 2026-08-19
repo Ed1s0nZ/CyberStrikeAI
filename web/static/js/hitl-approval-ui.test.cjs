@@ -262,10 +262,22 @@ test('多对话并发时释放隐藏主流且旧请求不能覆盖新对话状�
     assert.match(chat, /let loadConversationAbortController = null/);
     assert.match(chat, /cancelPendingConversationLoad\(\);[\s\S]{0,220}const conversationLoadController = new AbortController\(\)/);
     assert.match(chat, /signal: conversationLoadController\.signal/);
-    assert.match(template, /monitor\.js\?v=20260819-1/);
+    assert.match(template, /monitor\.js\?v=20260819-2/);
     assert.match(template, /chat-scroll\.js\?v=20260815-1/);
-    assert.match(template, /chat\.js\?v=20260819-2/);
+    assert.match(template, /chat\.js\?v=20260819-3/);
     assert.match(template, /style\.css\?v=20260818-3/);
+});
+
+test('彻底停止始终使用弹窗锁定的会话且状态刷新后仍会取消', () => {
+    const start = monitor.indexOf("async function performHardCancelProgressTask(progressId, conversationId = '')");
+    const end = monitor.indexOf('function progressElapsedText(', start);
+    assert.notEqual(start, -1);
+    assert.notEqual(end, -1);
+    const hardCancelSource = monitor.slice(start, end);
+    assert.match(monitor, /performHardCancelProgressTask\(progressId, conversationId\)/);
+    assert.match(hardCancelSource, /const targetConversationId = String\(conversationId \|\| \(state && state\.conversationId\) \|\| ''\)\.trim\(\)/);
+    assert.match(hardCancelSource, /await requestCancel\(targetConversationId\)/);
+    assert.doesNotMatch(hardCancelSource, /if \(!state \|\| !state\.conversationId\)/);
 });
 
 test('输入区 Agent 审查文字保留足够行高且不会裁切字形', () => {
@@ -310,7 +322,7 @@ test('审批状态主动轮询并在服务不可用时立即关闭旧审批', ()
     assert.match(monitor, /renderActiveTasks\(\[\]\);[\s\S]{0,260}hitlPendingInterruptTracker\.update\(\[\]\)/);
     assert.match(projects, /function syncProjectConversationApprovalStatuses\(items\)/);
     assert.match(projects, /window\.syncProjectConversationApprovalStatuses/);
-    assert.match(template, /projects\.js\?v=20260812-6/);
+    assert.match(template, /projects\.js\?v=20260819-1/);
 });
 
 test('旧会话首次升级到五分钟默认审批时限，仍允许用户之后主动选择不限时', () => {

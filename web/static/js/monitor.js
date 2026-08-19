@@ -1433,7 +1433,7 @@ async function submitUserInterruptHardCancel() {
     const { progressId, conversationId } = userInterruptModalPending;
     closeUserInterruptModal();
     if (progressId) {
-        await performHardCancelProgressTask(progressId);
+        await performHardCancelProgressTask(progressId, conversationId);
         return;
     }
     if (!conversationId) {
@@ -1449,11 +1449,12 @@ async function submitUserInterruptHardCancel() {
 }
 
 /** 彻底停止任务（原「停止任务」行为） */
-async function performHardCancelProgressTask(progressId) {
+async function performHardCancelProgressTask(progressId, conversationId = '') {
     const state = progressTaskState.get(progressId);
     const stopBtn = document.getElementById(`${progressId}-stop-btn`);
+    const targetConversationId = String(conversationId || (state && state.conversationId) || '').trim();
 
-    if (!state || !state.conversationId) {
+    if (!targetConversationId) {
         if (stopBtn) {
             stopBtn.disabled = true;
             setTimeout(() => {
@@ -1464,7 +1465,7 @@ async function performHardCancelProgressTask(progressId) {
         return;
     }
 
-    if (state.cancelling) {
+    if (state && state.cancelling) {
         return;
     }
 
@@ -1475,7 +1476,7 @@ async function performHardCancelProgressTask(progressId) {
     }
 
     try {
-        await requestCancel(state.conversationId);
+        await requestCancel(targetConversationId);
         loadActiveTasks();
     } catch (error) {
         console.error('取消任务失败:', error);

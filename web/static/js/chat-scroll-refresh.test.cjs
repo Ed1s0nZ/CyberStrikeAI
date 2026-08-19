@@ -6,6 +6,7 @@ const vm = require('node:vm');
 const scroll = fs.readFileSync('web/static/js/chat-scroll.js', 'utf8');
 const monitor = fs.readFileSync('web/static/js/monitor.js', 'utf8');
 const chat = fs.readFileSync('web/static/js/chat.js', 'utf8');
+const projects = fs.readFileSync('web/static/js/projects.js', 'utf8');
 const router = fs.readFileSync('web/static/js/router.js', 'utf8');
 const auth = fs.readFileSync('web/static/js/auth.js', 'utf8');
 const webshell = fs.readFileSync('web/static/js/webshell.js', 'utf8');
@@ -340,7 +341,7 @@ test('消息气泡内部流式增高时仅在跟随模式继续粘底', () => {
 
 test('页面在任务补流脚本之前加载智能滚动控制器', () => {
     const scrollIndex = html.indexOf('/static/js/chat-scroll.js?v=20260815-1');
-    const monitorIndex = html.indexOf('/static/js/monitor.js?v=20260819-1');
+    const monitorIndex = html.indexOf('/static/js/monitor.js?v=20260819-2');
 
     assert.notEqual(scrollIndex, -1);
     assert.notEqual(monitorIndex, -1);
@@ -437,6 +438,12 @@ test('新对话初始化期间切换会话后旧流事件不能把页面拉回',
     assert.match(newConversationSource, /markChatConversationNavigation\('', true\)/);
     assert.match(newConversationSource, /clearChatConversationHash\(\)/);
     assert.match(router, /function cancelScheduledChatConversationFromHash\(\)[\s\S]{0,160}chatConversationFromHashSeq\+\+/);
+    assert.match(chat, /function abandonChatConversationForPageNavigation\(\)[\s\S]{0,260}markChatConversationNavigation\('', true\)/);
+    assert.match(chat, /abandonChatConversationForPageNavigation\(\)[\s\S]{0,420}detachLiveChatStreamForNavigation\('', true\)/);
+    assert.match(router, /currentPage === 'chat'[\s\S]{0,140}window\.abandonChatConversationForPageNavigation\(\)/);
+    assert.match(chat, /const targetConversationId = String\(item\.dataset\.conversationId \|\| ''\)\.trim\(\);[\s\S]{0,80}loadConversation\(targetConversationId\)/);
+    assert.match(projects, /const targetConversationId = String\(event\.currentTarget && event\.currentTarget\.dataset\.conversationId \|\| ''\)\.trim\(\)/);
+    assert.match(projects, /window\.loadConversation\(targetConversationId\)/);
 });
 
 test('刷新指定对话时立即恢复且加载完成前不闪出无项目状态', () => {
@@ -453,8 +460,8 @@ test('刷新指定对话时立即恢复且加载完成前不闪出无项目状�
     assert.match(loadSource, /finally \{[\s\S]*?finishChatConversationRestore\(conversationId\)/);
     assert.match(css, /\.chat-container\.is-conversation-restoring #chat-messages/);
     assert.match(css, /\.chat-container\.is-conversation-restoring #chat-input-container/);
-    assert.match(html, /router\.js\?v=20260819-2/);
-    assert.match(html, /chat\.js\?v=20260819-2/);
+    assert.match(html, /router\.js\?v=20260819-3/);
+    assert.match(html, /chat\.js\?v=20260819-3/);
 });
 
 test('刷新运行中回复会复用已持久化 planning 并继续追加未来增量', () => {

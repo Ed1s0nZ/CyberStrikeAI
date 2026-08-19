@@ -129,6 +129,9 @@ function switchPage(pageId) {
     if (!targetPage) return;
     if (pageId !== 'chat') {
         setChatConversationRestorePending('', false);
+        if (currentPage === 'chat' && typeof window.abandonChatConversationForPageNavigation === 'function') {
+            window.abandonChatConversationForPageNavigation();
+        }
     }
 
     // 导航点击会修改 hash，随后浏览器还会触发 hashchange。
