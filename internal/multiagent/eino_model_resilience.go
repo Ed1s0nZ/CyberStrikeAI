@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"cyberstrike-ai/internal/config"
+	"cyberstrike-ai/internal/llm"
 	"cyberstrike-ai/internal/openai"
 	"cyberstrike-ai/internal/reasoning"
 
@@ -49,7 +50,7 @@ func newEinoBaseHTTPClient() *http.Client {
 	}
 }
 
-func newEinoOpenAIChatModelFactory(
+func newEinoToolCallingChatModelFactory(
 	baseHTTPClient *http.Client,
 	reasoningClient *reasoning.ClientIntent,
 	logger *zap.Logger,
@@ -58,6 +59,13 @@ func newEinoOpenAIChatModelFactory(
 		baseHTTPClient = newEinoBaseHTTPClient()
 	}
 	return func(ctx context.Context, oa config.OpenAIConfig, mode einoModelMode) (model.ToolCallingChatModel, error) {
+		if isEinoAgenticClaudeProvider(oa.Provider) {
+			nativeModel, err := newEinoClaudeAgenticChatModel(ctx, oa, mode, baseHTTPClient, reasoningClient)
+			if err != nil {
+				return nil, err
+			}
+			return newAgenticToolCallingChatModelAdapter(nativeModel), nil
+		}
 		httpClient := openai.NewEinoHTTPClient(&oa, baseHTTPClient)
 		openai.AttachSummarizationDiagTransport(httpClient, logger)
 		maxCompletionTokens := oa.MaxCompletionTokensEffective()
@@ -81,7 +89,7 @@ func newEinoOpenAIChatModelFactory(
 	}
 }
 
-func newEinoOpenAIAgenticChatModelFactory(
+func newEinoAgenticChatModelFactory(
 	baseHTTPClient *http.Client,
 	reasoningClient *reasoning.ClientIntent,
 	logger *zap.Logger,
@@ -90,8 +98,11 @@ func newEinoOpenAIAgenticChatModelFactory(
 		baseHTTPClient = newEinoBaseHTTPClient()
 	}
 	return func(ctx context.Context, oa config.OpenAIConfig, mode einoModelMode) (model.AgenticModel, error) {
-		if !supportsEinoAgenticOpenAIBackend(oa) {
-			return nil, fmt.Errorf("eino agentic model: provider %q is not enabled for agenticopenai backend", strings.TrimSpace(oa.Provider))
+		if !supportsEinoAgenticBackend(oa) {
+			return nil, fmt.Errorf("eino agentic model: provider %q is not supported", strings.TrimSpace(oa.Provider))
+		}
+		if isEinoAgenticClaudeProvider(oa.Provider) {
+			return newEinoClaudeAgenticChatModel(ctx, oa, mode, baseHTTPClient, reasoningClient)
 		}
 		httpClient := openai.NewEinoHTTPClient(&oa, baseHTTPClient)
 		openai.AttachSummarizationDiagTransport(httpClient, logger)
@@ -111,9 +122,36 @@ func newEinoOpenAIAgenticChatModelFactory(
 	}
 }
 
-func supportsEinoAgenticOpenAIBackend(oa config.OpenAIConfig) bool {
+func newEinoClaudeAgenticChatModel(
+	ctx context.Context,
+	oa config.OpenAIConfig,
+	mode einoModelMode,
+	httpClient *http.Client,
+	reasoningClient *reasoning.ClientIntent,
+) (model.AgenticModel, error) {
+	extraFields := reasoning.AgenticOpenAIExtraFields(&oa, reasoningClient)
+	if mode == einoModelModePlanner {
+		extraFields = reasoning.AgenticOpenAIPlannerExtraFields(&oa)
+	}
+	return llm.NewClaudeAgenticModel(
+		ctx,
+		oa,
+		httpClient,
+		oa.MaxCompletionTokensEffective(),
+		extraFields,
+	)
+}
+
+func supportsEinoAgenticBackend(oa config.OpenAIConfig) bool {
 	provider := strings.ToLower(strings.TrimSpace(oa.Provider))
-	return provider == "" || provider == "openai" || provider == "openai_compatible"
+	return provider == "" ||
+		provider == "openai" ||
+		provider == "openai_compatible" ||
+		isEinoAgenticClaudeProvider(provider)
+}
+
+func isEinoAgenticClaudeProvider(provider string) bool {
+	return llm.IsClaudeProvider(provider)
 }
 
 func agenticModelGateFactory(factory einoAgenticModelConfigFactory, oa config.OpenAIConfig, mode einoModelMode) einoAgenticModelFactory {

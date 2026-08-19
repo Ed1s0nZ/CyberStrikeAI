@@ -2,7 +2,6 @@ package multiagent
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"sync/atomic"
 
@@ -45,9 +44,16 @@ func (b *einoTurnLoopEventBridge) OnAgentEvents(
 		if ev == nil {
 			continue
 		}
-		if ev.Err != nil && isEinoTurnLoopPreemptCancel(tc, ev.Err) {
-			b.emitPreempted()
-			continue
+		if ev.Err != nil && isEinoVoluntaryCancelErr(ev.Err) {
+			// TurnLoop owns cancel routing. Returning CancelError /
+			// ErrStreamCanceled from OnAgentEvents aborts the whole loop and
+			// races with the Preempted signal becoming observable. A preempt
+			// must return nil so the queued user supplement can start the next
+			// turn; a terminal stop is surfaced through TurnLoopExitState.
+			if isEinoTurnLoopPreemptCancel(tc, ev.Err) {
+				b.emitPreempted()
+			}
+			return nil
 		}
 		if b.gen != nil {
 			b.gen.Send(ev)
@@ -79,11 +85,7 @@ func (b *einoTurnLoopEventBridge) emitPreempted() {
 }
 
 func isEinoTurnLoopPreemptCancel(tc *adk.TurnContext[EinoTurnLoopItem, *schema.Message], err error) bool {
-	if tc == nil || err == nil {
-		return false
-	}
-	var cancelErr *adk.CancelError
-	if !errors.As(err, &cancelErr) {
+	if tc == nil || !isEinoVoluntaryCancelErr(err) {
 		return false
 	}
 	select {

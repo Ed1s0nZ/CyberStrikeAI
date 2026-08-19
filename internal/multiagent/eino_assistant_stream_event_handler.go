@@ -2,7 +2,6 @@ package multiagent
 
 import (
 	"context"
-	"errors"
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/schema"
@@ -139,7 +138,7 @@ func (h *einoAssistantStreamEventHandler) Handle(mv *adk.MessageVariant, agentNa
 			streamUsage = maxEinoTokenUsage(streamUsage, chunk.ResponseMeta.Usage)
 		}
 	})
-	if recvErr != nil && !errors.Is(recvErr, context.Canceled) && h.logger != nil {
+	if recvErr != nil && !isEinoVoluntaryCancelErr(recvErr) && h.logger != nil {
 		h.logger.Warn("eino stream recv error, flushing incomplete stream",
 			zap.Error(recvErr),
 			zap.String("agent", agentName),

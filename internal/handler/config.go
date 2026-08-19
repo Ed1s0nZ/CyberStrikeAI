@@ -18,11 +18,13 @@ import (
 	"cyberstrike-ai/internal/config"
 	"cyberstrike-ai/internal/database"
 	"cyberstrike-ai/internal/knowledge"
+	"cyberstrike-ai/internal/llm"
 	"cyberstrike-ai/internal/mcp"
 	"cyberstrike-ai/internal/mcp/builtin"
 	"cyberstrike-ai/internal/openai"
 	"cyberstrike-ai/internal/security"
 
+	"github.com/cloudwego/eino/schema"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
@@ -1216,7 +1218,7 @@ func (h *ConfigHandler) TestOpenAI(c *gin.Context) {
 		"max_completion_tokens": 5,
 	}
 
-	// 使用内部 openai Client 进行测试，若 provider 为 claude 会自动走桥接层
+	// OpenAI-compatible 通道使用内部客户端；Claude 通道在下方直接使用 Eino agenticclaude。
 	tmpCfg := &config.OpenAIConfig{
 		Provider: req.Provider,
 		BaseURL:  baseURL,
@@ -1229,6 +1231,28 @@ func (h *ConfigHandler) TestOpenAI(c *gin.Context) {
 	defer cancel()
 
 	start := time.Now()
+	if llm.IsClaudeProvider(req.Provider) {
+		nativeModel, err := llm.NewClaudeAgenticModel(ctx, *tmpCfg, nil, 5, nil)
+		if err == nil {
+			_, err = nativeModel.Generate(ctx, []*schema.AgenticMessage{
+				schema.UserAgenticMessage("Hi"),
+			})
+		}
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"error":   "连接失败: " + err.Error(),
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"success":    true,
+			"model":      tmpCfg.Model,
+			"latency_ms": time.Since(start).Milliseconds(),
+		})
+		return
+	}
+
 	var chatResp struct {
 		ID      string `json:"id"`
 		Object  string `json:"object"`

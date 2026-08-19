@@ -31,7 +31,7 @@
             }
         })();
     </script>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260815-2">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260818-3">
     <link rel="stylesheet" href="/static/css/chat-plan-progress.css?v=20260813-4">
     <link rel="stylesheet" href="/static/css/c2.css">
     <link rel="stylesheet" href="/static/vendor/xterm.css">
@@ -1025,39 +1025,8 @@
                                     </span>
                                 </button>
                                 <div id="conversation-reasoning-body" class="conversation-reasoning-body" role="region">
-                                    <p class="chat-reasoning-panel-hint" data-i18n="chat.sessionSettingsHint">AI 通道、推理设置与人机协同只影响后续消息。</p>
+                                    <p class="chat-reasoning-panel-hint" data-i18n="chat.sessionSettingsHint">人机协同设置只影响后续消息。</p>
                                     <div class="chat-reasoning-fields">
-                                        <div class="session-settings-group session-settings-group-ai">
-                                            <div class="session-settings-group-title">AI</div>
-                                            <div class="chat-reasoning-field">
-                                                <label class="chat-reasoning-field-label" for="chat-ai-channel-select"><span data-i18n="chat.aiChannelLabel">AI 通道</span></label>
-                                                <select id="chat-ai-channel-select" class="chat-reasoning-select" onchange="persistChatAIChannelPref()">
-                                                    <option value="" data-i18n="chat.aiChannelDefault">跟随默认通道</option>
-                                                </select>
-                                            </div>
-                                            <div class="session-settings-inline">
-                                                <div class="chat-reasoning-field">
-                                                    <label class="chat-reasoning-field-label" for="chat-reasoning-mode"><span data-i18n="chat.reasoningModeLabel">模式</span></label>
-                                                    <select id="chat-reasoning-mode" class="chat-reasoning-select" onchange="persistChatReasoningPrefs()">
-                                                        <option value="default" data-i18n="chat.reasoningModeDefault">跟随系统</option>
-                                                        <option value="off" data-i18n="chat.reasoningModeOff">关闭</option>
-                                                        <option value="on" data-i18n="chat.reasoningModeOn">开启</option>
-                                                        <option value="auto" data-i18n="chat.reasoningModeAuto">自动</option>
-                                                    </select>
-                                                </div>
-                                                <div class="chat-reasoning-field">
-                                                    <label class="chat-reasoning-field-label" for="chat-reasoning-effort"><span data-i18n="chat.reasoningEffortLabel">推理强度</span></label>
-                                                    <select id="chat-reasoning-effort" class="chat-reasoning-select" onchange="persistChatReasoningPrefs()">
-                                                        <option value="" data-i18n="chat.reasoningEffortUnset">不指定</option>
-                                                        <option value="low">low</option>
-                                                        <option value="medium">medium</option>
-                                                        <option value="high">high</option>
-                                                        <option value="xhigh">xhigh</option>
-                                                        <option value="max">max</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                        </div>
 	                                        <div class="chat-reasoning-field session-hitl-field session-settings-group">
 	                                            <div class="session-settings-group-title" data-i18n="chat.hitlTitle">人机协同</div>
 	                                            <div id="hitl-apply-feedback" class="hitl-apply-feedback" role="status" aria-live="polite"></div>
@@ -1332,20 +1301,54 @@
                                         </button>
                                     </div>
                                     <div class="chat-composer-footer-trailing">
+                                        <div class="chat-ai-session-state" hidden>
+                                            <select id="chat-ai-channel-select" onchange="persistChatAIChannelPref()">
+                                                <option value="" data-i18n="chat.aiChannelDefault">跟随默认通道</option>
+                                            </select>
+                                            <select id="chat-reasoning-mode" onchange="persistChatReasoningPrefs()">
+                                                <option value="default" data-i18n="chat.reasoningModeDefault">跟随系统</option>
+                                                <option value="off" data-i18n="chat.reasoningModeOff">关闭</option>
+                                                <option value="on" data-i18n="chat.reasoningModeOn">开启</option>
+                                                <option value="auto" data-i18n="chat.reasoningModeAuto">自动</option>
+                                            </select>
+                                            <select id="chat-reasoning-effort" onchange="persistChatReasoningPrefs()">
+                                                <option value="" data-i18n="chat.reasoningEffortUnset">不指定</option>
+                                                <option value="low">low</option>
+                                                <option value="medium">medium</option>
+                                                <option value="high">high</option>
+                                                <option value="xhigh">xhigh</option>
+                                                <option value="max">max</option>
+                                            </select>
+                                        </div>
                                         <div id="chat-model-shortcut-wrap" class="chat-model-shortcut-wrap">
-                                            <button type="button" id="chat-model-shortcut" class="chat-session-shortcut chat-session-meta" onclick="openChatSystemModelPicker(event)" data-i18n="chat.modelSettingsAria" data-i18n-attr="aria-label,title" data-i18n-skip-text="true" aria-label="选择模型与推理强度" title="选择模型与推理强度" aria-haspopup="dialog" aria-expanded="false" aria-controls="chat-system-model-menu">
+                                            <button type="button" id="chat-model-shortcut" class="chat-session-shortcut chat-session-meta" onclick="openChatSystemModelPicker(event)" data-i18n="chat.modelSettingsAria" data-i18n-attr="aria-label,title" data-i18n-skip-text="true" aria-label="选择 AI 通道、模型与推理设置" title="选择 AI 通道、模型与推理设置" aria-haspopup="dialog" aria-expanded="false" aria-controls="chat-system-model-menu">
                                                 <span id="chat-model-shortcut-text">默认通道</span>
                                                 <span id="chat-model-shortcut-effort" class="chat-model-shortcut-effort">不指定</span>
                                                 <svg class="chat-system-model-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                                     <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                                                 </svg>
                                             </button>
-                                            <div id="chat-system-model-menu" class="chat-system-model-menu" role="dialog" aria-label="模型与推理强度" hidden>
+                                            <div id="chat-system-model-menu" class="chat-system-model-menu" role="dialog" aria-label="AI 通道、模型与推理设置" hidden>
                                                 <div id="chat-system-model-main" class="chat-system-model-main">
+                                                    <button type="button" class="chat-system-model-setting-row" onclick="openChatSystemModelView('channel', event)">
+                                                        <span class="chat-system-model-setting-label" data-i18n="chat.aiChannelLabel">AI 通道</span>
+                                                        <span class="chat-system-model-setting-value">
+                                                            <span id="chat-system-model-channel-value">默认通道</span>
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                                        </span>
+                                                    </button>
                                                     <button type="button" class="chat-system-model-setting-row" onclick="openChatSystemModelView('model', event)">
                                                         <span class="chat-system-model-setting-label" data-i18n="chat.systemModelField">模型</span>
                                                         <span class="chat-system-model-setting-value">
                                                             <span id="chat-system-model-current-value">默认通道</span>
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                                        </span>
+                                                    </button>
+                                                    <div class="chat-system-model-section-divider" role="separator"></div>
+                                                    <button type="button" class="chat-system-model-setting-row" onclick="openChatSystemModelView('mode', event)">
+                                                        <span class="chat-system-model-setting-label" data-i18n="chat.reasoningModeLabel">推理模式</span>
+                                                        <span class="chat-system-model-setting-value">
+                                                            <span id="chat-system-model-mode-value">跟随系统</span>
                                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                                         </span>
                                                     </button>
@@ -4017,7 +4020,7 @@
                                     <div class="settings-form">
                                         <div class="form-group">
                                             <label for="zoomeye-base-url">Base URL</label>
-                                            <input type="text" id="zoomeye-base-url" placeholder="https://api.zoomeye.org/v2/search（可选）" />
+                                            <input type="text" id="zoomeye-base-url" placeholder="https://api.zoomeye.ai/v2/search（可选）" />
                                             <small class="form-hint">留空则使用默认地址。</small>
                                         </div>
                                         <div class="form-group">
@@ -4034,7 +4037,7 @@
                                     <div class="settings-form">
                                         <div class="form-group">
                                             <label for="quake-base-url">Base URL</label>
-                                            <input type="text" id="quake-base-url" placeholder="https://quake.360.cn/api/v3/search/quake_service（可选）" />
+                                            <input type="text" id="quake-base-url" placeholder="https://quake.360.net/api/v3/search/quake_service（可选）" />
                                             <small class="form-hint">留空则使用默认地址。</small>
                                         </div>
                                         <div class="form-group">
@@ -6842,7 +6845,7 @@
     <script src="/static/js/dashboard.js"></script>
     <script src="/static/js/chat-scroll.js?v=20260815-1"></script>
     <script src="/static/js/monitor.js?v=20260815-2"></script>
-    <script src="/static/js/chat.js?v=20260815-2"></script>
+    <script src="/static/js/chat.js?v=20260818-3"></script>
     <script src="/static/js/chat-plan-progress.js?v=20260815-1"></script>
     <script src="/static/js/hitl.js?v=20260811-4"></script>
     <script src="/static/js/settings.js?v=20260717-1"></script>

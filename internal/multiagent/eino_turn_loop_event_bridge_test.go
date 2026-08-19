@@ -41,6 +41,52 @@ func TestEinoTurnLoopEventBridgeSwallowsPreemptCancel(t *testing.T) {
 	}
 }
 
+func TestEinoTurnLoopEventBridgeNeverForwardsStreamCanceled(t *testing.T) {
+	iter, gen := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
+	outIter, outGen := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
+	bridge := newEinoTurnLoopEventBridge("conv", "eino_single", nil, outGen)
+
+	gen.Send(&adk.AgentEvent{Err: adk.ErrStreamCanceled})
+	gen.Close()
+
+	err := bridge.OnAgentEvents(context.Background(), &adk.TurnContext[EinoTurnLoopItem, *schema.Message]{
+		Preempted: make(chan struct{}),
+	}, iter)
+	if err != nil {
+		t.Fatalf("ErrStreamCanceled must be owned by TurnLoop, got %v", err)
+	}
+	if bridge.ForwardedError() {
+		t.Fatal("ErrStreamCanceled must not be marked as forwarded")
+	}
+	outGen.Close()
+	if ev, ok := outIter.Next(); ok || ev != nil {
+		t.Fatalf("ErrStreamCanceled must not be forwarded, got ok=%v ev=%#v", ev, ok)
+	}
+}
+
+func TestEinoTurnLoopEventBridgeNeverForwardsCancelError(t *testing.T) {
+	iter, gen := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
+	outIter, outGen := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
+	bridge := newEinoTurnLoopEventBridge("conv", "eino_single", nil, outGen)
+
+	gen.Send(&adk.AgentEvent{Err: &adk.CancelError{Info: &adk.AgentCancelInfo{}}})
+	gen.Close()
+
+	err := bridge.OnAgentEvents(context.Background(), &adk.TurnContext[EinoTurnLoopItem, *schema.Message]{
+		Preempted: make(chan struct{}),
+	}, iter)
+	if err != nil {
+		t.Fatalf("CancelError must be owned by TurnLoop, got %v", err)
+	}
+	if bridge.ForwardedError() {
+		t.Fatal("CancelError must not be marked as forwarded")
+	}
+	outGen.Close()
+	if ev, ok := outIter.Next(); ok || ev != nil {
+		t.Fatalf("CancelError must not be forwarded, got ok=%v ev=%#v", ok, ev)
+	}
+}
+
 func TestEinoTurnLoopEventBridgeForwardsRegularError(t *testing.T) {
 	iter, gen := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
 	outIter, outGen := adk.NewAsyncIteratorPair[*adk.AgentEvent]()

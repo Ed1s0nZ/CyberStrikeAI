@@ -16,7 +16,7 @@ args:
     # ==================================================
 
     # Quake API基础URL
-    base_url = "https://quake.360.cn/api/v3/search/quake_service"
+    base_url = "https://quake.360.net/api/v3/search/quake_service"
 
     # 解析参数（从JSON字符串或命令行参数）
     def parse_args():
@@ -178,6 +178,16 @@ args:
                 sys.exit(1)
 
             results = result_data.get("data", [])
+            if isinstance(results, dict):
+                nested = None
+                for key in ("data", "items", "matches", "results", "list", "records"):
+                    value = results.get(key)
+                    if isinstance(value, list):
+                        nested = value
+                        break
+                results = nested if nested is not None else []
+            if not isinstance(results, list):
+                results = []
             meta = result_data.get("meta", {})
             pagination = meta.get("pagination", {}) if isinstance(meta, dict) else {}
 

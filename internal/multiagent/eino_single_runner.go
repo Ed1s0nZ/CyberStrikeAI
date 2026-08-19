@@ -90,7 +90,7 @@ func RunEinoSingleChatModelAgent(
 	}
 
 	baseHTTPClient := newEinoBaseHTTPClient()
-	agenticModelFactory := newEinoOpenAIAgenticChatModelFactory(baseHTTPClient, reasoningClient, logger)
+	agenticModelFactory := newEinoAgenticChatModelFactory(baseHTTPClient, reasoningClient, logger)
 	mainModel, err := agenticModelFactory(ctx, appCfg.OpenAI, einoModelModeNormal)
 	if err != nil {
 		return nil, fmt.Errorf("eino single agentic 模型: %w", err)

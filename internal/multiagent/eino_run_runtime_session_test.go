@@ -153,6 +153,44 @@ func TestEinoRunRuntimeSessionCancellationReturnsPartialError(t *testing.T) {
 	}
 }
 
+func TestEinoRunRuntimeSessionHandleRunErrorSwallowsTurnLoopPreempt(t *testing.T) {
+	agent := &fakeRuntimeSessionAgent{}
+	var events []string
+	drain := newEinoRunEventDrain(einoRunEventDrainConfig{
+		ConversationID:   "conv-1",
+		OrchMode:         "deep",
+		OrchestratorName: "lead",
+		Progress: func(eventType, _ string, _ interface{}) {
+			events = append(events, eventType)
+		},
+		BaseMessages: []adk.Message{schema.UserMessage("base")},
+	})
+	session := newEinoRunRuntimeSession(einoRunRuntimeSessionConfig{
+		Context: context.Background(),
+		Args: &einoADKRunLoopArgs{
+			ConversationID:   "conv-1",
+			OrchMode:         "deep",
+			OrchestratorName: "lead",
+			Progress: func(eventType, _ string, _ interface{}) {
+				events = append(events, eventType)
+			},
+			DA: agent,
+		},
+		Drain:        drain,
+		BaseMessages: []adk.Message{schema.UserMessage("base")},
+		EmptyHint:    "empty",
+	})
+	defer session.Close()
+
+	got := session.HandleRunError(adk.ErrStreamCanceled)
+	if got.Restarted || got.Result != nil || got.Err != nil {
+		t.Fatalf("result = %+v, want swallowed preempt", got)
+	}
+	if containsString(events, "error") || containsString(events, "eino_usage_summary") {
+		t.Fatalf("events = %#v, want no fatal/partial events", events)
+	}
+}
+
 func TestEinoRunRuntimeSessionBuildFinalEmitsUsageSummary(t *testing.T) {
 	agent := &fakeRuntimeSessionAgent{}
 	var usageEvent map[string]interface{}

@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func TestProcessDetailsSummaryDoesNotGuessIDLessResultsByOrder(t *testing.T) {
+func TestProcessDetailsSummaryDoesNotGuessIDLessResultsOntoDifferentTool(t *testing.T) {
 	db, conversationID, messageID := setupProcessDetailsSummaryTest(t)
 	for _, id := range []string{"call-1", "call-2", "call-3", "call-4"} {
 		if err := db.AddProcessDetail(messageID, conversationID, "tool_call", "call", map[string]interface{}{
@@ -20,8 +20,8 @@ func TestProcessDetailsSummaryDoesNotGuessIDLessResultsByOrder(t *testing.T) {
 	results := []map[string]interface{}{
 		{"toolName": "http-framework-test", "toolCallId": "call-1", "success": true},
 		{"toolName": "http-framework-test", "toolCallId": "call-2", "success": true},
-		{"toolName": "http-framework-test", "success": true},
-		{"toolName": "http-framework-test", "success": true},
+		{"toolName": "other-tool", "success": true},
+		{"toolName": "other-tool", "success": true},
 	}
 	var resultIDs []string
 	for _, result := range results {
@@ -53,9 +53,68 @@ func TestProcessDetailsSummaryDoesNotGuessIDLessResultsByOrder(t *testing.T) {
 		}
 	}
 	for i, execution := range summary.ToolExecutions[4:] {
-		if execution.Status != "completed" || execution.ToolCallID != "" {
+		if execution.Status != "completed" || execution.ToolCallID != "" || execution.ToolName != "other-tool" {
 			t.Fatalf("idless result %d = %#v, want separate completed result without toolCallId", i, execution)
 		}
+	}
+}
+
+func TestProcessDetailsSummaryPairsIDLessResultsWithSameToolName(t *testing.T) {
+	db, conversationID, messageID := setupProcessDetailsSummaryTest(t)
+	for i, id := range []string{"call-1", "call-2"} {
+		if err := db.AddProcessDetail(messageID, conversationID, "tool_call", "call", map[string]interface{}{
+			"toolName": "nmap", "toolCallId": id, "index": i + 1, "total": 2,
+		}); err != nil {
+			t.Fatalf("AddProcessDetail(tool_call): %v", err)
+		}
+	}
+	var resultIDs []string
+	for i := 0; i < 2; i++ {
+		resultID, err := db.AddProcessDetailWithID(messageID, conversationID, "tool_result", "result", map[string]interface{}{
+			"toolName": "nmap", "success": true,
+		})
+		if err != nil {
+			t.Fatalf("AddProcessDetail(tool_result): %v", err)
+		}
+		resultIDs = append(resultIDs, resultID)
+	}
+
+	summary, err := db.GetProcessDetailsSummary(messageID)
+	if err != nil {
+		t.Fatalf("GetProcessDetailsSummary: %v", err)
+	}
+	if len(summary.ToolExecutions) != 2 {
+		t.Fatalf("tool executions = %d, want 2", len(summary.ToolExecutions))
+	}
+	for i, execution := range summary.ToolExecutions {
+		if execution.Status != "completed" {
+			t.Fatalf("execution %d status = %q, want completed", i, execution.Status)
+		}
+		if execution.ResultDetailID != resultIDs[i] {
+			t.Fatalf("execution %d result detail id = %q, want %q", i, execution.ResultDetailID, resultIDs[i])
+		}
+	}
+}
+
+func TestProcessDetailsSummaryPairedResultWithoutSuccessIsCompleted(t *testing.T) {
+	db, conversationID, messageID := setupProcessDetailsSummaryTest(t)
+	if err := db.AddProcessDetail(messageID, conversationID, "tool_call", "call", map[string]interface{}{
+		"toolName": "nmap", "toolCallId": "call-1",
+	}); err != nil {
+		t.Fatalf("AddProcessDetail(tool_call): %v", err)
+	}
+	if err := db.AddProcessDetail(messageID, conversationID, "tool_result", "result", map[string]interface{}{
+		"toolName": "nmap", "toolCallId": "call-1", "resultPreview": "open 22",
+	}); err != nil {
+		t.Fatalf("AddProcessDetail(tool_result): %v", err)
+	}
+
+	summary, err := db.GetProcessDetailsSummary(messageID)
+	if err != nil {
+		t.Fatalf("GetProcessDetailsSummary: %v", err)
+	}
+	if len(summary.ToolExecutions) != 1 || summary.ToolExecutions[0].Status != "completed" {
+		t.Fatalf("tool executions = %#v, want completed", summary.ToolExecutions)
 	}
 }
 

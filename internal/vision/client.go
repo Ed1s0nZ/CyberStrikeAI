@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"cyberstrike-ai/internal/config"
+	"cyberstrike-ai/internal/llm"
 	"cyberstrike-ai/internal/openai"
 
 	einoopenai "github.com/cloudwego/eino-ext/components/model/openai"
@@ -58,8 +59,50 @@ func (c *Client) Analyze(ctx context.Context, img ImagePayload, question string)
 			ResponseHeaderTimeout: timeout + 10*time.Second,
 		},
 	}
-	httpClient = openai.NewEinoHTTPClient(&oa, httpClient)
 
+	b64 := base64.StdEncoding.EncodeToString(img.Bytes)
+	detail := schema.ImageURLDetailLow
+	switch c.cfg.DetailEffective() {
+	case "high":
+		detail = schema.ImageURLDetailHigh
+	case "auto":
+		detail = schema.ImageURLDetailAuto
+	}
+
+	prompt := buildVisionPrompt(question)
+	if llm.IsClaudeProvider(oa.Provider) {
+		nativeModel, err := llm.NewClaudeAgenticModel(
+			ctx,
+			oa,
+			httpClient,
+			oa.MaxCompletionTokensEffective(),
+			nil,
+		)
+		if err != nil {
+			return "", fmt.Errorf("vision native Claude model: %w", err)
+		}
+		resp, err := nativeModel.Generate(ctx, []*schema.AgenticMessage{{
+			Role: schema.AgenticRoleTypeUser,
+			ContentBlocks: []*schema.ContentBlock{
+				schema.NewContentBlock(&schema.UserInputText{Text: prompt}),
+				schema.NewContentBlock(&schema.UserInputImage{
+					Base64Data: b64,
+					MIMEType:   mime,
+					Detail:     detail,
+				}),
+			},
+		}})
+		if err != nil {
+			return "", fmt.Errorf("vision native Claude generate: %w", err)
+		}
+		content, _ := llm.AgenticText(resp)
+		if strings.TrimSpace(content) == "" {
+			return "", fmt.Errorf("vision model returned empty content")
+		}
+		return strings.TrimSpace(content), nil
+	}
+
+	httpClient = openai.NewEinoHTTPClient(&oa, httpClient)
 	maxCompletionTokens := oa.MaxCompletionTokensEffective()
 	modelCfg := &einoopenai.ChatModelConfig{
 		APIKey:              oa.APIKey,
@@ -72,17 +115,6 @@ func (c *Client) Analyze(ctx context.Context, img ImagePayload, question string)
 	if err != nil {
 		return "", fmt.Errorf("vision chat model: %w", err)
 	}
-
-	b64 := base64.StdEncoding.EncodeToString(img.Bytes)
-	detail := schema.ImageURLDetailLow
-	switch c.cfg.DetailEffective() {
-	case "high":
-		detail = schema.ImageURLDetailHigh
-	case "auto":
-		detail = schema.ImageURLDetailAuto
-	}
-
-	prompt := buildVisionPrompt(question)
 	userMsg := &schema.Message{
 		Role: schema.User,
 		UserInputMultiContent: []schema.MessageInputPart{

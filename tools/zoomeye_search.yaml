@@ -17,7 +17,7 @@ args:
     # ==================================================
 
     # ZoomEye API基础URL
-    base_url = "https://api.zoomeye.org/v2/search"
+    base_url = "https://api.zoomeye.ai/v2/search"
 
     # 解析参数（从JSON字符串或命令行参数）
     def parse_args():
@@ -78,7 +78,7 @@ args:
                 "status": "error",
                 "message": "缺少ZoomEye配置: api_key（ZoomEye API密钥）",
                 "required_config": ["api_key"],
-                "note": "请在YAML文件的ZOOMEYE_API_KEY配置项中填写您的API密钥，或在环境变量ZOOMEYE_API_KEY中设置。API密钥可在ZoomEye个人中心获取: https://www.zoomeye.org/user"
+                "note": "请在YAML文件的ZOOMEYE_API_KEY配置项中填写您的API密钥，或在环境变量ZOOMEYE_API_KEY中设置。API密钥可在ZoomEye个人中心获取: https://www.zoomeye.ai/user"
             }
             print(json.dumps(error_result, ensure_ascii=False, indent=2))
             sys.exit(1)
@@ -174,6 +174,16 @@ args:
             # 格式化输出结果
             # ZoomEye API 返回的数据在 data 字段中
             data_list = result_data.get('data', [])
+            if isinstance(data_list, dict):
+                nested = None
+                for key in ('data', 'items', 'matches', 'results', 'list', 'records'):
+                    value = data_list.get(key)
+                    if isinstance(value, list):
+                        nested = value
+                        break
+                data_list = nested if nested is not None else []
+            if not isinstance(data_list, list):
+                data_list = []
             output = {
                 "status": "success",
                 "query": result_data.get('query', query),

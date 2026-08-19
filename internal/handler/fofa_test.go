@@ -164,7 +164,7 @@ func TestQuakeSearchHandlesStringErrorCode(t *testing.T) {
 			t.Fatalf("Quake token = %q, want test-quake-key", got)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"code":"q5000","message":"查询语法错误"}`))
+		_, _ = w.Write([]byte(`{"code":"q5000","message":"查询语法错误","data":{}}`))
 	}))
 	defer quakeServer.Close()
 
@@ -192,6 +192,144 @@ func TestQuakeSearchHandlesStringErrorCode(t *testing.T) {
 	}
 	if strings.Contains(bodyText, "cannot unmarshal") {
 		t.Fatalf("response exposed JSON type decoding failure: %s", bodyText)
+	}
+}
+
+func TestQuakeSearchAcceptsArrayData(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Setenv("QUAKE_API_KEY", "")
+
+	quakeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":0,"message":"Successful.","data":[{"ip":"1.1.1.1","port":53}],"meta":{"pagination":{"total":1}}}`))
+	}))
+	defer quakeServer.Close()
+
+	h := NewFofaHandler(&config.Config{
+		Quake: config.SpaceSearchConfig{
+			BaseURL: quakeServer.URL,
+			APIKey:  "test-quake-key",
+		},
+	}, zap.NewNop())
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	body := `{"provider":"quake","query":"ip:\"1.1.1.1\"","fields":"ip,port","size":10,"page":1}`
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/fofa/search", strings.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	h.Search(ctx)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("Search() status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+	var response fofaSearchResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.ResultsCount != 1 || response.Total != 1 {
+		t.Fatalf("results_count=%d total=%d, want 1/1", response.ResultsCount, response.Total)
+	}
+}
+
+func TestZoomEyeSearchHandlesObjectDataError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Setenv("ZOOMEYE_API_KEY", "")
+
+	zoomeyeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("API-KEY"); got != "test-zoomeye-key" {
+			t.Fatalf("ZoomEye API-KEY = %q, want test-zoomeye-key", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":40001,"message":"invalid api key","data":{}}`))
+	}))
+	defer zoomeyeServer.Close()
+
+	h := NewFofaHandler(&config.Config{
+		ZoomEye: config.SpaceSearchConfig{
+			BaseURL: zoomeyeServer.URL,
+			APIKey:  "test-zoomeye-key",
+		},
+	}, zap.NewNop())
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	body := `{"provider":"zoomeye","query":"ip=\"1.1.1.1\"","fields":"ip,port","size":10,"page":1}`
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/fofa/search", strings.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	h.Search(ctx)
+
+	if recorder.Code != http.StatusBadGateway {
+		t.Fatalf("Search() status = %d, want %d, body = %s", recorder.Code, http.StatusBadGateway, recorder.Body.String())
+	}
+	bodyText := recorder.Body.String()
+	if !strings.Contains(bodyText, "invalid api key") {
+		t.Fatalf("response should include ZoomEye error message, got %s", bodyText)
+	}
+	if strings.Contains(bodyText, "cannot unmarshal") {
+		t.Fatalf("response exposed JSON type decoding failure: %s", bodyText)
+	}
+}
+
+func TestShodanSearchSurfacesJSONErrorOnUnauthorized(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Setenv("SHODAN_API_KEY", "")
+
+	shodanServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":"Invalid API key"}`))
+	}))
+	defer shodanServer.Close()
+
+	h := NewFofaHandler(&config.Config{
+		Shodan: config.SpaceSearchConfig{
+			BaseURL: shodanServer.URL,
+			APIKey:  "test-shodan-key",
+		},
+	}, zap.NewNop())
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	body := `{"provider":"shodan","query":"product:nginx","fields":"ip_str,port","size":10,"page":1}`
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/fofa/search", strings.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	h.Search(ctx)
+
+	if recorder.Code != http.StatusBadGateway {
+		t.Fatalf("Search() status = %d, want %d, body = %s", recorder.Code, http.StatusBadGateway, recorder.Body.String())
+	}
+	bodyText := recorder.Body.String()
+	if !strings.Contains(bodyText, "Invalid API key") {
+		t.Fatalf("response should include Shodan error message, got %s", bodyText)
+	}
+	if strings.Contains(bodyText, "非 2xx") {
+		t.Fatalf("response should not hide Shodan error behind generic status, got %s", bodyText)
+	}
+}
+
+func TestCanonicalizeSpaceSearchBaseURLMigratesLegacyHosts(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		provider string
+		in       string
+		want     string
+	}{
+		{provider: "zoomeye", in: "https://api.zoomeye.org/v2/search", want: "https://api.zoomeye.ai/v2/search"},
+		{provider: "quake", in: "https://quake.360.cn/api/v3/search/quake_service", want: "https://quake.360.net/api/v3/search/quake_service"},
+		{provider: "shodan", in: "https://api.shodan.io", want: "https://api.shodan.io"},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.provider, func(t *testing.T) {
+			t.Parallel()
+			got := canonicalizeSpaceSearchBaseURL(tc.provider, tc.in)
+			if got != tc.want {
+				t.Fatalf("canonicalizeSpaceSearchBaseURL() = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 

@@ -46,6 +46,12 @@ func (h *einoStreamErrorHandler) Handle(streamErr error, agentName string) einoS
 	if h == nil || streamErr == nil {
 		return einoStreamErrorHandleResult{}
 	}
+	if isEinoTurnLoopPreemptErr(h.ctx, streamErr) {
+		// Host context is still alive: TurnLoop preempt canceled the in-flight
+		// model/tool stream. Keep the outer iterator open so the queued
+		// interrupt_continue turn can start.
+		return einoStreamErrorHandleResult{Handled: true}
+	}
 	if isInterruptContinue(h.ctx) {
 		result, err := h.partial(streamErr)
 		return einoStreamErrorHandleResult{Handled: true, Result: result, Err: err}

@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -87,6 +89,24 @@ type fofaSearchResponse struct {
 	Results       []map[string]interface{} `json:"results"`
 }
 
+type spaceSearchEnvelope struct {
+	Code       interface{}     `json:"code"`
+	Message    string          `json:"message"`
+	Error      string          `json:"error"`
+	Query      string          `json:"query"`
+	Total      int             `json:"total"`
+	TotalCount int             `json:"total_count"`
+	Page       int             `json:"page"`
+	PageSize   int             `json:"pagesize"`
+	Data       json.RawMessage `json:"data"`
+	Matches    json.RawMessage `json:"matches"`
+	Meta       struct {
+		Pagination struct {
+			Total int `json:"total"`
+		} `json:"pagination"`
+	} `json:"meta"`
+}
+
 func normalizeSpaceSearchProvider(provider string) string {
 	switch strings.ToLower(strings.TrimSpace(provider)) {
 	case "", "fofa":
@@ -156,19 +176,20 @@ func (h *FofaHandler) resolveAPIKey(provider string) string {
 }
 
 func (h *FofaHandler) resolveBaseURL(provider string) string {
+	provider = normalizeSpaceSearchProvider(provider)
 	if h.cfg != nil {
-		switch normalizeSpaceSearchProvider(provider) {
+		switch provider {
 		case "zoomeye":
 			if v := strings.TrimSpace(h.cfg.ZoomEye.BaseURL); v != "" {
-				return v
+				return canonicalizeSpaceSearchBaseURL(provider, v)
 			}
 		case "quake":
 			if v := strings.TrimSpace(h.cfg.Quake.BaseURL); v != "" {
-				return v
+				return canonicalizeSpaceSearchBaseURL(provider, v)
 			}
 		case "shodan":
 			if v := strings.TrimSpace(h.cfg.Shodan.BaseURL); v != "" {
-				return v
+				return canonicalizeSpaceSearchBaseURL(provider, v)
 			}
 		default:
 			if v := strings.TrimSpace(h.cfg.FOFA.BaseURL); v != "" {
@@ -176,16 +197,30 @@ func (h *FofaHandler) resolveBaseURL(provider string) string {
 			}
 		}
 	}
-	switch normalizeSpaceSearchProvider(provider) {
+	switch provider {
 	case "zoomeye":
-		return "https://api.zoomeye.org/v2/search"
+		return "https://api.zoomeye.ai/v2/search"
 	case "quake":
-		return "https://quake.360.cn/api/v3/search/quake_service"
+		return "https://quake.360.net/api/v3/search/quake_service"
 	case "shodan":
 		return "https://api.shodan.io"
 	default:
 		return "https://fofa.info/api/v1/search/all"
 	}
+}
+
+func canonicalizeSpaceSearchBaseURL(provider, raw string) string {
+	v := strings.TrimSpace(raw)
+	if v == "" {
+		return v
+	}
+	switch normalizeSpaceSearchProvider(provider) {
+	case "zoomeye":
+		v = strings.Replace(v, "://api.zoomeye.org", "://api.zoomeye.ai", 1)
+	case "quake":
+		v = strings.Replace(v, "://quake.360.cn", "://quake.360.net", 1)
+	}
+	return v
 }
 
 // ParseNaturalLanguage 将自然语言解析为 FOFA 查询语法（仅生成，不执行查询）
@@ -716,23 +751,17 @@ func (h *FofaHandler) searchZoomEye(c *gin.Context, req fofaSearchRequest, apiKe
 	if fields := strings.TrimSpace(req.Fields); fields != "" {
 		body["fields"] = fields
 	}
-	var apiResp struct {
-		Code     int                      `json:"code"`
-		Message  string                   `json:"message"`
-		Query    string                   `json:"query"`
-		Total    int                      `json:"total"`
-		Page     int                      `json:"page"`
-		PageSize int                      `json:"pagesize"`
-		Data     []map[string]interface{} `json:"data"`
-	}
+	var apiResp spaceSearchEnvelope
 	if !h.doJSONRequest(c, http.MethodPost, u.String(), apiKey, "API-KEY", body, &apiResp, "ZoomEye") {
 		return
 	}
-	if apiResp.Code != 60000 {
-		msg := strings.TrimSpace(apiResp.Message)
-		if msg == "" {
-			msg = "ZoomEye 返回错误"
-		}
+	rows, err := decodeSpaceSearchRows(apiResp.Data)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "解析 ZoomEye 响应失败: " + err.Error()})
+		return
+	}
+	if zoomEyeRequestFailed(apiResp.Code, apiResp.Message) {
+		msg := firstNonEmptySpaceSearchValue(apiResp.Message, messageFromRawObject(apiResp.Data), "ZoomEye 返回错误")
 		c.JSON(http.StatusBadGateway, gin.H{"error": msg})
 		return
 	}
@@ -744,8 +773,8 @@ func (h *FofaHandler) searchZoomEye(c *gin.Context, req fofaSearchRequest, apiKe
 		Page:         firstPositive(apiResp.Page, req.Page),
 		Total:        apiResp.Total,
 		Fields:       fields,
-		ResultsCount: len(apiResp.Data),
-		Results:      projectRows(apiResp.Data, fields),
+		ResultsCount: len(rows),
+		Results:      projectRows(rows, fields),
 	})
 }
 
@@ -766,25 +795,17 @@ func (h *FofaHandler) searchQuake(c *gin.Context, req fofaSearchRequest, apiKey 
 	if len(fields) > 0 {
 		body["include"] = fields
 	}
-	var apiResp struct {
-		Code       interface{}              `json:"code"`
-		Message    string                   `json:"message"`
-		TotalCount int                      `json:"total_count"`
-		Data       []map[string]interface{} `json:"data"`
-		Meta       struct {
-			Pagination struct {
-				Total int `json:"total"`
-			} `json:"pagination"`
-		} `json:"meta"`
-	}
+	var apiResp spaceSearchEnvelope
 	if !h.doJSONRequest(c, http.MethodPost, u.String(), apiKey, "X-QuakeToken", body, &apiResp, "Quake") {
 		return
 	}
+	rows, err := decodeSpaceSearchRows(apiResp.Data)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "解析 Quake 响应失败: " + err.Error()})
+		return
+	}
 	if !isZeroSpaceSearchCode(apiResp.Code) {
-		msg := strings.TrimSpace(apiResp.Message)
-		if msg == "" {
-			msg = "Quake 返回错误"
-		}
+		msg := firstNonEmptySpaceSearchValue(apiResp.Message, messageFromRawObject(apiResp.Data), "Quake 返回错误")
 		c.JSON(http.StatusBadGateway, gin.H{"error": msg})
 		return
 	}
@@ -796,8 +817,8 @@ func (h *FofaHandler) searchQuake(c *gin.Context, req fofaSearchRequest, apiKey 
 		Page:         req.Page,
 		Total:        total,
 		Fields:       fields,
-		ResultsCount: len(apiResp.Data),
-		Results:      projectRows(apiResp.Data, fields),
+		ResultsCount: len(rows),
+		Results:      projectRows(rows, fields),
 	})
 }
 
@@ -811,11 +832,136 @@ func isZeroSpaceSearchCode(code interface{}) bool {
 		return v == 0
 	case float64:
 		return v == 0
+	case json.Number:
+		n, err := v.Int64()
+		return err == nil && n == 0
 	case string:
 		return strings.TrimSpace(v) == "0"
 	default:
 		return false
 	}
+}
+
+func isZoomEyeSuccessCode(code interface{}) bool {
+	switch v := code.(type) {
+	case int:
+		return v == 60000
+	case int64:
+		return v == 60000
+	case float64:
+		return v == 60000
+	case json.Number:
+		n, err := v.Int64()
+		return err == nil && n == 60000
+	case string:
+		return strings.TrimSpace(v) == "60000"
+	default:
+		return false
+	}
+}
+
+func zoomEyeRequestFailed(code interface{}, message string) bool {
+	if isZoomEyeSuccessCode(code) {
+		return false
+	}
+	msg := strings.ToLower(strings.TrimSpace(message))
+	if code == nil || isZeroSpaceSearchCode(code) {
+		return msg != "" && msg != "success" && msg != "ok" && msg != "successful."
+	}
+	return true
+}
+
+func decodeSpaceSearchRows(raw json.RawMessage) ([]map[string]interface{}, error) {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 || bytes.Equal(raw, []byte("null")) {
+		return nil, nil
+	}
+	switch raw[0] {
+	case '[':
+		var rows []map[string]interface{}
+		if err := json.Unmarshal(raw, &rows); err != nil {
+			return nil, err
+		}
+		if rows == nil {
+			return []map[string]interface{}{}, nil
+		}
+		return rows, nil
+	case '{':
+		var obj map[string]interface{}
+		if err := json.Unmarshal(raw, &obj); err != nil {
+			return nil, err
+		}
+		if len(obj) == 0 {
+			return []map[string]interface{}{}, nil
+		}
+		for _, key := range []string{"data", "items", "matches", "results", "list", "records"} {
+			nested, ok := obj[key]
+			if !ok {
+				continue
+			}
+			switch rows := nested.(type) {
+			case []map[string]interface{}:
+				return rows, nil
+			case []interface{}:
+				return interfaceSliceToRowMaps(rows), nil
+			}
+		}
+		return []map[string]interface{}{}, nil
+	default:
+		return nil, fmt.Errorf("unexpected JSON value")
+	}
+}
+
+func interfaceSliceToRowMaps(items []interface{}) []map[string]interface{} {
+	out := make([]map[string]interface{}, 0, len(items))
+	for _, item := range items {
+		if row, ok := item.(map[string]interface{}); ok {
+			out = append(out, row)
+		}
+	}
+	return out
+}
+
+func messageFromRawObject(raw json.RawMessage) string {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 || raw[0] != '{' {
+		return ""
+	}
+	var obj map[string]interface{}
+	if err := json.Unmarshal(raw, &obj); err != nil {
+		return ""
+	}
+	for _, key := range []string{"message", "error", "errmsg", "msg"} {
+		if s, ok := obj[key].(string); ok {
+			if msg := strings.TrimSpace(s); msg != "" {
+				return msg
+			}
+		}
+	}
+	return ""
+}
+
+func extractRemoteAPIError(body []byte, statusCode int, label string) string {
+	trimmed := bytes.TrimSpace(body)
+	if len(trimmed) > 0 && trimmed[0] == '{' {
+		var obj map[string]interface{}
+		if err := json.Unmarshal(trimmed, &obj); err == nil {
+			for _, key := range []string{"error", "message", "errmsg", "msg"} {
+				if s, ok := obj[key].(string); ok {
+					if msg := strings.TrimSpace(s); msg != "" {
+						return msg
+					}
+				}
+			}
+		}
+	}
+	if len(trimmed) > 0 && trimmed[0] == '<' {
+		return fmt.Sprintf("%s 返回了网页而不是 JSON（HTTP %d），请检查 Base URL 或网络是否被拦截", label, statusCode)
+	}
+	if statusCode < 200 || statusCode >= 300 {
+		return fmt.Sprintf("%s 返回非 2xx: %d", label, statusCode)
+	}
+	return ""
 }
 
 func (h *FofaHandler) searchShodan(c *gin.Context, req fofaSearchRequest, apiKey string) {
@@ -826,11 +972,7 @@ func (h *FofaHandler) searchShodan(c *gin.Context, req fofaSearchRequest, apiKey
 		return
 	}
 
-	var apiResp struct {
-		Total   int                      `json:"total"`
-		Matches []map[string]interface{} `json:"matches"`
-		Error   string                   `json:"error"`
-	}
+	var apiResp spaceSearchEnvelope
 	targetSize := req.Size
 	if targetSize <= 0 {
 		targetSize = 100
@@ -852,19 +994,23 @@ func (h *FofaHandler) searchShodan(c *gin.Context, req fofaSearchRequest, apiKey
 			params.Set("fields", fields)
 		}
 		pageURL.RawQuery = params.Encode()
-		apiResp.Matches = nil
-		apiResp.Error = ""
+		apiResp = spaceSearchEnvelope{}
 		if !h.doJSONRequest(c, http.MethodGet, pageURL.String(), "", "", nil, &apiResp, "Shodan") {
 			return
 		}
-		if strings.TrimSpace(apiResp.Error) != "" {
-			c.JSON(http.StatusBadGateway, gin.H{"error": apiResp.Error})
+		if errMsg := firstNonEmptySpaceSearchValue(apiResp.Error, apiResp.Message); errMsg != "" {
+			c.JSON(http.StatusBadGateway, gin.H{"error": errMsg})
 			return
 		}
-		if len(apiResp.Matches) == 0 {
+		pageMatches, err := decodeSpaceSearchRows(apiResp.Matches)
+		if err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": "解析 Shodan 响应失败: " + err.Error()})
+			return
+		}
+		if len(pageMatches) == 0 {
 			break
 		}
-		matches = append(matches, apiResp.Matches...)
+		matches = append(matches, pageMatches...)
 		if len(matches) >= targetSize {
 			matches = matches[:targetSize]
 			break
@@ -947,11 +1093,21 @@ func (h *FofaHandler) doJSONRequest(c *gin.Context, method, endpoint, apiKey, he
 		return false
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("%s 返回非 2xx: %d", label, resp.StatusCode)})
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "读取 " + label + " 响应失败: " + err.Error()})
 		return false
 	}
-	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		msg := extractRemoteAPIError(respBody, resp.StatusCode, label)
+		c.JSON(http.StatusBadGateway, gin.H{"error": msg})
+		return false
+	}
+	if err := json.Unmarshal(respBody, out); err != nil {
+		if msg := extractRemoteAPIError(respBody, resp.StatusCode, label); strings.Contains(msg, "网页") {
+			c.JSON(http.StatusBadGateway, gin.H{"error": msg})
+			return false
+		}
 		c.JSON(http.StatusBadGateway, gin.H{"error": "解析 " + label + " 响应失败: " + err.Error()})
 		return false
 	}

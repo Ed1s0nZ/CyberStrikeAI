@@ -22,29 +22,38 @@ test('输入区提供独立审批入口并暴露可配置等待时限', () => {
     assert.match(chat, /body\.hitl = \{[\s\S]*?timeoutSeconds: normalizeHitlTimeoutForChat\(hitlCfg\.timeoutSeconds/);
 });
 
-test('输入框可直接保存系统模型和系统推理强度且审批模型只出现在审计 Agent 入口', () => {
+test('输入框可按会话通道获取模型并双向同步会话推理且审批模型只出现在审计 Agent 入口', () => {
     assert.match(chat, /function currentSystemModelLabel\(\)/);
     assert.match(chat, /chatDefaultAIChannel \? chatAIChannels\[chatDefaultAIChannel\]/);
     assert.match(chat, /function currentHitlAuditModelLabel\(\)/);
-    assert.match(chat, /const label = currentSystemModelLabel\(\)/);
+    assert.match(chat, /const label = currentChatModelLabel\(\)/);
     assert.doesNotMatch(chat, /const label = data\.model \|\| currentChatModelLabel\(\)/);
     assert.match(chat, /const approvalModel = auditAgent \? currentHitlAuditModelLabel\(\) : ''/);
     assert.match(chat, /hitlAuditModel\.model\.trim\(\)/);
     assert.match(template, /id="chat-model-shortcut"[^>]+onclick="openChatSystemModelPicker\(event\)"/);
     assert.match(template, /id="chat-system-model-menu"[^>]+hidden/);
     assert.doesNotMatch(template, /id="chat-reasoning-shortcut"/);
-    assert.match(template, /openChatSystemModelView\('model', event\)[\s\S]{0,1200}openChatSystemModelView\('effort', event\)/);
+    assert.doesNotMatch(template, /session-settings-group-ai/);
+    assert.match(template, /class="chat-ai-session-state" hidden[\s\S]{0,500}id="chat-ai-channel-select"/);
+    assert.match(template, /openChatSystemModelView\('channel', event\)[\s\S]{0,1200}openChatSystemModelView\('model', event\)[\s\S]{0,1200}openChatSystemModelView\('mode', event\)[\s\S]{0,1200}openChatSystemModelView\('effort', event\)/);
     assert.match(chat, /function renderChatReasoningEffortOptions\(\)/);
-    assert.match(chat, /function currentSystemReasoningEffort\(\)[\s\S]{0,500}reasoning\.effort/);
+    assert.match(chat, /function renderChatReasoningModeOptions\(\)/);
     assert.match(chat, /case 'low': return 'low'[\s\S]{0,300}case 'max': return 'max'/);
     assert.match(chat, /chatTranslate\('chat\.reasoningEffortUnset', '不指定'\)/);
-    assert.match(chat, /function selectChatReasoningEffort\(effort\)[\s\S]{0,2400}reasoning: \{ \.\.\.\(state\.channel\.reasoning \|\| \{\}\), effort: chosen \}/);
-    assert.match(chat, /function selectChatReasoningEffort\(effort\)[\s\S]{0,4200}body: JSON\.stringify\(\{ ai: state\.ai \}\)[\s\S]{0,900}apiFetch\('\/api\/config\/apply'/);
-    assert.match(chat, /function openChatSystemModelPicker\(event\)[\s\S]{0,4200}apiFetch\('\/api\/config\/list-models'/);
+    assert.match(chat, /\['default', 'off', 'on', 'auto'\]/);
+    assert.match(chat, /\['', 'low', 'medium', 'high', 'xhigh', 'max'\]/);
+    assert.match(chat, /function selectChatReasoningMode\(mode\)[\s\S]{0,700}modeControl\.value = chosen[\s\S]{0,200}finishChatReasoningPickerUpdate\(\)/);
+    assert.match(chat, /function selectChatReasoningEffort\(effort\)[\s\S]{0,700}effortControl\.value = chosen[\s\S]{0,200}finishChatReasoningPickerUpdate\(\)/);
+    assert.match(chat, /function fetchChatSystemModelsForChannel\(channelId, options\)[\s\S]{0,4200}apiFetch\('\/api\/config\/list-models'/);
+    assert.match(chat, /function selectChatAIChannel\(channelId\)[\s\S]{0,900}fetchChatSystemModelsForChannel\(resolveChatPickerChannelId\(\), \{ force: true \}\)/);
+    assert.match(chat, /const chatSystemModelCache = new Map\(\)/);
+    assert.match(chat, /Date\.now\(\) - cached\.fetchedAt < CHAT_SYSTEM_MODEL_CACHE_TTL_MS/);
     assert.match(chat, /function selectChatSystemModel\(model\)[\s\S]{0,2600}method: 'PUT'[\s\S]{0,900}apiFetch\('\/api\/config\/apply'/);
     assert.match(chat, /body: JSON\.stringify\(\{ ai: state\.ai \}\)/);
-    assert.equal(zh.chat.modelSettingsAria, '选择模型与推理强度');
-    assert.equal(en.chat.modelSettingsAria, 'Choose model and reasoning effort');
+    assert.equal(zh.chat.modelSettingsAria, '选择 AI 通道、模型与推理设置');
+    assert.equal(en.chat.modelSettingsAria, 'Choose AI channel, model, and reasoning settings');
+    assert.equal(zh.chat.reasoningSessionUpdated, '会话推理设置已更新');
+    assert.equal(en.chat.reasoningSessionUpdated, 'Session reasoning updated');
 });
 
 test('审批请求按浏览器、命令、文件和通用工具动态描述', () => {
@@ -255,8 +264,8 @@ test('多对话并发时释放隐藏主流且旧请求不能覆盖新对话状�
     assert.match(chat, /signal: conversationLoadController\.signal/);
     assert.match(template, /monitor\.js\?v=20260815-2/);
     assert.match(template, /chat-scroll\.js\?v=20260815-1/);
-    assert.match(template, /chat\.js\?v=20260815-2/);
-    assert.match(template, /style\.css\?v=20260815-2/);
+    assert.match(template, /chat\.js\?v=20260818-3/);
+    assert.match(template, /style\.css\?v=20260818-3/);
 });
 
 test('输入区 Agent 审查文字保留足够行高且不会裁切字形', () => {

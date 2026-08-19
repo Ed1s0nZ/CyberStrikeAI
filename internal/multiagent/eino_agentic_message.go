@@ -110,10 +110,16 @@ func AgenticMessageToEino(msg *schema.AgenticMessage) []*schema.Message {
 			base.Role = schema.Assistant
 			base.Content += block.AssistantGenText.Text
 		case block.FunctionToolCall != nil:
+			var index *int
+			if block.StreamingMeta != nil {
+				i := block.StreamingMeta.Index
+				index = &i
+			}
 			base.Role = schema.Assistant
 			base.ToolCalls = append(base.ToolCalls, schema.ToolCall{
-				ID:   block.FunctionToolCall.CallID,
-				Type: "function",
+				Index: index,
+				ID:    block.FunctionToolCall.CallID,
+				Type:  "function",
 				Function: schema.FunctionCall{
 					Name:      block.FunctionToolCall.Name,
 					Arguments: block.FunctionToolCall.Arguments,

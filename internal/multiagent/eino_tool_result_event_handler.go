@@ -42,24 +42,42 @@ func (h *einoToolResultEventHandler) HandleStreaming(mv *adk.MessageVariant, age
 	if h == nil || mv == nil || !mv.IsStreaming || mv.MessageStream == nil || mv.Role != schema.Tool {
 		return false
 	}
-	toolName := strings.TrimSpace(mv.ToolName)
-	content, streamToolCallID, streamToolName, recvErr := recvSchemaMessageStream(h.ctx, mv.MessageStream)
-	if toolName == "" {
-		toolName = streamToolName
+	defaultName := strings.TrimSpace(mv.ToolName)
+	msgs, recvErr := recvSchemaToolResultMessages(h.ctx, mv.MessageStream)
+	if isEinoVoluntaryCancelErr(recvErr) && len(msgs) == 0 {
+		msgs = []*schema.Message{schema.ToolMessage("已中断并继续，当前工具调用已停止。", "", schema.WithToolName(defaultName))}
 	}
-	isErr := einoToolResultIsError(toolName, content)
-	content = einoToolResultBody(content)
-	if streamToolCallID != "" && h.runMessages != nil {
-		h.runMessages.AppendToolMessage(content, streamToolCallID, schema.WithToolName(toolName))
+	if len(msgs) == 0 {
+		msgs = []*schema.Message{schema.ToolMessage("", "", schema.WithToolName(defaultName))}
 	}
-	if h.emitter != nil {
-		h.emitter.Emit(h.ctx, toolName, content, streamToolCallID, isErr, agentName)
-	}
-	if recvErr != nil && h.logger != nil {
-		h.logger.Warn("eino tool result stream recv error",
-			zap.Error(recvErr),
-			zap.String("agent", agentName),
-			zap.String("tool", toolName))
+	for _, msg := range msgs {
+		if msg == nil {
+			continue
+		}
+		toolName := strings.TrimSpace(msg.ToolName)
+		if toolName == "" {
+			toolName = defaultName
+		}
+		content := msg.Content
+		if isEinoVoluntaryCancelErr(recvErr) && strings.TrimSpace(content) == "" {
+			content = "已中断并继续，当前工具调用已停止。"
+		}
+		isErr := einoToolResultIsError(toolName, content) || isEinoVoluntaryCancelErr(recvErr)
+		content = einoToolResultBody(content)
+		toolCallID := strings.TrimSpace(msg.ToolCallID)
+		if toolCallID != "" && h.runMessages != nil {
+			h.runMessages.AppendToolMessage(content, toolCallID, schema.WithToolName(toolName))
+		}
+		if h.emitter != nil {
+			h.emitter.Emit(h.ctx, toolName, content, toolCallID, isErr, agentName)
+		}
+		if recvErr != nil && !isEinoVoluntaryCancelErr(recvErr) && h.logger != nil {
+			h.logger.Warn("eino tool result stream recv error",
+				zap.Error(recvErr),
+				zap.String("agent", agentName),
+				zap.String("tool", toolName),
+				zap.String("toolCallId", toolCallID))
+		}
 	}
 	if recvErr == nil && h.confirmRecovery != nil {
 		h.confirmRecovery()

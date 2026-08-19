@@ -8,6 +8,7 @@ import (
 
 	"cyberstrike-ai/internal/config"
 
+	agenticclaude "github.com/cloudwego/eino-ext/components/model/agenticclaude"
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
@@ -307,9 +308,9 @@ func TestNewEinoAgenticModelFailoverConfigEmitsProgressEvent(t *testing.T) {
 	}
 }
 
-func TestNewEinoOpenAIAgenticChatModelFactoryBuildsBackend(t *testing.T) {
+func TestNewEinoAgenticChatModelFactoryBuildsOpenAIBackend(t *testing.T) {
 	t.Parallel()
-	factory := newEinoOpenAIAgenticChatModelFactory(newEinoBaseHTTPClient(), nil, nil)
+	factory := newEinoAgenticChatModelFactory(newEinoBaseHTTPClient(), nil, nil)
 	m, err := factory(context.Background(), config.OpenAIConfig{
 		Provider: "openai",
 		APIKey:   "test-key",
@@ -338,16 +339,23 @@ func TestNewEinoOpenAIAgenticChatModelFactoryBuildsBackend(t *testing.T) {
 	}
 }
 
-func TestNewEinoOpenAIAgenticChatModelFactoryRejectsUnsupportedProvider(t *testing.T) {
+func TestNewEinoAgenticChatModelFactoryBuildsNativeClaudeBackend(t *testing.T) {
 	t.Parallel()
-	factory := newEinoOpenAIAgenticChatModelFactory(newEinoBaseHTTPClient(), nil, nil)
-	if _, err := factory(context.Background(), config.OpenAIConfig{
+	factory := newEinoAgenticChatModelFactory(newEinoBaseHTTPClient(), nil, nil)
+	m, err := factory(context.Background(), config.OpenAIConfig{
 		Provider: "claude",
 		APIKey:   "test-key",
 		BaseURL:  "https://api.anthropic.com/v1",
 		Model:    "claude-sonnet-4",
-	}, einoModelModeNormal); err == nil {
-		t.Fatal("expected unsupported provider error")
+	}, einoModelModeNormal)
+	if err != nil {
+		t.Fatalf("claude agentic factory: %v", err)
+	}
+	if m == nil {
+		t.Fatal("claude agentic factory returned nil model")
+	}
+	if _, ok := m.(*agenticclaude.Model); !ok {
+		t.Fatalf("claude agentic factory returned %T, want native agenticclaude.Model", m)
 	}
 	gate := evaluateEinoAgenticModelGate(agenticModelGateFactory(factory, config.OpenAIConfig{
 		Provider: "claude",
@@ -355,8 +363,25 @@ func TestNewEinoOpenAIAgenticChatModelFactoryRejectsUnsupportedProvider(t *testi
 		BaseURL:  "https://api.anthropic.com/v1",
 		Model:    "claude-sonnet-4",
 	}, einoModelModeNormal), einoAgenticRuntimeSupportV0914())
-	if gate.Ready || !containsString(gate.Missing, "model.AgenticModel backend") {
-		t.Fatalf("gate = %#v, want backend missing for unsupported provider", gate)
+	if !gate.Ready {
+		t.Fatalf("gate = %#v, want ready with native Claude backend", gate)
+	}
+}
+
+func TestNewEinoToolCallingChatModelFactoryUsesNativeClaudeAdapter(t *testing.T) {
+	t.Parallel()
+	factory := newEinoToolCallingChatModelFactory(newEinoBaseHTTPClient(), nil, nil)
+	m, err := factory(context.Background(), config.OpenAIConfig{
+		Provider: "claude",
+		APIKey:   "test-key",
+		BaseURL:  "https://api.anthropic.com",
+		Model:    "claude-sonnet-4",
+	}, einoModelModePlanner)
+	if err != nil {
+		t.Fatalf("claude planner factory: %v", err)
+	}
+	if _, ok := m.(*agenticToolCallingChatModelAdapter); !ok {
+		t.Fatalf("claude planner factory returned %T, want native agentic adapter", m)
 	}
 }
 

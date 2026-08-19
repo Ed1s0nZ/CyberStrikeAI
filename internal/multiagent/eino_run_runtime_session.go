@@ -126,6 +126,9 @@ func (s *einoRunRuntimeSession) HandleRunError(runErr error) einoRunRuntimeError
 	if s == nil || runErr == nil {
 		return einoRunRuntimeErrorResult{}
 	}
+	if isEinoTurnLoopPreemptErr(s.ctx, runErr) {
+		return einoRunRuntimeErrorResult{}
+	}
 	restarted, fatal := s.maybeRestart(runErr)
 	if fatal != nil {
 		result, err := s.takePartial(fatal)

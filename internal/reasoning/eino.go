@@ -96,8 +96,8 @@ func ApplyToEinoChatModelConfig(cfg *einoopenai.ChatModelConfig, oa *config.Open
 		return
 	}
 
-	// Claude (Anthropic): merge admin extras first; optional extended thinking maps to top-level `thinking`
-	// (see internal/openai convertOpenAIToClaude). DeepSeek/OpenAI-style fields are not sent.
+	// Claude (Anthropic): merge admin extras first; optional extended thinking maps to top-level `thinking`.
+	// DeepSeek/OpenAI-style fields are not sent.
 	if strings.EqualFold(strings.TrimSpace(oa.Provider), "claude") ||
 		strings.EqualFold(strings.TrimSpace(oa.Provider), "anthropic") {
 		applyClaudeExtendedThinking(cfg, mode, effectiveEffort(sr, client, allowClient), oa.Model)

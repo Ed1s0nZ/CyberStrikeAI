@@ -107,6 +107,76 @@ func TestRunEinoADKAgentLoopUsesTurnLoopInterruptPush(t *testing.T) {
 	}
 }
 
+func TestRunEinoADKAgentLoopInterruptContinueSurvivesStreamCanceled(t *testing.T) {
+	baseCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	pushCh := make(chan func(string) bool, 1)
+	ctx := WithAgentTurnLoopInterruptRegistrar(baseCtx, func(push func(string) bool) func() {
+		pushCh <- push
+		return func() {}
+	})
+
+	mockModel := newTurnLoopHangingStreamModel()
+	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+		Name:  "turn-loop-agent",
+		Model: mockModel,
+	})
+	if err != nil {
+		t.Fatalf("NewChatModelAgent: %v", err)
+	}
+
+	done := make(chan struct{})
+	var result *RunResult
+	var runErr error
+	go func() {
+		defer close(done)
+		result, runErr = runEinoADKAgentLoop(ctx, &einoADKRunLoopArgs{
+			OrchMode:                 "deep",
+			OrchestratorName:         "turn-loop-agent",
+			ConversationID:           "conv-stream-cancel",
+			DA:                       agent,
+			EmptyResponseMessage:     "empty",
+			TurnLoopInterruptTimeout: 20 * time.Millisecond,
+		}, []*schema.Message{schema.UserMessage("initial task")})
+	}()
+
+	select {
+	case <-mockModel.started:
+	case <-ctx.Done():
+		t.Fatal("first stream did not start")
+	}
+	var push func(string) bool
+	select {
+	case push = <-pushCh:
+	case <-ctx.Done():
+		t.Fatal("turn loop interrupt hook was not registered")
+	}
+	if !push("focus emobile") {
+		t.Fatal("turn loop interrupt push was rejected")
+	}
+
+	select {
+	case <-mockModel.started:
+	case <-ctx.Done():
+		t.Fatal("second stream did not start after interrupt")
+	}
+	select {
+	case <-done:
+	case <-ctx.Done():
+		t.Fatal("run loop did not finish")
+	}
+	if runErr != nil {
+		t.Fatalf("runErr = %v, want interrupt-continue to survive stream canceled", runErr)
+	}
+	if result == nil || result.Response != "done" {
+		t.Fatalf("result = %#v, want continued turn output", result)
+	}
+	if isEinoStreamCanceled(runErr) {
+		t.Fatal("stream canceled leaked as the run error")
+	}
+}
+
 func containsString(items []string, target string) bool {
 	for _, item := range items {
 		if item == target {

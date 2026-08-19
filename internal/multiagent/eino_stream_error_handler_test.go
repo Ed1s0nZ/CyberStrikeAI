@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"github.com/cloudwego/eino/adk"
 )
 
 func TestEinoStreamErrorHandlerEmitsProgressAndRestarts(t *testing.T) {
@@ -70,6 +72,34 @@ func TestEinoStreamErrorHandlerRetryFatalUsesPartial(t *testing.T) {
 	}
 }
 
+func TestEinoStreamErrorHandlerTurnLoopPreemptSwallowsStreamCanceled(t *testing.T) {
+	var progressCalled bool
+	var retryCalled bool
+	var partialCalled bool
+	handler := newEinoStreamErrorHandler(
+		context.Background(),
+		"conv-1",
+		func(string, string, interface{}) { progressCalled = true },
+		nil,
+		func(error) (bool, error) {
+			retryCalled = true
+			return false, errors.New("should not retry")
+		},
+		func(error) (*RunResult, error) {
+			partialCalled = true
+			return nil, errors.New("should not take partial")
+		},
+	)
+
+	got := handler.Handle(adk.ErrStreamCanceled, "lead")
+	if !got.Handled || got.Restarted || got.Result != nil || got.Err != nil {
+		t.Fatalf("result = %+v, want swallowed preempt", got)
+	}
+	if progressCalled || retryCalled || partialCalled {
+		t.Fatalf("progressCalled=%v retryCalled=%v partialCalled=%v, want all false", progressCalled, retryCalled, partialCalled)
+	}
+}
+
 func TestEinoStreamErrorHandlerInterruptContinueUsesPartialWithoutProgress(t *testing.T) {
 	base := context.Background()
 	ctx, cancel := context.WithCancelCause(base)
@@ -100,6 +130,23 @@ func TestEinoStreamErrorHandlerInterruptContinueUsesPartialWithoutProgress(t *te
 	}
 	if progressCalled || retryCalled {
 		t.Fatalf("progressCalled=%v retryCalled=%v, want both false", progressCalled, retryCalled)
+	}
+}
+
+func TestIsEinoTurnLoopPreemptErr(t *testing.T) {
+	if !isEinoTurnLoopPreemptErr(context.Background(), adk.ErrStreamCanceled) {
+		t.Fatal("alive host + stream canceled should be treated as TurnLoop preempt")
+	}
+	if !isEinoTurnLoopPreemptErr(context.Background(), context.Canceled) {
+		t.Fatal("alive host + context.Canceled should be treated as TurnLoop preempt")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if isEinoTurnLoopPreemptErr(ctx, adk.ErrStreamCanceled) {
+		t.Fatal("canceled host should not be treated as TurnLoop preempt")
+	}
+	if isEinoTurnLoopPreemptErr(context.Background(), errors.New("boom")) {
+		t.Fatal("regular errors must stay fatal")
 	}
 }
 

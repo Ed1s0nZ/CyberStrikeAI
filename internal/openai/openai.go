@@ -93,7 +93,7 @@ func (c *Client) ChatCompletion(ctx context.Context, payload interface{}, out in
 		return fmt.Errorf("openai api key is empty")
 	}
 	if c.isClaude() {
-		return c.claudeChatCompletion(ctx, payload, out)
+		return c.claudeNativeChatCompletion(ctx, payload, out)
 	}
 
 	baseURL := strings.TrimSuffix(c.config.BaseURL, "/")
@@ -188,7 +188,7 @@ func (c *Client) ChatCompletionStream(ctx context.Context, payload interface{}, 
 		return "", fmt.Errorf("openai api key is empty")
 	}
 	if c.isClaude() {
-		return c.claudeChatCompletionStream(ctx, payload, onDelta)
+		return c.claudeNativeChatCompletionStream(ctx, payload, onDelta)
 	}
 
 	baseURL := strings.TrimSuffix(c.config.BaseURL, "/")
@@ -338,7 +338,7 @@ func (c *Client) ChatCompletionStreamWithToolCalls(
 		return "", nil, "", fmt.Errorf("openai api key is empty")
 	}
 	if c.isClaude() {
-		return c.claudeChatCompletionStreamWithToolCalls(ctx, payload, onContentDelta)
+		return "", nil, "", fmt.Errorf("native Claude tool-call streaming requires Eino AgenticModel")
 	}
 
 	baseURL := strings.TrimSuffix(c.config.BaseURL, "/")
