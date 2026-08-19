@@ -6,6 +6,7 @@ const ACTIVE_TASK_REFRESH_INTERVAL = 2000; // 运行态与审批态需要及时�
 const TASK_FINAL_STATUSES = new Set(['failed', 'timeout', 'cancelled', 'completed']);
 const hitlInterruptToolItemMap = new Map();
 let activeTasksLoadPromise = null;
+let activeTasksVisualSignature = '';
 const CHAT_TASK_SYNC_CHANNEL_NAME = 'cyberstrike-chat-task-sync-v1';
 let chatTaskSyncChannel = null;
 let visibleConversationReplaySyncPromise = null;
@@ -1432,7 +1433,7 @@ async function submitUserInterruptHardCancel() {
     const { progressId, conversationId } = userInterruptModalPending;
     closeUserInterruptModal();
     if (progressId) {
-        await performHardCancelProgressTask(progressId);
+        await performHardCancelProgressTask(progressId, conversationId);
         return;
     }
     if (!conversationId) {
@@ -1448,11 +1449,12 @@ async function submitUserInterruptHardCancel() {
 }
 
 /** 彻底停止任务（原「停止任务」行为） */
-async function performHardCancelProgressTask(progressId) {
+async function performHardCancelProgressTask(progressId, conversationId = '') {
     const state = progressTaskState.get(progressId);
     const stopBtn = document.getElementById(`${progressId}-stop-btn`);
+    const targetConversationId = String(conversationId || (state && state.conversationId) || '').trim();
 
-    if (!state || !state.conversationId) {
+    if (!targetConversationId) {
         if (stopBtn) {
             stopBtn.disabled = true;
             setTimeout(() => {
@@ -1463,7 +1465,7 @@ async function performHardCancelProgressTask(progressId) {
         return;
     }
 
-    if (state.cancelling) {
+    if (state && state.cancelling) {
         return;
     }
 
@@ -1474,7 +1476,7 @@ async function performHardCancelProgressTask(progressId) {
     }
 
     try {
-        await requestCancel(state.conversationId);
+        await requestCancel(targetConversationId);
         loadActiveTasks();
     } catch (error) {
         console.error('取消任务失败:', error);
@@ -6858,6 +6860,17 @@ function syncVisibleConversationTaskReplay(tasks) {
     visibleConversationReplaySyncId = conversationId;
     visibleConversationReplaySyncPromise = Promise.resolve()
         .then(async function () {
+            // 用户可能在任务刷新排队后、此微任务执行前切换了会话。
+            // 不允许旧会话补流取消或覆盖用户刚发起的目标会话加载。
+            if (String(window.currentConversationId || '') !== conversationId) {
+                return false;
+            }
+            if (
+                typeof window.isChatConversationLoadPending === 'function' &&
+                window.isChatConversationLoadPending(conversationId)
+            ) {
+                return false;
+            }
             // 另一标签页已新增用户消息和运行中助手轮次；先重载轻量历史，避免把补流挂到旧助手消息上。
             if (typeof window.loadConversation === 'function') {
                 await window.loadConversation(conversationId);
@@ -6893,6 +6906,33 @@ function getActiveTaskDisplayName(task) {
     return message || unnamedTaskText;
 }
 
+function stableActiveTasksForDisplay(tasks) {
+    return (Array.isArray(tasks) ? tasks : []).slice().sort(function (a, b) {
+        const aStartedAt = Date.parse(a && a.startedAt ? a.startedAt : '');
+        const bStartedAt = Date.parse(b && b.startedAt ? b.startedAt : '');
+        const aTime = Number.isFinite(aStartedAt) ? aStartedAt : Number.MAX_SAFE_INTEGER;
+        const bTime = Number.isFinite(bStartedAt) ? bStartedAt : Number.MAX_SAFE_INTEGER;
+        if (aTime !== bTime) return aTime - bTime;
+        return String(a && a.conversationId || '').localeCompare(String(b && b.conversationId || ''));
+    });
+}
+
+function activeTasksRenderSignature(tasks) {
+    const language = typeof i18next !== 'undefined' && i18next.language ? i18next.language : getCurrentTimeLocale();
+    return JSON.stringify({
+        language: language,
+        tasks: (Array.isArray(tasks) ? tasks : []).map(function (task) {
+            return {
+                conversationId: task && task.conversationId || '',
+                title: task && task.title || '',
+                message: task && task.message || '',
+                startedAt: task && task.startedAt || '',
+                status: task && task.status || ''
+            };
+        })
+    });
+}
+
 function updateActiveTaskConversationTitle(conversationId, newTitle) {
     const bar = document.getElementById('active-tasks-bar');
     if (!bar || !conversationId) return;
@@ -6909,7 +6949,7 @@ function renderActiveTasks(tasks) {
     const bar = document.getElementById('active-tasks-bar');
     if (!bar) return;
 
-    const normalizedTasks = Array.isArray(tasks) ? tasks : [];
+    const normalizedTasks = stableActiveTasksForDisplay(tasks);
     conversationExecutionTracker.update(normalizedTasks);
     window.dispatchEvent(new CustomEvent('conversation-task-state-changed', {
         detail: { tasks: normalizedTasks }
@@ -6930,10 +6970,20 @@ function renderActiveTasks(tasks) {
     if (normalizedTasks.length === 0) {
         bar.style.display = 'none';
         bar.innerHTML = '';
+        activeTasksVisualSignature = '';
         return;
     }
 
     bar.style.display = 'flex';
+    const nextVisualSignature = activeTasksRenderSignature(normalizedTasks);
+    if (
+        nextVisualSignature === activeTasksVisualSignature &&
+        bar.querySelectorAll('.active-task-item').length === normalizedTasks.length
+    ) {
+        return;
+    }
+    const previousScrollLeft = bar.scrollLeft;
+    activeTasksVisualSignature = nextVisualSignature;
     bar.innerHTML = '';
 
     function openActiveTaskConversation(conversationId) {
@@ -7012,6 +7062,7 @@ function renderActiveTasks(tasks) {
 
         bar.appendChild(item);
     });
+    bar.scrollLeft = previousScrollLeft;
 }
 
 function reconcileHitlApprovalStateWithActiveTasks(tasks) {

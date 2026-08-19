@@ -3352,15 +3352,17 @@ function appendChatProjectConversationItem(list, conversation, project) {
     });
     button.appendChild(label);
 
-    button.addEventListener('click', async () => {
+    button.addEventListener('click', async (event) => {
+        const targetConversationId = String(event.currentTarget && event.currentTarget.dataset.conversationId || '').trim();
+        if (!targetConversationId) return;
         projectConversationPreviewSuppressedUntil = Date.now() + 700;
         hideProjectConversationPreview(true);
-        selectChatProjectConversationItem(conversation.id);
+        selectChatProjectConversationItem(targetConversationId);
         if (typeof window.loadConversation === 'function') {
-            await window.loadConversation(conversation.id);
+            await window.loadConversation(targetConversationId);
         }
-        if (window.currentConversationId === conversation.id && completed) {
-            markProjectConversationViewed(conversation.id, completed.completedAt);
+        if (window.currentConversationId === targetConversationId && completed) {
+            markProjectConversationViewed(targetConversationId, completed.completedAt);
             renderChatProjectFolders(projectsCacheAll);
         }
     });

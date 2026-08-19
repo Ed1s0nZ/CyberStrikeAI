@@ -6,6 +6,7 @@ const vm = require('node:vm');
 const scroll = fs.readFileSync('web/static/js/chat-scroll.js', 'utf8');
 const monitor = fs.readFileSync('web/static/js/monitor.js', 'utf8');
 const chat = fs.readFileSync('web/static/js/chat.js', 'utf8');
+const projects = fs.readFileSync('web/static/js/projects.js', 'utf8');
 const router = fs.readFileSync('web/static/js/router.js', 'utf8');
 const auth = fs.readFileSync('web/static/js/auth.js', 'utf8');
 const webshell = fs.readFileSync('web/static/js/webshell.js', 'utf8');
@@ -383,6 +384,76 @@ test('任务计划进度事件在活跃任务列表变化和新任务开始时�
     assert.match(renderSource, /detail: \{ tasks: normalizedTasks \}/);
 });
 
+test('活跃任务按启动时间稳定排列且无变化刷新不重建停止按钮', () => {
+    const sortSource = functionSource(monitor, 'stableActiveTasksForDisplay', 'activeTasksRenderSignature');
+    const sortTasks = vm.runInNewContext(`(${sortSource.trim()})`);
+    const tasks = [
+        { conversationId: 'conversation-z', startedAt: '2026-08-19T10:00:00Z' },
+        { conversationId: 'conversation-late', startedAt: '2026-08-19T10:01:00Z' },
+        { conversationId: 'conversation-a', startedAt: '2026-08-19T10:00:00Z' }
+    ];
+    assert.deepEqual(
+        Array.from(sortTasks(tasks), task => task.conversationId),
+        ['conversation-a', 'conversation-z', 'conversation-late']
+    );
+
+    const renderSource = functionSource(monitor, 'renderActiveTasks', 'reconcileHitlApprovalStateWithActiveTasks');
+    assert.match(renderSource, /nextVisualSignature === activeTasksVisualSignature/);
+    assert.match(renderSource, /bar\.querySelectorAll\('\.active-task-item'\)\.length === normalizedTasks\.length/);
+    assert.match(renderSource, /const previousScrollLeft = bar\.scrollLeft/);
+    assert.match(renderSource, /bar\.scrollLeft = previousScrollLeft/);
+});
+
+test('新对话初始化期间切换会话后旧流事件不能把页面拉回', () => {
+    const guardSource = functionSource(chat, 'shouldIgnoreLiveChatStreamEvent', 'clearLiveChatStreamIfOwned');
+    const shouldIgnore = vm.runInNewContext(`(${guardSource.trim()})`);
+    const activeStream = { active: true, detached: false, navigationSeq: 7 };
+
+    assert.equal(shouldIgnore(activeStream, activeStream, 7), false);
+    activeStream.detached = true;
+    assert.equal(shouldIgnore(activeStream, activeStream, 7), true);
+    activeStream.detached = false;
+    activeStream.active = false;
+    assert.equal(shouldIgnore(activeStream, activeStream, 7), true);
+    activeStream.active = true;
+    assert.equal(shouldIgnore(activeStream, activeStream, 8), true);
+    assert.equal(shouldIgnore({ active: true, detached: false, navigationSeq: 7 }, activeStream, 7), true);
+
+    const sendSource = functionSource(chat, 'sendMessage', 'renderChatFileChips');
+    const guardIndex = sendSource.indexOf('shouldIgnoreLiveChatStreamEvent(liveStreamState)');
+    const handlerIndex = sendSource.indexOf('handleStreamEvent(eventData');
+    assert.notEqual(guardIndex, -1);
+    assert.notEqual(handlerIndex, -1);
+    assert.ok(guardIndex < handlerIndex);
+    assert.match(sendSource, /const requestNavigationSeq = chatConversationNavigationSeq;[\s\S]*?await loadActiveTasks\(\)/);
+    assert.match(sendSource, /if \(requestNavigationSeq !== chatConversationNavigationSeq\) \{[\s\S]{0,80}return;/);
+    assert.match(sendSource, /navigationSeq: requestNavigationSeq/);
+    assert.match(sendSource, /if \(!streamConversationId\) \{[\s\S]{0,180}liveStreamState\.conversationId = eventConvId/);
+    assert.match(sendSource, /if \(eventConvId\) updateProgressConversation\(progressId, eventConvId\);[\s\S]{0,80}return;/);
+
+    const loadSource = functionSource(chat, 'loadConversation', 'attachDeleteTurnButton');
+    const newConversationSource = functionSource(chat, 'startNewConversation', 'loadConversations');
+    assert.match(loadSource, /markChatConversationNavigation\(conversationId\)/);
+    assert.match(loadSource, /window\.cancelScheduledChatConversationFromHash\(\)/);
+    assert.match(newConversationSource, /markChatConversationNavigation\('', true\)/);
+    assert.match(newConversationSource, /clearChatConversationHash\(\)/);
+    assert.match(router, /function cancelScheduledChatConversationFromHash\(\)[\s\S]{0,160}chatConversationFromHashSeq\+\+/);
+    assert.match(chat, /function abandonChatConversationForPageNavigation\(\)[\s\S]{0,260}markChatConversationNavigation\('', true\)/);
+    assert.match(chat, /abandonChatConversationForPageNavigation\(\)[\s\S]{0,420}detachLiveChatStreamForNavigation\('', true\)/);
+    assert.match(router, /currentPage === 'chat'[\s\S]{0,140}window\.abandonChatConversationForPageNavigation\(\)/);
+    assert.match(chat, /const targetConversationId = String\(item\.dataset\.conversationId \|\| ''\)\.trim\(\);[\s\S]{0,80}loadConversation\(targetConversationId\)/);
+    assert.match(projects, /const targetConversationId = String\(event\.currentTarget && event\.currentTarget\.dataset\.conversationId \|\| ''\)\.trim\(\)/);
+    assert.match(projects, /window\.loadConversation\(targetConversationId\)/);
+    assert.match(chat, /let loadConversationPendingId = ''/);
+    assert.match(chat, /window\.isChatConversationLoadPending = isChatConversationLoadPending/);
+    const immediateSelectionIndex = loadSource.indexOf('currentConversationId = conversationId;');
+    const conversationFetchIndex = loadSource.indexOf('await apiFetch(`/api/conversations/${conversationId}?include_process_details=0`');
+    assert.notEqual(immediateSelectionIndex, -1);
+    assert.notEqual(conversationFetchIndex, -1);
+    assert.ok(immediateSelectionIndex < conversationFetchIndex);
+    assert.match(monitor, /String\(window\.currentConversationId \|\| ''\) !== conversationId[\s\S]{0,300}window\.isChatConversationLoadPending\(conversationId\)/);
+});
+
 test('刷新指定对话时立即恢复且加载完成前不闪出无项目状态', () => {
     const scheduleSource = functionSource(router, 'scheduleChatConversationFromHash', 'navigateToConversation');
     const restoreStateSource = functionSource(router, 'setChatConversationRestorePending', 'finishChatConversationRestore');
@@ -397,8 +468,8 @@ test('刷新指定对话时立即恢复且加载完成前不闪出无项目状�
     assert.match(loadSource, /finally \{[\s\S]*?finishChatConversationRestore\(conversationId\)/);
     assert.match(css, /\.chat-container\.is-conversation-restoring #chat-messages/);
     assert.match(css, /\.chat-container\.is-conversation-restoring #chat-input-container/);
-    assert.match(html, /router\.js\?v=20260813-2/);
-    assert.match(html, /chat\.js\?v=20260819-1/);
+    assert.match(html, /router\.js\?v=20260819-3/);
+    assert.match(html, /chat\.js\?v=20260819-5/);
 });
 
 test('刷新运行中回复会复用已持久化 planning 并继续追加未来增量', () => {
