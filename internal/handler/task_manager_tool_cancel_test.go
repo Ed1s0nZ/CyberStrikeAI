@@ -32,7 +32,7 @@ func TestCancelTaskInvokesToolCancelerOnFullStop(t *testing.T) {
 	}
 }
 
-func TestCancelTaskUsesAgentRuntimeCancelAsPrimaryPath(t *testing.T) {
+func TestCancelTaskFullStopCancelsRuntimeAndParentContext(t *testing.T) {
 	tm := NewAgentTaskManager()
 	var order []string
 	tm.SetToolCanceler(func(conversationID string) {
@@ -61,7 +61,7 @@ func TestCancelTaskUsesAgentRuntimeCancelAsPrimaryPath(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatalf("CancelTask: ok=%v err=%v", ok, err)
 	}
-	want := []string{"runtime", "tool"}
+	want := []string{"runtime", "context", "tool"}
 	if len(order) != len(want) {
 		t.Fatalf("order length got %d want %d: %#v", len(order), len(want), order)
 	}
@@ -69,6 +69,29 @@ func TestCancelTaskUsesAgentRuntimeCancelAsPrimaryPath(t *testing.T) {
 		if order[i] != want[i] {
 			t.Fatalf("order[%d] got %q want %q; full=%#v", i, order[i], want[i], order)
 		}
+	}
+}
+
+func TestCancelTaskInterruptContinueKeepsParentWhenRuntimeHandlesIt(t *testing.T) {
+	tm := NewAgentTaskManager()
+	ctx, cancel := context.WithCancelCause(context.Background())
+	if _, err := tm.StartTask("conv-interrupt-native", "hello", cancel); err != nil {
+		t.Fatalf("StartTask: %v", err)
+	}
+	unregister := tm.BindAgentRuntimeCancel("conv-interrupt-native", func(err error) bool {
+		if !errors.Is(err, multiagent.ErrInterruptContinue) {
+			t.Fatalf("runtime cancel got %v", err)
+		}
+		return true
+	})
+	defer unregister()
+
+	ok, err := tm.CancelTask("conv-interrupt-native", multiagent.ErrInterruptContinue)
+	if err != nil || !ok {
+		t.Fatalf("CancelTask: ok=%v err=%v", ok, err)
+	}
+	if cause := context.Cause(ctx); cause != nil {
+		t.Fatalf("interrupt-continue parent context cause = %v, want nil", cause)
 	}
 }
 

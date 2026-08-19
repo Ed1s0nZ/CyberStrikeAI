@@ -485,7 +485,10 @@ func (m *AgentTaskManager) CancelTask(conversationID string, cause error) (bool,
 	if runtimeCancel != nil {
 		runtimeHandled = runtimeCancel(cause)
 	}
-	if cancel != nil && !runtimeHandled {
+	// 「彻底停止」必须同时取消宿主 context：原生 Agent Cancel 即使已受理，
+	// 也可能只在安全点返回或报告超时，不能据此让整条任务继续存活。
+	// 中断并继续仍保留原语义：原生取消已处理时由运行时负责恢复。
+	if cancel != nil && (!runtimeHandled || errors.Is(cause, ErrTaskCancelled)) {
 		cancel(cause)
 	}
 	if toolCanceler != nil {
