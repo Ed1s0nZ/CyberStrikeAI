@@ -58,6 +58,24 @@ func ToolsFromDefinitions(
 	return out, nil
 }
 
+// sanitizeOpenAIToolName 将 MCP 工具名转换为 OpenAI 兼容格式，满足 ^[a-zA-Z0-9_-]+$ 约束。
+// MCP 命名空间分隔符 :: 转为 __，点号 . 转为 _，其余非法字符转为 _。
+// 仅用于展示给模型的 ToolInfo.Name；执行时仍使用原始 m.name（mcpBridgeTool.name），不受影响。
+func sanitizeOpenAIToolName(name string) string {
+	name = strings.ReplaceAll(name, "::", "__")
+	name = strings.ReplaceAll(name, ".", "_")
+	var b strings.Builder
+	b.Grow(len(name))
+	for _, r := range name {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
+			b.WriteRune(r)
+			continue
+		}
+		b.WriteByte('_')
+	}
+	return b.String()
+}
+
 func toolInfoFromDefinition(d agent.Tool) (*schema.ToolInfo, error) {
 	fn := d.Function
 	raw, err := json.Marshal(fn.Parameters)
@@ -77,7 +95,7 @@ func toolInfoFromDefinition(d agent.Tool) (*schema.ToolInfo, error) {
 		// 空参数对象
 	}
 	return &schema.ToolInfo{
-		Name:        fn.Name,
+		Name:        sanitizeOpenAIToolName(fn.Name),
 		Desc:        fn.Description,
 		ParamsOneOf: schema.NewParamsOneOfByJSONSchema(&js),
 	}, nil
