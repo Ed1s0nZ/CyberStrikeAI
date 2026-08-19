@@ -130,6 +130,8 @@ const DEFAULT_HITL_TIMEOUT_SECONDS = 300;
 const DEFAULT_HITL_SESSION_TOOL_WHITELIST = 'tool_search, skill, task, write_todos, transfer_to_agent, exit, TaskCreate, TaskGet, TaskUpdate, TaskList, upsert_project_fact, get_project_fact';
 let hitlApplyFeedbackTimer = null;
 let hitlAutoSaveTimer = null;
+let hitlConfigSyncConversationId = '';
+let hitlConfigSyncPromise = Promise.resolve();
 const sessionSettingsSelects = new Map();
 let sessionSettingsSelectDocBound = false;
 
@@ -704,6 +706,18 @@ function bindHitlSidebarModeListener() {
 function refreshHitlConfigByCurrentConversation() {
     const cfg = getHitlConfigForConversation(currentConversationId || '');
     applyHitlConfigToUI(cfg);
+}
+
+async function waitForHitlConfigReady(conversationId) {
+    const cid = String(conversationId || '').trim();
+    if (cid && hitlConfigSyncConversationId === cid) {
+        await hitlConfigSyncPromise;
+        return;
+    }
+    if (!cid && window.csaiHitlDefaultReviewerReady && typeof window.csaiHitlDefaultReviewerReady.then === 'function') {
+        await window.csaiHitlDefaultReviewerReady.catch(function () {});
+        if (!currentConversationId) refreshHitlConfigByCurrentConversation();
+    }
 }
 
 function showHitlApplyFeedback(text, isError, partial) {
@@ -2198,6 +2212,15 @@ async function sendMessage() {
     if (!message && !hasAttachments) {
         return;
     }
+
+    // A restored conversation renders from the local cache first, while its
+    // authoritative HITL config is fetched separately. Do not let a fast send
+    // reuse the temporary/default reviewer (historically "human") before that
+    // fetch completes, otherwise refreshing could turn Audit Agent review into
+    // a human approval for the next tool call.
+    const hitlConversationAtSendStart = String(currentConversationId || '').trim();
+    await waitForHitlConfigReady(hitlConversationAtSendStart);
+    if (String(currentConversationId || '').trim() !== hitlConversationAtSendStart) return;
 
     // Enter 会直接调用 sendMessage；同一会话在其他标签页已启动任务时，
     // 必须在渲染用户气泡和发起 POST 前做一次权威状态同步，避免生成一轮“已有任务执行中”伪对话。
@@ -6178,7 +6201,12 @@ async function loadConversation(conversationId) {
                 }
             }).catch(() => {})
             : Promise.resolve();
-        void hitlSyncPromise;
+        hitlConfigSyncConversationId = conversationId;
+        hitlConfigSyncPromise = Promise.resolve(hitlSyncPromise);
+        await hitlConfigSyncPromise;
+        if (seq !== loadConversationRequestSeq || currentConversationId !== conversationId) {
+            return;
+        }
         updateActiveConversation();
         
         // 如果攻击链模态框打开且显示的不是当前对话，关闭它

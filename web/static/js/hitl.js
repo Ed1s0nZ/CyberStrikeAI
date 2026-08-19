@@ -100,6 +100,7 @@ const HITL_LOGS_PAGE_SIZE_KEY = 'cyberstrike_hitl_logs_page_size';
 const HITL_PENDING_PAGE_SIZE_KEY = 'cyberstrike_hitl_pending_page_size';
 const HITL_TIMEOUT_DEFAULT_MIGRATION_PREFIX = 'cyberstrike-hitl-timeout-default-v1:';
 const HITL_PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
+const hitlConversationConfigSaveQueues = new Map();
 
 function hitlPaginationT(key, opts, fallback) {
     if (typeof window.t === 'function') {
@@ -495,29 +496,39 @@ async function saveHitlPageWhitelist() {
 
 async function saveHitlConversationConfig(conversationId, config) {
     if (!conversationId || !config) return false;
+    const normalizedConversationId = String(conversationId).trim();
     const mode = hitlModeNormalize(config.mode || 'off');
     const enabled = typeof config.enabled === 'boolean' ? config.enabled : (mode !== 'off');
     const sensitiveTools = hitlSensitiveToolsToArray(config);
     const timeoutSeconds = normalizeHitlTimeoutSeconds(config.timeoutSeconds, 0);
     const reviewer = hitlReviewerNormalize(config.reviewer || 'human');
-    const resp = await hitlApiFetch('/api/hitl/config', {
-        method: 'PUT',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            conversationId: conversationId,
-            enabled: enabled,
-            mode: mode,
-            reviewer: reviewer,
-            sensitiveTools: sensitiveTools,
-            timeoutSeconds: timeoutSeconds
-        })
+    const previous = hitlConversationConfigSaveQueues.get(normalizedConversationId) || Promise.resolve();
+    const queued = previous.catch(function () {}).then(async function () {
+        const resp = await hitlApiFetch('/api/hitl/config', {
+            method: 'PUT',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                conversationId: normalizedConversationId,
+                enabled: enabled,
+                mode: mode,
+                reviewer: reviewer,
+                sensitiveTools: sensitiveTools,
+                timeoutSeconds: timeoutSeconds
+            })
+        });
+        if (!resp.ok) {
+            const msg = await readHitlApiError(resp);
+            throw new Error(msg || ('HTTP ' + resp.status));
+        }
+        return true;
     });
-    if (!resp.ok) {
-        const msg = await readHitlApiError(resp);
-        throw new Error(msg || ('HTTP ' + resp.status));
-    }
-    return true;
+    hitlConversationConfigSaveQueues.set(normalizedConversationId, queued);
+    return queued.finally(function () {
+        if (hitlConversationConfigSaveQueues.get(normalizedConversationId) === queued) {
+            hitlConversationConfigSaveQueues.delete(normalizedConversationId);
+        }
+    });
 }
 
 async function syncHitlConfigFromServer(conversationId) {
@@ -1809,7 +1820,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (typeof window.bindHitlReviewerToggleListeners === 'function') {
         window.bindHitlReviewerToggleListeners();
     }
-    initHitlDefaultReviewerFromServer();
+    window.csaiHitlDefaultReviewerReady = initHitlDefaultReviewerFromServer();
     setTimeout(reconcileHitlUiState, 0);
 });
 

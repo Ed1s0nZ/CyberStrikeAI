@@ -4282,7 +4282,9 @@ function describeHitlApprovalRequest(data) {
     if (isBrowser) {
         kind = 'browser';
         question = url
-            ? hitlApprovalTemplate('hitl.requestVisitUrl', '允许 CyberStrikeAI 访问 {{url}}？', { url: url })
+            ? (url.length > 160
+                ? hitlApprovalTranslate('hitl.requestVisitLongUrl', '允许 CyberStrikeAI 访问此地址？')
+                : hitlApprovalTemplate('hitl.requestVisitUrl', '允许 CyberStrikeAI 访问 {{url}}？', { url: url }))
             : hitlApprovalTranslate('hitl.requestBrowser', '允许 CyberStrikeAI 使用浏览器？');
         primary = url;
     } else if (isCommand) {
@@ -4292,7 +4294,9 @@ function describeHitlApprovalRequest(data) {
     } else if (isFile) {
         kind = 'file';
         question = path
-            ? hitlApprovalTemplate('hitl.requestFile', '允许 CyberStrikeAI 修改 {{path}}？', { path: path })
+            ? (path.length > 160
+                ? hitlApprovalTranslate('hitl.requestModifyLongPath', '允许 CyberStrikeAI 修改此文件？')
+                : hitlApprovalTemplate('hitl.requestFile', '允许 CyberStrikeAI 修改 {{path}}？', { path: path }))
             : hitlApprovalTranslate('hitl.requestFiles', '允许 CyberStrikeAI 修改文件？');
         primary = path;
     }
@@ -4835,6 +4839,20 @@ function clearChatHitlApprovalDock(interruptId) {
     if (container) container.classList.remove('has-hitl-approval');
 }
 
+function wrapChatHitlApprovalScrollRegion(dock) {
+    if (!dock) return;
+    const actions = Array.prototype.find.call(dock.children, function (child) {
+        return child.classList && child.classList.contains('hitl-inline-actions');
+    });
+    if (!actions) return;
+    const scrollRegion = document.createElement('div');
+    scrollRegion.className = 'chat-hitl-approval-scroll-region';
+    while (dock.firstChild && dock.firstChild !== actions) {
+        scrollRegion.appendChild(dock.firstChild);
+    }
+    dock.insertBefore(scrollRegion, actions);
+}
+
 function renderChatHitlApprovalDock(data) {
     const dock = document.getElementById('chat-hitl-approval-dock');
     if (!dock || !data || !data.interruptId) return false;
@@ -4855,6 +4873,7 @@ function renderChatHitlApprovalDock(data) {
         allowEdit: allowEdit,
         argsJSON: JSON.stringify(hitlApprovalArguments(data), null, 2)
     });
+    wrapChatHitlApprovalScrollRegion(dock);
     dock.hidden = false;
     const container = dock.closest('.chat-input-container');
     if (container) container.classList.add('has-hitl-approval');
