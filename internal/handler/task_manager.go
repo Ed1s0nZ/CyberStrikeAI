@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -591,6 +592,12 @@ func (m *AgentTaskManager) GetActiveTasks() []*AgentTask {
 			Status:         task.Status,
 		})
 	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].StartedAt.Equal(result[j].StartedAt) {
+			return result[i].ConversationID < result[j].ConversationID
+		}
+		return result[i].StartedAt.Before(result[j].StartedAt)
+	})
 	return result
 }
 
