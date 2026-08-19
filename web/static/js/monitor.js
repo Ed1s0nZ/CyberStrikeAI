@@ -6841,6 +6841,17 @@ function syncVisibleConversationTaskReplay(tasks) {
     visibleConversationReplaySyncId = conversationId;
     visibleConversationReplaySyncPromise = Promise.resolve()
         .then(async function () {
+            // 用户可能在任务刷新排队后、此微任务执行前切换了会话。
+            // 不允许旧会话补流取消或覆盖用户刚发起的目标会话加载。
+            if (String(window.currentConversationId || '') !== conversationId) {
+                return false;
+            }
+            if (
+                typeof window.isChatConversationLoadPending === 'function' &&
+                window.isChatConversationLoadPending(conversationId)
+            ) {
+                return false;
+            }
             // 另一标签页已新增用户消息和运行中助手轮次；先重载轻量历史，避免把补流挂到旧助手消息上。
             if (typeof window.loadConversation === 'function') {
                 await window.loadConversation(conversationId);

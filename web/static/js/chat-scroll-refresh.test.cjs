@@ -341,7 +341,7 @@ test('消息气泡内部流式增高时仅在跟随模式继续粘底', () => {
 
 test('页面在任务补流脚本之前加载智能滚动控制器', () => {
     const scrollIndex = html.indexOf('/static/js/chat-scroll.js?v=20260815-1');
-    const monitorIndex = html.indexOf('/static/js/monitor.js?v=20260819-2');
+    const monitorIndex = html.indexOf('/static/js/monitor.js?v=20260819-3');
 
     assert.notEqual(scrollIndex, -1);
     assert.notEqual(monitorIndex, -1);
@@ -444,6 +444,14 @@ test('新对话初始化期间切换会话后旧流事件不能把页面拉回',
     assert.match(chat, /const targetConversationId = String\(item\.dataset\.conversationId \|\| ''\)\.trim\(\);[\s\S]{0,80}loadConversation\(targetConversationId\)/);
     assert.match(projects, /const targetConversationId = String\(event\.currentTarget && event\.currentTarget\.dataset\.conversationId \|\| ''\)\.trim\(\)/);
     assert.match(projects, /window\.loadConversation\(targetConversationId\)/);
+    assert.match(chat, /let loadConversationPendingId = ''/);
+    assert.match(chat, /window\.isChatConversationLoadPending = isChatConversationLoadPending/);
+    const immediateSelectionIndex = loadSource.indexOf('currentConversationId = conversationId;');
+    const conversationFetchIndex = loadSource.indexOf('await apiFetch(`/api/conversations/${conversationId}?include_process_details=0`');
+    assert.notEqual(immediateSelectionIndex, -1);
+    assert.notEqual(conversationFetchIndex, -1);
+    assert.ok(immediateSelectionIndex < conversationFetchIndex);
+    assert.match(monitor, /String\(window\.currentConversationId \|\| ''\) !== conversationId[\s\S]{0,300}window\.isChatConversationLoadPending\(conversationId\)/);
 });
 
 test('刷新指定对话时立即恢复且加载完成前不闪出无项目状态', () => {
@@ -461,7 +469,7 @@ test('刷新指定对话时立即恢复且加载完成前不闪出无项目状�
     assert.match(css, /\.chat-container\.is-conversation-restoring #chat-messages/);
     assert.match(css, /\.chat-container\.is-conversation-restoring #chat-input-container/);
     assert.match(html, /router\.js\?v=20260819-3/);
-    assert.match(html, /chat\.js\?v=20260819-3/);
+    assert.match(html, /chat\.js\?v=20260819-4/);
 });
 
 test('刷新运行中回复会复用已持久化 planning 并继续追加未来增量', () => {

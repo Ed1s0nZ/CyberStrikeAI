@@ -18,7 +18,14 @@ function clearChatConversationHash() {
 window.clearChatConversationHash = clearChatConversationHash;
 let loadConversationRequestSeq = 0;
 let loadConversationAbortController = null;
+let loadConversationPendingId = '';
 let chatConversationNavigationSeq = 0;
+
+function isChatConversationLoadPending(conversationId) {
+    const id = String(conversationId || '').trim();
+    return !!id && loadConversationPendingId === id;
+}
+window.isChatConversationLoadPending = isChatConversationLoadPending;
 
 function markChatConversationNavigation(nextConversationId, force = false) {
     const nextId = String(nextConversationId || '').trim();
@@ -6127,6 +6134,8 @@ async function prefetchLastAssistantProcessDetails() {
 }
 
 async function loadConversation(conversationId) {
+    conversationId = String(conversationId || '').trim();
+    if (!conversationId) return;
     // Keep the visible conversation addressable across a full page refresh.
     // Sidebar/project entries call loadConversation directly (rather than the
     // router helper), so without this synchronization #chat loses the active
@@ -6141,6 +6150,14 @@ async function loadConversation(conversationId) {
     const previousConversationId = currentConversationId;
     cancelPendingConversationLoad();
     detachLiveChatStreamForNavigation(conversationId);
+    // 用户单击即代表新的可见会话。必须在任何网络等待之前提交该选择，
+    // 否则每 2 秒的活跃任务刷新仍会把旧会话识别为可见，并排队重载旧补流，
+    // 反过来取消这次切换。
+    currentConversationId = conversationId;
+    try {
+        window.currentConversationId = conversationId;
+    } catch (e) { /* ignore */ }
+    loadConversationPendingId = conversationId;
     const conversationLoadController = new AbortController();
     loadConversationAbortController = conversationLoadController;
     if (typeof window.selectChatProjectConversationItem === 'function') {
@@ -6171,6 +6188,14 @@ async function loadConversation(conversationId) {
             return;
         }
         if (response && !response.ok) {
+            if (seq === loadConversationRequestSeq) {
+                currentConversationId = previousConversationId;
+                try {
+                    window.currentConversationId = previousConversationId || '';
+                } catch (e) { /* ignore */ }
+                if (previousConversationId) syncChatConversationHash(previousConversationId);
+                else clearChatConversationHash();
+            }
             showChatToast('加载对话失败: ' + (conversation.error || '未知错误'), 'error');
             return;
         }
@@ -6452,8 +6477,16 @@ async function loadConversation(conversationId) {
         }
     } catch (error) {
         if (error && error.name === 'AbortError') return;
-        if (seq === loadConversationRequestSeq && typeof window.selectChatProjectConversationItem === 'function') {
-            window.selectChatProjectConversationItem(previousConversationId);
+        if (seq === loadConversationRequestSeq) {
+            currentConversationId = previousConversationId;
+            try {
+                window.currentConversationId = previousConversationId || '';
+            } catch (e) { /* ignore */ }
+            if (previousConversationId) syncChatConversationHash(previousConversationId);
+            else clearChatConversationHash();
+            if (typeof window.selectChatProjectConversationItem === 'function') {
+                window.selectChatProjectConversationItem(previousConversationId);
+            }
         }
         console.error('加载对话失败:', error);
         showChatToast('加载对话失败: ' + (error && error.message ? error.message : String(error)), 'error');
@@ -6463,6 +6496,9 @@ async function loadConversation(conversationId) {
         }
         if (loadConversationAbortController === conversationLoadController) {
             loadConversationAbortController = null;
+        }
+        if (seq === loadConversationRequestSeq && loadConversationPendingId === conversationId) {
+            loadConversationPendingId = '';
         }
     }
 }

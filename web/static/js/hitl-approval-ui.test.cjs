@@ -260,11 +260,11 @@ test('多对话并发时释放隐藏主流且旧请求不能覆盖新对话状�
     assert.match(monitor, /function scrollProcessDetailsToLatest\(assistantMessageId, smooth = true\)/);
     assert.match(monitor, /timeline\.scrollTop = targetTop/);
     assert.match(chat, /let loadConversationAbortController = null/);
-    assert.match(chat, /cancelPendingConversationLoad\(\);[\s\S]{0,220}const conversationLoadController = new AbortController\(\)/);
+    assert.match(chat, /cancelPendingConversationLoad\(\);[\s\S]{0,900}const conversationLoadController = new AbortController\(\)/);
     assert.match(chat, /signal: conversationLoadController\.signal/);
-    assert.match(template, /monitor\.js\?v=20260819-2/);
+    assert.match(template, /monitor\.js\?v=20260819-3/);
     assert.match(template, /chat-scroll\.js\?v=20260815-1/);
-    assert.match(template, /chat\.js\?v=20260819-3/);
+    assert.match(template, /chat\.js\?v=20260819-4/);
     assert.match(template, /style\.css\?v=20260818-3/);
 });
 
