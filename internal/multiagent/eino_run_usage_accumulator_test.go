@@ -49,16 +49,16 @@ func TestEinoRunUsageAccumulatorEmitOnce(t *testing.T) {
 		}
 	}
 
-	if !acc.EmitOnce("conv-1", "deep", "final", progress, nil) {
+	if !acc.EmitOnce("conv-1", "deep", "final", "gpt-test", progress, nil) {
 		t.Fatal("first emit should return true")
 	}
-	if acc.EmitOnce("conv-1", "deep", "partial", progress, nil) {
+	if acc.EmitOnce("conv-1", "deep", "partial", "gpt-test", progress, nil) {
 		t.Fatal("second emit should return false")
 	}
 	if len(events) != 1 {
 		t.Fatalf("events = %#v, want one usage summary", events)
 	}
-	if events[0]["conversationId"] != "conv-1" || events[0]["orchestration"] != "deep" || events[0]["reason"] != "final" || events[0]["totalTokens"] != 3 {
+	if events[0]["conversationId"] != "conv-1" || events[0]["orchestration"] != "deep" || events[0]["reason"] != "final" || events[0]["model"] != "gpt-test" || events[0]["totalTokens"] != 3 {
 		t.Fatalf("event = %#v", events[0])
 	}
 }

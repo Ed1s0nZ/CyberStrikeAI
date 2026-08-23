@@ -529,6 +529,16 @@
                                         <span class="dashboard-kpi-sub-text" id="dashboard-kpi-rate-sub-text" data-i18n="dashboard.healthyStatus">运行平稳</span>
                                     </div>
                                 </div>
+                                <div class="dashboard-kpi-card" role="button" tabindex="0" onclick="switchPage('chat')" onkeydown="if(event.key==='Enter'||event.key===' ') { event.preventDefault(); switchPage('chat'); }" data-i18n="dashboard.clickToViewChat" data-i18n-attr="title" title="点击查看对话">
+                                    <div class="dashboard-kpi-head">
+                                        <div class="dashboard-kpi-label" data-i18n="dashboard.tokenUsage">Token 用量</div>
+                                        <span class="dashboard-kpi-icon dashboard-kpi-icon-tokens" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/><path d="M8 3 6 21"/><path d="m18 3-2 18"/></svg></span>
+                                    </div>
+                                    <div class="dashboard-kpi-value" id="dashboard-kpi-token-usage">-</div>
+                                    <div class="dashboard-kpi-sub">
+                                        <span class="dashboard-kpi-sub-text" id="dashboard-kpi-token-sub-text">-</span>
+                                    </div>
+                                </div>
                             </div>
                             <!-- 两列主内容区 -->
                             <div class="dashboard-grid">
@@ -1213,7 +1223,7 @@
                                 <div id="agent-mode-wrapper" class="agent-mode-wrapper" style="display: none;">
                                     <div class="agent-mode-inner">
                                         <button type="button" id="agent-mode-btn" class="role-selector-btn agent-mode-btn" onclick="toggleAgentModePanel()" data-i18n="chat.agentModeSelectAria" data-i18n-attr="aria-label,title" data-i18n-skip-text="true" aria-label="选择对话执行模式" aria-haspopup="listbox" aria-expanded="false" title="选择对话执行模式">
-                                            <span id="agent-mode-icon" class="role-selector-icon" aria-hidden="true">🤖</span>
+                                            <span id="agent-mode-icon" class="role-selector-icon agent-mode-logo agent-mode-logo--default" aria-hidden="true"><svg class="agent-mode-logo__svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><path d="M8 16h.01"/><path d="M16 16h.01"/></svg></span>
                                             <span id="agent-mode-text" class="role-selector-text">单代理</span>
                                             <svg class="role-selector-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                                                 <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1230,7 +1240,7 @@
                                             </div>
                                             <div class="agent-mode-options">
                                                 <button type="button" class="role-selection-item-main agent-mode-option" data-value="eino_single" role="option" onclick="selectAgentMode('eino_single')" data-agent-mode-detail="CloudWeGo Eino ChatModelAgent + Runner，MCP 工具（/api/eino-agent）" data-i18n="chat.agentModeEinoSingleHint" data-i18n-attr="data-agent-mode-detail" data-i18n-skip-text="true">
-                                                    <div class="role-selection-item-icon-main" aria-hidden="true">⚡</div>
+                                                    <div class="role-selection-item-icon-main agent-mode-logo agent-mode-logo--eino" aria-hidden="true"><svg class="agent-mode-logo__svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><path d="M8 16h.01"/><path d="M16 16h.01"/></svg></div>
                                                     <div class="role-selection-item-content-main">
                                                         <div class="role-selection-item-name-main" data-i18n="chat.agentModeEinoSingle">Eino 单代理（ADK）</div>
                                                         <div class="role-selection-item-description-main" data-i18n="chat.agentModeEinoSingleHint">CloudWeGo Eino ChatModelAgent + Runner，MCP 工具（/api/eino-agent）</div>
@@ -1238,7 +1248,7 @@
                                                     <div class="role-selection-checkmark-main agent-mode-check" data-agent-mode-check="eino_single">✓</div>
                                                 </button>
                                                 <button type="button" class="role-selection-item-main agent-mode-option" data-value="deep" role="option" onclick="selectAgentMode('deep')" data-agent-mode-detail="Eino DeepAgent，适合复杂安全测试、多阶段 task 子代理委派与汇总" data-i18n="chat.agentModeDeepHint" data-i18n-attr="data-agent-mode-detail" data-i18n-skip-text="true">
-                                                    <div class="role-selection-item-icon-main" aria-hidden="true">🧩</div>
+                                                    <div class="role-selection-item-icon-main agent-mode-logo agent-mode-logo--deep" aria-hidden="true"><svg class="agent-mode-logo__svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><path d="M8 16h.01"/><path d="M16 16h.01"/></svg></div>
                                                     <div class="role-selection-item-content-main">
                                                         <div class="role-selection-item-name-main" data-i18n="chat.agentModeDeep">Deep（DeepAgent）</div>
                                                         <div class="role-selection-item-description-main" data-i18n="chat.agentModeDeepHint">Eino DeepAgent，适合复杂安全测试、多阶段 task 子代理委派与汇总</div>
@@ -1246,7 +1256,7 @@
                                                     <div class="role-selection-checkmark-main agent-mode-check" data-agent-mode-check="deep">✓</div>
                                                 </button>
                                                 <button type="button" class="role-selection-item-main agent-mode-option" data-value="plan_execute" role="option" onclick="selectAgentMode('plan_execute')" data-agent-mode-detail="规划 → 执行 → 重规划（单执行器工具链）" data-i18n="chat.agentModePlanExecuteHint" data-i18n-attr="data-agent-mode-detail" data-i18n-skip-text="true">
-                                                    <div class="role-selection-item-icon-main" aria-hidden="true">📋</div>
+                                                    <div class="role-selection-item-icon-main agent-mode-logo agent-mode-logo--plan" aria-hidden="true"><svg class="agent-mode-logo__svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><path d="M8 16h.01"/><path d="M16 16h.01"/></svg></div>
                                                     <div class="role-selection-item-content-main">
                                                         <div class="role-selection-item-name-main" data-i18n="chat.agentModePlanExecuteLabel">Plan-Execute</div>
                                                         <div class="role-selection-item-description-main" data-i18n="chat.agentModePlanExecuteHint">规划 → 执行 → 重规划（单执行器工具链）</div>
@@ -1254,7 +1264,7 @@
                                                     <div class="role-selection-checkmark-main agent-mode-check" data-agent-mode-check="plan_execute">✓</div>
                                                 </button>
                                                 <button type="button" class="role-selection-item-main agent-mode-option" data-value="supervisor" role="option" onclick="selectAgentMode('supervisor')" data-agent-mode-detail="专家路由场景：监督者通过 transfer 动态分派多个专业子代理" data-i18n="chat.agentModeSupervisorHint" data-i18n-attr="data-agent-mode-detail" data-i18n-skip-text="true">
-                                                    <div class="role-selection-item-icon-main" aria-hidden="true">🎯</div>
+                                                    <div class="role-selection-item-icon-main agent-mode-logo agent-mode-logo--supervisor" aria-hidden="true"><svg class="agent-mode-logo__svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><path d="M8 16h.01"/><path d="M16 16h.01"/></svg></div>
                                                     <div class="role-selection-item-content-main">
                                                         <div class="role-selection-item-name-main" data-i18n="chat.agentModeSupervisorLabel">Supervisor（专家路由）</div>
                                                         <div class="role-selection-item-description-main" data-i18n="chat.agentModeSupervisorHint">专家路由场景：监督者通过 transfer 动态分派多个专业子代理</div>

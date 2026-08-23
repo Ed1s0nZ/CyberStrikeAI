@@ -61,6 +61,7 @@ func (a *einoRunUsageAccumulator) EmitOnce(
 	conversationID string,
 	orchestration string,
 	reason string,
+	modelName string,
 	progress func(eventType, message string, data interface{}),
 	logger *zap.Logger,
 ) bool {
@@ -81,6 +82,7 @@ func (a *einoRunUsageAccumulator) EmitOnce(
 		"source":           "eino",
 		"orchestration":    orchestration,
 		"reason":           reason,
+		"model":            modelName,
 		"modelCalls":       s.ModelCalls,
 		"promptTokens":     s.PromptTokens,
 		"completionTokens": s.CompletionTokens,
@@ -96,6 +98,7 @@ func (a *einoRunUsageAccumulator) EmitOnce(
 			zap.String("conversationId", conversationID),
 			zap.String("orchestration", orchestration),
 			zap.String("reason", reason),
+			zap.String("model", modelName),
 			zap.Int("modelCalls", s.ModelCalls),
 			zap.Int("promptTokens", s.PromptTokens),
 			zap.Int("completionTokens", s.CompletionTokens),

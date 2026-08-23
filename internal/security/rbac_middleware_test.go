@@ -119,6 +119,12 @@ func TestRBACResourcePickerRequiresWritePermission(t *testing.T) {
 	}
 }
 
+func TestRBACMiddlewareMapsTokenUsageStatsToDashboardRead(t *testing.T) {
+	if got := permissionForRequest(http.MethodGet, "/api/usage/tokens"); got != "dashboard:read" {
+		t.Fatalf("token usage permission = %q, want dashboard:read", got)
+	}
+}
+
 func TestMCPInvocationPermissionIsSeparateFromMCPAdministration(t *testing.T) {
 	if got := permissionForRequest(http.MethodPost, "/api/mcp"); got != "mcp:execute" {
 		t.Fatalf("MCP invocation permission = %q, want mcp:execute", got)

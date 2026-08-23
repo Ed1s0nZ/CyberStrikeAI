@@ -4107,62 +4107,50 @@ html[data-theme="dark"] .sidebar-content:hover::-webkit-scrollbar-thumb:hover {
     position: relative;
 }
 
-/* 消息复制按钮 - 位于消息气泡右下角 */
+/* 消息复制按钮 - 与时间戳同一行 */
 .message-copy-btn {
-    position: absolute;
-    bottom: 12px;
-    right: 12px;
-    display: flex;
+    position: static;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    padding: 8px 14px;
-    background: #ffffff;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    border-radius: 20px;
-    color: #666;
-    font-size: 0.8125rem;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--text-secondary, #888);
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
-    z-index: 10;
-    opacity: 0;
-    transform: translateY(4px);
-    font-weight: 500;
-}
-
-.message-bubble:hover .message-copy-btn {
-    opacity: 1;
-    transform: translateY(0);
+    opacity: 0.72;
+    flex-shrink: 0;
+    transition: opacity 0.2s ease, color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 
 .message-copy-btn:hover {
-    background: rgba(255, 255, 255, 1);
-    border-color: rgba(0, 102, 255, 0.2);
-    color: #0066ff;
-    box-shadow: 0 4px 12px rgba(0, 102, 255, 0.15), 0 2px 4px rgba(0, 0, 0, 0.08);
-    transform: translateY(-1px);
+    color: var(--accent-color, #0066ff);
+    background: rgba(0, 102, 255, 0.07);
+    border-color: rgba(0, 102, 255, 0.14);
+    opacity: 1;
 }
 
 .message-copy-btn:active {
-    transform: translateY(0) scale(0.98);
-    box-shadow: 0 2px 6px rgba(0, 102, 255, 0.12), 0 1px 2px rgba(0, 0, 0, 0.06);
+    background: rgba(0, 102, 255, 0.11);
 }
 
 .message-copy-btn svg {
     width: 16px;
     height: 16px;
     flex-shrink: 0;
-    transition: transform 0.2s ease;
 }
 
-.message-copy-btn:hover svg {
-    transform: scale(1.1);
+.message-copy-btn:focus-visible {
+    opacity: 1;
+    outline: 2px solid var(--accent-color, #0066ff);
+    outline-offset: 1px;
 }
 
 .message-copy-btn span {
-    font-weight: 500;
-    letter-spacing: 0.01em;
+    display: none;
 }
 
 /* 时间戳 + 删除本轮（与气泡分离，和「展开详情」同一视觉层级） */
@@ -24302,9 +24290,13 @@ tr.mcp-stats-tool-row[data-tool-name]:focus-visible {
 /* 第一行：核心 KPI（视觉层次 + 色块强调） */
 .dashboard-kpi-row {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 16px;
     margin-bottom: 24px;
+}
+
+@media (max-width: 1200px) {
+    .dashboard-kpi-row { grid-template-columns: repeat(3, 1fr); }
 }
 
 @media (max-width: 900px) {
@@ -24466,6 +24458,7 @@ tr.mcp-stats-tool-row[data-tool-name]:focus-visible {
 .dashboard-kpi-card:nth-child(2) { background: linear-gradient(145deg, #fff 0%, #fef2f2 100%); }
 .dashboard-kpi-card:nth-child(3) { background: linear-gradient(145deg, #fff 0%, #f0fdf4 100%); }
 .dashboard-kpi-card:nth-child(4) { background: linear-gradient(145deg, #fff 0%, #f0fdfa 100%); }
+.dashboard-kpi-card:nth-child(5) { background: linear-gradient(145deg, #fff 0%, #f8fafc 100%); }
 
 .dashboard-kpi-card:hover {
     transform: translateY(-3px);
@@ -24494,6 +24487,7 @@ tr.mcp-stats-tool-row[data-tool-name]:focus-visible {
 .dashboard-kpi-icon-vuln { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
 .dashboard-kpi-icon-calls { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
 .dashboard-kpi-icon-rate { background: rgba(20, 184, 166, 0.1); color: #14b8a6; }
+.dashboard-kpi-icon-tokens { background: rgba(99, 102, 241, 0.1); color: #6366f1; }
 
 .dashboard-kpi-value {
     font-size: 1.875rem;
@@ -28734,12 +28728,54 @@ html[data-theme="dark"] .vulnerability-details code.vuln-detail-field-value {
 }
 
 .role-selector-icon {
-    font-size: 1rem;
-    line-height: 1;
     flex-shrink: 0;
-    display: flex;
+}
+
+.agent-mode-logo {
+    --agent-logo-a: #858d98;
+    --agent-logo-b: #858d98;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
+    width: 18px;
+    height: 18px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--agent-logo-a);
+    box-shadow: none;
+    overflow: visible;
+    flex: 0 0 auto;
+}
+
+.agent-mode-logo--deep {
+    --agent-logo-a: #858d98;
+    --agent-logo-b: #858d98;
+}
+
+.agent-mode-logo--plan {
+    --agent-logo-a: #858d98;
+    --agent-logo-b: #858d98;
+}
+
+.agent-mode-logo--supervisor {
+    --agent-logo-a: #858d98;
+    --agent-logo-b: #858d98;
+}
+
+.agent-mode-logo--default {
+    --agent-logo-a: #858d98;
+    --agent-logo-b: #858d98;
+}
+
+.agent-mode-logo__svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 .role-selector-text {
@@ -29048,6 +29084,16 @@ html[data-theme="dark"] .vulnerability-details code.vuln-detail-field-value {
     background: linear-gradient(135deg, rgba(138, 43, 226, 0.2) 0%, rgba(138, 43, 226, 0.12) 100%);
     border-color: rgba(138, 43, 226, 0.3);
     box-shadow: 0 2px 6px rgba(138, 43, 226, 0.2);
+}
+
+.role-selection-item-main .role-selection-item-icon-main.agent-mode-logo,
+.role-selection-item-main:hover .role-selection-item-icon-main.agent-mode-logo,
+.role-selection-item-main.selected .role-selection-item-icon-main.agent-mode-logo {
+    width: 28px;
+    height: 28px;
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
 }
 .role-selection-item-content-main {
     display: flex;
@@ -36309,7 +36355,8 @@ html[data-theme="dark"] .conversation-reasoning-card .hitl-reviewer-toggle-btn.i
 html[data-theme="dark"] .dashboard-kpi-card:nth-child(1),
 html[data-theme="dark"] .dashboard-kpi-card:nth-child(2),
 html[data-theme="dark"] .dashboard-kpi-card:nth-child(3),
-html[data-theme="dark"] .dashboard-kpi-card:nth-child(4) {
+html[data-theme="dark"] .dashboard-kpi-card:nth-child(4),
+html[data-theme="dark"] .dashboard-kpi-card:nth-child(5) {
     background: linear-gradient(145deg, #111827 0%, #172033 100%);
 }
 
@@ -36797,21 +36844,17 @@ html[data-theme="dark"] .webshell-ai-msg.assistant.webshell-ai-candidate-output 
 }
 
 html[data-theme="dark"] .message-copy-btn {
-    background: #1f2937;
-    border-color: #334155;
     color: var(--text-secondary);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
 }
 
 html[data-theme="dark"] .message-copy-btn:hover {
-    background: #263244;
+    background: rgba(96, 165, 250, 0.12);
     border-color: rgba(96, 165, 250, 0.45);
     color: var(--accent-hover);
-    box-shadow: 0 4px 12px rgba(96, 165, 250, 0.18);
 }
 
 html[data-theme="dark"] .message-copy-btn:active {
-    box-shadow: 0 2px 6px rgba(96, 165, 250, 0.14);
+    background: rgba(96, 165, 250, 0.18);
 }
 
 html[data-theme="dark"] .message.user .message-bubble {
@@ -37362,6 +37405,16 @@ html[data-theme="dark"] .agent-mode-option.selected .role-selection-item-name-ma
 html[data-theme="dark"] .role-selection-item-icon-main {
     background: rgba(148, 163, 184, 0.10) !important;
     border-color: rgba(148, 163, 184, 0.12) !important;
+}
+
+html[data-theme="dark"] .role-selection-item-icon-main.agent-mode-logo,
+html[data-theme="dark"] .project-conversation-preview-mode-icon.agent-mode-logo,
+html[data-theme="dark"] .role-selector-icon.agent-mode-logo {
+    --agent-logo-a: #94a3b8;
+    --agent-logo-b: #94a3b8;
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
 }
 
 html[data-theme="dark"] .sidebar-list-pagination,
@@ -45062,6 +45115,13 @@ html[data-theme="dark"] .project-folder-preview-edit:focus-visible {
     color: #858d98;
 }
 
+.project-conversation-preview-mode-icon.agent-mode-logo {
+    width: 16px;
+    height: 16px;
+    margin-right: 0;
+    color: #858d98;
+}
+
 .project-conversation-preview-project,
 .project-conversation-preview-mode {
     min-width: 0;
@@ -46350,15 +46410,6 @@ html[data-theme="dark"] .chat-composer-surface > .chat-session-settings-popover 
     margin-bottom: 0;
 }
 
-.message.assistant-turn-with-process .message-copy-btn {
-    right: 0;
-    bottom: -34px;
-    padding: 5px 9px;
-    border: 0;
-    background: transparent;
-    box-shadow: none;
-}
-
 .message.assistant-turn-with-process .mcp-call-section {
     width: 100%;
     margin: 0;
@@ -46408,8 +46459,9 @@ html[data-theme="dark"] .chat-composer-surface > .chat-session-settings-popover 
 .turn-process-leading {
     display: inline-flex;
     align-items: center;
-    gap: 9px;
+    gap: 8px;
     min-width: 0;
+    flex-wrap: wrap;
 }
 
 .turn-process-status-dot {
@@ -46424,6 +46476,26 @@ html[data-theme="dark"] .chat-composer-surface > .chat-session-settings-popover 
     background: var(--accent-color, #0b6cff);
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-color, #0b6cff) 10%, transparent);
     animation: codex-turn-pulse 1.55s ease-in-out infinite;
+}
+
+.turn-process-token-chip {
+    display: inline;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+    opacity: 0.72;
+    white-space: nowrap;
+}
+
+.turn-process-token-chip::before {
+    content: "· ";
+    color: inherit;
+    font-weight: inherit;
 }
 
 @keyframes codex-turn-pulse {

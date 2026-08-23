@@ -66,10 +66,12 @@ async function refreshDashboard() {
         setDashboardOverviewPlaceholder('…');
         setEl('dashboard-kpi-tools-calls', '…');
         setEl('dashboard-kpi-success-rate', '…');
+        setEl('dashboard-kpi-token-usage', '…');
         setKpiSubText('dashboard-kpi-tasks-sub-text', '…');
         setKpiSubText('dashboard-kpi-vuln-sub-text', '…');
         setKpiSubText('dashboard-kpi-tools-sub-text', '…');
         setKpiSubText('dashboard-kpi-rate-sub-text', '…');
+        setKpiSubText('dashboard-kpi-token-sub-text', '…');
         hideEl('dashboard-kpi-vuln-critical-badge');
         hideEl('dashboard-alert-banner');
         setRecentVulnsLoading();
@@ -127,7 +129,7 @@ async function refreshDashboard() {
             hitlPendingRes, notificationsRes, externalMcpStatsRes,
             webshellRes,
             c2ListenersRes, c2SessionsRes, c2TasksRes,
-            projectSummaryRes, severityFilteredStatsRes
+            projectSummaryRes, severityFilteredStatsRes, tokenUsageRes
         ] = await Promise.all([
             fetchJson('/api/agent-loop/tasks'),
             fetchJson('/api/vulnerabilities/stats'),
@@ -159,7 +161,8 @@ async function refreshDashboard() {
             fetchJson(dashboardProjectScopedUrl('/api/c2/sessions?limit=500')),
             fetchJson(dashboardProjectScopedUrl('/api/c2/tasks?page=1&page_size=1')),
             fetchJson('/api/projects/dashboard-summary?fact_limit=10'),
-            selectedSeverityStatus ? fetchJson('/api/vulnerabilities/stats?status=' + encodeURIComponent(selectedSeverityStatus)) : Promise.resolve(null)
+            selectedSeverityStatus ? fetchJson('/api/vulnerabilities/stats?status=' + encodeURIComponent(selectedSeverityStatus)) : Promise.resolve(null),
+            fetchJson(dashboardProjectScopedUrl('/api/usage/tokens?days=7&limit=5'))
         ]);
 
         // 如果在 await 期间 controller 已被 abort，说明又有新刷新启动了，丢弃本次结果
@@ -330,6 +333,8 @@ async function refreshDashboard() {
             renderDashboardToolsBar(null);
         }
 
+        renderDashboardTokenUsage(tokenUsageRes);
+
         // 「能力总览 → MCP 工具」用配置总数（包含未被调用过的工具）；专项接口失败时回落到 monitor 的 names.length
         if (toolsConfigRes && typeof toolsConfigRes.total === 'number') {
             setEl('dashboard-resource-tools', formatNumber(toolsConfigRes.total));
@@ -435,10 +440,12 @@ async function refreshDashboard() {
         setDashboardOverviewPlaceholder('-');
         setEl('dashboard-kpi-success-rate', '-');
         setEl('dashboard-kpi-tools-calls', '-');
+        setEl('dashboard-kpi-token-usage', '-');
         setKpiSubText('dashboard-kpi-tasks-sub-text', '-');
         setKpiSubText('dashboard-kpi-vuln-sub-text', '-');
         setKpiSubText('dashboard-kpi-tools-sub-text', '-');
         setKpiSubText('dashboard-kpi-rate-sub-text', '-');
+        setKpiSubText('dashboard-kpi-token-sub-text', '-');
         ['tools', 'skills', 'knowledge', 'roles', 'agents'].forEach(function (k) {
             setEl('dashboard-resource-' + k, '-');
         });
@@ -698,6 +705,41 @@ function setKpiRateBadge(id, rate, failedCount) {
         el.textContent = dt('dashboard.degradedStatus', null, '需要关注') + (failedCount > 0 ? ' · ' + dt('dashboard.failedNCalls', { count: failedCount }, failedCount + ' 失败') : '');
         el.classList.add('is-danger');
     }
+}
+
+function renderDashboardTokenUsage(res) {
+    const summary = res && res.summary ? res.summary : null;
+    if (!summary) {
+        setEl('dashboard-kpi-token-usage', '-');
+        setKpiSubText('dashboard-kpi-token-sub-text', '-');
+        return;
+    }
+    const total = Number(summary.totalTokens || 0);
+    const calls = Number(summary.modelCalls || 0);
+    const today = res && res.today ? Number(res.today.totalTokens || 0) : 0;
+    if (!Number.isFinite(total) || total <= 0) {
+        setEl('dashboard-kpi-token-usage', '0');
+        setKpiSubText('dashboard-kpi-token-sub-text', dt('dashboard.noTokenUsageYet', null, '暂无用量'));
+        return;
+    }
+    setEl('dashboard-kpi-token-usage', formatTokenUsageCompact(total));
+    setKpiSubText('dashboard-kpi-token-sub-text',
+        dt('dashboard.tokenUsageSub', {
+            today: formatTokenUsageCompact(today),
+            calls: Number.isFinite(calls) ? calls : 0
+        }, '近 7 天 ' + (Number.isFinite(calls) ? calls : 0) + ' 次调用 · 今日 ' + formatTokenUsageCompact(today)));
+}
+
+function formatTokenUsageCompact(num) {
+    const n = Number(num || 0);
+    if (!Number.isFinite(n) || n <= 0) return '0';
+    if (n >= 1000000) {
+        return (n / 1000000).toFixed(n >= 10000000 ? 0 : 1).replace(/\.0$/, '') + 'M';
+    }
+    if (n >= 1000) {
+        return (n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'K';
+    }
+    return String(Math.trunc(n));
 }
 
 // sessionStorage：告警条「×」忽略记录 + 最近一次**实际展示过**的 reason 片段（不含 level），

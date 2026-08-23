@@ -66,7 +66,7 @@ function createHarness(nowMs) {
         clearInterval() {},
     };
     vm.runInNewContext(
-        `${timingSource(chat)}; this.setAssistantTurnTiming = setAssistantTurnTiming;`,
+        `${timingSource(chat)}; this.setAssistantTurnTiming = setAssistantTurnTiming; this.setAssistantTurnTokenUsage = setAssistantTurnTokenUsage; this.extractAssistantTurnTokenUsage = extractAssistantTurnTokenUsage;`,
         context
     );
     return context;
@@ -101,6 +101,45 @@ test('已完成任务仍优先使用持久化耗时', () => {
 
     assert.equal(message.dataset.turnDurationMs, '65000');
     assert.match(message.label.innerHTML, /耗时 1 分钟 5 秒/);
+});
+
+test('助手轮次摘要会显示持久化 token 用量', () => {
+    const context = createHarness(Date.parse('2026-08-12T02:05:00.000Z'));
+    const message = createMessage();
+
+    context.setAssistantTurnTiming(message, {
+        startedAt: '2026-08-12T02:00:00.000Z',
+        completedAt: '2026-08-12T02:00:03.000Z',
+        durationMs: 3000,
+        status: 'completed',
+    });
+    context.setAssistantTurnTokenUsage(message, {
+        promptTokens: 1200,
+        completionTokens: 34,
+        cachedTokens: 200,
+        reasoningTokens: 12,
+        modelCalls: 1,
+        model: 'deepseek-v3',
+    });
+
+    assert.equal(message.dataset.turnTotalTokens, '1234');
+    assert.match(message.label.innerHTML, /1\.2K tokens/);
+    assert.match(message.label.innerHTML, /turn-process-token-chip/);
+});
+
+test('助手轮次可从 Eino usage summary 过程详情提取 token 用量', () => {
+    const context = createHarness(Date.parse('2026-08-12T02:05:00.000Z'));
+
+    const usage = context.extractAssistantTurnTokenUsage([
+        { eventType: 'progress', data: { totalTokens: 9999 } },
+        { eventType: 'eino_usage_summary', data: { promptTokens: 400, completionTokens: 100, modelCalls: 1 } },
+        { eventType: 'eino_usage_summary', data: { totalTokens: 25, modelCalls: 1 } },
+    ]);
+
+    assert.equal(usage.totalTokens, 525);
+    assert.equal(usage.promptTokens, 400);
+    assert.equal(usage.completionTokens, 100);
+    assert.equal(usage.modelCalls, 2);
 });
 
 test('已中断任务使用固定终态耗时且不再按当前时间增长', () => {

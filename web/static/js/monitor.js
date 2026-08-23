@@ -1044,7 +1044,7 @@ function updateAssistantBubbleContent(assistantMessageId, content, renderMarkdow
     const bubble = assistantElement.querySelector('.message-bubble');
     if (!bubble) return;
 
-    // 保留复制按钮：addMessage 会把按钮 append 在 message-bubble 里
+    // 清理旧版本可能残留在气泡内的复制按钮；新版按钮统一在时间行。
     const copyBtn = bubble.querySelector('.message-copy-btn');
     if (copyBtn) copyBtn.remove();
 
@@ -1066,7 +1066,9 @@ function updateAssistantBubbleContent(assistantMessageId, content, renderMarkdow
     if (typeof wrapTablesInBubble === 'function') {
         wrapTablesInBubble(bubble);
     }
-    if (copyBtn) bubble.appendChild(copyBtn);
+    if (typeof window.appendMessageCopyButton === 'function') {
+        window.appendMessageCopyButton(assistantElement);
+    }
 
     if (typeof window.csMarkdownSanitize !== 'undefined') {
         window.csMarkdownSanitize.stripSuspiciousImages(bubble);

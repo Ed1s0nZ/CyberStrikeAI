@@ -216,6 +216,32 @@ func (db *DB) initTables() error {
 		FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
 	);`
 
+	// 创建模型 Token 用量表：process_details 负责时间线回放，本表负责结构化聚合统计。
+	createModelTokenUsageTable := `
+	CREATE TABLE IF NOT EXISTS model_token_usage (
+		id TEXT PRIMARY KEY,
+		process_detail_id TEXT NOT NULL UNIQUE,
+		message_id TEXT NOT NULL,
+		conversation_id TEXT NOT NULL,
+		project_id TEXT,
+		source TEXT NOT NULL DEFAULT '',
+		orchestration TEXT NOT NULL DEFAULT '',
+		reason TEXT NOT NULL DEFAULT '',
+		model TEXT NOT NULL DEFAULT '',
+		model_calls INTEGER NOT NULL DEFAULT 0,
+		prompt_tokens INTEGER NOT NULL DEFAULT 0,
+		completion_tokens INTEGER NOT NULL DEFAULT 0,
+		total_tokens INTEGER NOT NULL DEFAULT 0,
+		cached_tokens INTEGER NOT NULL DEFAULT 0,
+		reasoning_tokens INTEGER NOT NULL DEFAULT 0,
+		created_at DATETIME NOT NULL,
+		updated_at DATETIME NOT NULL,
+		FOREIGN KEY (process_detail_id) REFERENCES process_details(id) ON DELETE CASCADE,
+		FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+		FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+		FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+	);`
+
 	// 创建工具执行记录表
 	createToolExecutionsTable := `
 	CREATE TABLE IF NOT EXISTS tool_executions (
@@ -719,6 +745,10 @@ func (db *DB) initTables() error {
 	CREATE INDEX IF NOT EXISTS idx_conversations_updated_at ON conversations(updated_at);
 	CREATE INDEX IF NOT EXISTS idx_process_details_message_id ON process_details(message_id);
 	CREATE INDEX IF NOT EXISTS idx_process_details_conversation_id ON process_details(conversation_id);
+	CREATE INDEX IF NOT EXISTS idx_model_token_usage_created_at ON model_token_usage(created_at);
+	CREATE INDEX IF NOT EXISTS idx_model_token_usage_conversation ON model_token_usage(conversation_id);
+	CREATE INDEX IF NOT EXISTS idx_model_token_usage_project ON model_token_usage(project_id);
+	CREATE INDEX IF NOT EXISTS idx_model_token_usage_model ON model_token_usage(model);
 	CREATE INDEX IF NOT EXISTS idx_tool_executions_tool_name ON tool_executions(tool_name);
 	CREATE INDEX IF NOT EXISTS idx_tool_executions_start_time ON tool_executions(start_time);
 	CREATE INDEX IF NOT EXISTS idx_tool_executions_status ON tool_executions(status);
@@ -804,6 +834,10 @@ func (db *DB) initTables() error {
 
 	if _, err := db.Exec(createProcessDetailsTable); err != nil {
 		return fmt.Errorf("创建process_details表失败: %w", err)
+	}
+
+	if _, err := db.Exec(createModelTokenUsageTable); err != nil {
+		return fmt.Errorf("创建model_token_usage表失败: %w", err)
 	}
 
 	if _, err := db.Exec(createToolExecutionsTable); err != nil {
@@ -980,6 +1014,10 @@ func (db *DB) initTables() error {
 
 	if _, err := db.Exec(createIndexes); err != nil {
 		return fmt.Errorf("创建索引失败: %w", err)
+	}
+
+	if err := db.BackfillModelTokenUsageFromProcessDetails(); err != nil {
+		return fmt.Errorf("回填模型Token用量失败: %w", err)
 	}
 	db.logger.Debug("数据库表初始化完成")
 	return nil

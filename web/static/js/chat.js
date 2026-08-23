@@ -1001,14 +1001,18 @@ function getAgentModeLabelForValue(mode) {
     }
 }
 
-function getAgentModeIconForValue(mode) {
+function getAgentModeIconClassForValue(mode) {
     switch (mode) {
-        case CHAT_AGENT_MODE_EINO_SINGLE: return '⚡';
-        case 'deep': return '🧩';
-        case 'plan_execute': return '📋';
-        case 'supervisor': return '🎯';
-        default: return '🤖';
+        case CHAT_AGENT_MODE_EINO_SINGLE: return 'eino';
+        case 'deep': return 'deep';
+        case 'plan_execute': return 'plan';
+        case 'supervisor': return 'supervisor';
+        default: return 'default';
     }
+}
+
+function renderAgentModeLogoMarkup() {
+    return '<svg class="agent-mode-logo__svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><path d="M8 16h.01"/><path d="M16 16h.01"/></svg>';
 }
 
 function syncAgentModeFromValue(value) {
@@ -1017,7 +1021,10 @@ function syncAgentModeFromValue(value) {
     const icon = document.getElementById('agent-mode-icon');
     if (hid) hid.value = value;
     if (label) label.textContent = getAgentModeLabelForValue(value);
-    if (icon) icon.textContent = getAgentModeIconForValue(value);
+    if (icon) {
+        icon.className = 'role-selector-icon agent-mode-logo agent-mode-logo--' + getAgentModeIconClassForValue(value);
+        icon.innerHTML = renderAgentModeLogoMarkup();
+    }
     document.querySelectorAll('.agent-mode-option').forEach(function (el) {
         const v = el.getAttribute('data-value');
         el.classList.toggle('selected', v === value);
@@ -3507,8 +3514,59 @@ function refreshSystemReadyMessageBubbles() {
         bubble.innerHTML = formattedContent;
         if (typeof wrapTablesInBubble === 'function') wrapTablesInBubble(bubble);
         messageDiv.dataset.originalContent = text;
+        appendMessageCopyButton(messageDiv);
     });
 }
+
+function ensureMessageMetaFooter(content) {
+    if (!content) return null;
+    let footer = content.querySelector('.message-meta-footer');
+    if (footer) return footer;
+    const timeDiv = content.querySelector('.message-time');
+    footer = document.createElement('div');
+    footer.className = 'message-meta-footer';
+    if (timeDiv && timeDiv.parentNode === content) {
+        timeDiv.parentNode.insertBefore(footer, timeDiv);
+        footer.appendChild(timeDiv);
+    } else {
+        content.appendChild(footer);
+    }
+    return footer;
+}
+
+function appendMessageCopyButton(messageDiv) {
+    if (!messageDiv) return null;
+    if (!messageDiv.classList || (!messageDiv.classList.contains('assistant') && !messageDiv.classList.contains('user'))) {
+        return null;
+    }
+    const content = messageDiv.querySelector('.message-content');
+    const footer = ensureMessageMetaFooter(content);
+    if (!footer) return null;
+
+    messageDiv.querySelectorAll('.message-bubble .message-copy-btn').forEach((btn) => btn.remove());
+    let copyBtn = footer.querySelector('.message-copy-btn');
+    if (copyBtn) return copyBtn;
+
+    copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'message-copy-btn';
+    copyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg><span>' + (typeof window.t === 'function' ? window.t('common.copy') : '复制') + '</span>';
+    copyBtn.title = typeof window.t === 'function' ? window.t('chat.copyMessageTitle') : '复制消息内容';
+    copyBtn.setAttribute('aria-label', copyBtn.title);
+    copyBtn.onclick = function(e) {
+        e.stopPropagation();
+        copyMessageToClipboard(messageDiv, this);
+    };
+    const deleteBtn = footer.querySelector('.message-delete-turn-btn');
+    if (deleteBtn) {
+        footer.insertBefore(copyBtn, deleteBtn);
+    } else {
+        footer.appendChild(copyBtn);
+    }
+    return copyBtn;
+}
+window.appendMessageCopyButton = appendMessageCopyButton;
+window.ensureMessageMetaFooter = ensureMessageMetaFooter;
 
 // 添加消息（options.systemReadyMessage 为 true 时，语言切换会刷新该条文案）
 function addMessage(role, content, mcpExecutionIds = null, progressId = null, createdAt = null, options = null) {
@@ -3581,21 +3639,8 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
     contentWrapper.appendChild(bubble);
     
     // 保存原始内容到消息元素，用于复制功能
-    if (role === 'assistant') {
+    if (role === 'assistant' || role === 'user') {
         messageDiv.dataset.originalContent = content;
-    }
-    
-    // 为助手消息添加复制按钮（复制整个回复内容）- 放在消息气泡右下角
-    if (role === 'assistant') {
-        const copyBtn = document.createElement('button');
-        copyBtn.className = 'message-copy-btn';
-        copyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg><span>' + (typeof window.t === 'function' ? window.t('common.copy') : '复制') + '</span>';
-        copyBtn.title = typeof window.t === 'function' ? window.t('chat.copyMessageTitle') : '复制消息内容';
-        copyBtn.onclick = function(e) {
-            e.stopPropagation();
-            copyMessageToClipboard(messageDiv, this);
-        };
-        bubble.appendChild(copyBtn);
     }
     
     // 添加时间戳
@@ -3626,8 +3671,16 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
     try {
         timeDiv.dataset.messageTime = messageTime.toISOString();
     } catch (e) { /* ignore */ }
-    contentWrapper.appendChild(timeDiv);
+    const metaFooter = document.createElement('div');
+    metaFooter.className = 'message-meta-footer';
+    metaFooter.appendChild(timeDiv);
+    contentWrapper.appendChild(metaFooter);
     messageDiv.appendChild(contentWrapper);
+
+    // 为用户和助手消息添加复制按钮（复制整条消息内容）
+    if (role === 'assistant' || role === 'user') {
+        appendMessageCopyButton(messageDiv);
+    }
     
     // 有 MCP 执行记录且非流式占位消息时展示调用按钮；带 progressId 的流式占位不挂此条（与进度卡片一致，结束时 integrate 再创建）
     if (role === 'assistant' && (mcpExecutionIds && Array.isArray(mcpExecutionIds) && mcpExecutionIds.length > 0) && !progressId) {
@@ -4131,6 +4184,10 @@ function renderProcessDetails(messageId, processDetails, options) {
     } else if (markLoaded) {
         detailsContainer.dataset.lazyNotLoaded = '0';
         detailsContainer.dataset.loaded = '1';
+    }
+    const turnUsageFromDetails = extractAssistantTurnTokenUsage(processDetails);
+    if (turnUsageFromDetails) {
+        setAssistantTurnTokenUsage(messageElement, turnUsageFromDetails);
     }
     processDetails = mergeMessageReasoningContentIntoProcessDetails(processDetails, reasoningFromMessage);
     processDetails = filterNoiseProcessDetails(processDetails);
@@ -4887,6 +4944,134 @@ function formatAssistantTurnDuration(durationMs) {
         : seconds + ' 秒';
 }
 
+function assistantTurnUsageNumber(value) {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
+}
+
+function normalizeAssistantTurnTokenUsage(data) {
+    const source = data && typeof data === 'object' ? data : {};
+    const usage = {
+        modelCalls: assistantTurnUsageNumber(source.modelCalls),
+        promptTokens: assistantTurnUsageNumber(source.promptTokens),
+        completionTokens: assistantTurnUsageNumber(source.completionTokens),
+        totalTokens: assistantTurnUsageNumber(source.totalTokens),
+        cachedTokens: assistantTurnUsageNumber(source.cachedTokens),
+        reasoningTokens: assistantTurnUsageNumber(source.reasoningTokens),
+        model: source.model != null ? String(source.model).trim() : ''
+    };
+    if (usage.totalTokens <= 0 && (usage.promptTokens > 0 || usage.completionTokens > 0)) {
+        usage.totalTokens = usage.promptTokens + usage.completionTokens;
+    }
+    return usage.totalTokens > 0 ? usage : null;
+}
+
+function mergeAssistantTurnTokenUsage(target, usage) {
+    if (!usage) return target || null;
+    const out = target || {
+        modelCalls: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        cachedTokens: 0,
+        reasoningTokens: 0,
+        model: ''
+    };
+    out.modelCalls += usage.modelCalls || 0;
+    out.promptTokens += usage.promptTokens || 0;
+    out.completionTokens += usage.completionTokens || 0;
+    out.totalTokens += usage.totalTokens || 0;
+    out.cachedTokens += usage.cachedTokens || 0;
+    out.reasoningTokens += usage.reasoningTokens || 0;
+    if (!out.model && usage.model) out.model = usage.model;
+    return out.totalTokens > 0 ? out : null;
+}
+
+function extractAssistantTurnTokenUsage(processDetails) {
+    if (!Array.isArray(processDetails)) return null;
+    let total = null;
+    processDetails.forEach((detail) => {
+        if (!detail || String(detail.eventType || '').trim() !== 'eino_usage_summary') return;
+        const usage = normalizeAssistantTurnTokenUsage(detail.data);
+        total = mergeAssistantTurnTokenUsage(total, usage);
+    });
+    return total;
+}
+
+function setAssistantTurnTokenUsage(messageElementOrId, usage) {
+    const messageElement = typeof messageElementOrId === 'string'
+        ? document.getElementById(messageElementOrId)
+        : messageElementOrId;
+    if (!messageElement || !messageElement.dataset) return;
+    const normalized = normalizeAssistantTurnTokenUsage(usage);
+    if (!normalized) {
+        delete messageElement.dataset.turnModelCalls;
+        delete messageElement.dataset.turnPromptTokens;
+        delete messageElement.dataset.turnCompletionTokens;
+        delete messageElement.dataset.turnTotalTokens;
+        delete messageElement.dataset.turnCachedTokens;
+        delete messageElement.dataset.turnReasoningTokens;
+        delete messageElement.dataset.turnModel;
+        syncAssistantTurnSummary(messageElement);
+        return;
+    }
+    messageElement.dataset.turnModelCalls = String(normalized.modelCalls || 0);
+    messageElement.dataset.turnPromptTokens = String(normalized.promptTokens || 0);
+    messageElement.dataset.turnCompletionTokens = String(normalized.completionTokens || 0);
+    messageElement.dataset.turnTotalTokens = String(normalized.totalTokens || 0);
+    messageElement.dataset.turnCachedTokens = String(normalized.cachedTokens || 0);
+    messageElement.dataset.turnReasoningTokens = String(normalized.reasoningTokens || 0);
+    if (normalized.model) {
+        messageElement.dataset.turnModel = normalized.model;
+    } else {
+        delete messageElement.dataset.turnModel;
+    }
+    syncAssistantTurnSummary(messageElement);
+}
+
+function getAssistantTurnTokenUsage(messageElement) {
+    if (!messageElement || !messageElement.dataset) return null;
+    return normalizeAssistantTurnTokenUsage({
+        modelCalls: messageElement.dataset.turnModelCalls,
+        promptTokens: messageElement.dataset.turnPromptTokens,
+        completionTokens: messageElement.dataset.turnCompletionTokens,
+        totalTokens: messageElement.dataset.turnTotalTokens,
+        cachedTokens: messageElement.dataset.turnCachedTokens,
+        reasoningTokens: messageElement.dataset.turnReasoningTokens,
+        model: messageElement.dataset.turnModel
+    });
+}
+
+function formatAssistantTurnTokenCount(value) {
+    const n = assistantTurnUsageNumber(value);
+    if (n >= 1000000) return (n / 1000000).toFixed(n >= 10000000 ? 0 : 1).replace(/\.0$/, '') + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(n >= 100000 ? 0 : 1).replace(/\.0$/, '') + 'K';
+    return String(n);
+}
+
+function formatAssistantTurnTokenUsageLabel(usage) {
+    const tokens = formatAssistantTurnTokenCount(usage && usage.totalTokens);
+    return typeof window.t === 'function'
+        ? window.t('chat.turnTokenUsageLabel', { tokens: tokens })
+        : tokens + ' tokens';
+}
+
+function formatAssistantTurnTokenUsageTitle(usage) {
+    const safeUsage = usage || {};
+    const values = {
+        total: formatAssistantTurnTokenCount(safeUsage.totalTokens),
+        prompt: formatAssistantTurnTokenCount(safeUsage.promptTokens),
+        completion: formatAssistantTurnTokenCount(safeUsage.completionTokens),
+        cached: formatAssistantTurnTokenCount(safeUsage.cachedTokens),
+        reasoning: formatAssistantTurnTokenCount(safeUsage.reasoningTokens),
+        calls: formatAssistantTurnTokenCount(safeUsage.modelCalls),
+        model: safeUsage.model || ''
+    };
+    return typeof window.t === 'function'
+        ? window.t('chat.turnTokenUsageTitle', values)
+        : 'Token usage: ' + values.total + ' (input ' + values.prompt + ', output ' + values.completion + ')';
+}
+
 function assistantTurnTimestamp(value) {
     if (value == null || value === '') return NaN;
     const n = new Date(value).getTime();
@@ -4985,6 +5170,12 @@ function syncAssistantTurnSummary(messageElementOrId) {
             : 0;
     }
     const duration = formatAssistantTurnDuration(durationMs);
+    const tokenUsage = getAssistantTurnTokenUsage(messageElement);
+    const tokenUsageHtml = tokenUsage
+        ? '<span class="turn-process-token-chip" title="' + escapeHtml(formatAssistantTurnTokenUsageTitle(tokenUsage)) + '">' +
+            escapeHtml(formatAssistantTurnTokenUsageLabel(tokenUsage)) +
+          '</span>'
+        : '';
     let text;
     if (status === 'running') {
         text = typeof window.t === 'function' ? window.t('chat.turnElapsedRunning', { duration: duration }) : '已处理 ' + duration;
@@ -5001,6 +5192,7 @@ function syncAssistantTurnSummary(messageElementOrId) {
         <span class="turn-process-leading">
             <span class="turn-process-status-dot${status === 'running' ? ' is-running' : ''}" aria-hidden="true"></span>
             <span class="turn-process-summary-text">${escapeHtml(text)}</span>
+            ${tokenUsageHtml}
         </span>
         <svg class="turn-process-chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7.5 5.5L12 10l-4.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
     `;
@@ -5012,8 +5204,10 @@ function syncAssistantTurnSummary(messageElementOrId) {
 }
 
 window.setAssistantTurnTiming = setAssistantTurnTiming;
+window.setAssistantTurnTokenUsage = setAssistantTurnTokenUsage;
 window.syncAssistantTurnSummary = syncAssistantTurnSummary;
 window.formatAssistantTurnDuration = formatAssistantTurnDuration;
+window.extractAssistantTurnTokenUsage = extractAssistantTurnTokenUsage;
 
 /** 渗透测试区：工具栏（展开详情 | N次工具执行）+ 独立工具列表 + 迭代时间线 */
 function ensureMcpCallSectionChrome(messageElement, messageId) {
@@ -6156,6 +6350,43 @@ async function prefetchLastAssistantProcessDetails() {
     }
 }
 
+async function hydrateConversationTokenUsage(conversationId, expectedSeq, signal) {
+    const id = String(conversationId || '').trim();
+    if (!id || typeof apiFetch !== 'function' || typeof window.setAssistantTurnTokenUsage !== 'function') return;
+    if (signal && signal.aborted) return;
+    const params = new URLSearchParams();
+    params.set('since', '1970-01-01');
+    params.set('limit', '500');
+    const res = await apiFetch(
+        '/api/conversations/' + encodeURIComponent(id) + '/token-usage?' + params.toString(),
+        signal ? { signal: signal } : undefined
+    );
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok || (signal && signal.aborted)) return;
+    if (expectedSeq != null && expectedSeq !== loadConversationRequestSeq) return;
+    if (currentConversationId !== id) return;
+    const rows = Array.isArray(payload && payload.recent) ? payload.recent : [];
+    if (rows.length === 0) return;
+    const byMessage = new Map();
+    rows.forEach((row) => {
+        const messageId = row && row.messageId != null ? String(row.messageId).trim() : '';
+        if (!messageId) return;
+        const usage = normalizeAssistantTurnTokenUsage(row);
+        if (!usage) return;
+        byMessage.set(messageId, mergeAssistantTurnTokenUsage(byMessage.get(messageId) || null, usage));
+    });
+    if (byMessage.size === 0) return;
+    document.querySelectorAll('#chat-messages .message.assistant[data-backend-message-id]').forEach((messageElement) => {
+        const backendMessageId = messageElement && messageElement.dataset
+            ? String(messageElement.dataset.backendMessageId || '').trim()
+            : '';
+        const usage = backendMessageId ? byMessage.get(backendMessageId) : null;
+        if (usage) {
+            window.setAssistantTurnTokenUsage(messageElement, usage);
+        }
+    });
+}
+
 async function loadConversation(conversationId) {
     conversationId = String(conversationId || '').trim();
     if (!conversationId) return;
@@ -6458,6 +6689,11 @@ async function loadConversation(conversationId) {
             if (seq !== loadConversationRequestSeq) {
                 return;
             }
+            hydrateConversationTokenUsage(conversationId, seq, conversationLoadController.signal).catch((e) => {
+                if (!e || e.name !== 'AbortError') {
+                    console.warn('hydrateConversationTokenUsage failed', e);
+                }
+            });
             if (currentConversationId === conversationId && typeof window.restoreHitlInlineForConversation === 'function') {
                 await window.restoreHitlInlineForConversation(conversationId);
             }

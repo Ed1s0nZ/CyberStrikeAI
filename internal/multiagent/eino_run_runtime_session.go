@@ -371,5 +371,9 @@ func (s *einoRunRuntimeSession) emitUsageSummary(reason string) bool {
 	if s == nil || s.usage == nil {
 		return false
 	}
-	return s.usage.EmitOnce(s.conversationID, s.orchMode, reason, s.progress, s.logger)
+	modelName := ""
+	if s.args != nil {
+		modelName = s.args.ModelName
+	}
+	return s.usage.EmitOnce(s.conversationID, s.orchMode, reason, modelName, s.progress, s.logger)
 }

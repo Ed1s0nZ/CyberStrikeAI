@@ -138,3 +138,17 @@ test('对话悬浮预览标题与时间分行显示并保留更多标题内容',
     assert.match(titleStyles, /-webkit-line-clamp: 2;/);
     assert.doesNotMatch(titleStyles, /white-space: nowrap;/);
 });
+
+test('对话悬浮预览使用美化后的代理模式徽标', () => {
+    const projects = fs.readFileSync('web/static/js/projects.js', 'utf8');
+
+    assert.match(projects, /function getProjectConversationModeIconClass\(conversation\)/);
+    assert.match(projects, /project-conversation-preview-mode-icon agent-mode-logo agent-mode-logo--default/);
+    assert.match(projects, /agent-mode-logo__svg/);
+    assert.match(projects, /<rect x="3" y="11" width="18" height="10" rx="2"/);
+    assert.match(projects, /agent-mode-logo--' \+ getProjectConversationModeIconClass\(conversation\)/);
+    assert.match(styles, /\.agent-mode-logo\s*\{[\s\S]*?background: transparent;/);
+    assert.match(styles, /\.agent-mode-logo__svg\s*\{[\s\S]*?stroke: currentColor;[\s\S]*?stroke-width: 1\.9;/);
+    assert.match(styles, /\.project-conversation-preview-mode-icon\.agent-mode-logo\s*\{[\s\S]*?width: 16px;/);
+    assert.doesNotMatch(cssBlock(styles, '.agent-mode-logo'), /linear-gradient|box-shadow: 0 5px/);
+});
