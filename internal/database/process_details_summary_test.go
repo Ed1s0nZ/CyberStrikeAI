@@ -165,6 +165,32 @@ func TestProcessDetailsSummaryDoesNotReportPersistedOrphanAsRunning(t *testing.T
 	}
 }
 
+func TestProcessDetailsSummaryReportsUnmatchedToolCallAsRunningForActiveTurn(t *testing.T) {
+	db, conversationID, messageID := setupProcessDetailsSummaryTest(t)
+	if _, err := db.Exec(
+		"UPDATE messages SET content = ?, updated_at = ? WHERE id = ?",
+		"处理中...", "2026-08-10T08:00:00Z", messageID,
+	); err != nil {
+		t.Fatalf("update running message: %v", err)
+	}
+	if err := db.AddProcessDetail(messageID, conversationID, "tool_call", "call", map[string]interface{}{
+		"toolName": "execute", "toolCallId": "pending",
+	}); err != nil {
+		t.Fatalf("AddProcessDetail(tool_call): %v", err)
+	}
+
+	summary, err := db.GetProcessDetailsSummary(messageID)
+	if err != nil {
+		t.Fatalf("GetProcessDetailsSummary: %v", err)
+	}
+	if summary.Status != "running" {
+		t.Fatalf("summary status = %q, want running", summary.Status)
+	}
+	if len(summary.ToolExecutions) != 1 || summary.ToolExecutions[0].Status != "running" {
+		t.Fatalf("tool executions = %#v, want running", summary.ToolExecutions)
+	}
+}
+
 func TestProcessDetailsSummaryIncludesPersistedTurnTiming(t *testing.T) {
 	db, _, messageID := setupProcessDetailsSummaryTest(t)
 	startedAt := "2026-08-10T08:00:00Z"

@@ -7,6 +7,7 @@ import (
 
 	"cyberstrike-ai/internal/database"
 	"cyberstrike-ai/internal/mcp"
+	"cyberstrike-ai/internal/multiagent"
 
 	"go.uber.org/zap"
 )
@@ -128,5 +129,25 @@ func TestDecideAllowsInformationalAnswerWhenExecutionEvidenceIsNotRequired(t *te
 	d := Decide(nil, Input{Response: "这是一个概念解释，不需要执行工具。"})
 	if !d.Finalizable || !d.Finalized || d.Status != StatusCompleted {
 		t.Fatalf("informational response should finalize when execution evidence is not required: %+v", d)
+	}
+}
+
+func TestFromRunResultDoesNotReusePreviousFinalizationStatusAsRunStatus(t *testing.T) {
+	db := newDecisionTestDB(t)
+	saveDecisionTestExecution(t, db, "run-slow", mcp.ToolExecutionStatusRunning)
+	result := &multiagent.RunResult{
+		Response:        "工具已触发，按用户要求直接总结。",
+		MCPExecutionIDs: []string{"run-slow"},
+	}
+
+	first := FromRunResult(db, result, Input{})
+	if first.Finalizable || first.CompletionReason != ReasonPendingTools || result.Status != StatusInProgress {
+		t.Fatalf("first decision should mark pending and write metadata: decision=%+v result=%+v", first, result)
+	}
+
+	saveDecisionTestExecution(t, db, "run-slow", mcp.ToolExecutionStatusCancelled)
+	second := FromRunResult(db, result, Input{})
+	if !second.Finalizable || !second.Finalized || second.Status != StatusCompleted {
+		t.Fatalf("second decision should ignore previous result status after pending cleanup: decision=%+v result=%+v", second, result)
 	}
 }

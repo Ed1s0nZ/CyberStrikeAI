@@ -281,7 +281,12 @@ func (h *AgentHandler) executeOneBatchSubTask(queueID string, queue *BatchTaskQu
 	if useBatchMulti {
 		agentMode = "batch_eino_" + batchOrch
 	}
-	decision := h.finalizeAgentRunForDeliveryWithPolicy(conversationID, assistantMessageID, agentMode, resultMA, mcpIDs, reasoningContent, true)
+	decision := h.decideAgentRunForDeliveryWithPolicy(conversationID, assistantMessageID, agentMode, resultMA, mcpIDs, true)
+	autoCancelledPendingExecutionIDs := h.cleanupPendingToolExecutionsAfterIteration(taskCtx, conversationID, decision, progressCallback)
+	if len(autoCancelledPendingExecutionIDs) > 0 {
+		decision = h.decideAgentRunForDeliveryWithPolicy(conversationID, assistantMessageID, agentMode, resultMA, mcpIDs, true)
+	}
+	h.persistFinalizationDecision(conversationID, assistantMessageID, agentMode, mcpIDs, reasoningContent, decision)
 	resText := decision.FinalText
 	if !decision.Finalizable {
 		resText = finalizationBlockedMessage(decision)
@@ -289,14 +294,15 @@ func (h *AgentHandler) executeOneBatchSubTask(queueID string, queue *BatchTaskQu
 		sendEvent("finalization_check", resText, decision)
 	}
 	sendEvent("response", resText, finalizationResponsePayload(decision, map[string]interface{}{
-		"conversationId":   conversationID,
-		"messageId":        assistantMessageID,
-		"agentMode":        agentMode,
-		"mcpExecutionIds":  mcpIDs,
-		"batchQueueId":     queueID,
-		"batchTaskId":      task.ID,
-		"batchTaskStatus":  map[bool]string{true: string(BatchTaskStatusCompleted), false: string(BatchTaskStatusFailed)}[decision.Finalizable],
-		"candidatePreview": safeTruncateString(resultMA.Response, 500),
+		"conversationId":                   conversationID,
+		"messageId":                        assistantMessageID,
+		"agentMode":                        agentMode,
+		"mcpExecutionIds":                  mcpIDs,
+		"batchQueueId":                     queueID,
+		"batchTaskId":                      task.ID,
+		"batchTaskStatus":                  map[bool]string{true: string(BatchTaskStatusCompleted), false: string(BatchTaskStatusFailed)}[decision.Finalizable],
+		"candidatePreview":                 safeTruncateString(resultMA.Response, 500),
+		"autoCancelledPendingExecutionIds": autoCancelledPendingExecutionIDs,
 	}))
 
 	if assistantMessageID == "" {

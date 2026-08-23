@@ -4428,7 +4428,7 @@ function renderProcessDetails(messageId, processDetails, options) {
                 }
             }
         }
-        if (!timelineOpts.toolStatus && eventType === 'tool_call' && detail.id && toolStatusByProcessDetailId.has(String(detail.id))) {
+        if (eventType === 'tool_call' && detail.id && toolStatusByProcessDetailId.has(String(detail.id))) {
             timelineOpts.toolStatus = toolStatusByProcessDetailId.get(String(detail.id));
         }
         const itemId = addTimelineItem(timeline, eventType, timelineOpts);
