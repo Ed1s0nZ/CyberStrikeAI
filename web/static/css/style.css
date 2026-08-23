@@ -858,7 +858,7 @@ html[data-theme="dark"] .vulnerability-alert-switch input:disabled + .vulnerabil
 }
 
 .conversation-sidebar {
-    width: 280px;
+    width: 320px;
     background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
     border-right: 1px solid var(--border-color);
     display: flex;
@@ -44995,7 +44995,7 @@ html[data-theme="dark"] .project-folder-preview-edit:focus-visible {
 .project-conversation-preview {
     position: fixed;
     z-index: 1200;
-    width: min(300px, calc(100vw - 32px));
+    width: min(340px, calc(100vw - 32px));
     padding: 12px 14px 11px;
     border: 1px solid rgba(30, 41, 59, 0.15);
     border-radius: 14px;
@@ -45011,11 +45011,12 @@ html[data-theme="dark"] .project-folder-preview-edit:focus-visible {
 }
 
 .project-conversation-preview-header {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: baseline;
-    gap: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
     margin-bottom: 8px;
+    min-width: 0;
 }
 
 .project-conversation-preview-title {
@@ -45025,8 +45026,11 @@ html[data-theme="dark"] .project-folder-preview-edit:focus-visible {
     font-size: 0.9rem;
     font-weight: 650;
     line-height: 1.35;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow-wrap: anywhere;
 }
 
 .project-conversation-preview-age {
