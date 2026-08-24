@@ -304,7 +304,7 @@ multi_agent:
     plan_execute_executed_steps_budget_ratio: 0.2 # plan_execute 中 executed_steps 预算比例
     plan_execute_max_step_result_runes: 4000 # plan_execute 每步结果最大字符数（超出截断）
     plan_execute_keep_last_steps: 8 # plan_execute 仅保留最近 N 步正文，早期步骤折叠为标题
-    checkpoint_dir: data/eino-checkpoints # P0：进程崩溃/OOM 后同会话自动 ADK Resume；正常结束会删 .ckpt；与「中断并继续」(last_react_*) 是两套机制
+    checkpoint_dir: "" # 聊天链路不再使用 ADK checkpoint；跨轮模型态统一走 conversations.last_react_*，便于排查 stale context
     model_retry_max_retries: 0 # Eino 原生 ChatModel retry；408/409/425/429/5xx/网络抖动/空流式输出会重试；0=默认 4（永久性 4xx 不重试）
     model_retry_max_backoff_sec: 0 # Eino 原生 ChatModel retry 单次退避上限秒数；0=默认 30
     model_failover_channels: [] # Eino 原生 ChatModel failover；填写 ai.channels ID，例如 [qwen-plus]；retry 耗尽后按顺序切换

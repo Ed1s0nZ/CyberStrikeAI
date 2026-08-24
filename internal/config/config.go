@@ -298,7 +298,8 @@ type MultiAgentEinoMiddlewareConfig struct {
 	PlanExecuteMaxStepResultRunes int `yaml:"plan_execute_max_step_result_runes,omitempty" json:"plan_execute_max_step_result_runes,omitempty"`
 	// PlanExecuteKeepLastSteps keeps only the tail steps in prompt view (default 8).
 	PlanExecuteKeepLastSteps int `yaml:"plan_execute_keep_last_steps,omitempty" json:"plan_execute_keep_last_steps,omitempty"`
-	// CheckpointDir when non-empty enables adk.Runner CheckPointStore (file-backed) for interrupt/resume persistence.
+	// CheckpointDir is retained for config compatibility. Chat agent runs do
+	// not consume it; cross-turn recovery is centralized in conversations.last_react_*.
 	CheckpointDir string `yaml:"checkpoint_dir,omitempty" json:"checkpoint_dir,omitempty"`
 	// DeepOutputKey passed to deep.Config OutputKey (session final text); empty = off.
 	DeepOutputKey string `yaml:"deep_output_key,omitempty" json:"deep_output_key,omitempty"`

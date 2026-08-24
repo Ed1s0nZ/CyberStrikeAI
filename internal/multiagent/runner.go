@@ -614,15 +614,18 @@ func RunDeepAgent(
 	}
 
 	return runEinoADKAgentLoop(ctx, &einoADKRunLoopArgs{
-		OrchMode:                orchMode,
-		OrchestratorName:        orchestratorName,
-		ConversationID:          conversationID,
-		Progress:                progress,
-		Logger:                  logger,
-		SnapshotMCPIDs:          snapshotMCPIDs,
-		StreamsMainAssistant:    streamsMainAssistant,
-		EinoRoleTag:             einoRoleTag,
-		CheckpointDir:           ma.EinoMiddleware.CheckpointDir,
+		OrchMode:             orchMode,
+		OrchestratorName:     orchestratorName,
+		ConversationID:       conversationID,
+		Progress:             progress,
+		Logger:               logger,
+		SnapshotMCPIDs:       snapshotMCPIDs,
+		StreamsMainAssistant: streamsMainAssistant,
+		EinoRoleTag:          einoRoleTag,
+		// Chat history recovery is intentionally centralized in last_react_*.
+		// ADK checkpoints are a second persisted model-state channel and make
+		// stale-context bugs hard to reason about across user turns.
+		CheckpointDir:           "",
 		RunRetryMaxAttempts:     RunRetryMaxAttemptsFromConfig(&ma.EinoMiddleware),
 		RunRetryMaxBackoffSec:   int(einoRunRetryMaxBackoffFromConfig(&ma.EinoMiddleware).Seconds()),
 		McpIDsMu:                &mcpIDsMu,
