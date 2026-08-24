@@ -3,6 +3,8 @@ package multiagent
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/cloudwego/eino/adk"
 )
@@ -82,12 +84,97 @@ func (h *einoRunErrorHandler) emitError(err error, kind string) {
 	if h == nil || h.progress == nil || err == nil {
 		return
 	}
+	userErr := einoUserFacingRunError(err)
 	data := map[string]interface{}{
 		"conversationId": h.conversationID,
 		"source":         "eino",
+		"error":          err.Error(),
 	}
 	if kind != "" {
 		data["errorKind"] = kind
+	} else if userErr.kind != "" {
+		data["errorKind"] = userErr.kind
 	}
-	h.progress("error", err.Error(), data)
+	if userErr.summary != "" {
+		data["errorSummary"] = userErr.summary
+	}
+	if userErr.retryExhausted {
+		data["retryExhausted"] = true
+		if userErr.totalRetries > 0 {
+			data["totalRetries"] = userErr.totalRetries
+		}
+	}
+	if userErr.rawLastError != "" {
+		data["lastError"] = userErr.rawLastError
+	}
+	message := err.Error()
+	if userErr.message != "" {
+		message = userErr.message
+	}
+	h.progress("error", message, data)
+}
+
+type einoRunUserError struct {
+	message        string
+	kind           string
+	summary        string
+	rawLastError   string
+	retryExhausted bool
+	totalRetries   int
+}
+
+func einoUserFacingRunError(err error) einoRunUserError {
+	var out einoRunUserError
+	if err == nil {
+		return out
+	}
+	var retryErr *adk.RetryExhaustedError
+	if !errors.As(err, &retryErr) {
+		return out
+	}
+	out.retryExhausted = true
+	out.totalRetries = retryErr.TotalRetries
+	lastErr := retryErr.LastErr
+	if lastErr == nil {
+		out.kind = "model_retry_exhausted"
+		out.summary = "模型调用多次重试后仍未成功。"
+		out.message = out.summary
+		return out
+	}
+	out.rawLastError = strings.TrimSpace(lastErr.Error())
+	if isEinoShouldRetryOutputRejected(lastErr) {
+		out.kind = "empty_model_output"
+		out.summary = "模型输出被重试策略拒绝；常见原因是空内容或缺少有效输出。"
+		out.message = formatEinoRetryExhaustedMessage(out.rawLastError, retryErr.TotalRetries)
+		return out
+	}
+	kind, summary := einoTransientRunErrorUserDetail(lastErr)
+	if strings.TrimSpace(summary) == "" {
+		summary = einoTrimRetryErrorSummary(lastErr.Error())
+	}
+	if kind == "" {
+		kind = "model_retry_exhausted"
+	}
+	out.kind = kind
+	out.summary = summary
+	out.message = formatEinoRetryExhaustedMessage(summary, retryErr.TotalRetries)
+	return out
+}
+
+func isEinoShouldRetryOutputRejected(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "model output rejected by shouldretry")
+}
+
+func formatEinoRetryExhaustedMessage(summary string, totalRetries int) string {
+	summary = strings.TrimSpace(summary)
+	if summary == "" {
+		summary = "模型调用多次重试后仍未成功。"
+	}
+	if totalRetries > 0 {
+		return fmt.Sprintf("模型调用重试已耗尽（已重试 %d 次）：%s", totalRetries, summary)
+	}
+	return "模型调用重试已耗尽：" + summary
 }

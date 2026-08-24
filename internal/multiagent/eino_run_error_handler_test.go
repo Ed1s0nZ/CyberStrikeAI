@@ -3,6 +3,7 @@ package multiagent
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/cloudwego/eino/adk"
@@ -58,6 +59,83 @@ func TestEinoRunErrorHandlerTimeoutAndGeneralErrorProgress(t *testing.T) {
 				t.Fatalf("errorKind = %#v, want %#v", gotKind, tc.errorKind)
 			}
 		})
+	}
+}
+
+func TestEinoRunErrorHandlerRetryExhaustedEmptyOutputProgress(t *testing.T) {
+	err := &adk.RetryExhaustedError{
+		LastErr:      errors.New("model output rejected by ShouldRetry at attempt 5"),
+		TotalRetries: 4,
+	}
+	var message string
+	var data map[string]interface{}
+
+	got := newEinoRunErrorHandler(einoRunErrorHandlerConfig{
+		ConversationID: "conv-1",
+		Progress: func(eventType, msg string, raw interface{}) {
+			if eventType == "error" {
+				message = msg
+				data, _ = raw.(map[string]interface{})
+			}
+		},
+	}).Handle(err)
+
+	if !errors.Is(got, err) {
+		t.Fatalf("err = %v", got)
+	}
+	if !strings.Contains(message, "模型调用重试已耗尽") ||
+		!strings.Contains(message, "model output rejected by ShouldRetry at attempt 5") {
+		t.Fatalf("message = %q", message)
+	}
+	if data["errorKind"] != "empty_model_output" {
+		t.Fatalf("errorKind = %#v", data["errorKind"])
+	}
+	if data["errorSummary"] != "模型输出被重试策略拒绝；常见原因是空内容或缺少有效输出。" {
+		t.Fatalf("errorSummary = %#v", data["errorSummary"])
+	}
+	if data["retryExhausted"] != true || data["totalRetries"] != 4 {
+		t.Fatalf("retry metadata = %#v", data)
+	}
+	if data["lastError"] != "model output rejected by ShouldRetry at attempt 5" {
+		t.Fatalf("lastError = %#v", data["lastError"])
+	}
+	if data["error"] != err.Error() {
+		t.Fatalf("raw error = %#v, want %#v", data["error"], err.Error())
+	}
+}
+
+func TestEinoRunErrorHandlerRetryExhaustedOriginalErrorProgress(t *testing.T) {
+	err := &adk.RetryExhaustedError{
+		LastErr:      errors.New("HTTP 429 Too Many Requests"),
+		TotalRetries: 3,
+	}
+	var message string
+	var data map[string]interface{}
+
+	got := newEinoRunErrorHandler(einoRunErrorHandlerConfig{
+		ConversationID: "conv-1",
+		Progress: func(eventType, msg string, raw interface{}) {
+			if eventType == "error" {
+				message = msg
+				data, _ = raw.(map[string]interface{})
+			}
+		},
+	}).Handle(err)
+
+	if !errors.Is(got, err) {
+		t.Fatalf("err = %v", got)
+	}
+	if !strings.Contains(message, "HTTP 429 Too Many Requests") {
+		t.Fatalf("message = %q", message)
+	}
+	if data["errorKind"] != "rate_limit" {
+		t.Fatalf("errorKind = %#v", data["errorKind"])
+	}
+	if data["errorSummary"] != "HTTP 429 Too Many Requests" {
+		t.Fatalf("errorSummary = %#v", data["errorSummary"])
+	}
+	if data["lastError"] != "HTTP 429 Too Many Requests" {
+		t.Fatalf("lastError = %#v", data["lastError"])
 	}
 }
 
