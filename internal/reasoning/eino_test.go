@@ -140,7 +140,7 @@ func TestAgenticOpenAIPlannerExtraFields_deepseekDisablesThinking(t *testing.T) 
 	}
 }
 
-func TestAgenticOpenAIPlannerExtraFields_deepseekEndpointWinsOverOpenAIProfile(t *testing.T) {
+func TestAgenticOpenAIPlannerExtraFields_openAIProfileWinsOverDeepseekEndpoint(t *testing.T) {
 	oa := &config.OpenAIConfig{
 		BaseURL: "https://api.deepseek.com/v1",
 		Model:   "deepseek-v4-flash",
@@ -155,12 +155,10 @@ func TestAgenticOpenAIPlannerExtraFields_deepseekEndpointWinsOverOpenAIProfile(t
 		},
 	}
 	got := AgenticOpenAIPlannerExtraFields(oa)
-	if _, ok := got["reasoning_effort"]; ok {
-		t.Fatalf("planner should strip reasoning_effort: %#v", got)
-	}
-	thinking, ok := got["thinking"].(map[string]any)
-	if !ok || thinking["type"] != "disabled" {
-		t.Fatalf("expected deepseek thinking disabled despite openai_compat profile, got %#v", got)
+	for _, key := range reasoningPayloadKeysForTest {
+		if _, ok := got[key]; ok {
+			t.Fatalf("planner fields unexpectedly contain %q: %#v", key, got)
+		}
 	}
 	if got["vendor_option"] != true {
 		t.Fatalf("vendor option not preserved: %#v", got)
@@ -189,7 +187,7 @@ func TestApplyPlanExecutePlannerModelConfig_stripsReasoningWhenGlobalOn(t *testi
 	}
 }
 
-func TestApplyPlanExecutePlannerModelConfig_deepseekEndpointWinsOverOpenAIProfile(t *testing.T) {
+func TestApplyPlanExecutePlannerModelConfig_openAIProfileWinsOverDeepseekEndpoint(t *testing.T) {
 	cfg := &einoopenai.ChatModelConfig{ExtraFields: map[string]any{
 		"thinking":         map[string]any{"type": "enabled"},
 		"reasoning_effort": "high",
@@ -205,16 +203,7 @@ func TestApplyPlanExecutePlannerModelConfig_deepseekEndpointWinsOverOpenAIProfil
 		},
 	}
 	ApplyPlanExecutePlannerModelConfig(cfg, oa)
-	if cfg.ReasoningEffort != "" {
-		t.Fatalf("expected ReasoningEffort omitted, got %q", cfg.ReasoningEffort)
-	}
-	if _, ok := cfg.ExtraFields["reasoning_effort"]; ok {
-		t.Fatalf("expected reasoning_effort omitted, got %#v", cfg.ExtraFields)
-	}
-	thinking, ok := cfg.ExtraFields["thinking"].(map[string]any)
-	if !ok || thinking["type"] != "disabled" {
-		t.Fatalf("expected deepseek thinking disabled despite openai_compat profile, got %#v", cfg.ExtraFields)
-	}
+	assertNoReasoningFields(t, cfg)
 	if cfg.ExtraFields["vendor_option"] != true {
 		t.Fatalf("expected unrelated extra field preserved, got %#v", cfg.ExtraFields)
 	}
@@ -246,6 +235,89 @@ func TestApplyReasoningOff_omitsAllReasoningFields(t *testing.T) {
 	}
 }
 
+func TestApplyReasoningOff_openAICompatDeepseekModelOmitsAllReasoningFields(t *testing.T) {
+	allowClient := false
+	cfg := &einoopenai.ChatModelConfig{ExtraFields: map[string]any{
+		"thinking":         map[string]any{"type": "enabled"},
+		"reasoning_effort": "high",
+	}}
+	oa := &config.OpenAIConfig{
+		Provider: "openai_compatible",
+		BaseURL:  "http://your-gateway:port/v1",
+		Model:    "deepseek-v4-flash-0731",
+		Reasoning: config.OpenAIReasoningConfig{
+			Mode:                 "off",
+			Effort:               "high",
+			Profile:              "openai_compat",
+			AllowClientReasoning: &allowClient,
+			ExtraRequestFields: map[string]interface{}{
+				"thinking":      map[string]any{"type": "disabled"},
+				"output_config": map[string]any{"effort": "high"},
+				"vendor_option": true,
+			},
+		},
+	}
+	ApplyToEinoChatModelConfig(cfg, oa, nil)
+	assertNoReasoningFields(t, cfg)
+	if cfg.ExtraFields["vendor_option"] != true {
+		t.Fatalf("expected unrelated extra field preserved, got %#v", cfg.ExtraFields)
+	}
+}
+
+func TestAgenticOpenAIExtraFields_openAICompatDeepseekModelOmitsAllReasoningFields(t *testing.T) {
+	oa := &config.OpenAIConfig{
+		Provider: "openai_compatible",
+		BaseURL:  "http://your-gateway:port/v1",
+		Model:    "deepseek-v4-flash-0731",
+		Reasoning: config.OpenAIReasoningConfig{
+			Mode:    "off",
+			Effort:  "high",
+			Profile: "openai_compat",
+			ExtraRequestFields: map[string]interface{}{
+				"thinking":         map[string]any{"type": "disabled"},
+				"reasoning_effort": "high",
+				"vendor_option":    true,
+			},
+		},
+	}
+	got := AgenticOpenAIExtraFields(oa, nil)
+	for _, key := range reasoningPayloadKeysForTest {
+		if _, ok := got[key]; ok {
+			t.Fatalf("agentic fields unexpectedly contain %q: %#v", key, got)
+		}
+	}
+	if got["vendor_option"] != true {
+		t.Fatalf("vendor option not preserved: %#v", got)
+	}
+}
+
+func TestAgenticOpenAIPlannerExtraFields_openAICompatDeepseekModelOmitsAllReasoningFields(t *testing.T) {
+	oa := &config.OpenAIConfig{
+		Provider: "openai_compatible",
+		BaseURL:  "http://your-gateway:port/v1",
+		Model:    "deepseek-v4-flash-0731",
+		Reasoning: config.OpenAIReasoningConfig{
+			Mode:    "on",
+			Effort:  "high",
+			Profile: "openai_compat",
+			ExtraRequestFields: map[string]interface{}{
+				"thinking":         map[string]any{"type": "enabled"},
+				"reasoning_effort": "high",
+				"vendor_option":    true,
+			},
+		},
+	}
+	got := AgenticOpenAIPlannerExtraFields(oa)
+	for _, key := range reasoningPayloadKeysForTest {
+		if _, ok := got[key]; ok {
+			t.Fatalf("planner fields unexpectedly contain %q: %#v", key, got)
+		}
+	}
+	if got["vendor_option"] != true {
+		t.Fatalf("vendor option not preserved: %#v", got)
+	}
+}
+
 func TestApplyReasoningOff_clientOverrideOmit(t *testing.T) {
 	cfg := &einoopenai.ChatModelConfig{}
 	oa := &config.OpenAIConfig{Reasoning: config.OpenAIReasoningConfig{
@@ -256,7 +328,7 @@ func TestApplyReasoningOff_clientOverrideOmit(t *testing.T) {
 }
 
 func TestApplyReasoningOff_deepseekExplicitlyDisablesDefaultThinking(t *testing.T) {
-	for _, profile := range []string{"deepseek_compat", "auto", "openai_compat"} {
+	for _, profile := range []string{"deepseek_compat", "auto"} {
 		t.Run(profile, func(t *testing.T) {
 			cfg := &einoopenai.ChatModelConfig{ExtraFields: map[string]any{
 				"reasoning_effort": "high",
@@ -284,6 +356,25 @@ func TestApplyReasoningOff_deepseekExplicitlyDisablesDefaultThinking(t *testing.
 				t.Fatalf("expected unrelated extra field preserved, got %#v", cfg.ExtraFields)
 			}
 		})
+	}
+}
+
+func TestApplyReasoningOff_openAIProfileWinsOverDeepseekEndpoint(t *testing.T) {
+	cfg := &einoopenai.ChatModelConfig{ExtraFields: map[string]any{
+		"reasoning_effort": "high",
+		"vendor_option":    true,
+	}}
+	oa := &config.OpenAIConfig{
+		BaseURL: "https://api.deepseek.com",
+		Model:   "deepseek-v4-pro",
+		Reasoning: config.OpenAIReasoningConfig{
+			Mode: "off", Effort: "high", Profile: "openai_compat",
+		},
+	}
+	ApplyToEinoChatModelConfig(cfg, oa, nil)
+	assertNoReasoningFields(t, cfg)
+	if cfg.ExtraFields["vendor_option"] != true {
+		t.Fatalf("expected unrelated extra field preserved, got %#v", cfg.ExtraFields)
 	}
 }
 

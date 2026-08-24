@@ -205,7 +205,7 @@ func TestReasoningToolChoiceCompatRoundTripperDeepSeek(t *testing.T) {
 	}
 }
 
-func TestReasoningToolChoiceCompatRoundTripperDeepSeekEndpointWinsOverProfile(t *testing.T) {
+func TestReasoningToolChoiceCompatRoundTripperOpenAIProfileWinsOverDeepSeekEndpoint(t *testing.T) {
 	var gotBody string
 	rt := &reasoningToolChoiceCompatRoundTripper{
 		cfg: &config.OpenAIConfig{
@@ -235,11 +235,11 @@ func TestReasoningToolChoiceCompatRoundTripperDeepSeekEndpointWinsOverProfile(t 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(gotBody, "tool_choice") {
-		t.Fatalf("expected DeepSeek tool_choice stripped despite openai_compat profile, got %s", gotBody)
+	if !strings.Contains(gotBody, "tool_choice") {
+		t.Fatalf("expected tool_choice preserved for explicit openai_compat profile, got %s", gotBody)
 	}
 	if !strings.Contains(gotBody, "tools") {
-		t.Fatalf("expected tools preserved for DeepSeek, got %s", gotBody)
+		t.Fatalf("expected tools preserved for explicit openai_compat profile, got %s", gotBody)
 	}
 }
 

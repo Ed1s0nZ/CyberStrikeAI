@@ -36,7 +36,7 @@ func ApplyPlanExecutePlannerModelConfig(cfg *einoopenai.ChatModelConfig, oa *con
 	}
 	mergeExtraRequestFields(cfg, oa.Reasoning.ExtraRequestFields)
 	clearReasoningFromChatModelConfig(cfg)
-	if resolveWireProfile(oa, &oa.Reasoning) == wireDeepseek || oa.IsDeepSeekEndpointOrModel() {
+	if resolveWireProfile(oa, &oa.Reasoning) == wireDeepseek {
 		// DeepSeek enables thinking by default, so omission would not actually
 		// disable it for the planner's forced tool-choice requests.
 		applyThinkingDisabled(cfg)
@@ -88,9 +88,9 @@ func ApplyToEinoChatModelConfig(cfg *einoopenai.ChatModelConfig, oa *config.Open
 		clearReasoningFromChatModelConfig(cfg)
 		// Strict OpenAI endpoints reject unknown `thinking` fields, whereas the
 		// DeepSeek API enables thinking by default and requires an explicit
-		// thinking.type=disabled switch. Detect the actual DeepSeek target even
-		// when the configured reasoning profile was left as openai_compat.
-		if resolveWireProfile(oa, sr) == wireDeepseek || oa.IsDeepSeekEndpointOrModel() {
+		// thinking.type=disabled switch. The configured profile is authoritative;
+		// auto-detection only happens inside resolveWireProfile for profile=auto.
+		if resolveWireProfile(oa, sr) == wireDeepseek {
 			applyThinkingDisabled(cfg)
 		}
 		return
@@ -132,7 +132,7 @@ func AgenticOpenAIExtraFields(oa *config.OpenAIConfig, client *ClientIntent) map
 	fields := cloneExtraRequestFields(sr.ExtraRequestFields)
 	if mode == "off" {
 		clearReasoningExtraFields(fields)
-		if resolveWireProfile(oa, sr) == wireDeepseek || oa.IsDeepSeekEndpointOrModel() {
+		if resolveWireProfile(oa, sr) == wireDeepseek {
 			if fields == nil {
 				fields = make(map[string]any)
 			}
@@ -194,7 +194,7 @@ func AgenticOpenAIPlannerExtraFields(oa *config.OpenAIConfig) map[string]any {
 	}
 	fields := cloneExtraRequestFields(oa.Reasoning.ExtraRequestFields)
 	clearReasoningExtraFields(fields)
-	if resolveWireProfile(oa, &oa.Reasoning) == wireDeepseek || oa.IsDeepSeekEndpointOrModel() {
+	if resolveWireProfile(oa, &oa.Reasoning) == wireDeepseek {
 		if fields == nil {
 			fields = make(map[string]any)
 		}

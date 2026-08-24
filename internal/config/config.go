@@ -959,13 +959,12 @@ func (c OpenAIConfig) MaxCompletionTokensEffective() int {
 }
 
 // IsDeepSeekEndpointOrModel reports whether the channel targets DeepSeek's
-// official-compatible API or a DeepSeek model family. This is separate from the
-// reasoning profile: profile controls field mapping, while DeepSeek has provider
-// constraints such as default thinking mode and no tool_choice in thinking mode.
+// official-compatible API endpoint. The historical name is kept for compatibility;
+// model names alone are not enough to infer DeepSeek wire behavior behind
+// OpenAI-compatible gateways.
 func (c OpenAIConfig) IsDeepSeekEndpointOrModel() bool {
 	baseURL := strings.ToLower(strings.TrimSpace(c.BaseURL))
-	model := strings.ToLower(strings.TrimSpace(c.Model))
-	return strings.Contains(baseURL, "deepseek") || strings.Contains(model, "deepseek")
+	return strings.Contains(baseURL, "deepseek")
 }
 
 // OpenAIReasoningConfig 全局默认与网关 profile（对话页可通过 ChatRequest.reasoning 覆盖，受 AllowClientReasoning 约束）。
