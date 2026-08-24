@@ -84,20 +84,30 @@ func TestEinoRunErrorHandlerRetryExhaustedEmptyOutputProgress(t *testing.T) {
 		t.Fatalf("err = %v", got)
 	}
 	if !strings.Contains(message, "模型调用重试已耗尽") ||
-		!strings.Contains(message, "model output rejected by ShouldRetry at attempt 5") {
+		!strings.Contains(message, "模型未返回原始错误；输出被重试策略拒绝。") ||
+		strings.Contains(message, "model output rejected by ShouldRetry at attempt 5") {
 		t.Fatalf("message = %q", message)
 	}
 	if data["errorKind"] != "model_output_rejected" {
 		t.Fatalf("errorKind = %#v", data["errorKind"])
 	}
-	if _, ok := data["errorSummary"]; ok {
-		t.Fatalf("errorSummary should not infer a reason, got %#v", data["errorSummary"])
+	if data["errorSummary"] != "模型未返回原始错误；输出被重试策略拒绝。" {
+		t.Fatalf("errorSummary = %#v", data["errorSummary"])
+	}
+	if data["hasModelOriginalError"] != false {
+		t.Fatalf("hasModelOriginalError = %#v", data["hasModelOriginalError"])
 	}
 	if data["retryExhausted"] != true || data["totalRetries"] != 4 {
 		t.Fatalf("retry metadata = %#v", data)
 	}
 	if data["lastError"] != "model output rejected by ShouldRetry at attempt 5" {
 		t.Fatalf("lastError = %#v", data["lastError"])
+	}
+	if data["technicalError"] != "model output rejected by ShouldRetry at attempt 5" {
+		t.Fatalf("technicalError = %#v", data["technicalError"])
+	}
+	if _, ok := data["modelOriginalError"]; ok {
+		t.Fatalf("modelOriginalError should be absent for ShouldRetry rejection, got %#v", data["modelOriginalError"])
 	}
 	if data["error"] != err.Error() {
 		t.Fatalf("raw error = %#v, want %#v", data["error"], err.Error())
@@ -136,6 +146,12 @@ func TestEinoRunErrorHandlerRetryExhaustedOriginalErrorProgress(t *testing.T) {
 	}
 	if data["lastError"] != "HTTP 429 Too Many Requests" {
 		t.Fatalf("lastError = %#v", data["lastError"])
+	}
+	if data["modelOriginalError"] != "HTTP 429 Too Many Requests" {
+		t.Fatalf("modelOriginalError = %#v", data["modelOriginalError"])
+	}
+	if _, ok := data["hasModelOriginalError"]; ok {
+		t.Fatalf("hasModelOriginalError should be absent when original error is present, got %#v", data["hasModelOriginalError"])
 	}
 }
 

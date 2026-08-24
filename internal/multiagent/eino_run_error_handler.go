@@ -107,6 +107,14 @@ func (h *einoRunErrorHandler) emitError(err error, kind string) {
 	if userErr.rawLastError != "" {
 		data["lastError"] = userErr.rawLastError
 	}
+	if userErr.technicalError != "" {
+		data["technicalError"] = userErr.technicalError
+	}
+	if userErr.hasModelOriginalError {
+		data["modelOriginalError"] = userErr.rawLastError
+	} else if userErr.retryExhausted {
+		data["hasModelOriginalError"] = false
+	}
 	message := err.Error()
 	if userErr.message != "" {
 		message = userErr.message
@@ -115,12 +123,14 @@ func (h *einoRunErrorHandler) emitError(err error, kind string) {
 }
 
 type einoRunUserError struct {
-	message        string
-	kind           string
-	summary        string
-	rawLastError   string
-	retryExhausted bool
-	totalRetries   int
+	message               string
+	kind                  string
+	summary               string
+	rawLastError          string
+	technicalError        string
+	retryExhausted        bool
+	totalRetries          int
+	hasModelOriginalError bool
 }
 
 func einoUserFacingRunError(err error) einoRunUserError {
@@ -144,7 +154,9 @@ func einoUserFacingRunError(err error) einoRunUserError {
 	out.rawLastError = strings.TrimSpace(lastErr.Error())
 	if isEinoShouldRetryOutputRejected(lastErr) {
 		out.kind = "model_output_rejected"
-		out.message = formatEinoRetryExhaustedMessage(out.rawLastError, retryErr.TotalRetries)
+		out.summary = "模型未返回原始错误；输出被重试策略拒绝。"
+		out.technicalError = out.rawLastError
+		out.message = formatEinoRetryExhaustedMessage(out.summary, retryErr.TotalRetries)
 		return out
 	}
 	kind, summary := einoTransientRunErrorUserDetail(lastErr)
@@ -156,6 +168,7 @@ func einoUserFacingRunError(err error) einoRunUserError {
 	}
 	out.kind = kind
 	out.summary = summary
+	out.hasModelOriginalError = out.rawLastError != ""
 	out.message = formatEinoRetryExhaustedMessage(summary, retryErr.TotalRetries)
 	return out
 }
