@@ -972,6 +972,8 @@ func setupRoutes(
 		protected.GET("/hitl/tool-whitelist", agentHandler.GetHITLGlobalToolWhitelist)
 		protected.PUT("/hitl/tool-whitelist", agentHandler.SetHITLGlobalToolWhitelist)
 		protected.POST("/hitl/tool-whitelist", agentHandler.MergeHITLGlobalToolWhitelist)
+		protected.GET("/hitl/default-config", agentHandler.GetHITLDefaultConfig)
+		protected.PUT("/hitl/default-config", agentHandler.UpdateHITLDefaultConfig)
 		protected.GET("/hitl/default-reviewer", agentHandler.GetHITLDefaultReviewer)
 		protected.PUT("/hitl/default-reviewer", agentHandler.UpdateHITLDefaultReviewer)
 		protected.GET("/hitl/audit-strategy", agentHandler.GetHITLAuditStrategy)

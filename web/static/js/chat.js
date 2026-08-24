@@ -154,9 +154,6 @@ const chatSystemModelCache = new Map();
 
 // 人机协同（HITL）会话级配置
 const HITL_STORAGE_PREFIX = 'cyberstrike-chat-hitl';
-const HITL_DRAFT_KEY = 'cyberstrike-chat-hitl-draft';
-/** 跨会话记忆：用户最近一次在侧栏选择的 HITL 偏好（与 hitl.js 中 readHitlGlobalLast 使用同一 key） */
-const HITL_GLOBAL_LAST_KEY = `${HITL_STORAGE_PREFIX}:__last__`;
 const HITL_MODE_OFF = 'off';
 const HITL_MODE_APPROVAL = 'approval';
 const HITL_MODE_REVIEW_EDIT = 'review_edit';
@@ -432,14 +429,17 @@ function normalizeHitlTimeoutForChat(value, fallback) {
 }
 
 function defaultHitlConfig() {
-    const serverReviewer = (typeof window !== 'undefined' && window.csaiHitlDefaultReviewer)
+    const serverDefault = (typeof window !== 'undefined' && window.csaiHitlDefaultConfig && typeof window.csaiHitlDefaultConfig === 'object')
+        ? window.csaiHitlDefaultConfig
+        : {};
+    const serverReviewer = serverDefault.reviewer || ((typeof window !== 'undefined' && window.csaiHitlDefaultReviewer)
         ? window.csaiHitlDefaultReviewer
-        : 'human';
+        : 'human');
     return {
-        mode: HITL_MODE_OFF,
+        mode: normalizeHitlMode(serverDefault.mode || HITL_MODE_OFF),
         reviewer: normalizeHitlReviewer(serverReviewer),
         sensitiveTools: DEFAULT_HITL_SESSION_TOOL_WHITELIST,
-        timeoutSeconds: DEFAULT_HITL_TIMEOUT_SECONDS,
+        timeoutSeconds: normalizeHitlTimeoutForChat(serverDefault.timeoutSeconds, DEFAULT_HITL_TIMEOUT_SECONDS),
         updatedAt: ''
     };
 }
@@ -520,70 +520,11 @@ function getHitlModeLabel(mode) {
     }
 }
 
-function getHitlLastGlobalConfig() {
-    const fallback = defaultHitlConfig();
-    try {
-        const raw = localStorage.getItem(HITL_GLOBAL_LAST_KEY);
-        if (!raw) return null;
-        const parsed = JSON.parse(raw);
-        if (!parsed || typeof parsed !== 'object') return null;
-        return {
-            mode: normalizeHitlMode(parsed.mode),
-            reviewer: normalizeHitlReviewer(parsed.reviewer),
-            sensitiveTools: typeof parsed.sensitiveTools === 'string' ? parsed.sensitiveTools : fallback.sensitiveTools,
-            timeoutSeconds: normalizeHitlTimeoutForChat(parsed.timeoutSeconds, fallback.timeoutSeconds),
-            updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : ''
-        };
-    } catch (e) {
-        return null;
-    }
-}
-
-function saveHitlLastGlobalConfig(payload) {
-    if (!payload || typeof payload !== 'object') return;
-    try {
-        localStorage.setItem(HITL_GLOBAL_LAST_KEY, JSON.stringify(payload));
-    } catch (e) {
-        console.warn('saveHitlLastGlobalConfig failed', e);
-    }
-}
-
 function getHitlConfigForConversation(conversationId) {
     const fallback = defaultHitlConfig();
     const cid = conversationId ? String(conversationId).trim() : '';
     if (!cid) {
-        const globalLast = getHitlLastGlobalConfig();
-        let draftCfg = null;
-        try {
-            const raw = localStorage.getItem(HITL_DRAFT_KEY);
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                if (parsed && typeof parsed === 'object') {
-                    draftCfg = {
-                        mode: normalizeHitlMode(parsed.mode),
-                        reviewer: normalizeHitlReviewer(parsed.reviewer),
-                        sensitiveTools: typeof parsed.sensitiveTools === 'string' ? parsed.sensitiveTools : fallback.sensitiveTools,
-                        timeoutSeconds: normalizeHitlTimeoutForChat(parsed.timeoutSeconds, fallback.timeoutSeconds),
-                        updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : ''
-                    };
-                }
-            }
-        } catch (e) {
-            draftCfg = null;
-        }
-        const g = globalLast ? {
-            mode: normalizeHitlMode(globalLast.mode),
-            reviewer: normalizeHitlReviewer(globalLast.reviewer),
-            sensitiveTools: typeof globalLast.sensitiveTools === 'string' ? globalLast.sensitiveTools : fallback.sensitiveTools,
-            timeoutSeconds: normalizeHitlTimeoutForChat(globalLast.timeoutSeconds, fallback.timeoutSeconds),
-            updatedAt: typeof globalLast.updatedAt === 'string' ? globalLast.updatedAt : ''
-        } : null;
-        if (!draftCfg && !g) return fallback;
-        if (!draftCfg) return g;
-        if (!g) return draftCfg;
-        const tg = Date.parse(g.updatedAt) || 0;
-        const td = Date.parse(draftCfg.updatedAt) || 0;
-        return tg > td ? g : draftCfg;
+        return fallback;
     }
     const key = getHitlStorageKeyByConversation(cid);
     try {
@@ -627,6 +568,8 @@ async function onHitlReviewerChanged(reviewer) {
     try {
         if (cid && typeof window.saveHitlConversationConfig === 'function') {
             await window.saveHitlConversationConfig(cid, cfg);
+        } else if (typeof window.putHitlDefaultConfig === 'function') {
+            await window.putHitlDefaultConfig(cfg);
         } else if (typeof window.putHitlDefaultReviewer === 'function') {
             await window.putHitlDefaultReviewer(cfg.reviewer);
         }
@@ -652,7 +595,10 @@ function bindHitlReviewerToggleListeners() {
 }
 
 function saveHitlConfigForConversation(conversationId, cfg, opts) {
-    const syncGlobalLast = !!(opts && opts.syncGlobalLast);
+    void opts;
+    if (!conversationId) {
+        return;
+    }
     const payload = {
         mode: normalizeHitlMode(cfg && cfg.mode),
         reviewer: normalizeHitlReviewer(cfg && cfg.reviewer),
@@ -660,12 +606,9 @@ function saveHitlConfigForConversation(conversationId, cfg, opts) {
         timeoutSeconds: normalizeHitlTimeoutForChat(cfg && cfg.timeoutSeconds, DEFAULT_HITL_TIMEOUT_SECONDS),
         updatedAt: typeof (cfg && cfg.updatedAt) === 'string' ? cfg.updatedAt : ''
     };
-    const key = conversationId ? getHitlStorageKeyByConversation(conversationId) : HITL_DRAFT_KEY;
+    const key = getHitlStorageKeyByConversation(conversationId);
     try {
         localStorage.setItem(key, JSON.stringify(payload));
-        if (syncGlobalLast) {
-            saveHitlLastGlobalConfig(payload);
-        }
     } catch (e) {
         console.warn('saveHitlConfigForConversation failed', e);
     }
@@ -752,8 +695,9 @@ async function waitForHitlConfigReady(conversationId) {
         await hitlConfigSyncPromise;
         return;
     }
-    if (!cid && window.csaiHitlDefaultReviewerReady && typeof window.csaiHitlDefaultReviewerReady.then === 'function') {
-        await window.csaiHitlDefaultReviewerReady.catch(function () {});
+    const defaultReady = window.csaiHitlDefaultConfigReady || window.csaiHitlDefaultReviewerReady;
+    if (!cid && defaultReady && typeof defaultReady.then === 'function') {
+        await defaultReady.catch(function () {});
         if (!currentConversationId) refreshHitlConfigByCurrentConversation();
     }
 }
@@ -818,6 +762,10 @@ async function applyHitlSidebarConfig() {
             await window.saveHitlConversationConfig(cid, cfg);
             const ok = typeof window.t === 'function' ? window.t('chat.hitlApplyOkSync') : '人机协同配置已保存并同步到服务器。';
             showHitlApplyFeedback(ok, false);
+        } else if (typeof window.putHitlDefaultConfig === 'function') {
+            await window.putHitlDefaultConfig(cfg);
+            const okDefault = typeof window.t === 'function' ? window.t('chat.hitlApplyOkDefaultConfig') : '人机协同默认配置已写入 config.yaml 并生效。';
+            showHitlApplyFeedback(okDefault, false);
         } else if (yamlMerged) {
             const okYaml = typeof window.t === 'function' ? window.t('chat.hitlApplyOkWhitelistYaml') : '免审批工具已合并进 config.yaml 并生效。会话配置会自动保存。';
             showHitlApplyFeedback(okYaml, false);
@@ -913,6 +861,11 @@ function applyConversationAgentMode(conversationId, conversation) {
 
 if (typeof window !== 'undefined') {
     window.csaiHitlGlobalToolWhitelist = window.csaiHitlGlobalToolWhitelist || [];
+    window.csaiHitlDefaultConfig = window.csaiHitlDefaultConfig || {
+        mode: HITL_MODE_OFF,
+        reviewer: 'human',
+        timeoutSeconds: DEFAULT_HITL_TIMEOUT_SECONDS
+    };
     window.csaiHitlDefaultReviewer = window.csaiHitlDefaultReviewer || 'human';
     window.csaiChatAgentMode = {
         EINO_MODES: CHAT_AGENT_EINO_MODES,
@@ -934,7 +887,6 @@ if (typeof window !== 'undefined') {
     window.setHitlReviewerUI = setHitlReviewerUI;
     window.onHitlReviewerChanged = onHitlReviewerChanged;
     window.bindHitlReviewerToggleListeners = bindHitlReviewerToggleListeners;
-    window.getHitlLastGlobalConfig = getHitlLastGlobalConfig;
     window.hitlMergeToolsForDisplay = hitlMergeToolsForDisplay;
     window.hitlStripGlobalToolsFromFormString = hitlStripGlobalToolsFromFormString;
     window.hitlToolsSplitToArray = hitlToolsSplitToArray;
@@ -5964,13 +5916,6 @@ async function startNewConversation(options = {}) {
         chatInput.value = '';
         adjustTextareaHeight(chatInput);
     }
-    // 把当前侧栏人机协同选项写入草稿与「最近应用」记忆，避免刷新时被旧草稿里的「关闭」覆盖
-    try {
-        if (typeof readHitlConfigFromForm === 'function' && typeof saveHitlConfigForConversation === 'function') {
-            const snap = readHitlConfigFromForm();
-            saveHitlConfigForConversation('', snap, { syncGlobalLast: true });
-        }
-    } catch (e) { /* ignore */ }
     refreshHitlConfigByCurrentConversation();
 }
 

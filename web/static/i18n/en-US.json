@@ -819,6 +819,7 @@
     "hitlWhitelistHint": "Separate with commas or new lines; shown merged with the global allowlist in config.",
     "hitlApply": "Apply",
     "hitlApplyOkSync": "HITL settings saved and synced to the server.",
+    "hitlApplyOkDefaultConfig": "Default HITL settings saved to config.yaml and activated.",
     "hitlApplyOkWhitelistYaml": "Tool whitelist merged into config.yaml and active. Session settings are saved automatically.",
     "hitlApplyOkLocal": "Saved in this browser.",
     "hitlApplyFail": "Failed to sync to server",

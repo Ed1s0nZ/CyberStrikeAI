@@ -95,6 +95,29 @@ func TestHitlAuditModelEffectiveFallsBackToMainConfig(t *testing.T) {
 	}
 }
 
+func TestHitlDefaultConfigEffectiveValues(t *testing.T) {
+	if got := (HitlConfig{}).EffectiveDefaultMode(); got != "off" {
+		t.Fatalf("empty default mode = %q, want off", got)
+	}
+	if got := (HitlConfig{DefaultMode: "review-edit"}).EffectiveDefaultMode(); got != "off" {
+		t.Fatalf("unknown default mode = %q, want off", got)
+	}
+	if got := (HitlConfig{DefaultMode: "review_edit"}).EffectiveDefaultMode(); got != "review_edit" {
+		t.Fatalf("review_edit default mode = %q, want review_edit", got)
+	}
+	if got := (HitlConfig{}).EffectiveDefaultTimeoutSeconds(); got != 300 {
+		t.Fatalf("empty default timeout = %d, want 300", got)
+	}
+	zero := 0
+	if got := (HitlConfig{DefaultTimeoutSeconds: &zero}).EffectiveDefaultTimeoutSeconds(); got != 0 {
+		t.Fatalf("zero default timeout = %d, want 0", got)
+	}
+	neg := -1
+	if got := (HitlConfig{DefaultTimeoutSeconds: &neg}).EffectiveDefaultTimeoutSeconds(); got != 0 {
+		t.Fatalf("negative default timeout = %d, want 0", got)
+	}
+}
+
 func TestLoadUsesAIDefaultChannelAsRuntimeOpenAI(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")

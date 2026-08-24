@@ -1062,8 +1062,24 @@ type HitlConfig struct {
 	AuditAgentPromptReviewEdit string `yaml:"audit_agent_prompt_review_edit,omitempty" json:"audit_agent_prompt_review_edit,omitempty"`
 	// RetentionDays 已决策审计日志（hitl_interrupts 非 pending）保留天数；省略时默认 90；0 表示不自动清理。
 	RetentionDays *int `yaml:"retention_days,omitempty" json:"retention_days,omitempty"`
-	// DefaultReviewer 全局默认审批方（human | audit_agent）；未选会话时切换会写入 config.yaml；新建会话无独立配置时沿用。
+	// DefaultMode 全局默认人机协同模式（off | approval | review_edit）；新建会话无独立配置时沿用。
+	DefaultMode string `yaml:"default_mode,omitempty" json:"default_mode,omitempty"`
+	// DefaultReviewer 全局默认审批方（human | audit_agent）；新建会话无独立配置时沿用。
 	DefaultReviewer string `yaml:"default_reviewer,omitempty" json:"default_reviewer,omitempty"`
+	// DefaultTimeoutSeconds 全局默认审批等待秒数；nil 表示使用前端历史默认 300 秒，0 表示不限时。
+	DefaultTimeoutSeconds *int `yaml:"default_timeout_seconds,omitempty" json:"default_timeout_seconds,omitempty"`
+}
+
+// EffectiveDefaultMode returns off, approval, or review_edit; omitted or unknown values default to off.
+func (h HitlConfig) EffectiveDefaultMode() string {
+	switch strings.ToLower(strings.TrimSpace(h.DefaultMode)) {
+	case "feedback", "followup":
+		return "approval"
+	case "approval", "review_edit":
+		return strings.ToLower(strings.TrimSpace(h.DefaultMode))
+	default:
+		return "off"
+	}
 }
 
 // EffectiveDefaultReviewer returns human or audit_agent; omitted or unknown values default to human.
@@ -1074,6 +1090,17 @@ func (h HitlConfig) EffectiveDefaultReviewer() string {
 	default:
 		return "human"
 	}
+}
+
+// EffectiveDefaultTimeoutSeconds returns the default HITL approval timeout; nil defaults to 5 minutes.
+func (h HitlConfig) EffectiveDefaultTimeoutSeconds() int {
+	if h.DefaultTimeoutSeconds == nil {
+		return 300
+	}
+	if *h.DefaultTimeoutSeconds < 0 {
+		return 0
+	}
+	return *h.DefaultTimeoutSeconds
 }
 
 // RetentionDaysEffective returns retention; 0 means keep forever; omitted defaults to 90.

@@ -135,8 +135,12 @@ agent:
 #   approval → audit_agent_prompt
 #   review_edit → audit_agent_prompt_review_edit（可改参后放行）
 hitl:
-  # 全局默认审批方：human=人工审批，audit_agent=审计 Agent；未选会话时切换会写入本项，重启后仍生效
+  # 全局默认人机协同模式：off=关闭，approval=审批模式，review_edit=审查编辑；新建会话无独立配置时沿用
+  default_mode: off
+  # 全局默认审批方：human=人工审批，audit_agent=审计 Agent；新建会话无独立配置时沿用
   default_reviewer: human
+  # 全局默认审批等待时限（秒）：300=5分钟，0=不限时；新建会话无独立配置时沿用
+  default_timeout_seconds: 300
   # 审计 Agent 专用模型；字段留空则复用上方 openai 配置。建议 model 填小模型，用于降低审批成本。
   audit_model:
     provider: "" # openai / claude；留空跟随 openai.provider

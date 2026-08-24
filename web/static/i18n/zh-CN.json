@@ -807,6 +807,7 @@
     "hitlWhitelistHint": "白名单内工具免审批；每行一个或逗号分隔，与 config 全局白名单合并。",
     "hitlApply": "应用",
     "hitlApplyOkSync": "人机协同配置已保存并同步到服务器。",
+    "hitlApplyOkDefaultConfig": "人机协同默认配置已写入 config.yaml 并生效。",
     "hitlApplyOkWhitelistYaml": "免审批工具已合并进 config.yaml 并生效。会话配置会自动保存。",
     "hitlApplyOkLocal": "已保存到本浏览器。",
     "hitlApplyFail": "同步到服务器失败",
