@@ -57,6 +57,16 @@ func (a *einoRunMessageAccumulator) Messages() []adk.Message {
 	return a.msgs
 }
 
+func (a *einoRunMessageAccumulator) NewMessages() []adk.Message {
+	if a == nil {
+		return nil
+	}
+	if a.baseCount < 0 || a.baseCount >= len(a.msgs) {
+		return nil
+	}
+	return a.msgs[a.baseCount:]
+}
+
 func (a *einoRunMessageAccumulator) BaseCount() int {
 	if a == nil {
 		return 0

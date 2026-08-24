@@ -45,7 +45,7 @@ func (b *einoRunResultBuilder) BuildFinal() *RunResult {
 func (b *einoRunResultBuilder) build(partial bool) *RunResult {
 	var runMsgs []adk.Message
 	if b.cfg.RunMessages != nil {
-		runMsgs = b.cfg.RunMessages.Messages()
+		runMsgs = b.cfg.RunMessages.NewMessages()
 	}
 	var lastAssistant string
 	var lastPlanExecuteExecutor string
@@ -107,6 +107,9 @@ func buildEinoRunResultFromAccumulated(
 	if cleaned == "" {
 		if fb := strings.TrimSpace(einoExtractFallbackAssistantFromMsgs(runAccumulatedMsgs)); fb != "" {
 			cleaned = fb
+			if orchMode == "plan_execute" {
+				cleaned = UnwrapPlanExecuteUserText(cleaned)
+			}
 		}
 	}
 	cleaned = dedupeRepeatedParagraphs(cleaned, 80)
@@ -146,32 +149,38 @@ func markModelFacingTraceForPersistence(msgs []adk.Message) []adk.Message {
 	return out
 }
 
-// einoExtractFallbackAssistantFromMsgs 在「主通道未产出助手正文」时，从 Eino ADK 轨迹中回填用户可见回复。
-// 典型场景：监督者仅调用 exit（final_result 落在 Tool 消息中），或工具结果已写入历史但 lastAssistant 未更新。
+// einoExtractFallbackAssistantFromMsgs 在「主通道未产出助手正文」时，从 Eino ADK
+// 原生消息轨迹中回填用户可见回复。这里保持克制：只采纳倒序最近的可交付终态，
+// 避免把工具调用前的过渡语或子任务过程误升为最终回复。
 //
-// 优先级：最后一次 exit 工具输出 → 最后一条含 exit 的助手 tool_calls 参数中的 final_result。
+// 可交付终态：
+// - exit 工具输出；
+// - assistant 调用 exit 时 arguments.final_result；
+// - 没有后续普通工具结果截断的纯 assistant 正文。
 func einoExtractFallbackAssistantFromMsgs(msgs []adk.Message) string {
 	for i := len(msgs) - 1; i >= 0; i-- {
 		m := msgs[i]
-		if m == nil || m.Role != schema.Tool {
+		if m == nil {
 			continue
 		}
-		if !strings.EqualFold(strings.TrimSpace(m.ToolName), adk.ToolInfoExit.Name) {
-			continue
-		}
-		content := strings.TrimSpace(m.Content)
-		if content == "" || strings.HasPrefix(content, einomcp.ToolErrorPrefix) {
-			continue
-		}
-		return content
-	}
-	for i := len(msgs) - 1; i >= 0; i-- {
-		m := msgs[i]
-		if m == nil || m.Role != schema.Assistant {
-			continue
-		}
-		if s := einoExtractExitFinalFromAssistantToolCalls(m); s != "" {
-			return s
+		switch m.Role {
+		case schema.Tool:
+			if strings.EqualFold(strings.TrimSpace(m.ToolName), adk.ToolInfoExit.Name) {
+				content := strings.TrimSpace(m.Content)
+				if content != "" && !strings.HasPrefix(content, einomcp.ToolErrorPrefix) {
+					return content
+				}
+			}
+			return ""
+		case schema.Assistant:
+			if s := einoExtractExitFinalFromAssistantToolCalls(m); s != "" {
+				return s
+			}
+			if len(m.ToolCalls) == 0 {
+				if content := strings.TrimSpace(m.Content); content != "" {
+					return content
+				}
+			}
 		}
 	}
 	return ""

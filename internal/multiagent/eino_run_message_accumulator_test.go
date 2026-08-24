@@ -27,6 +27,10 @@ func TestEinoRunMessageAccumulatorTracksBaseAndAppends(t *testing.T) {
 	if len(msgs) != 2 || msgs[1].Role != schema.Assistant || msgs[1].Content != "hello" {
 		t.Fatalf("messages = %#v", msgs)
 	}
+	newMsgs := acc.NewMessages()
+	if len(newMsgs) != 1 || newMsgs[0].Content != "hello" {
+		t.Fatalf("new messages = %#v", newMsgs)
+	}
 }
 
 func TestEinoRunMessageAccumulatorToolMessage(t *testing.T) {

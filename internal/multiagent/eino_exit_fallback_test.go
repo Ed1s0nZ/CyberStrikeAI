@@ -55,6 +55,70 @@ func TestEinoExtractFallbackAssistantFromMsgs_prefersToolOverEarlierAssistant(t 
 	}
 }
 
+func TestEinoExtractFallbackAssistantFromMsgs_plainAssistant(t *testing.T) {
+	msgs := []*schema.Message{
+		schema.UserMessage("hi"),
+		schema.AssistantMessage("plain answer", nil),
+	}
+	if got := einoExtractFallbackAssistantFromMsgs(msgs); got != "plain answer" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestEinoExtractFallbackAssistantFromMsgs_finalAssistantAfterToolResult(t *testing.T) {
+	msgs := []*schema.Message{
+		schema.UserMessage("hi"),
+		schema.AssistantMessage("", []schema.ToolCall{{
+			ID:   "call-1",
+			Type: "function",
+			Function: schema.FunctionCall{
+				Name:      "execute",
+				Arguments: `{"command":"pwd"}`,
+			},
+		}}),
+		schema.ToolMessage("/tmp", "call-1", schema.WithToolName("execute")),
+		schema.AssistantMessage("final after tool", nil),
+	}
+	if got := einoExtractFallbackAssistantFromMsgs(msgs); got != "final after tool" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestEinoExtractFallbackAssistantFromMsgs_doesNotUseAssistantBeforeUnfinishedToolResult(t *testing.T) {
+	msgs := []*schema.Message{
+		schema.UserMessage("hi"),
+		schema.AssistantMessage("I will inspect that.", nil),
+		schema.AssistantMessage("", []schema.ToolCall{{
+			ID:   "call-1",
+			Type: "function",
+			Function: schema.FunctionCall{
+				Name:      "execute",
+				Arguments: `{"command":"pwd"}`,
+			},
+		}}),
+		schema.ToolMessage("/tmp", "call-1", schema.WithToolName("execute")),
+	}
+	if got := einoExtractFallbackAssistantFromMsgs(msgs); got != "" {
+		t.Fatalf("got %q, want empty", got)
+	}
+}
+
+func TestEinoRunResultBuilderFinalFallsBackToPlainAssistantTrace(t *testing.T) {
+	runMessages := newEinoRunMessageAccumulator(nil)
+	runMessages.Append(schema.UserMessage("hi"))
+	runMessages.Append(schema.AssistantMessage("plain answer", nil))
+
+	got := newEinoRunResultBuilder(einoRunResultBuilderConfig{
+		OrchMode:    "deep",
+		EmptyHint:   "empty",
+		RunMessages: runMessages,
+	}).BuildFinal()
+
+	if got.Response != "plain answer" {
+		t.Fatalf("response = %q, want plain answer", got.Response)
+	}
+}
+
 func toolExitMsg(content, callID string) *schema.Message {
 	m := schema.ToolMessage(content, callID)
 	m.ToolName = "exit"
