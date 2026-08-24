@@ -143,8 +143,7 @@ func einoUserFacingRunError(err error) einoRunUserError {
 	}
 	out.rawLastError = strings.TrimSpace(lastErr.Error())
 	if isEinoShouldRetryOutputRejected(lastErr) {
-		out.kind = "empty_model_output"
-		out.summary = "模型输出被重试策略拒绝；常见原因是空内容或缺少有效输出。"
+		out.kind = "model_output_rejected"
 		out.message = formatEinoRetryExhaustedMessage(out.rawLastError, retryErr.TotalRetries)
 		return out
 	}

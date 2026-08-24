@@ -87,11 +87,11 @@ func TestEinoRunErrorHandlerRetryExhaustedEmptyOutputProgress(t *testing.T) {
 		!strings.Contains(message, "model output rejected by ShouldRetry at attempt 5") {
 		t.Fatalf("message = %q", message)
 	}
-	if data["errorKind"] != "empty_model_output" {
+	if data["errorKind"] != "model_output_rejected" {
 		t.Fatalf("errorKind = %#v", data["errorKind"])
 	}
-	if data["errorSummary"] != "模型输出被重试策略拒绝；常见原因是空内容或缺少有效输出。" {
-		t.Fatalf("errorSummary = %#v", data["errorSummary"])
+	if _, ok := data["errorSummary"]; ok {
+		t.Fatalf("errorSummary should not infer a reason, got %#v", data["errorSummary"])
 	}
 	if data["retryExhausted"] != true || data["totalRetries"] != 4 {
 		t.Fatalf("retry metadata = %#v", data)
