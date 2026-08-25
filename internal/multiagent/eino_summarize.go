@@ -301,6 +301,7 @@ func newEinoSummarizationModelOptions(outputReserve int, modelName, kind string,
 		label = "eino " + kind + " summarization generate request"
 	}
 	return []model.Option{
+		model.WithMaxTokens(outputReserve),
 		einoopenai.WithMaxCompletionTokens(outputReserve),
 		einoopenai.WithExtraHeader(map[string]string{
 			copenai.SummarizationRequestHeader: "1",

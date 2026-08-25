@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"cyberstrike-ai/internal/config"
+
+	"github.com/cloudwego/eino/components/model"
 )
 
 func TestStripReasoningFromSummarizationPayload(t *testing.T) {
@@ -66,5 +68,17 @@ func TestStripReasoningFromSummarizationPayloadHonorsOpenAICompatProfile(t *test
 	s := string(out)
 	if strings.Contains(s, "thinking") || strings.Contains(s, "reasoning_effort") {
 		t.Fatalf("expected OpenAI-compatible profile to strip reasoning fields, got %s", s)
+	}
+}
+
+func TestEinoSummarizationModelOptionsSetCommonMaxTokens(t *testing.T) {
+	const outputReserve = 4096
+	opts := newEinoSummarizationModelOptions(outputReserve, "minimax-m3", "agentic", nil, nil)
+	common := model.GetCommonOptions(nil, opts...)
+	if common == nil || common.MaxTokens == nil {
+		t.Fatal("expected summarization options to set common max_tokens")
+	}
+	if *common.MaxTokens != outputReserve {
+		t.Fatalf("max_tokens = %d, want %d", *common.MaxTokens, outputReserve)
 	}
 }
