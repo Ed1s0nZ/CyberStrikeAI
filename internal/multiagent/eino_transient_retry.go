@@ -52,6 +52,9 @@ func isEinoTransientRunError(err error) bool {
 	if msg == "" {
 		return false
 	}
+	if isEinoEmptySummaryContentErrorText(msg) {
+		return true
+	}
 	if status := httpStatusFromErrorText(msg); status > 0 {
 		return isRetryableHTTPStatus(status)
 	}
@@ -92,6 +95,11 @@ func isEinoTransientRunError(err error) bool {
 		}
 	}
 	return false
+}
+
+func isEinoEmptySummaryContentErrorText(msg string) bool {
+	return strings.Contains(msg, "summary content is empty") ||
+		strings.Contains(msg, "agentic summarization returned empty summary")
 }
 
 func isRetryableHTTPStatus(status int) bool {

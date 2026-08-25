@@ -32,6 +32,23 @@ func StripReasoningFromChatCompletionBody(rawBody []byte) ([]byte, error) {
 	return out, nil
 }
 
+// DisableThinkingForChatCompletionBody removes generic reasoning controls and
+// explicitly disables DeepSeek-style thinking. Use only for providers where
+// omitting the field would leave thinking enabled by default.
+func DisableThinkingForChatCompletionBody(rawBody []byte) ([]byte, error) {
+	var payload map[string]any
+	if err := sonic.Unmarshal(rawBody, &payload); err != nil {
+		return rawBody, nil
+	}
+	stripReasoningFields(payload)
+	payload["thinking"] = map[string]any{"type": "disabled"}
+	out, err := sonic.Marshal(payload)
+	if err != nil {
+		return rawBody, err
+	}
+	return out, nil
+}
+
 // StripReasoningIfForcedToolChoice removes thinking / reasoning fields when the
 // request sets tool_choice to "required" or an object. Several providers reject
 // that combination (e.g. DashScope: "tool_choice does not support being set to

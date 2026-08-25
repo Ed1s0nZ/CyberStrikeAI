@@ -10,7 +10,6 @@ import (
 	"cyberstrike-ai/internal/config"
 	"cyberstrike-ai/internal/database"
 
-	einoopenai "github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/adk/middlewares/summarization"
 	"github.com/cloudwego/eino/components/model"
@@ -109,9 +108,7 @@ func newEinoAgenticSummarizationMiddleware(
 	retryPolicy := einoTransientRunRetryPolicyFromMW(mwCfg)
 	retryMax := retryPolicy.maxAttempts
 	var summaryOverflowRetries int
-	summaryModelOpts := []model.Option{
-		einoopenai.WithMaxCompletionTokens(outputReserve),
-	}
+	summaryModelOpts := newEinoSummarizationModelOptions(outputReserve, modelName, "agentic", &appCfg.OpenAI, logger)
 
 	mw, err := summarization.NewTyped[*schema.AgenticMessage](ctx, &summarization.TypedConfig[*schema.AgenticMessage]{
 		Model:        summaryModel,

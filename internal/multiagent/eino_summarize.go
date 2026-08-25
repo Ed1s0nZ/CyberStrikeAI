@@ -164,24 +164,7 @@ func newEinoSummarizationMiddleware(
 	retryMax := retryPolicy.maxAttempts
 	var summaryOverflowRetries int
 
-	// ModelOptions apply only to summarization Generate (same ChatModel instance as the agent).
-	// Strip thinking/reasoning on this call path; mark requests for empty-choices diagnostics.
-	summaryModelOpts := []model.Option{
-		einoopenai.WithMaxCompletionTokens(outputReserve),
-		einoopenai.WithExtraHeader(map[string]string{
-			copenai.SummarizationRequestHeader: "1",
-		}),
-		einoopenai.WithRequestPayloadModifier(func(_ context.Context, in []*schema.Message, rawBody []byte) ([]byte, error) {
-			if logger != nil {
-				logger.Info("eino summarization generate request",
-					zap.Int("input_messages", len(in)),
-					zap.Int("payload_bytes", len(rawBody)),
-					zap.String("model", modelName),
-				)
-			}
-			return stripReasoningFromSummarizationPayload(rawBody)
-		}),
-	}
+	summaryModelOpts := newEinoSummarizationModelOptions(outputReserve, modelName, "classic", &appCfg.OpenAI, logger)
 
 	mw, err := summarization.New(ctx, &summarization.Config{
 		Model:        summaryModel,
@@ -306,6 +289,33 @@ func newEinoSummarizationMiddleware(
 		return nil, fmt.Errorf("summarization.New: %w", err)
 	}
 	return mw, nil
+}
+
+// newEinoSummarizationModelOptions applies only to summarization Generate calls
+// on the shared main model. Summary generation should be plain-text and cheap:
+// strip provider reasoning/thinking controls so DeepSeek/OpenAI-compatible
+// endpoints do not spend the reserved output budget on invisible reasoning.
+func newEinoSummarizationModelOptions(outputReserve int, modelName, kind string, oa *config.OpenAIConfig, logger *zap.Logger) []model.Option {
+	label := "eino summarization generate request"
+	if strings.TrimSpace(kind) != "" && kind != "classic" {
+		label = "eino " + kind + " summarization generate request"
+	}
+	return []model.Option{
+		einoopenai.WithMaxCompletionTokens(outputReserve),
+		einoopenai.WithExtraHeader(map[string]string{
+			copenai.SummarizationRequestHeader: "1",
+		}),
+		einoopenai.WithRequestPayloadModifier(func(_ context.Context, in []*schema.Message, rawBody []byte) ([]byte, error) {
+			if logger != nil {
+				logger.Info(label,
+					zap.Int("input_messages", len(in)),
+					zap.Int("payload_bytes", len(rawBody)),
+					zap.String("model", modelName),
+				)
+			}
+			return stripReasoningFromSummarizationPayload(rawBody, oa)
+		}),
+	}
 }
 
 // summarizationInputBudgetOpts controls spill/truncation behavior when a round alone exceeds budget.

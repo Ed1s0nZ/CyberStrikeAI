@@ -36,6 +36,7 @@ func TestIsEinoTransientRunError(t *testing.T) {
 		{"http2 goaway", errors.New("failed to receive stream chunk: error, http2: server sent GOAWAY and closed the connection; LastStreamID=791, ErrCode=NO_ERROR"), true},
 		{"unexpected internal stream chunk", errors.New("failed to receive stream chunk: error, The service encountered an unexpected internal error. Request id: 0217851391106464f01ec66621d0980a42fd45436ed75957a6a0a"), true},
 		{"unexpected eof", errors.New("unexpected EOF"), true},
+		{"empty summarization output", errors.New("[NodeRunError] summary content is empty\nnode path: [node_1, ChatModel]"), true},
 		{"503", errors.New("upstream returned 503"), true},
 		{"iteration limit", errors.New("max iteration reached"), false},
 		{"canceled", context.Canceled, false},
