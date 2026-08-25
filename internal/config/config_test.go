@@ -160,6 +160,84 @@ func TestLoadUsesAIDefaultChannelAsRuntimeOpenAI(t *testing.T) {
 	}
 }
 
+func TestNormalizeAIProviderProfilesForOfficialDeepSeekEndpoint(t *testing.T) {
+	cfg := &Config{
+		OpenAI: OpenAIConfig{
+			BaseURL: "https://api.deepseek.com/v1",
+			Model:   "deepseek-chat",
+			Reasoning: OpenAIReasoningConfig{
+				Profile: "openai_compat",
+			},
+		},
+		AI: AIConfig{
+			Channels: map[string]AIChannelConfig{
+				"official": {
+					BaseURL: "api.deepseek.com/v1",
+					Model:   "deepseek-chat",
+					Reasoning: OpenAIReasoningConfig{
+						Profile: "auto",
+					},
+				},
+				"gateway": {
+					BaseURL: "https://compatible.example.com/v1",
+					Model:   "deepseek-chat",
+					Reasoning: OpenAIReasoningConfig{
+						Profile: "openai_compat",
+					},
+				},
+			},
+		},
+	}
+
+	cfg.NormalizeAIProviderProfiles()
+
+	if cfg.OpenAI.Reasoning.Profile != "deepseek" {
+		t.Fatalf("openai profile = %q, want deepseek", cfg.OpenAI.Reasoning.Profile)
+	}
+	if got := cfg.AI.Channels["official"].Reasoning.Profile; got != "deepseek" {
+		t.Fatalf("official channel profile = %q, want deepseek", got)
+	}
+	if got := cfg.AI.Channels["gateway"].Reasoning.Profile; got != "openai_compat" {
+		t.Fatalf("gateway profile should be preserved, got %q", got)
+	}
+}
+
+func TestLoadNormalizesDefaultChannelForOfficialDeepSeekEndpoint(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	initial := strings.Join([]string{
+		"ai:",
+		"  default_channel: deepseek",
+		"  channels:",
+		"    deepseek:",
+		"      name: DeepSeek",
+		"      provider: openai_compatible",
+		"      base_url: https://api.deepseek.com/v1",
+		"      api_key: deepseek-key",
+		"      model: deepseek-chat",
+		"      reasoning:",
+		"        profile: openai_compat",
+		"server:",
+		"  host: 127.0.0.1",
+		"  port: 8080",
+		"",
+	}, "\n")
+	if err := os.WriteFile(path, []byte(initial), 0644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.OpenAI.Reasoning.Profile != "deepseek" {
+		t.Fatalf("runtime OpenAI profile = %q, want deepseek", cfg.OpenAI.Reasoning.Profile)
+	}
+	if got := cfg.AI.Channels["deepseek"].Reasoning.Profile; got != "deepseek" {
+		t.Fatalf("channel profile = %q, want deepseek", got)
+	}
+}
+
 func TestSummarizationUserIntentLedgerRunesEffective(t *testing.T) {
 	var zero MultiAgentEinoMiddlewareConfig
 	if got := zero.SummarizationUserIntentLedgerMaxRunesEffective(); got != DefaultSummarizationUserIntentLedgerMaxRunes {
