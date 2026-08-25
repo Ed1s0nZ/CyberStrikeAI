@@ -51,3 +51,12 @@ test('Eino 模型 retry/failover 设置项有中英文文案', () => {
         assert.ok(en.settingsBasic[key].length > 0, `en ${key} is empty`);
     });
 });
+
+test('AI 通道保存前会自动识别 DeepSeek 官方线路', () => {
+    assert.match(settings, /function\s+isOfficialDeepSeekBaseURL/);
+    assert.match(settings, /api\.deepseek\.com/);
+    assert.match(settings, /profile:\s*'deepseek'/);
+    assert.match(settings, /normalizeAIChannelProviderProfile\(\{/);
+    assert.match(settings, /normalizeAIConfigProviderProfiles\(currentConfig\.ai\)/);
+    assert.match(template, /<option value="deepseek">deepseek<\/option>/);
+});
