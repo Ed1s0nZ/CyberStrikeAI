@@ -155,6 +155,84 @@ func TestEinoRunErrorHandlerRetryExhaustedOriginalErrorProgress(t *testing.T) {
 	}
 }
 
+func TestEinoClientRunErrorMessageUsesRawRetryExhaustedModelError(t *testing.T) {
+	raw := "summary content is empty: role=assistant content_runes=0 reasoning_runes=42\nprovider request id: req_123"
+	err := &adk.RetryExhaustedError{
+		LastErr:      errors.New(raw),
+		TotalRetries: 4,
+	}
+
+	got := EinoClientRunErrorMessage(err)
+	if !strings.Contains(got, "模型调用重试已耗尽（已重试 4 次）") {
+		t.Fatalf("message missing retry prefix: %q", got)
+	}
+	if !strings.Contains(got, raw) {
+		t.Fatalf("message should include raw model error:\n%s", got)
+	}
+
+	fields := EinoClientRunErrorFields(err)
+	if fields["modelOriginalError"] != raw || fields["lastError"] != raw {
+		t.Fatalf("raw fields = %#v", fields)
+	}
+}
+
+func TestEinoClientRunErrorMessageMarksSummarizationModelRetryError(t *testing.T) {
+	raw := `POST "https://api.deepseek.com/v1/chat/completions": 429 Too Many Requests: {"error":{"message":"Rate limit reached"}}`
+	err := &adk.RetryExhaustedError{
+		LastErr:      newEinoSummarizationModelError(errors.New(raw)),
+		TotalRetries: 4,
+	}
+
+	got := EinoClientRunErrorMessage(err)
+	for _, want := range []string{
+		"摘要阶段大模型调用失败",
+		"模型调用重试已耗尽（已重试 4 次）",
+		"最后一次大模型报错原文",
+		raw,
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("message missing %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "summarization model error") {
+		t.Fatalf("message leaked internal wrapper:\n%s", got)
+	}
+
+	fields := EinoClientRunErrorFields(err)
+	if fields["errorPhase"] != "summarization" || fields["summarizationModelError"] != true {
+		t.Fatalf("phase fields = %#v", fields)
+	}
+	if fields["modelOriginalError"] != raw || fields["lastError"] != raw {
+		t.Fatalf("raw fields = %#v", fields)
+	}
+}
+
+func TestEinoClientRunErrorMessageMarksDirectSummarizationModelError(t *testing.T) {
+	raw := `POST "https://api.deepseek.com/v1/chat/completions": 400 Bad Request: {"error":{"message":"invalid thinking parameter"}}`
+	err := newEinoSummarizationModelError(errors.New(raw))
+
+	got := EinoClientRunErrorMessage(err)
+	for _, want := range []string{
+		"摘要阶段大模型调用失败",
+		"大模型报错原文",
+		raw,
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("message missing %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "summarization model error") {
+		t.Fatalf("message leaked internal wrapper:\n%s", got)
+	}
+
+	fields := EinoClientRunErrorFields(err)
+	if fields["errorPhase"] != "summarization" ||
+		fields["modelOriginalError"] != raw ||
+		fields["lastError"] != raw {
+		t.Fatalf("fields = %#v", fields)
+	}
+}
+
 func TestEinoRunErrorHandlerIterationLimitProgress(t *testing.T) {
 	var events []string
 	var errorKind interface{}

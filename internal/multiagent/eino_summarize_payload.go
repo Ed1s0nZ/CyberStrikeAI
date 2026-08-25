@@ -21,12 +21,15 @@ func shouldDisableDeepSeekThinkingForSummarization(oa *config.OpenAIConfig) bool
 	if oa == nil {
 		return false
 	}
+	if oa.IsDeepSeekEndpointOrModel() {
+		return true
+	}
 	profile := strings.ToLower(strings.TrimSpace(oa.Reasoning.ProfileEffective()))
 	switch profile {
 	case "deepseek", "deepseek_compat":
 		return true
 	case "", "auto":
-		return oa.IsDeepSeekEndpointOrModel()
+		return false
 	default:
 		return false
 	}

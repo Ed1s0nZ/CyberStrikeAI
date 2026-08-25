@@ -371,15 +371,17 @@ func (h *AgentHandler) EinoSingleAgentLoopStream(c *gin.Context) {
 		h.logger.Error("Eino ADK 单代理执行失败", zap.Error(runErr))
 		taskStatus = "failed"
 		h.tasks.UpdateTaskStatus(conversationID, taskStatus)
-		errMsg := "执行失败: " + runErr.Error()
+		clientErr := multiagent.EinoClientRunErrorMessage(runErr)
+		errMsg := "执行失败: " + clientErr
 		if assistantMessageID != "" {
 			_, _ = h.db.Exec("UPDATE messages SET content = ?, updated_at = ? WHERE id = ?", errMsg, time.Now(), assistantMessageID)
 			_ = h.db.AddProcessDetail(assistantMessageID, conversationID, "error", errMsg, nil)
 		}
-		sendEvent("error", errMsg, map[string]interface{}{
-			"conversationId": conversationID,
-			"messageId":      assistantMessageID,
-		})
+		errData := multiagent.EinoClientRunErrorFields(runErr)
+		errData["conversationId"] = conversationID
+		errData["messageId"] = assistantMessageID
+		errData["error"] = errMsg
+		sendEvent("error", errMsg, errData)
 		sendEvent("done", "", map[string]interface{}{"conversationId": conversationID})
 		timeoutCancel()
 		return

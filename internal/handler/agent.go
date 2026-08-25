@@ -747,7 +747,7 @@ func (h *AgentHandler) finalizeRobotAgentError(ctx context.Context, assistantMes
 	if shouldPersistEinoAgentTraceAfterRunError(ctx) {
 		h.persistEinoAgentTraceForResume(conversationID, resultMA)
 	}
-	errMsg := "执行失败: " + errMA.Error()
+	errMsg := "执行失败: " + multiagent.EinoClientRunErrorMessage(errMA)
 	if assistantMessageID != "" {
 		_, _ = h.db.Exec("UPDATE messages SET content = ?, updated_at = ? WHERE id = ?", errMsg, time.Now(), assistantMessageID)
 		_ = h.db.AddProcessDetail(assistantMessageID, conversationID, "error", errMsg, nil)

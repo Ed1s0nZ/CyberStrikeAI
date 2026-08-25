@@ -167,7 +167,7 @@ func newEinoSummarizationMiddleware(
 	summaryModelOpts := newEinoSummarizationModelOptions(outputReserve, modelName, "classic", &appCfg.OpenAI, logger)
 
 	mw, err := summarization.New(ctx, &summarization.Config{
-		Model:        summaryModel,
+		Model:        newNonEmptySummaryChatModel(summaryModel),
 		ModelOptions: summaryModelOpts,
 		GenModelInput: func(ctx context.Context, sysInstruction, userInstruction adk.Message, originalMsgs []adk.Message) ([]adk.Message, error) {
 			if transcriptPath != "" && len(originalMsgs) > 0 {

@@ -12,15 +12,24 @@ import (
 )
 
 type capturingAgenticChatModel struct {
-	mu     sync.Mutex
-	inputs [][]*schema.AgenticMessage
-	output *schema.AgenticMessage
+	mu      sync.Mutex
+	inputs  [][]*schema.AgenticMessage
+	output  *schema.AgenticMessage
+	outputs []*schema.AgenticMessage
 }
 
 func (m *capturingAgenticChatModel) Generate(_ context.Context, input []*schema.AgenticMessage, _ ...model.Option) (*schema.AgenticMessage, error) {
 	m.mu.Lock()
 	m.inputs = append(m.inputs, input)
+	callNo := len(m.inputs)
 	m.mu.Unlock()
+	if len(m.outputs) > 0 {
+		idx := callNo - 1
+		if idx >= len(m.outputs) {
+			idx = len(m.outputs) - 1
+		}
+		return m.outputs[idx], nil
+	}
 	if m.output != nil {
 		return m.output, nil
 	}

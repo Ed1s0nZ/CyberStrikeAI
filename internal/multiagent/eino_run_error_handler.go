@@ -115,11 +115,7 @@ func (h *einoRunErrorHandler) emitError(err error, kind string) {
 	} else if userErr.retryExhausted {
 		data["hasModelOriginalError"] = false
 	}
-	message := err.Error()
-	if userErr.message != "" {
-		message = userErr.message
-	}
-	h.progress("error", message, data)
+	h.progress("error", EinoClientRunErrorMessage(err), data)
 }
 
 type einoRunUserError struct {
@@ -131,6 +127,7 @@ type einoRunUserError struct {
 	retryExhausted        bool
 	totalRetries          int
 	hasModelOriginalError bool
+	summarizationModelErr bool
 }
 
 func einoUserFacingRunError(err error) einoRunUserError {
@@ -152,6 +149,10 @@ func einoUserFacingRunError(err error) einoRunUserError {
 		return out
 	}
 	out.rawLastError = strings.TrimSpace(lastErr.Error())
+	if raw, ok := einoSummarizationModelRawErrorText(lastErr); ok {
+		out.rawLastError = raw
+		out.summarizationModelErr = true
+	}
 	if isEinoShouldRetryOutputRejected(lastErr) {
 		out.kind = "model_output_rejected"
 		out.summary = "模型未返回原始错误；输出被重试策略拒绝。"
@@ -162,6 +163,9 @@ func einoUserFacingRunError(err error) einoRunUserError {
 	kind, summary := einoTransientRunErrorUserDetail(lastErr)
 	if strings.TrimSpace(summary) == "" {
 		summary = einoTrimRetryErrorSummary(lastErr.Error())
+	}
+	if out.summarizationModelErr {
+		summary = einoTrimRetryErrorSummary(out.rawLastError)
 	}
 	if kind == "" {
 		kind = "model_retry_exhausted"
@@ -189,4 +193,106 @@ func formatEinoRetryExhaustedMessage(summary string, totalRetries int) string {
 		return fmt.Sprintf("模型调用重试已耗尽（已重试 %d 次）：%s", totalRetries, summary)
 	}
 	return "模型调用重试已耗尽：" + summary
+}
+
+// EinoClientRunErrorMessage returns the error text that should be shown directly
+// to clients. When native retry hides the final provider failure behind a retry
+// wrapper, prefer the original last model error so summarization/model issues are
+// diagnosable from the frontend without opening server logs.
+func EinoClientRunErrorMessage(err error) string {
+	if err == nil {
+		return ""
+	}
+	userErr := einoUserFacingRunError(err)
+	if userErr.retryExhausted {
+		if userErr.hasModelOriginalError && userErr.rawLastError != "" {
+			if userErr.summarizationModelErr {
+				return formatEinoSummarizationRetryExhaustedRawModelMessage(userErr.rawLastError, userErr.totalRetries)
+			}
+			return formatEinoRetryExhaustedRawModelMessage(userErr.rawLastError, userErr.totalRetries)
+		}
+		if userErr.message != "" {
+			return userErr.message
+		}
+	}
+	if raw, ok := einoSummarizationModelRawErrorText(err); ok {
+		return formatEinoSummarizationRawModelMessage(raw)
+	}
+	return err.Error()
+}
+
+func formatEinoRetryExhaustedRawModelMessage(raw string, totalRetries int) string {
+	raw = strings.TrimSpace(raw)
+	prefix := "模型调用重试已耗尽"
+	if totalRetries > 0 {
+		prefix = fmt.Sprintf("模型调用重试已耗尽（已重试 %d 次）", totalRetries)
+	}
+	if raw == "" {
+		return prefix
+	}
+	return prefix + "，最后一次模型原始错误：\n" + raw
+}
+
+func formatEinoSummarizationRetryExhaustedRawModelMessage(raw string, totalRetries int) string {
+	raw = strings.TrimSpace(raw)
+	prefix := "摘要阶段大模型调用失败，模型调用重试已耗尽"
+	if totalRetries > 0 {
+		prefix = fmt.Sprintf("摘要阶段大模型调用失败，模型调用重试已耗尽（已重试 %d 次）", totalRetries)
+	}
+	if raw == "" {
+		return prefix
+	}
+	return prefix + "，最后一次大模型报错原文：\n" + raw
+}
+
+func formatEinoSummarizationRawModelMessage(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "摘要阶段大模型调用失败。"
+	}
+	return "摘要阶段大模型调用失败，大模型报错原文：\n" + raw
+}
+
+// EinoClientRunErrorFields returns structured diagnostic fields that handlers can
+// attach to their final error event in addition to the visible message.
+func EinoClientRunErrorFields(err error) map[string]interface{} {
+	fields := make(map[string]interface{})
+	if err == nil {
+		return fields
+	}
+	userErr := einoUserFacingRunError(err)
+	if userErr.kind != "" {
+		fields["errorKind"] = userErr.kind
+	}
+	if userErr.summary != "" {
+		fields["errorSummary"] = userErr.summary
+	}
+	if userErr.retryExhausted {
+		fields["retryExhausted"] = true
+		if userErr.totalRetries > 0 {
+			fields["totalRetries"] = userErr.totalRetries
+		}
+	}
+	if userErr.rawLastError != "" {
+		fields["lastError"] = userErr.rawLastError
+	}
+	if userErr.technicalError != "" {
+		fields["technicalError"] = userErr.technicalError
+	}
+	if userErr.hasModelOriginalError {
+		fields["modelOriginalError"] = userErr.rawLastError
+	} else if userErr.retryExhausted {
+		fields["hasModelOriginalError"] = false
+	}
+	if userErr.summarizationModelErr {
+		fields["errorPhase"] = "summarization"
+		fields["summarizationModelError"] = true
+		fields["modelOriginalError"] = userErr.rawLastError
+	} else if raw, ok := einoSummarizationModelRawErrorText(err); ok {
+		fields["errorPhase"] = "summarization"
+		fields["summarizationModelError"] = true
+		fields["modelOriginalError"] = raw
+		fields["lastError"] = raw
+	}
+	return fields
 }

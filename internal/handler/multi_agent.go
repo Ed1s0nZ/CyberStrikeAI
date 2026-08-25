@@ -385,15 +385,17 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 		h.logger.Error("Eino DeepAgent 执行失败", zap.Error(runErr))
 		taskStatus = "failed"
 		h.tasks.UpdateTaskStatus(conversationID, taskStatus)
-		errMsg := "执行失败: " + runErr.Error()
+		clientErr := multiagent.EinoClientRunErrorMessage(runErr)
+		errMsg := "执行失败: " + clientErr
 		if assistantMessageID != "" {
 			_, _ = h.db.Exec("UPDATE messages SET content = ?, updated_at = ? WHERE id = ?", errMsg, time.Now(), assistantMessageID)
 			_ = h.db.AddProcessDetail(assistantMessageID, conversationID, "error", errMsg, nil)
 		}
-		sendEvent("error", errMsg, map[string]interface{}{
-			"conversationId": conversationID,
-			"messageId":      assistantMessageID,
-		})
+		errData := multiagent.EinoClientRunErrorFields(runErr)
+		errData["conversationId"] = conversationID
+		errData["messageId"] = assistantMessageID
+		errData["error"] = errMsg
+		sendEvent("error", errMsg, errData)
 		sendEvent("done", "", map[string]interface{}{"conversationId": conversationID})
 		timeoutCancel()
 		return
@@ -513,11 +515,14 @@ func (h *AgentHandler) MultiAgentLoop(c *gin.Context) {
 				h.persistEinoAgentTraceForResume(prep.ConversationID, result)
 			}
 			h.logger.Error("Eino DeepAgent 执行失败", zap.Error(runErr))
-			errMsg := "执行失败: " + runErr.Error()
+			clientErr := multiagent.EinoClientRunErrorMessage(runErr)
+			errMsg := "执行失败: " + clientErr
 			if prep.AssistantMessageID != "" {
 				_, _ = h.db.Exec("UPDATE messages SET content = ?, updated_at = ? WHERE id = ?", errMsg, time.Now(), prep.AssistantMessageID)
 			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": errMsg})
+			errData := multiagent.EinoClientRunErrorFields(runErr)
+			errData["error"] = errMsg
+			c.JSON(http.StatusInternalServerError, errData)
 			return
 		}
 		mw := &h.config.MultiAgent.EinoMiddleware

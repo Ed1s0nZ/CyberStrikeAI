@@ -111,7 +111,7 @@ func newEinoAgenticSummarizationMiddleware(
 	summaryModelOpts := newEinoSummarizationModelOptions(outputReserve, modelName, "agentic", &appCfg.OpenAI, logger)
 
 	mw, err := summarization.NewTyped[*schema.AgenticMessage](ctx, &summarization.TypedConfig[*schema.AgenticMessage]{
-		Model:        summaryModel,
+		Model:        newNonEmptyAgenticSummaryModel(summaryModel),
 		ModelOptions: summaryModelOpts,
 		GenModelInput: func(ctx context.Context, sysInstruction, userInstruction *schema.AgenticMessage, originalMsgs []*schema.AgenticMessage) ([]*schema.AgenticMessage, error) {
 			classicOriginal := AgenticMessagesToEino(originalMsgs)

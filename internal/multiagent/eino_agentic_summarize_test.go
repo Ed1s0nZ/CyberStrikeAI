@@ -171,6 +171,59 @@ func TestEinoAgenticChatModelAgentCompactsContextBeforeBusinessModel(t *testing.
 	}
 }
 
+func TestEinoAgenticSummarizationMiddlewareRetriesWhenSummaryModelReturnsEmpty(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	emit := false
+	summaryModel := &capturingAgenticChatModel{
+		outputs: []*schema.AgenticMessage{
+			agenticAssistantTextMessage(""),
+			agenticAssistantTextMessage("<summary>有效摘要：继续验证 SQL 注入路径</summary>"),
+		},
+	}
+	appCfg := &config.Config{}
+	appCfg.OpenAI.Model = "gpt-4o"
+	appCfg.OpenAI.MaxTotalTokens = 5000
+	appCfg.Database.Path = filepath.Join(t.TempDir(), "cyberstrike.db")
+	mwCfg := &config.MultiAgentEinoMiddlewareConfig{
+		SummarizationEmitInternalEvents:  &emit,
+		SummarizationOutputReserveTokens: 1024,
+	}
+
+	mw, err := newEinoAgenticSummarizationMiddleware(ctx, summaryModel, appCfg, mwCfg, "conv-agentic-empty-summary", nil, "", nil)
+	if err != nil {
+		t.Fatalf("newEinoAgenticSummarizationMiddleware: %v", err)
+	}
+	state := &adk.TypedChatModelAgentState[*schema.AgenticMessage]{
+		Messages: []*schema.AgenticMessage{
+			schema.SystemAgenticMessage("system root"),
+			schema.UserAgenticMessage("授权范围 example.com\n" + strings.Repeat("历史扫描输出 ", 12000)),
+			agenticAssistantTextMessage("已记录范围"),
+			schema.UserAgenticMessage("继续验证 SQL 注入路径"),
+		},
+	}
+
+	_, after, err := mw.BeforeModelRewriteState(ctx, state, nil)
+	if err != nil {
+		t.Fatalf("BeforeModelRewriteState should retry instead of failing on empty summary: %v", err)
+	}
+	if after == nil {
+		t.Fatal("after state is nil")
+	}
+	if inputs := summaryModel.snapshotInputs(); len(inputs) < 2 {
+		t.Fatalf("summary model calls=%d, want retry after empty output", len(inputs))
+	}
+	joined := joinClassicMessageContent(AgenticMessagesToEino(after.Messages))
+	for _, want := range []string{"有效摘要", "继续验证 SQL 注入路径", "原始用户输入与约束账本"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("retried compacted context missing %q:\n%s", want, joined)
+		}
+	}
+	if strings.Contains(joined, "本地压缩摘要") {
+		t.Fatalf("local fallback should not be used:\n%s", joined)
+	}
+}
+
 func TestAppendEinoAgenticChatModelTailMiddlewaresIncludesTypedSummarization(t *testing.T) {
 	t.Parallel()
 	mw := newAgenticSystemMessageNormalizerMiddleware(nil, "summary")

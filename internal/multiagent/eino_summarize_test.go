@@ -13,6 +13,7 @@ import (
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/adk/middlewares/summarization"
+	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 	"go.uber.org/zap"
 )
@@ -383,6 +384,84 @@ func TestSummarizeFinalize_MergesSystemMessages(t *testing.T) {
 	if systemCount != 1 {
 		t.Fatalf("want 1 merged system message, got %d", systemCount)
 	}
+}
+
+func TestEinoSummarizationMiddlewareRetriesWhenSummaryModelReturnsEmpty(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	emit := false
+	summaryModel := &capturingClassicChatModel{outputs: []*schema.Message{
+		schema.AssistantMessage("", nil),
+		schema.AssistantMessage("<summary>有效摘要：继续验证 SQL 注入路径</summary>", nil),
+	}}
+	appCfg := &config.Config{}
+	appCfg.OpenAI.Model = "gpt-4o"
+	appCfg.OpenAI.MaxTotalTokens = 5000
+	appCfg.Database.Path = filepath.Join(t.TempDir(), "cyberstrike.db")
+	mwCfg := &config.MultiAgentEinoMiddlewareConfig{
+		SummarizationEmitInternalEvents:  &emit,
+		SummarizationOutputReserveTokens: 1024,
+	}
+
+	mw, err := newEinoSummarizationMiddleware(ctx, summaryModel, appCfg, mwCfg, "conv-empty-summary", nil, "", nil)
+	if err != nil {
+		t.Fatalf("newEinoSummarizationMiddleware: %v", err)
+	}
+	state := &adk.ChatModelAgentState{Messages: []adk.Message{
+		schema.SystemMessage("system root"),
+		schema.UserMessage("授权范围 example.com\n" + strings.Repeat("历史扫描输出 ", 12000)),
+		schema.AssistantMessage("已记录范围", nil),
+		schema.UserMessage("继续验证 SQL 注入路径"),
+	}}
+
+	_, after, err := mw.BeforeModelRewriteState(ctx, state, nil)
+	if err != nil {
+		t.Fatalf("BeforeModelRewriteState should retry instead of failing on empty summary: %v", err)
+	}
+	if after == nil {
+		t.Fatal("after state is nil")
+	}
+	if summaryModel.calls < 2 {
+		t.Fatalf("summary model calls=%d, want retry after empty output", summaryModel.calls)
+	}
+	joined := joinClassicMessageContent(after.Messages)
+	for _, want := range []string{"有效摘要", "继续验证 SQL 注入路径", "原始用户输入与约束账本"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("retried compacted context missing %q:\n%s", want, joined)
+		}
+	}
+	if strings.Contains(joined, "本地压缩摘要") {
+		t.Fatalf("local fallback should not be used:\n%s", joined)
+	}
+}
+
+type capturingClassicChatModel struct {
+	output  *schema.Message
+	outputs []*schema.Message
+	calls   int
+}
+
+func (m *capturingClassicChatModel) Generate(_ context.Context, _ []*schema.Message, _ ...model.Option) (*schema.Message, error) {
+	m.calls++
+	if len(m.outputs) > 0 {
+		idx := m.calls - 1
+		if idx >= len(m.outputs) {
+			idx = len(m.outputs) - 1
+		}
+		return m.outputs[idx], nil
+	}
+	if m.output != nil {
+		return m.output, nil
+	}
+	return schema.AssistantMessage("classic answer", nil), nil
+}
+
+func (m *capturingClassicChatModel) Stream(ctx context.Context, input []*schema.Message, opts ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+	msg, err := m.Generate(ctx, input, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return schema.StreamReaderFromArray([]*schema.Message{msg}), nil
 }
 
 // assertNoOrphanTool 断言消息列表里的每个 role=tool 消息都能在更前面找到一个
