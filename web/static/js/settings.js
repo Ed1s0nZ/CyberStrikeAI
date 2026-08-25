@@ -2632,6 +2632,7 @@ function writeAIChannelToMainForm(id) {
     if (providerEl) {
         const provider = (ch.provider === 'openai' || !ch.provider) ? 'openai_compatible' : ch.provider;
         providerEl.value = provider;
+        syncSettingsCustomSelect(providerEl);
     }
     const keyEl = document.getElementById('openai-api-key');
     if (keyEl) keyEl.value = ch.api_key || '';
@@ -2645,11 +2646,20 @@ function writeAIChannelToMainForm(id) {
     if (maxCompletionTokensEl) maxCompletionTokensEl.value = ch.max_completion_tokens || 32768;
     const r = ch.reasoning || {};
     const modeEl = document.getElementById('openai-reasoning-mode');
-    if (modeEl) modeEl.value = ['auto', 'on', 'off'].includes(String(r.mode || '').toLowerCase()) ? String(r.mode).toLowerCase() : 'auto';
+    if (modeEl) {
+        modeEl.value = ['auto', 'on', 'off'].includes(String(r.mode || '').toLowerCase()) ? String(r.mode).toLowerCase() : 'auto';
+        syncSettingsCustomSelect(modeEl);
+    }
     const effEl = document.getElementById('openai-reasoning-effort');
-    if (effEl) effEl.value = ['', 'low', 'medium', 'high', 'max', 'xhigh'].includes(String(r.effort || '').toLowerCase()) ? String(r.effort || '').toLowerCase() : '';
+    if (effEl) {
+        effEl.value = ['', 'low', 'medium', 'high', 'max', 'xhigh'].includes(String(r.effort || '').toLowerCase()) ? String(r.effort || '').toLowerCase() : '';
+        syncSettingsCustomSelect(effEl);
+    }
     const profileEl = document.getElementById('openai-reasoning-profile');
-    if (profileEl) profileEl.value = ['auto', 'deepseek', 'deepseek_compat', 'openai_compat', 'output_config_effort'].includes(String(r.profile || '').toLowerCase()) ? String(r.profile || '').toLowerCase() : 'auto';
+    if (profileEl) {
+        profileEl.value = ['auto', 'deepseek', 'deepseek_compat', 'openai_compat', 'output_config_effort'].includes(String(r.profile || '').toLowerCase()) ? String(r.profile || '').toLowerCase() : 'auto';
+        syncSettingsCustomSelect(profileEl);
+    }
     const allowEl = document.getElementById('openai-reasoning-allow-client');
     if (allowEl) allowEl.checked = r.allow_client_reasoning !== false;
     syncModelListFetchButtons();
