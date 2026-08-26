@@ -8,18 +8,20 @@ const template = fs.readFileSync('web/templates/index.html', 'utf8');
 
 function functionSource(source, name, nextName) {
     const start = source.indexOf(`function ${name}(`);
-    const end = source.indexOf(`function ${nextName}(`, start);
+    const end = nextName ? source.indexOf(`function ${nextName}(`, start) : source.length;
     assert.notEqual(start, -1, `${name} should exist`);
-    assert.notEqual(end, -1, `${nextName} should follow ${name}`);
+    if (nextName) {
+        assert.notEqual(end, -1, `${nextName} should follow ${name}`);
+    }
     return source.slice(start, end);
 }
 
 test('全局置顶检查接口结果并即时通知项目文件夹', () => {
-    const source = functionSource(chat, 'pinConversation', 'showMoveToGroupSubmenu');
+    const source = functionSource(chat, 'pinConversation');
 
     assert.match(source, /assertConversationActionResponse\(updateResponse, '更新置顶状态失败'\)/);
     assert.match(source, /notifyConversationPinnedChanged\(convId, newPinned\)/);
-    assert.match(source, /loadConversationsWithGroups\(\)/);
+    assert.match(source, /loadConversations\(\)/);
 });
 
 test('项目文件夹内置顶对话优先排序并显示图钉', () => {
@@ -58,17 +60,20 @@ test('项目文件夹菜单可以置顶并立即更新排序', () => {
     assert.match(projects, /\[\.\.\.pinnedProjects, unassignedProject, \.\.\.regularProjects\]/);
 });
 
-test('对话侧栏不再显示对话分组区域', () => {
+test('对话侧栏只保留最近对话区域', () => {
     assert.doesNotMatch(template, /class="conversation-groups-section"/);
     assert.doesNotMatch(template, /id="conversation-groups-list"/);
 });
 
-test('删除对话分组检查接口结果并先清理本地状态', () => {
-    const deleteSource = functionSource(chat, 'deleteConversationGroupById', 'deleteGroup');
-    const contextSource = functionSource(chat, 'deleteGroupFromContext', 'closeGroupContextMenu');
+test('对话三点菜单仍绑定打开上下文菜单', () => {
+    const itemSource = functionSource(chat, 'createConversationListItemWithMenu', 'openConversationContextMenuForId');
+    const menuSource = functionSource(chat, 'showConversationContextMenu', 'ensureConversationRenameModal');
 
-    assert.match(deleteSource, /assertConversationActionResponse\(deleteResponse, '删除分组失败'\)/);
-    assert.match(deleteSource, /removeConversationGroupFromLocalState\(groupId\)/);
-    assert.match(deleteSource, /if \(currentGroupId === groupId\) exitGroupDetail\(\)/);
-    assert.match(contextSource, /deleteConversationGroupById\(groupId, \{ closeContextMenu: true \}\)/);
+    assert.match(itemSource, /menuBtn\.onclick = \(e\) => openConversationContextMenuForId\(e, conversation\.id, conversation\.title \|\| ''\)/);
+    assert.match(menuSource, /const menu = document\.getElementById\('conversation-context-menu'\)/);
+    assert.match(menuSource, /menu\.style\.display = 'block'/);
+    assert.match(chat, /function clearDownloadMarkdownSubmenuHideTimeout\(/);
+    assert.match(chat, /function handleDownloadMarkdownSubmenuEnter\(/);
+    assert.match(chat, /function handleDownloadMarkdownSubmenuLeave\(/);
+    assert.match(chat, /function hideDownloadMarkdownSubmenu\(/);
 });

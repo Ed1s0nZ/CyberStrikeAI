@@ -2557,7 +2557,7 @@ function selectWebshell(id, stateReady) {
         '<svg class="role-selector-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
         '</button>' +
         '<div id="ws-role-selection-panel" class="role-selection-panel" style="display:none;">' +
-        '<div class="role-selection-panel-header"><h3 class="role-selection-panel-title">' + (wsT('chatGroup.rolePanelTitle') || '选择角色') + '</h3>' +
+        '<div class="role-selection-panel-header"><h3 class="role-selection-panel-title">' + (wsT('chat.rolePanelTitle') || '选择角色') + '</h3>' +
         '<button type="button" class="role-selection-panel-close" onclick="wsCloseRolePanel()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
         '</div><div id="ws-role-selection-list" class="role-selection-list-main"></div></div>' +
         '</div>' +

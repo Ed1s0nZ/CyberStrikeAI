@@ -58,27 +58,8 @@ func TestRBACToolExecutionOwnershipAccess(t *testing.T) {
 	}
 }
 
-func TestRBACGroupAndUploadOwnership(t *testing.T) {
+func TestRBACUploadOwnership(t *testing.T) {
 	db := newRBACTestDB(t)
-	group1, err := db.CreateGroup("u1 group", "", "u1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	group2, err := db.CreateGroup("u2 group", "", "u2")
-	if err != nil {
-		t.Fatal(err)
-	}
-	groups, err := db.ListGroupsForAccess("u1", RBACScopeAssigned)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(groups) != 1 || groups[0].ID != group1.ID {
-		t.Fatalf("groups = %#v, want only %s (not %s)", groups, group1.ID, group2.ID)
-	}
-	if db.UserCanAccessGroup("u1", RBACScopeAssigned, group2.ID) {
-		t.Fatal("foreign group was accessible")
-	}
-
 	conversation, err := db.CreateConversation("upload", ConversationCreateMeta{})
 	if err != nil {
 		t.Fatal(err)

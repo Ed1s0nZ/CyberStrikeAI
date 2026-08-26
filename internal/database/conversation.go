@@ -665,81 +665,6 @@ func scanConversationRows(rows *sql.Rows) ([]*Conversation, error) {
 	return conversations, rows.Err()
 }
 
-const ungroupedConversationsSQL = `
-	FROM conversations c
-	WHERE NOT EXISTS (
-		SELECT 1 FROM conversation_group_mappings cgm WHERE cgm.conversation_id = c.id
-	)`
-
-// CountUngroupedConversations 统计不在任何分组中的对话数量。
-func (db *DB) CountUngroupedConversations(projectID string) (int, error) {
-	where := ungroupedConversationsSQL
-	args := []interface{}{}
-	where, args = appendConversationProjectFilter(where, args, projectID, "c")
-	var count int
-	if err := db.QueryRow(`SELECT COUNT(*) `+where, args...).Scan(&count); err != nil {
-		return 0, fmt.Errorf("统计未分组对话失败: %w", err)
-	}
-	return count, nil
-}
-
-func (db *DB) CountUngroupedConversationsForAccess(projectID, userID, scope string) (int, error) {
-	where := ungroupedConversationsSQL
-	args := []interface{}{}
-	where, args = appendConversationProjectFilter(where, args, projectID, "c")
-	where, args = appendConversationAccessFilter(where, args, userID, scope, "c")
-	var count int
-	if err := db.QueryRow(`SELECT COUNT(*) `+where, args...).Scan(&count); err != nil {
-		return 0, fmt.Errorf("统计未分组对话失败: %w", err)
-	}
-	return count, nil
-}
-
-// ListUngroupedConversations 列出不在任何分组中的对话（最近对话侧栏）。
-func (db *DB) ListUngroupedConversations(limit, offset int, sortBy, projectID string) ([]*Conversation, error) {
-	orderClause := conversationOrderClause(sortBy, "c")
-	where := ungroupedConversationsSQL
-	args := []interface{}{}
-	where, args = appendConversationProjectFilter(where, args, projectID, "c")
-	args = append(args, limit, offset)
-	rows, err := db.Query(
-		`SELECT c.id, c.title, COALESCE(c.pinned, 0), c.created_at, c.updated_at, c.project_id, c.role_name, c.agent_mode `+
-			where+`
-		 `+orderClause+`
-		 LIMIT ? OFFSET ?`,
-		args...,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("查询未分组对话失败: %w", err)
-	}
-	defer rows.Close()
-	return scanConversationRows(rows)
-}
-
-func (db *DB) ListUngroupedConversationsForAccess(limit, offset int, sortBy, projectID, userID, scope string) ([]*Conversation, error) {
-	if scope == RBACScopeAll || strings.TrimSpace(userID) == "" {
-		return db.ListUngroupedConversations(limit, offset, sortBy, projectID)
-	}
-	orderClause := conversationOrderClause(sortBy, "c")
-	where := ungroupedConversationsSQL
-	args := []interface{}{}
-	where, args = appendConversationProjectFilter(where, args, projectID, "c")
-	where, args = appendConversationAccessFilter(where, args, userID, scope, "c")
-	args = append(args, limit, offset)
-	rows, err := db.Query(
-		`SELECT c.id, c.title, COALESCE(c.pinned, 0), c.created_at, c.updated_at, c.project_id, c.role_name, c.agent_mode `+
-			where+`
-		 `+orderClause+`
-		 LIMIT ? OFFSET ?`,
-		args...,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("查询未分组对话失败: %w", err)
-	}
-	defer rows.Close()
-	return scanConversationRows(rows)
-}
-
 // GetConversationTitle 获取对话标题（轻量查询，不加载消息）
 func (db *DB) GetConversationTitle(id string) (string, error) {
 	var title string
@@ -766,6 +691,22 @@ func (db *DB) UpdateConversationTitle(id, title string) error {
 	return nil
 }
 
+// UpdateConversationPinned 更新对话置顶状态
+func (db *DB) UpdateConversationPinned(id string, pinned bool) error {
+	pinnedValue := 0
+	if pinned {
+		pinnedValue = 1
+	}
+	_, err := db.Exec(
+		"UPDATE conversations SET pinned = ?, updated_at = ? WHERE id = ?",
+		pinnedValue, time.Now(), id,
+	)
+	if err != nil {
+		return fmt.Errorf("更新对话置顶状态失败: %w", err)
+	}
+	return nil
+}
+
 // UpdateConversationTime 更新对话时间
 func (db *DB) UpdateConversationTime(id string) error {
 	_, err := db.Exec(
@@ -784,7 +725,6 @@ func (db *DB) UpdateConversationTime(id string) error {
 // - process_details（过程详情）
 // - attack_chain_nodes（攻击链节点）
 // - attack_chain_edges（攻击链边）
-// - conversation_group_mappings（分组映射）
 // 漏洞记录会保留：vulnerabilities.conversation_id 使用 ON DELETE SET NULL，仅解除与会话的关联。
 // 注意：knowledge_retrieval_logs 在删除前会被显式清理。
 func (db *DB) DeleteConversation(id string) error {

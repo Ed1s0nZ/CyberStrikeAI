@@ -132,7 +132,7 @@ CyberStrikeAI connects planning, execution, human oversight, evidence, and repla
 
 ### Security operations
 
-- 📁 **Conversation management** provides grouping, pinning, renaming, and batch organization.
+- 📁 **Conversation management** provides pinning, renaming, and batch organization.
 - 📂 **Projects and attack chains** connect cross-session facts, risk scoring, graph views, and step-by-step replay.
 - 🗂️ **Asset management** normalizes and deduplicates domains, IP addresses, ports, and services; supports XLSX/CSV import and export, advanced filters and saved views, ownership and business metadata, cross-page bulk maintenance, and duplicate merging; and tracks scan coverage, linked vulnerabilities, and risk state. See the [Asset Management guide](docs/en-US/asset-management.md).
 - 🛡️ **Vulnerability management** provides severity classification, lifecycle tracking, filtering, and statistics.

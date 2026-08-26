@@ -329,29 +329,6 @@ func (db *DB) initTables() error {
 		FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE SET NULL
 	);`
 
-	// 创建对话分组表
-	createConversationGroupsTable := `
-	CREATE TABLE IF NOT EXISTS conversation_groups (
-		id TEXT PRIMARY KEY,
-		name TEXT NOT NULL,
-		icon TEXT,
-		owner_user_id TEXT,
-		created_at DATETIME NOT NULL,
-		updated_at DATETIME NOT NULL
-	);`
-
-	// 创建对话分组映射表
-	createConversationGroupMappingsTable := `
-	CREATE TABLE IF NOT EXISTS conversation_group_mappings (
-		id TEXT PRIMARY KEY,
-		conversation_id TEXT NOT NULL,
-		group_id TEXT NOT NULL,
-		created_at DATETIME NOT NULL,
-		FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
-		FOREIGN KEY (group_id) REFERENCES conversation_groups(id) ON DELETE CASCADE,
-		UNIQUE(conversation_id, group_id)
-	);`
-
 	// 机器人会话绑定表（用于跨重启保持「平台+租户+用户」到 conversation 的映射）
 	createRobotUserSessionsTable := `
 	CREATE TABLE IF NOT EXISTS robot_user_sessions (
@@ -759,8 +736,6 @@ func (db *DB) initTables() error {
 	CREATE INDEX IF NOT EXISTS idx_knowledge_retrieval_logs_conversation ON knowledge_retrieval_logs(conversation_id);
 	CREATE INDEX IF NOT EXISTS idx_knowledge_retrieval_logs_message ON knowledge_retrieval_logs(message_id);
 	CREATE INDEX IF NOT EXISTS idx_knowledge_retrieval_logs_created_at ON knowledge_retrieval_logs(created_at);
-	CREATE INDEX IF NOT EXISTS idx_conversation_group_mappings_conversation ON conversation_group_mappings(conversation_id);
-	CREATE INDEX IF NOT EXISTS idx_conversation_group_mappings_group ON conversation_group_mappings(group_id);
 	CREATE INDEX IF NOT EXISTS idx_robot_user_sessions_updated_at ON robot_user_sessions(updated_at);
 	CREATE INDEX IF NOT EXISTS idx_conversations_pinned ON conversations(pinned);
 	CREATE INDEX IF NOT EXISTS idx_vulnerabilities_conversation_id ON vulnerabilities(conversation_id);
@@ -864,13 +839,6 @@ func (db *DB) initTables() error {
 		return fmt.Errorf("创建knowledge_retrieval_logs表失败: %w", err)
 	}
 
-	if _, err := db.Exec(createConversationGroupsTable); err != nil {
-		return fmt.Errorf("创建conversation_groups表失败: %w", err)
-	}
-
-	if _, err := db.Exec(createConversationGroupMappingsTable); err != nil {
-		return fmt.Errorf("创建conversation_group_mappings表失败: %w", err)
-	}
 	if _, err := db.Exec(createRobotUserSessionsTable); err != nil {
 		return fmt.Errorf("创建robot_user_sessions表失败: %w", err)
 	}
@@ -963,16 +931,6 @@ func (db *DB) initTables() error {
 
 	if err := db.migrateMessagesTable(); err != nil {
 		db.logger.Warn("迁移messages表失败", zap.Error(err))
-		// 不返回错误，允许继续运行
-	}
-
-	if err := db.migrateConversationGroupsTable(); err != nil {
-		db.logger.Warn("迁移conversation_groups表失败", zap.Error(err))
-		// 不返回错误，允许继续运行
-	}
-
-	if err := db.migrateConversationGroupMappingsTable(); err != nil {
-		db.logger.Warn("迁移conversation_group_mappings表失败", zap.Error(err))
 		// 不返回错误，允许继续运行
 	}
 
@@ -1231,54 +1189,6 @@ func (db *DB) migrateConversationsTable() error {
 	} else if count == 0 {
 		if _, err := db.Exec("ALTER TABLE conversations ADD COLUMN agent_mode TEXT NOT NULL DEFAULT 'eino_single'"); err != nil {
 			db.logger.Warn("添加agent_mode字段失败", zap.Error(err))
-		}
-	}
-
-	return nil
-}
-
-// migrateConversationGroupsTable 迁移conversation_groups表，添加新字段
-func (db *DB) migrateConversationGroupsTable() error {
-	// 检查pinned字段是否存在
-	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('conversation_groups') WHERE name='pinned'").Scan(&count)
-	if err != nil {
-		// 如果查询失败，尝试添加字段
-		if _, addErr := db.Exec("ALTER TABLE conversation_groups ADD COLUMN pinned INTEGER DEFAULT 0"); addErr != nil {
-			// 如果字段已存在，忽略错误
-			errMsg := strings.ToLower(addErr.Error())
-			if !strings.Contains(errMsg, "duplicate column") && !strings.Contains(errMsg, "already exists") {
-				db.logger.Warn("添加pinned字段失败", zap.Error(addErr))
-			}
-		}
-	} else if count == 0 {
-		// 字段不存在，添加它
-		if _, err := db.Exec("ALTER TABLE conversation_groups ADD COLUMN pinned INTEGER DEFAULT 0"); err != nil {
-			db.logger.Warn("添加pinned字段失败", zap.Error(err))
-		}
-	}
-
-	return nil
-}
-
-// migrateConversationGroupMappingsTable 迁移conversation_group_mappings表，添加新字段
-func (db *DB) migrateConversationGroupMappingsTable() error {
-	// 检查pinned字段是否存在
-	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('conversation_group_mappings') WHERE name='pinned'").Scan(&count)
-	if err != nil {
-		// 如果查询失败，尝试添加字段
-		if _, addErr := db.Exec("ALTER TABLE conversation_group_mappings ADD COLUMN pinned INTEGER DEFAULT 0"); addErr != nil {
-			// 如果字段已存在，忽略错误
-			errMsg := strings.ToLower(addErr.Error())
-			if !strings.Contains(errMsg, "duplicate column") && !strings.Contains(errMsg, "already exists") {
-				db.logger.Warn("添加pinned字段失败", zap.Error(addErr))
-			}
-		}
-	} else if count == 0 {
-		// 字段不存在，添加它
-		if _, err := db.Exec("ALTER TABLE conversation_group_mappings ADD COLUMN pinned INTEGER DEFAULT 0"); err != nil {
-			db.logger.Warn("添加pinned字段失败", zap.Error(err))
 		}
 	}
 

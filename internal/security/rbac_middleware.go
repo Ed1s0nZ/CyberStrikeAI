@@ -122,8 +122,6 @@ func permissionForRequest(method, fullPath string) string {
 		return "dashboard:read"
 	case strings.HasPrefix(path, "/conversations"), strings.HasPrefix(path, "/messages"), strings.HasPrefix(path, "/process-details"):
 		return crudPermission(method, "chat")
-	case strings.HasPrefix(path, "/groups"):
-		return crudPermission(method, "group")
 	case strings.HasPrefix(path, "/monitor"):
 		return crudPermission(method, "monitor")
 	case strings.HasPrefix(path, "/notifications"):

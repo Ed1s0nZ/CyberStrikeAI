@@ -2999,11 +2999,9 @@ function handleStreamEvent(event, progressElement, progressId,
                 loadActiveTasks();
                 // 延迟刷新对话列表，确保用户消息已保存，updated_at已更新
                 // 这样新对话才能正确显示在最近对话列表的顶部
-                // 使用loadConversationsWithGroups确保分组映射缓存正确加载，无论是否有分组都能立即显示
+                // 刷新最近对话列表
                 setTimeout(() => {
-                    if (typeof loadConversationsWithGroups === 'function') {
-                        loadConversationsWithGroups();
-                    } else if (typeof loadConversations === 'function') {
+                    if (typeof loadConversations === 'function') {
                         loadConversations();
                     }
                     if (typeof window.refreshChatProjectFolders === 'function') {

@@ -1084,51 +1084,6 @@
 	                            </div>
 	                        </aside>
                         
-                        <!-- 分组详情页面 -->
-                        <div id="group-detail-page" class="group-detail-page" style="display: none;">
-                            <div class="group-detail-header">
-                                <button class="back-btn" onclick="exitGroupDetail()">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                    </svg>
-                                </button>
-                                <h2 id="group-detail-title" class="group-detail-title"></h2>
-                                <div class="group-detail-actions">
-                                    <button class="group-action-btn" onclick="toggleGroupSearch()" data-i18n="chatGroup.search" data-i18n-attr="title" title="搜索" id="group-search-toggle-btn">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/>
-                                            <path d="m21 21-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                        </svg>
-                                    </button>
-                                    <button class="group-action-btn" data-require-permission="group:write" onclick="editGroup()" data-i18n="chatGroup.edit" data-i18n-attr="title" title="编辑">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                        </svg>
-                                    </button>
-                                    <button class="group-action-btn delete-btn" data-require-permission="group:delete" onclick="deleteGroup()" data-i18n="chatGroup.delete" data-i18n-attr="title" title="删除">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                            <div id="group-search-container" class="group-search-container" style="display: none;">
-                                <div class="group-search-input-wrapper">
-                                    <input type="text" id="group-search-input" class="group-search-input" data-i18n="chat.searchInGroup" data-i18n-attr="placeholder" placeholder="搜索分组中的对话..." onkeyup="handleGroupSearchInput(event)" oninput="handleGroupSearchInput(event)">
-                                    <button class="group-search-clear-btn" onclick="clearGroupSearch()" data-i18n="common.clearSearch" data-i18n-attr="title" title="清除搜索" id="group-search-clear-btn" style="display: none;">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-                                            <path d="m8 8 8 8M16 8l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="group-detail-content">
-                                <div id="group-conversations-list" class="group-conversations-list"></div>
-                            </div>
-                        </div>
-
                         <!-- 对话界面 -->
                         <div class="chat-container">
                             <!-- 会话顶部栏（只在有会话选中时显示） -->
@@ -1210,7 +1165,7 @@
                                     <!-- 角色选择下拉面板 -->
                                     <div id="role-selection-panel" class="role-selection-panel" style="display: none;">
                                         <div class="role-selection-panel-header">
-                                            <h3 class="role-selection-panel-title" data-i18n="chatGroup.rolePanelTitle">选择角色</h3>
+                                            <h3 class="role-selection-panel-title" data-i18n="chat.rolePanelTitle">选择角色</h3>
                                             <button class="role-selection-panel-close" onclick="closeRoleSelectionPanel()" data-i18n="common.close" data-i18n-attr="title" title="关闭">
                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                                     <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -5923,10 +5878,6 @@
                         <option value="" data-i18n="chat.filterAllProjects">全部项目</option>
                         <option value="__none__" data-i18n="chat.filterUnboundProjects">未绑定项目</option>
                     </select>
-                    <select id="batch-group-filter" class="conversation-project-filter-native" onchange="applyBatchConversationFilters()" data-i18n="batchManageModal.filterByGroup" data-i18n-attr="title" title="按分组筛选">
-                        <option value="" data-i18n="batchManageModal.filterAllGroups">全部分组</option>
-                        <option value="__none__" data-i18n="batchManageModal.filterUngrouped">无分组</option>
-                    </select>
                     <div class="batch-search-box">
                         <input type="text" id="batch-search-input" data-i18n="batchManageModal.searchPlaceholder" data-i18n-attr="placeholder" placeholder="搜索历史记录" oninput="filterBatchConversations(this.value)" />
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -5945,7 +5896,6 @@
                         </div>
                         <div class="batch-table-col-name" data-i18n="batchManageModal.conversationName">对话名称</div>
                         <div class="batch-table-col-project" data-i18n="batchManageModal.project">项目</div>
-                        <div class="batch-table-col-group" data-i18n="batchManageModal.group">对话分组</div>
                         <div class="batch-table-col-time" data-i18n="batchManageModal.lastTime">最近一次对话时间</div>
                         <div class="batch-table-col-action" data-i18n="batchManageModal.action">操作</div>
                     </div>
@@ -5953,79 +5903,10 @@
                 </div>
             </div>
             <div class="modal-footer batch-manage-footer">
-                <div class="batch-footer-move">
-                    <select id="batch-move-group-select" class="batch-move-group-select conversation-project-filter-native" data-i18n="batchManageModal.setGroup" data-i18n-attr="title" title="设置分组">
-                        <option value="__none__" data-i18n="batchManageModal.noGroupOption">无分组</option>
-                    </select>
-                    <button type="button" class="btn-secondary" onclick="applyBatchGroupChange()" data-i18n="batchManageModal.setGroup">设置分组</button>
-                </div>
                 <div class="batch-footer-actions">
                     <button class="btn-secondary" onclick="closeBatchManageModal()" data-i18n="common.cancel">取消</button>
                     <button class="btn-primary" data-require-permission="chat:delete" onclick="deleteSelectedConversations()" data-i18n="batchManageModal.deleteSelected">删除所选</button>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 创建分组模态框 -->
-    <div id="create-group-modal" class="modal">
-        <div class="modal-content create-group-modal-content">
-            <div class="modal-header">
-                <h2 data-i18n="createGroupModal.title">创建分组</h2>
-                <span class="modal-close" onclick="closeCreateGroupModal()">&times;</span>
-            </div>
-            <div class="modal-body create-group-body">
-                <p class="create-group-description" data-i18n="createGroupModal.description">分组功能可将对话集中归类管理，让对话更加井然有序。</p>
-                <div class="create-group-input-wrapper">
-                    <button type="button" class="group-icon-input" id="create-group-icon-btn" onclick="toggleGroupIconPicker()" data-i18n="createGroupModal.selectIcon" data-i18n-attr="title" title="点击选择图标">📁</button>
-                    <input type="text" id="create-group-name-input" data-i18n="createGroupModal.groupNamePlaceholder" data-i18n-attr="placeholder" placeholder="请输入分组名称" />
-                    <!-- Emoji选择器面板 -->
-                    <div id="group-icon-picker" class="group-icon-picker" style="display: none;">
-                        <div class="icon-picker-header">
-                            <span data-i18n="createGroupModal.pickIcon">选择图标</span>
-                            <div class="icon-picker-custom">
-                                <input type="text" id="custom-icon-input" class="custom-icon-input" data-i18n="createGroupModal.customIcon" data-i18n-attr="placeholder" placeholder="自定义" maxlength="2" />
-                                <button type="button" class="custom-icon-btn" onclick="applyCustomIcon()" data-i18n="createGroupModal.confirmIcon">确定</button>
-                            </div>
-                        </div>
-                        <div class="icon-picker-grid">
-                            <span class="icon-option" onclick="selectGroupIcon('📁')">📁</span>
-                            <span class="icon-option" onclick="selectGroupIcon('🔒')">🔒</span>
-                            <span class="icon-option" onclick="selectGroupIcon('🛡️')">🛡️</span>
-                            <span class="icon-option" onclick="selectGroupIcon('⚔️')">⚔️</span>
-                            <span class="icon-option" onclick="selectGroupIcon('🎯')">🎯</span>
-                            <span class="icon-option" onclick="selectGroupIcon('🔍')">🔍</span>
-                            <span class="icon-option" onclick="selectGroupIcon('💻')">💻</span>
-                            <span class="icon-option" onclick="selectGroupIcon('🐛')">🐛</span>
-                            <span class="icon-option" onclick="selectGroupIcon('🚀')">🚀</span>
-                            <span class="icon-option" onclick="selectGroupIcon('⚡')">⚡</span>
-                            <span class="icon-option" onclick="selectGroupIcon('🔥')">🔥</span>
-                            <span class="icon-option" onclick="selectGroupIcon('💡')">💡</span>
-                            <span class="icon-option" onclick="selectGroupIcon('🎮')">🎮</span>
-                            <span class="icon-option" onclick="selectGroupIcon('🏴‍☠️')">🏴‍☠️</span>
-                            <span class="icon-option" onclick="selectGroupIcon('🕵️')">🕵️</span>
-                            <span class="icon-option" onclick="selectGroupIcon('🔑')">🔑</span>
-                            <span class="icon-option" onclick="selectGroupIcon('📡')">📡</span>
-                            <span class="icon-option" onclick="selectGroupIcon('🌐')">🌐</span>
-                            <span class="icon-option" onclick="selectGroupIcon('📊')">📊</span>
-                            <span class="icon-option" onclick="selectGroupIcon('📝')">📝</span>
-                            <span class="icon-option" onclick="selectGroupIcon('🗂️')">🗂️</span>
-                            <span class="icon-option" onclick="selectGroupIcon('📌')">📌</span>
-                            <span class="icon-option" onclick="selectGroupIcon('⭐')">⭐</span>
-                            <span class="icon-option" onclick="selectGroupIcon('💎')">💎</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="create-group-suggestions">
-                    <div class="suggestion-tag" data-i18n="createGroupModal.suggestionPenetrationTest" onclick="selectSuggestionByKey('createGroupModal.suggestionPenetrationTest')">渗透测试</div>
-                    <div class="suggestion-tag" data-i18n="createGroupModal.suggestionCtf" onclick="selectSuggestionByKey('createGroupModal.suggestionCtf')">CTF</div>
-                    <div class="suggestion-tag" data-i18n="createGroupModal.suggestionRedTeam" onclick="selectSuggestionByKey('createGroupModal.suggestionRedTeam')">红队</div>
-                    <div class="suggestion-tag" data-i18n="createGroupModal.suggestionVulnerabilityMining" onclick="selectSuggestionByKey('createGroupModal.suggestionVulnerabilityMining')">漏洞挖掘</div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" onclick="closeCreateGroupModal()" data-i18n="createGroupModal.cancel">取消</button>
-                <button class="btn-primary" data-require-permission="group:write" onclick="createGroup(event)" data-i18n="createGroupModal.create">创建</button>
             </div>
         </div>
     </div>
@@ -6088,45 +5969,12 @@
             </svg>
             <span data-i18n="contextMenu.batchManage">批量管理</span>
         </div>
-        <div class="context-menu-item context-menu-item-has-submenu" onmouseenter="handleMoveToGroupSubmenuEnter()" onmouseleave="handleMoveToGroupSubmenuLeave(event)">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span data-i18n="contextMenu.moveToGroup">移动到分组</span>
-            <svg class="submenu-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <div id="move-to-group-submenu" class="context-submenu" style="display: none;" onmouseenter="clearSubmenuHideTimeout()" onmouseleave="hideMoveToGroupSubmenu()"></div>
-        </div>
         <div class="context-menu-divider"></div>
         <div class="context-menu-item context-menu-item-danger" data-require-permission="chat:delete" onclick="deleteConversationFromContext()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
             <span data-i18n="contextMenu.deleteConversation">删除此对话</span>
-        </div>
-    </div>
-
-    <!-- 分组上下文菜单 -->
-    <div id="group-context-menu" class="context-menu" style="display: none;">
-        <div class="context-menu-item" onclick="renameGroupFromContext()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span data-i18n="contextMenu.rename">重命名</span>
-        </div>
-        <div class="context-menu-item" onclick="pinGroupFromContext()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 17v5M5 17h14l-1-7H6l-1 7zM9 10V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span id="pin-group-menu-text" data-i18n="contextMenu.pinGroup">置顶此分组</span>
-        </div>
-        <div class="context-menu-item context-menu-item-danger" data-require-permission="group:delete" onclick="deleteGroupFromContext()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span data-i18n="contextMenu.deleteGroup">删除此分组</span>
         </div>
     </div>
 
@@ -6443,7 +6291,7 @@
     <div id="role-select-modal" class="modal">
         <div class="modal-content role-select-modal-content">
             <div class="modal-header">
-                <h2 data-i18n="chatGroup.rolePanelTitle">选择角色</h2>
+                <h2 data-i18n="chat.rolePanelTitle">选择角色</h2>
                 <span class="modal-close" onclick="closeRoleSelectModal()">&times;</span>
             </div>
             <div class="modal-body role-select-body">

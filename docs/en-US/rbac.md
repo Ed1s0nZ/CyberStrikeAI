@@ -89,7 +89,6 @@ Permissions use `module:action`. Common actions are `read`, `write`, `delete`, a
 | Attack chain | `attackchain:read`, `attackchain:write` |
 | Network-space search / Reconnaissance | `fofa:execute` |
 | OpenAPI | `openapi:read` |
-| Chat groups | `group:read`, `group:write`, `group:delete` |
 | Monitor | `monitor:read`, `monitor:write`, `monitor:delete` |
 
 Important distinctions:

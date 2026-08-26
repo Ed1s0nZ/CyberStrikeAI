@@ -96,7 +96,6 @@ AI 测试角色不是安全授权边界。即使选择了“渗透测试”角�
 | 攻击链 | `attackchain:read`、`attackchain:write` |
 | 网络空间测绘 / 信息收集 | `fofa:execute` |
 | OpenAPI | `openapi:read` |
-| 对话分组 | `group:read`、`group:write`、`group:delete` |
 | 执行监控 | `monitor:read`、`monitor:write`、`monitor:delete` |
 
 特殊权限说明：

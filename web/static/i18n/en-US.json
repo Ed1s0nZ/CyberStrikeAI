@@ -10,6 +10,7 @@
     "close": "Close",
     "edit": "Edit",
     "delete": "Delete",
+    "remove": "Remove",
     "save": "Save",
     "loading": "Loading…",
     "search": "Search",
@@ -554,10 +555,10 @@
     "projectPreviewNoDescription": "No project description",
     "projectPreviewScope": "Test scope: {{scope}}",
     "projectPreviewEdit": "Edit project",
-    "conversationPreviewJustNow": "Now",
+    "conversationPreviewJustNow": "Just now",
     "conversationPreviewMinutes": "{{count}} min",
-    "conversationPreviewHours": "{{count}}h",
-    "conversationPreviewDays": "{{count}}d",
+    "conversationPreviewHours": "{{count}} hr",
+    "conversationPreviewDays": "{{count}} days",
     "conversationPreviewDateTime": "{{year}}-{{month}}-{{day}} {{hour}}:{{minute}}",
     "conversationPreviewNoProject": "No project",
     "conversationPreviewDefaultMode": "Default",
@@ -579,8 +580,6 @@
     "renameConversationSubtitle": "The name will update in project folders and recent conversations",
     "conversationTitleLabel": "Conversation name",
     "conversationTitlePlaceholder": "Enter a conversation name",
-    "conversationGroups": "Conversation groups",
-    "addGroup": "New group",
     "recentConversations": "Recent conversations",
     "toggleRecentConversations": "Expand/collapse recent conversations",
     "filterByProject": "Filter by project",
@@ -622,7 +621,6 @@
     "attachmentUploadFailed": "Failed",
     "attachmentUploadAlert": "Upload failed: {{name}}",
     "send": "Send",
-    "searchInGroup": "Search in group...",
     "loadingTools": "Loading tools...",
     "noMatchTools": "No matching tools",
     "penetrationTestDetail": "Task execution details",
@@ -656,11 +654,7 @@
     "deleteTurnTitle": "Delete this turn",
     "deleteTurnConfirm": "Delete this entire turn (user message and assistant reply)? This cannot be undone. The next reply will use only the remaining messages; saved context snapshots will be cleared.",
     "deleteTurnFailed": "Failed to delete turn",
-    "emptyGroupConversations": "This group has no conversations yet.",
-    "noMatchingConversationsInGroup": "No matching conversations found.",
     "noHistoryConversations": "No conversation history yet",
-    "renameGroupPrompt": "Please enter new name:",
-    "deleteGroupConfirm": "Are you sure you want to delete this group? Conversations in the group will not be deleted, but will be removed from the group.",
     "deleteConversationConfirm": "Delete this conversation? Chat messages cannot be recovered, but recorded vulnerabilities will remain in the vulnerability library.",
     "renameFailed": "Rename failed",
     "downloadConversationFailed": "Failed to download conversation",
@@ -675,7 +669,6 @@
     "projectWelcomeTitleSuffix": "?",
     "noProjectWelcomeTitle": "What should be tested?",
     "welcomeSubtitle": "Enter your test requirements and the system will automatically run the corresponding security tests.",
-    "addNewGroup": "+ New group",
     "callNumber": "Call #{{n}}",
     "iterationRound": "Iteration {{n}}",
     "einoOrchestratorRound": "Orchestrator · round {{n}}",
@@ -747,10 +740,6 @@
     "historyGroupToday": "Today",
     "historyGroupLast7Days": "Past 7 days",
     "historyGroupEarlier": "Older",
-    "conversationPreviewJustNow": "Just now",
-    "conversationPreviewMinutes": "{{count}} min",
-    "conversationPreviewHours": "{{count}} hr",
-    "conversationPreviewDays": "{{count}} days",
     "agentModeSelectAria": "Choose conversation execution mode",
     "agentModePanelTitle": "Conversation mode",
     "agentModeEinoSingle": "Eino single (ADK)",
@@ -829,7 +818,8 @@
     "hitlTimeoutTenMinutes": "10 minutes",
     "hitlTimeoutUnlimited": "No limit",
     "hitlTimeoutHint": "Unanswered requests are rejected automatically when time expires; approval cards show the countdown.",
-    "hitlStatusOff": "Human-in-the-loop: Off"
+    "hitlStatusOff": "Human-in-the-loop: Off",
+    "rolePanelTitle": "Select role"
   },
   "hitl": {
     "pageTitle": "HITL approvals",
@@ -870,7 +860,7 @@
     "viewEditedArgs": "View edited parameters",
     "reviewArgs": "Review parameters (JSON)",
     "commentOptional": "Comment (optional)",
-    "commentPlaceholder": "For example: read-only operations only",
+    "commentPlaceholder": "e.g. allow read-only command",
     "reject": "Reject",
     "allowOnce": "Allow once",
     "saveEditedAndAllow": "Save edits and allow",
@@ -971,8 +961,6 @@
     "reviewEditHelp": "Review & edit mode: provide a JSON object to override tool arguments. Example: {\"command\":\"ls -la\"}",
     "approvalHelp": "Approval mode: only approve/reject, argument editing is disabled.",
     "commentHelp": "Comment (optional): briefly note the approval reason.",
-    "commentPlaceholder": "e.g. allow read-only command",
-    "reject": "Reject",
     "approve": "Approve",
     "loadFailed": "Failed to load",
     "invalidJson": "Invalid JSON arguments",
@@ -2019,7 +2007,6 @@
       "conversationManagement": "Conversation Management",
       "conversationInteraction": "Conversation Interaction",
       "batchTasks": "Batch Tasks",
-      "conversationGroups": "Conversation Groups",
       "vulnerabilityManagement": "Vulnerability Management",
       "roleManagement": "Role Management",
       "skillsManagement": "Skills Management",
@@ -2065,14 +2052,6 @@
       "portScan": "Port scan",
       "updateBatchTask": "Update batch task",
       "deleteBatchTask": "Delete batch task",
-      "createGroup": "Create group",
-      "listGroups": "List groups",
-      "getGroup": "Get group",
-      "updateGroup": "Update group",
-      "deleteGroup": "Delete group",
-      "getGroupConversations": "Get conversations in group",
-      "addConversationToGroup": "Add conversation to group",
-      "removeConversationFromGroup": "Remove conversation from group",
       "listVulnerabilities": "List vulnerabilities",
       "createVulnerability": "Create vulnerability",
       "getVulnerabilityStats": "Get vulnerability statistics",
@@ -2115,8 +2094,6 @@
       "getAttackChain": "Get attack chain",
       "regenerateAttackChain": "Regenerate attack chain",
       "pinConversation": "Pin conversation",
-      "pinGroup": "Pin group",
-      "pinGroupConversation": "Pin conversation in group",
       "getCategories": "Get categories",
       "listKnowledgeItems": "List knowledge items",
       "createKnowledgeItem": "Create knowledge item",
@@ -2143,7 +2120,6 @@
       "updateBatchQueueMetadata": "Update queue metadata",
       "updateBatchQueueSchedule": "Update queue schedule",
       "setBatchQueueScheduleEnabled": "Toggle cron auto-schedule",
-      "getAllGroupMappings": "Get all group mappings",
       "fofaSearch": "FOFA search",
       "fofaParse": "Parse natural language to FOFA syntax",
       "testOpenAI": "Test OpenAI API connection",
@@ -2207,8 +2183,6 @@
       "conversationNotFound": "Conversation not found",
       "conversationOrResultNotFound": "Conversation or result not found",
       "badRequestTaskEmpty": "Bad request (e.g. task is empty)",
-      "badRequestGroupNameExists": "Bad request or group name already exists",
-      "groupNotFound": "Group not found",
       "badRequestConfig": "Bad request (e.g. invalid config or missing required fields)",
       "badRequestQueryEmpty": "Bad request (e.g. query is empty)",
       "methodNotAllowed": "Method not allowed (POST only)",
@@ -2227,7 +2201,6 @@
       "pauseSuccess": "Paused successfully",
       "addSuccess": "Added successfully",
       "taskNotFound": "Task not found",
-      "conversationOrGroupNotFound": "Conversation or group not found",
       "cancelSubmitted": "Cancel request submitted",
       "noRunningTask": "No running task found",
       "messageSent": "Message sent, AI reply returned",
@@ -2267,23 +2240,6 @@
       "assetImportForbidden": "Missing asset:write permission or access to the specified project",
       "assetImportTransactionFailed": "Import transaction failed"
     }
-  },
-  "chatGroup": {
-    "search": "Search",
-    "edit": "Edit",
-    "delete": "Delete",
-    "clearSearch": "Clear search",
-    "searchInGroupPlaceholder": "Search in group...",
-    "attackChain": "Attack chain",
-    "viewAttackChain": "View attack chain",
-    "selectRole": "Select role",
-    "close": "Close",
-    "selectFile": "Select file",
-    "uploadFile": "Upload file (multi-select or drag & drop)",
-    "send": "Send",
-    "rolePanelTitle": "Select role",
-    "copyMessage": "Copy message",
-    "remove": "Remove"
   },
   "mcpMonitor": {
     "deselectAll": "Deselect all",
@@ -2579,16 +2535,16 @@
     "errorGeneric": "Something went wrong. Please try again."
   },
   "vulnerabilityPage": {
-	"alertTitle": "Robot vulnerability alerts",
-	"alertDescription": "Push newly discovered vulnerabilities to robots bound to this account, filtered by severity.",
-	"alertHint": "Send newly discovered vulnerabilities at or above this severity to your bound robot accounts.",
-	"alertConfiguredNotBound": "{{platforms}} is enabled, but this Web account is not bound to a recipient identity.",
-	"alertNoBinding": "No proactive robot is both enabled and bound. Your settings are still saved.",
-	"alertBindAction": "Bind recipient account",
-	"alertMinimum": "Minimum severity",
-	"alertEnabled": "Enable alerts",
-	"alertSaved": "Vulnerability alert settings saved",
-	"alertSaveFailed": "Failed to save vulnerability alert settings",
+    "alertTitle": "Robot vulnerability alerts",
+    "alertDescription": "Push newly discovered vulnerabilities to robots bound to this account, filtered by severity.",
+    "alertHint": "Send newly discovered vulnerabilities at or above this severity to your bound robot accounts.",
+    "alertConfiguredNotBound": "{{platforms}} is enabled, but this Web account is not bound to a recipient identity.",
+    "alertNoBinding": "No proactive robot is both enabled and bound. Your settings are still saved.",
+    "alertBindAction": "Bind recipient account",
+    "alertMinimum": "Minimum severity",
+    "alertEnabled": "Enable alerts",
+    "alertSaved": "Vulnerability alert settings saved",
+    "alertSaveFailed": "Failed to save vulnerability alert settings",
     "statTotal": "Total",
     "statClickAll": "View all (clear severity filter)",
     "statClickFilter": "Click to filter by this severity; click again to clear",
@@ -3376,49 +3332,17 @@
     "searchPlaceholder": "Search history",
     "conversationName": "Conversation name",
     "project": "Project",
-    "group": "Group",
     "noProject": "No project",
     "unknownProject": "Unknown project",
-    "noGroup": "Ungrouped",
-    "unknownGroup": "Unknown group",
     "filterByProject": "Filter by project",
-    "filterByGroup": "Filter by group",
-    "filterAllGroups": "All groups",
-    "filterUngrouped": "Ungrouped",
     "lastTime": "Last activity",
     "action": "Action",
     "selectAll": "Select all",
-    "setGroup": "Set group",
-    "noGroupOption": "Ungrouped",
     "deleteSelected": "Delete selected",
     "confirmDeleteNone": "Please select at least one conversation to delete",
     "confirmDeleteN": "Delete {{count}} selected conversation(s)? Chat messages cannot be recovered, but recorded vulnerabilities will remain in the vulnerability library.",
-    "confirmGroupChangeNone": "Please select at least one conversation",
-    "confirmMoveN": "Move {{count}} selected conversation(s) to \"{{group}}\"?",
-    "confirmRemoveNoGroup": "None of the selected conversations belong to a group",
-    "confirmRemoveN": "Remove {{count}} selected conversation(s) from their group(s)?",
-    "removeFailed": "Remove failed",
-    "moveFailed": "Move failed",
     "deleteFailed": "Delete failed",
     "unnamedConversation": "Unnamed conversation"
-  },
-  "createGroupModal": {
-    "title": "Create group",
-    "description": "Group conversations for easier management.",
-    "selectIcon": "Click to choose icon",
-    "groupNamePlaceholder": "Enter group name",
-    "pickIcon": "Pick icon",
-    "customIcon": "Custom",
-    "confirmIcon": "OK",
-    "create": "Create",
-    "cancel": "Cancel",
-    "suggestionPenetrationTest": "Penetration Testing",
-    "suggestionCtf": "CTF",
-    "suggestionRedTeam": "Red Team",
-    "suggestionVulnerabilityMining": "Vulnerability Mining",
-    "nameExists": "Group name already exists, please use another name.",
-    "createFailed": "Create failed",
-    "unknownError": "Unknown error"
   },
   "contextMenu": {
     "viewAttackChain": "View attack chain",
@@ -3430,11 +3354,7 @@
     "pinConversation": "Pin conversation",
     "unpinConversation": "Unpin",
     "batchManage": "Batch manage",
-    "moveToGroup": "Move to group",
-    "deleteConversation": "Delete conversation",
-    "pinGroup": "Pin group",
-    "unpinGroup": "Unpin",
-    "deleteGroup": "Delete group"
+    "deleteConversation": "Delete conversation"
   },
   "batchImportModal": {
     "title": "New task",
@@ -4565,10 +4485,22 @@
       }
     },
     "systemRoles": {
-      "admin": { "name": "Administrator", "description": "Full platform administration access" },
-      "operator": { "name": "Operator", "description": "Run daily security workflows without account or core configuration management" },
-      "auditor": { "name": "Auditor", "description": "Read-only access to audits, monitoring, and assets" },
-      "viewer": { "name": "Read-only User", "description": "Read-only access to explicitly granted resources" }
+      "admin": {
+        "name": "Administrator",
+        "description": "Full platform administration access"
+      },
+      "operator": {
+        "name": "Operator",
+        "description": "Run daily security workflows without account or core configuration management"
+      },
+      "auditor": {
+        "name": "Auditor",
+        "description": "Read-only access to audits, monitoring, and assets"
+      },
+      "viewer": {
+        "name": "Read-only User",
+        "description": "Read-only access to explicitly granted resources"
+      }
     },
     "empty": {
       "noMatchingUsers": "No matching members",
@@ -4624,7 +4556,6 @@
       "dashboard": "Dashboard",
       "files": "Files",
       "fofa": "FOFA",
-      "group": "Conversation Groups",
       "hitl": "Human-in-the-loop",
       "knowledge": "Knowledge Base",
       "mcp": "MCP",
@@ -4643,14 +4574,20 @@
       "workflow": "Workflows"
     },
     "permissionDescriptions": {
-      "auth": { "self": "Manage own session and password" },
-      "dashboard": { "read": "View dashboard summaries" },
+      "auth": {
+        "self": "Manage own session and password"
+      },
+      "dashboard": {
+        "read": "View dashboard summaries"
+      },
       "chat": {
         "read": "View conversations",
         "write": "Create and update conversations",
         "delete": "Delete conversations and turns"
       },
-      "agent": { "execute": "Run AI agents and workflows" },
+      "agent": {
+        "execute": "Run AI agents and workflows"
+      },
       "hitl": {
         "read": "View human-in-the-loop queues and logs",
         "write": "Approve, dismiss, and configure human-in-the-loop requests"
@@ -4713,7 +4650,9 @@
         "read": "View system configuration",
         "write": "Update and apply system configuration"
       },
-      "terminal": { "execute": "Execute terminal commands" },
+      "terminal": {
+        "execute": "Execute terminal commands"
+      },
       "audit": {
         "read": "View and export audit logs",
         "delete": "Delete audit logs"
@@ -4739,12 +4678,11 @@
         "read": "View attack chains",
         "write": "Regenerate attack chains"
       },
-      "fofa": { "execute": "Run FOFA searches and parse queries" },
-      "openapi": { "read": "Read OpenAPI aggregation results" },
-      "group": {
-        "read": "View conversation groups",
-        "write": "Create and update conversation groups",
-        "delete": "Delete conversation groups"
+      "fofa": {
+        "execute": "Run FOFA searches and parse queries"
+      },
+      "openapi": {
+        "read": "Read OpenAPI aggregation results"
       },
       "monitor": {
         "read": "View the execution monitor",

@@ -10,6 +10,7 @@
     "close": "关闭",
     "edit": "编辑",
     "delete": "删除",
+    "remove": "移除",
     "save": "保存",
     "loading": "加载中…",
     "search": "搜索",
@@ -567,8 +568,6 @@
     "renameConversationSubtitle": "修改后会同步更新项目文件夹和最近对话中的名称",
     "conversationTitleLabel": "对话名称",
     "conversationTitlePlaceholder": "请输入对话名称",
-    "conversationGroups": "对话分组",
-    "addGroup": "新建分组",
     "recentConversations": "最近对话",
     "toggleRecentConversations": "展开/折叠最近对话",
     "filterByProject": "按项目筛选",
@@ -610,7 +609,6 @@
     "attachmentUploadFailed": "失败",
     "attachmentUploadAlert": "上传失败：{{name}}",
     "send": "发送",
-    "searchInGroup": "搜索分组中的对话...",
     "loadingTools": "正在加载工具...",
     "noMatchTools": "没有匹配的工具",
     "penetrationTestDetail": "任务执行详情",
@@ -644,11 +642,7 @@
     "deleteTurnTitle": "删除本轮对话",
     "deleteTurnConfirm": "确定删除本轮对话？将同时删除该轮用户消息与助手回复，且无法恢复；下次模型回复将仅基于剩余消息（已保存的上下文快照会清空并按剩余内容重建）。",
     "deleteTurnFailed": "删除本轮失败",
-    "emptyGroupConversations": "该分组暂无对话",
-    "noMatchingConversationsInGroup": "未找到匹配的对话",
     "noHistoryConversations": "暂无历史对话",
-    "renameGroupPrompt": "请输入新名称：",
-    "deleteGroupConfirm": "确定要删除此分组吗？分组中的对话不会被删除，但会从分组中移除。",
     "deleteConversationConfirm": "确定要删除此对话吗？对话消息将不可恢复，但已记录的漏洞会保留在漏洞库中。",
     "renameFailed": "重命名失败",
     "downloadConversationFailed": "下载对话失败",
@@ -663,7 +657,6 @@
     "projectWelcomeTitleSuffix": " 项目中测试什么？",
     "noProjectWelcomeTitle": "要测试什么？",
     "welcomeSubtitle": "请输入您的测试需求，系统将自动执行相应的安全测试。",
-    "addNewGroup": "+ 新增分组",
     "callNumber": "调用 #{{n}}",
     "iterationRound": "第 {{n}} 轮迭代",
     "einoOrchestratorRound": "主代理 · 第 {{n}} 轮",
@@ -735,10 +728,6 @@
     "historyGroupToday": "今天",
     "historyGroupLast7Days": "过去七天",
     "historyGroupEarlier": "更早",
-    "conversationPreviewJustNow": "刚刚",
-    "conversationPreviewMinutes": "{{count}} 分钟",
-    "conversationPreviewHours": "{{count}} 小时",
-    "conversationPreviewDays": "{{count}} 天",
     "agentModeSelectAria": "选择对话执行模式",
     "agentModePanelTitle": "对话模式",
     "agentModeEinoSingle": "Eino 单代理（ADK）",
@@ -817,7 +806,8 @@
     "hitlTimeoutTenMinutes": "10 分钟",
     "hitlTimeoutUnlimited": "不限制",
     "hitlTimeoutHint": "到期未处理将自动拒绝；审批卡片会显示倒计时。",
-    "hitlStatusOff": "人机协同：关闭"
+    "hitlStatusOff": "人机协同：关闭",
+    "rolePanelTitle": "选择角色"
   },
   "hitl": {
     "pageTitle": "人机协同审批",
@@ -858,7 +848,7 @@
     "viewEditedArgs": "查看修改后的参数",
     "reviewArgs": "审查参数（JSON）",
     "commentOptional": "备注（可选）",
-    "commentPlaceholder": "例如：仅允许只读操作",
+    "commentPlaceholder": "例如：允许只读命令",
     "reject": "拒绝",
     "allowOnce": "允许一次",
     "saveEditedAndAllow": "保存修改并允许",
@@ -959,8 +949,6 @@
     "reviewEditHelp": "审查编辑模式：可填写 JSON 对象覆盖参数。示例：{\"command\":\"ls -la\"}",
     "approvalHelp": "审批模式：仅通过/拒绝，不支持改参。",
     "commentHelp": "备注（可选）：建议写审批依据。",
-    "commentPlaceholder": "例如：允许只读命令",
-    "reject": "拒绝",
     "approve": "通过",
     "loadFailed": "加载失败",
     "invalidJson": "JSON 参数格式错误",
@@ -2007,7 +1995,6 @@
       "conversationManagement": "对话管理",
       "conversationInteraction": "对话交互",
       "batchTasks": "批量任务",
-      "conversationGroups": "对话分组",
       "vulnerabilityManagement": "漏洞管理",
       "roleManagement": "角色管理",
       "skillsManagement": "Skills管理",
@@ -2053,14 +2040,6 @@
       "portScan": "端口扫描",
       "updateBatchTask": "更新批量任务",
       "deleteBatchTask": "删除批量任务",
-      "createGroup": "创建分组",
-      "listGroups": "列出分组",
-      "getGroup": "获取分组",
-      "updateGroup": "更新分组",
-      "deleteGroup": "删除分组",
-      "getGroupConversations": "获取分组中的对话",
-      "addConversationToGroup": "添加对话到分组",
-      "removeConversationFromGroup": "从分组移除对话",
       "listVulnerabilities": "列出漏洞",
       "createVulnerability": "创建漏洞",
       "getVulnerabilityStats": "获取漏洞统计",
@@ -2103,8 +2082,6 @@
       "getAttackChain": "获取攻击链",
       "regenerateAttackChain": "重新生成攻击链",
       "pinConversation": "设置对话置顶",
-      "pinGroup": "设置分组置顶",
-      "pinGroupConversation": "设置分组中对话的置顶",
       "getCategories": "获取分类",
       "listKnowledgeItems": "列出知识项",
       "createKnowledgeItem": "创建知识项",
@@ -2131,7 +2108,6 @@
       "updateBatchQueueMetadata": "修改队列元数据",
       "updateBatchQueueSchedule": "修改队列调度配置",
       "setBatchQueueScheduleEnabled": "开关Cron自动调度",
-      "getAllGroupMappings": "获取所有分组映射",
       "fofaSearch": "FOFA搜索",
       "fofaParse": "自然语言解析为FOFA语法",
       "testOpenAI": "测试OpenAI API连接",
@@ -2195,8 +2171,6 @@
       "conversationNotFound": "对话不存在",
       "conversationOrResultNotFound": "对话不存在或结果不存在",
       "badRequestTaskEmpty": "请求参数错误（如task为空）",
-      "badRequestGroupNameExists": "请求参数错误或分组名称已存在",
-      "groupNotFound": "分组不存在",
       "badRequestConfig": "请求参数错误（如配置格式不正确、缺少必需字段等）",
       "badRequestQueryEmpty": "请求参数错误（如query为空）",
       "methodNotAllowed": "方法不允许（仅支持POST请求）",
@@ -2215,7 +2189,6 @@
       "pauseSuccess": "暂停成功",
       "addSuccess": "添加成功",
       "taskNotFound": "任务不存在",
-      "conversationOrGroupNotFound": "对话或分组不存在",
       "cancelSubmitted": "取消请求已提交",
       "noRunningTask": "未找到正在执行的任务",
       "messageSent": "消息发送成功，返回AI回复",
@@ -2255,23 +2228,6 @@
       "assetImportForbidden": "缺少 asset:write 权限或无权访问指定项目",
       "assetImportTransactionFailed": "导入事务失败"
     }
-  },
-  "chatGroup": {
-    "search": "搜索",
-    "edit": "编辑",
-    "delete": "删除",
-    "clearSearch": "清除搜索",
-    "searchInGroupPlaceholder": "搜索分组中的对话...",
-    "attackChain": "攻击链",
-    "viewAttackChain": "查看攻击链",
-    "selectRole": "选择角色",
-    "close": "关闭",
-    "selectFile": "选择文件",
-    "uploadFile": "上传文件（可多选或拖拽到此处）",
-    "send": "发送",
-    "rolePanelTitle": "选择角色",
-    "copyMessage": "复制消息内容",
-    "remove": "移除"
   },
   "mcpMonitor": {
     "deselectAll": "取消全选",
@@ -2567,16 +2523,16 @@
     "errorGeneric": "操作失败，请稍后重试。"
   },
   "vulnerabilityPage": {
-	"alertTitle": "机器人漏洞提醒",
-	"alertDescription": "按严重级别将新发现的漏洞推送至当前账号绑定的机器人。",
-	"alertHint": "发现符合级别的新漏洞后，通过已绑定机器人账号推送。",
-	"alertConfiguredNotBound": "{{platforms}}已启用，但当前 Web 账号尚未绑定对应的接收身份。",
-	"alertNoBinding": "尚未启用并绑定支持主动推送的机器人。设置仍会保存。",
-	"alertBindAction": "绑定接收账号",
-	"alertMinimum": "最低级别",
-	"alertEnabled": "启用提醒",
-	"alertSaved": "漏洞提醒设置已保存",
-	"alertSaveFailed": "保存漏洞提醒设置失败",
+    "alertTitle": "机器人漏洞提醒",
+    "alertDescription": "按严重级别将新发现的漏洞推送至当前账号绑定的机器人。",
+    "alertHint": "发现符合级别的新漏洞后，通过已绑定机器人账号推送。",
+    "alertConfiguredNotBound": "{{platforms}}已启用，但当前 Web 账号尚未绑定对应的接收身份。",
+    "alertNoBinding": "尚未启用并绑定支持主动推送的机器人。设置仍会保存。",
+    "alertBindAction": "绑定接收账号",
+    "alertMinimum": "最低级别",
+    "alertEnabled": "启用提醒",
+    "alertSaved": "漏洞提醒设置已保存",
+    "alertSaveFailed": "保存漏洞提醒设置失败",
     "statTotal": "总漏洞数",
     "statClickAll": "查看全部（清除严重度筛选）",
     "statClickFilter": "点击按此严重度筛选；再次点击清除",
@@ -3364,49 +3320,17 @@
     "searchPlaceholder": "搜索历史记录",
     "conversationName": "对话名称",
     "project": "项目",
-    "group": "对话分组",
     "noProject": "无项目",
     "unknownProject": "未知项目",
-    "noGroup": "无分组",
-    "unknownGroup": "未知分组",
     "filterByProject": "按项目筛选",
-    "filterByGroup": "按分组筛选",
-    "filterAllGroups": "全部分组",
-    "filterUngrouped": "无分组",
     "lastTime": "最近一次对话时间",
     "action": "操作",
     "selectAll": "全选",
-    "setGroup": "设置分组",
-    "noGroupOption": "无分组",
     "deleteSelected": "删除所选",
     "confirmDeleteNone": "请先选择要删除的对话",
     "confirmDeleteN": "确定要删除选中的 {{count}} 条对话吗？对话消息将不可恢复，但已记录的漏洞会保留在漏洞库中。",
-    "confirmGroupChangeNone": "请先选择要操作的对话",
-    "confirmMoveN": "确定将选中的 {{count}} 条对话移动到「{{group}}」吗？",
-    "confirmRemoveNoGroup": "所选对话均未归属分组",
-    "confirmRemoveN": "确定将选中的 {{count}} 条对话移出分组吗？",
-    "removeFailed": "移出失败",
-    "moveFailed": "移动失败",
     "deleteFailed": "删除失败",
     "unnamedConversation": "未命名对话"
-  },
-  "createGroupModal": {
-    "title": "创建分组",
-    "description": "分组功能可将对话集中归类管理，让对话更加井然有序。",
-    "selectIcon": "点击选择图标",
-    "groupNamePlaceholder": "请输入分组名称",
-    "pickIcon": "选择图标",
-    "customIcon": "自定义",
-    "confirmIcon": "确定",
-    "create": "创建",
-    "cancel": "取消",
-    "suggestionPenetrationTest": "渗透测试",
-    "suggestionCtf": "CTF",
-    "suggestionRedTeam": "红队",
-    "suggestionVulnerabilityMining": "漏洞挖掘",
-    "nameExists": "分组名称已存在，请使用其他名称",
-    "createFailed": "创建失败",
-    "unknownError": "未知错误"
   },
   "contextMenu": {
     "viewAttackChain": "查看攻击链",
@@ -3418,11 +3342,7 @@
     "pinConversation": "置顶此对话",
     "unpinConversation": "取消置顶",
     "batchManage": "批量管理",
-    "moveToGroup": "移动到分组",
-    "deleteConversation": "删除此对话",
-    "pinGroup": "置顶此分组",
-    "unpinGroup": "取消置顶",
-    "deleteGroup": "删除此分组"
+    "deleteConversation": "删除此对话"
   },
   "batchImportModal": {
     "title": "新建任务",
@@ -4553,10 +4473,22 @@
       }
     },
     "systemRoles": {
-      "admin": { "name": "管理员", "description": "全局管理权限" },
-      "operator": { "name": "操作员", "description": "可执行日常安全工作流，不能管理账号与核心配置" },
-      "auditor": { "name": "审计员", "description": "只读查看审计、监控与资产" },
-      "viewer": { "name": "只读用户", "description": "只读查看被授权资源" }
+      "admin": {
+        "name": "管理员",
+        "description": "全局管理权限"
+      },
+      "operator": {
+        "name": "操作员",
+        "description": "可执行日常安全工作流，不能管理账号与核心配置"
+      },
+      "auditor": {
+        "name": "审计员",
+        "description": "只读查看审计、监控与资产"
+      },
+      "viewer": {
+        "name": "只读用户",
+        "description": "只读查看被授权资源"
+      }
     },
     "empty": {
       "noMatchingUsers": "没有匹配的成员",
@@ -4612,7 +4544,6 @@
       "dashboard": "仪表盘",
       "files": "文件",
       "fofa": "FOFA",
-      "group": "对话分组",
       "hitl": "人机协同",
       "knowledge": "知识库",
       "mcp": "MCP",
@@ -4631,14 +4562,20 @@
       "workflow": "工作流"
     },
     "permissionDescriptions": {
-      "auth": { "self": "管理自己的会话和密码" },
-      "dashboard": { "read": "查看仪表盘汇总" },
+      "auth": {
+        "self": "管理自己的会话和密码"
+      },
+      "dashboard": {
+        "read": "查看仪表盘汇总"
+      },
       "chat": {
         "read": "查看对话",
         "write": "创建和更新对话",
         "delete": "删除对话和消息轮次"
       },
-      "agent": { "execute": "运行 AI 智能体和工作流" },
+      "agent": {
+        "execute": "运行 AI 智能体和工作流"
+      },
       "hitl": {
         "read": "查看人机协同队列和日志",
         "write": "审批、驳回和配置人机协同"
@@ -4701,7 +4638,9 @@
         "read": "查看系统配置",
         "write": "更新并应用系统配置"
       },
-      "terminal": { "execute": "执行终端命令" },
+      "terminal": {
+        "execute": "执行终端命令"
+      },
       "audit": {
         "read": "查看和导出审计日志",
         "delete": "删除审计日志"
@@ -4727,12 +4666,11 @@
         "read": "查看攻击链",
         "write": "重新生成攻击链"
       },
-      "fofa": { "execute": "执行 FOFA 搜索和查询解析" },
-      "openapi": { "read": "读取 OpenAPI 聚合结果" },
-      "group": {
-        "read": "查看对话分组",
-        "write": "创建和更新对话分组",
-        "delete": "删除对话分组"
+      "fofa": {
+        "execute": "执行 FOFA 搜索和查询解析"
+      },
+      "openapi": {
+        "read": "读取 OpenAPI 聚合结果"
       },
       "monitor": {
         "read": "查看执行监控",
